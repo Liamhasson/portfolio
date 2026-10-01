@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test } from "vitest";
 import { hasSeenLoader, LOADER_SEEN_KEY, markLoaderSeen } from "./session-flags";
 
 function memoryStorage(): Storage {
@@ -25,6 +25,8 @@ const throwingStorage = {
 } as unknown as Storage;
 
 describe("loader session flag", () => {
+  afterEach(() => window.sessionStorage.clear());
+
   test("false before, true after marking", () => {
     const s = memoryStorage();
     expect(hasSeenLoader(s)).toBe(false);
