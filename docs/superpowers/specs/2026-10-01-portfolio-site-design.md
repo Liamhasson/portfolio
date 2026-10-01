@@ -1,7 +1,7 @@
 # Liam Hasson Portfolio: Design Spec
 
 **Date:** 2026-10-01
-**Status:** Awaiting review
+**Status:** Approved 2026-10-01
 **Replaces:** https://liamhasson.figma.site (Figma Sites)
 **Launch domain:** liamhasson.com (bought at launch)
 
@@ -60,7 +60,7 @@ Recorded from the live site at 1440×900 on 2026-10-01. "Live" is what exists to
 | H6 | Floating pill nav (Projects / About / Contact) | Fades up on load (opacity 0, y 16 → 0). Hover gives a warm rose fill | Kept, plus a **sliding active-section highlight** and a reading-progress line on case studies |
 | H7 | "Projects" intro text | Fades up y 8 → 0 on enter. **Re-hides when scrolled away** | Fades up once and doesn't re-hide |
 | H8 | Project cards | Rise from y 100 → 0 as they enter. **Re-hide when scrolled away** | Rise once, 60ms stagger in reading order. Distance tuned to the motion tokens (see 5) |
-| H9 | Project card hover | The render crossfades to a **brand-color panel with the project wordmark** (e.g. Eventread green) | Replaced by a **muted product loop** in the card (approved in design review). Brand color stays as the card's hover tint and in the transition into the case study. *See open question Q1* |
+| H9 | Project card hover | The render crossfades to a **brand-color panel with the project wordmark** (e.g. Eventread green) | Replaced by a **muted product loop** in the card (approved in design review). Brand color stays as the card's hover tint and in the transition into the case study. Approved (Q1) |
 | H10 | Horizontal drifting band (~2200px wide, y≈2737) | Moves along X, scrubbed by scroll | Removed with the statement section |
 | H11 | Statement "I turn shapes on screens / INTO SOMETHING PEOPLE BELIEVE IN" | Top line scales up (0.38→0.83) and bottom line scales down (1.42→0.97), scrubbed | **Removed**. The work should prove it, not text |
 | H12 | Toolkit icons | ~12 tool logos start at scale 0.01, rotated, scattered offsets, and **burst out into their resting positions**, scrubbed by scroll. The large Figma logo drifts horizontally with a slight scale-up | Kept and scrubbed (it naturally reverses because it's tied to scroll). Adds a gentle cursor lean (≤8px, desktop only) |
@@ -235,9 +235,9 @@ Each phase ends with a Vercel preview link for Liam to review.
 
 ---
 
-## 10. Open questions
+## 10. Resolved decisions
 
-- **Q1. Card hover:** the live site shows a brand-color panel with the wordmark. The approved design plays a product loop. The proposal is the product loop with a brand-color hover tint. Confirm, or keep the live wordmark panel.
+- **Q1. Card hover:** product loop with a brand-color hover tint (approved 2026-10-01). The live wordmark panel is retired.
 
 ## 11. Out of scope (for this spec)
 
