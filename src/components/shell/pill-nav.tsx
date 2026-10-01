@@ -17,12 +17,23 @@ const SECTION_IDS = ITEMS.map((i) => i.id);
 const PILL =
   "relative flex min-h-11 items-center rounded-full border border-rose bg-surface-2/80 px-5 text-xs text-ink backdrop-blur-sm transition-colors duration-(--duration-micro) hover:bg-rose/30";
 
+function ReadingProgress() {
+  const { scrollYProgress } = useScroll();
+  return (
+    <motion.span
+      data-testid="reading-progress"
+      aria-hidden
+      className="absolute inset-x-4 -top-2 h-0.5 origin-left rounded-full bg-rose"
+      style={{ scaleX: scrollYProgress }}
+    />
+  );
+}
+
 export function PillNav() {
   const pathname = usePathname();
   const isHome = pathname === "/";
   const activeSection = useActiveSection(SECTION_IDS, pathname);
   const active = isHome ? activeSection : null;
-  const { scrollYProgress } = useScroll();
 
   return (
     <motion.nav
@@ -33,14 +44,7 @@ export function PillNav() {
       className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2"
     >
       <div className="relative flex gap-2 rounded-full p-1">
-        {!isHome && (
-          <motion.span
-            data-testid="reading-progress"
-            aria-hidden
-            className="absolute inset-x-4 -top-2 h-0.5 origin-left rounded-full bg-rose"
-            style={{ scaleX: scrollYProgress }}
-          />
-        )}
+        {!isHome && <ReadingProgress />}
         {ITEMS.map((item) => {
           const isActive = active === item.id;
           const href = `/#${item.id}`;
@@ -58,6 +62,7 @@ export function PillNav() {
             </>
           );
           // On home, a plain anchor lets Lenis own the smooth scroll (no router scrollIntoView fight).
+          // Different element types per branch, so links remount when crossing home ↔ case study; Next restores focus on navigation.
           return isHome ? (
             <a key={item.id} href={href} aria-current={isActive ? "location" : undefined} className={PILL}>
               {content}
