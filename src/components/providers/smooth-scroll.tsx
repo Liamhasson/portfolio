@@ -12,7 +12,7 @@ export function SmoothScroll({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!shouldUseSmoothScroll((q) => window.matchMedia(q).matches)) return;
 
-    const lenis = new Lenis({ lerp: 0.1, anchors: true });
+    const lenis = new Lenis({ lerp: 0.1, anchors: true, stopInertiaOnNavigate: true });
     lenis.on("scroll", ScrollTrigger.update);
     const tick = (time: number) => lenis.raf(time * 1000);
     gsap.ticker.add(tick);
