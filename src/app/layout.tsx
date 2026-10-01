@@ -6,7 +6,7 @@ import { PillNav } from "@/components/shell/pill-nav";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Liam Hasson | Product Designer",
+  title: { default: "Liam Hasson | Product Designer", template: "%s | Liam Hasson" },
   description: "Product designer who researches, prototypes and ships products people trust.",
 };
 
@@ -22,7 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </a>
         <MotionPreferences>
           <SmoothScroll>
-            <main id="main">{children}</main>
+            <main id="main" tabIndex={-1} className="outline-none">{children}</main>
             <PillNav />
           </SmoothScroll>
         </MotionPreferences>

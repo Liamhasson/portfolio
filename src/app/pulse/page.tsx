@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { BackButton } from "@/components/shell/back-button";
 
-export const metadata: Metadata = { title: "Pulse case study | Liam Hasson" };
+export const metadata: Metadata = { title: "Pulse case study" };
 
 export default function PulsePage() {
   return (
