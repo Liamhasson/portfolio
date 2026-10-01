@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+/* z-index scale: page 0 · shell (nav, back button) 50 · loader/transition overlays 80 · skip link 100 */
 @theme static {
   /* Color: measured from liamhasson.figma.site (2026-10-01) */
   --color-bg: #000000;
@@ -37,6 +38,7 @@
     color: var(--color-ink);
     color-scheme: dark;
     -webkit-font-smoothing: antialiased;
+    scroll-padding-bottom: 6rem;
   }
 
   body {
