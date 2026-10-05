@@ -245,3 +245,43 @@ Each phase ends with a Vercel preview link for Liam to review.
 - A CMS. Content lives in MDX files in the repo.
 - A blog, analytics dashboards, contact forms.
 - A real-time 3D (WebGL) particle system. The existing video stays the hero visual. It can be revisited after launch, for example once Liam's Blender work is ready.
+
+---
+
+## 12. Amendments (2026-10-05, agreed with Liam)
+
+These override earlier sections where they conflict (§3.1 H1–H6, §4.1, §4.3, §5, §6).
+
+### 12.1 Quality bar (applies to every phase and every plan)
+
+Aim for the level of moto-card.com and oryzo.ai: motion that is mesmerizing and not what the viewer expects. **No shortcuts. Only the best-quality option is accepted.** If a result needs Blender-authored assets or GLB files, they are made. Real-time 3D is preferred over baked video wherever it is better. Visual acceptance gates are reviewed with Liam before moving on. Performance (60fps), accessibility and reduced-motion parity are part of quality, not exceptions to it.
+
+What the references do (observed 2026-10-05): moto-card.com = a real GLB model + custom GLSL shaders + matcap lighting, scrubbed by GSAP ScrollTrigger and Lenis, one persistent object across pinned scenes. oryzo.ai = a fixed full-viewport WebGL canvas behind a very long scroll, one persistent photoreal object whose pose, light and environment change with scroll, framed by technical overlay graphics.
+
+### 12.2 Loader
+
+- **Not skippable.** It plays through to completion. **Total ≤ 6s** (built at 5.4s).
+- Still plays once per browser session on the first arrival at `/` (a session that starts on another page never plays it).
+- Sequence: a dot ignites → bursts into the chaotic particle cloud while "Hi, I'm Liam." types in → the cloud breathes → "I build ambiguous ideas" rises in → "Product Designer" label and scroll cue appear → scroll unlocks and the pill nav fades in.
+
+### 12.3 Hero (replaces §4.1 hero hierarchy)
+
+- **Scroll-triggered, not time-based.** The hero is a tall sticky section; scroll position drives everything.
+- Copy: "Hi, I'm Liam. I build ambiguous ideas" → (scroll) → "Hi, I'm Liam. … into products where design and user needs meet." The second half swaps word by word as you scroll.
+- A small "Product Designer" label stays. The six capability phrases and the alternating line are **removed** (the phrases move to About).
+- Beside the copy: a real-time particle system. It starts as the chaotic spread cloud and, as the user scrolls, resolves into a **perfect, exactly centered ball**.
+- The ball is centered by construction (camera on axis, geometry centroid at the origin) and verified by an automated measurement of the rendered frame.
+
+### 12.4 Particles: hero only
+
+The particle system appears **in the hero only**. It does not reappear as a repeating motif and does not morph into logos or portraits (Liam: it looks bad and doesn't support the portfolio). A quiet return of the unmoving ball at Contact is optional and decided later.
+
+### 12.5 The recurring 3D motif is the work itself
+
+Real-time **3D devices (laptop, phone, browser) modelled in Blender, exported as GLB**, carry the real recorded product screens (Eventread search flow, Cyvore hero interaction, Pulse flows) and move with scroll in the style of the references. They share the hero's rose-and-gold lighting so the page reads as one world. One shared WebGL stage (single canvas, as the references do) serves hero and devices.
+
+### 12.6 Particle look and rendering
+
+- Real-time WebGL (three.js), GPU-driven particles, custom shaders. Rose and gold, evolved: luminous, with depth of field and bloom.
+- The current baked video (`public/media/particles.*`) is **not** used for the hero. Its measured flaw: in the collapsed-ball frames (2.5s to 5.0s) the sphere's bounding box is 384×378px centered at (772, 415) in the 1440×810 frame, i.e. **52px right (3.6% of width) and 10px low** of true center. If the real-time version cannot match or beat it, the fallback is the video re-centered by `translate: -3.61% -1.23%`.
+- Quality tiers (high / mid / low), a runtime frame-time governor that steps quality down, and a static poster for reduced motion and no-WebGL.
