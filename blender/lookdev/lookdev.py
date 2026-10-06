@@ -25,7 +25,9 @@ argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 ap = argparse.ArgumentParser()
 ap.add_argument("--scene", choices=["ball", "chaos", "glass", "studio", "desk", "bench", "canvas", "hero"], required=True)
 ap.add_argument("--grid", choices=["etched", "glow", "mat"], default="etched", help="bench scene only")
-ap.add_argument("--word", choices=["solid", "light", "cutout"], default="solid", help="hero scene only")
+ap.add_argument("--word", choices=["solid", "light", "cutout", "none"], default="light", help="hero scene only")
+ap.add_argument("--phase", choices=["chaos", "mid", "ball"], default="chaos", help="hero scene only")
+ap.add_argument("--light", type=float, default=1.0, help="hero scene only: scale every light (loader fade-in)")
 ap.add_argument("--state", choices=["dense", "mid", "glass"], default="glass", help="studio scene only")
 ap.add_argument("--preview", action="store_true", help="small, fast, noisy render to check the setup")
 ap.add_argument("--out", default="blender/lookdev/renders")
@@ -646,7 +648,7 @@ def transcript_texture(name, seed):
         y += 22 if rng.uniform() > 0.15 else 40
     return image_from_array(name, rgba)
 
-def paper_material(name, base, overlay=None):
+def paper_material(name, base, overlay=None, ink_power=1.0):
     m = bpy.data.materials.new(name)
     m.use_nodes = True
     nt = m.node_tree
@@ -666,7 +668,9 @@ def paper_material(name, base, overlay=None):
     if overlay is not None:
         tex = nt.nodes.new("ShaderNodeTexImage"); tex.image = overlay
         ink = nt.nodes.new("ShaderNodeMix"); ink.data_type = "RGBA"
-        nt.links.new(tex.outputs["Alpha"], ink.inputs["Factor"])
+        boost = nt.nodes.new("ShaderNodeMath"); boost.operation = "POWER"; boost.inputs[1].default_value = ink_power
+        nt.links.new(tex.outputs["Alpha"], boost.inputs[0])
+        nt.links.new(boost.outputs[0], ink.inputs["Factor"])
         nt.links.new(col, csock(ink.inputs, "A"))
         nt.links.new(tex.outputs["Color"], csock(ink.inputs, "B"))
         col = csock(ink.outputs, "Result")
@@ -696,7 +700,7 @@ def sheet(name, size, loc, rot_z, mat, curl=0.0, lift=0.0006, fold=None, seed=0,
         tw = rng_.uniform(-1, 1)
         vv = (v[:, 1] - v[:, 1].min()) / (v[:, 1].max() - v[:, 1].min() + 1e-9)
         v[:, 2] += curl * 0.02 * u ** 3 * (1 + 0.6 * tw * (vv - 0.5))      # uneven: one corner lifts more
-        v[:, 2] += 0.0006 * np.sin(v[:, 0] * 37 + seed) * np.sin(v[:, 1] * 29 + seed * 2)   # soft waviness
+        v[:, 2] += 0.0006 * np.abs(np.sin(v[:, 0] * 37 + seed) * np.sin(v[:, 1] * 29 + seed * 2))   # soft waviness, never below the desk
         ob.data.vertices.foreach_set("co", v.ravel())
         ob.data.update()
     # Imperfect edges: the outline wanders by a fraction of a millimetre, like a real cut or torn sticky note.
@@ -888,7 +892,7 @@ def build_desk():
     sheet("stack_1", (0.21, 0.297), (0.198, 0.168, -0.0002), 0.35, blank, curl=0.05, seed=6)
     sheet("transcript", (0.21, 0.297), (0.2, 0.17, 0), 0.32, paper_material("transcript_m", PAPER, transcript_texture("transcript_t", 3)), curl=0.06, fold=0.34, seed=7)
     sheet("card_b", (0.127, 0.076), (-0.175, 0.035, 0), 0.12, paper_material("card_b_m", CARD), curl=0.04, lift=0.0004, seed=12)
-    sheet("card_a", (0.127, 0.076), (-0.135, 0.105, 0), -0.34, paper_material("card_a_m", CARD, handwriting("check-commit-card")), curl=0.05, lift=0.0009, seed=11)
+    sheet("card_a", (0.127, 0.076), (-0.135, 0.105, 0), -0.34, paper_material("card_a_m", CARD, handwriting("check-commit-card"), ink_power=0.4), curl=0.05, lift=0.0009, seed=11)
     # The hero sticky note: closest to the ball and to the camera, in focus.
     sheet("sticky_hero", (0.076, 0.076), (0.075, -0.095, 0.0008), -0.21, paper_material("sticky_hero_m", YELLOW, handwriting("who-for")), curl=0.12)
     sheet("sticky_b", (0.076, 0.076), (-0.15, -0.03, 0.0010), 0.52, paper_material("sticky_b_m", PINK, handwriting("make-fail")), curl=0.08)
@@ -1046,12 +1050,34 @@ def chaos_points(n):
     spread = 1 + 0.6 * r ** 3
     pts = np.stack([wx * 2.3 * spread, wz * 2.0 * spread, wy * 1.45 * spread], axis=1)
     radius = rng.uniform(0.004, 0.009, len(pts)) * (2.4 if args.preview else 1)
-    return pts.astype(np.float32), hue, radius
+    # Where each grain ends up on the dense ball (same texture, pulled to the surface).
+    dirs = p / np.maximum(r[:, None], 1e-6)
+    ball = np.stack([dirs[:, 0], dirs[:, 2], dirs[:, 1]], axis=1) * (r ** 0.3)[:, None]
+    return pts.astype(np.float32), hue, radius, ball.astype(np.float32)
 
 def build_hero():
     """Ch1 hero, scroll 0%: the chaos in a pure dark void with light haze, and the LIAM HASSON wordmark in depth."""
-    pts, hue, radius = chaos_points(80_000 if args.preview else 520_000)
-    grains("chaos", pts, hue, radius)
+    HERO_R, HERO_C = 1.1, np.array([0.0, 0.0, 0.1])       # ball centred on the camera's aim point
+    if args.phase == "ball":
+        dense_ball(tuple(HERO_C), HERO_R, flare=False)
+        ob = bpy.data.objects["ball"]
+        # The spin: a short slice of rotation, rendered with motion blur, shows the ball turning.
+        ob.location = HERO_C; ob.data.transform(__import__("mathutils").Matrix.Translation(-Vector(HERO_C)))
+        scene.frame_set(1)
+        ob.rotation_euler = (0, 0, 0); ob.keyframe_insert("rotation_euler", frame=1)
+        ob.rotation_euler = (0, 0, 0.22); ob.keyframe_insert("rotation_euler", frame=2)
+        scene.render.use_motion_blur = False   # a smeared still reads as cheap; the spin is shown live on the web
+        scene.render.motion_blur_shutter = 1.0
+        scene.frame_set(1)
+    else:
+        pts, hue, radius, ball = chaos_points(80_000 if args.preview else 520_000)
+        if args.phase == "mid":
+            rng_m = np.random.default_rng(31)
+            delay = rng_m.uniform(0, 1, len(pts))
+            tt = np.clip((0.5 - delay * 0.4) / 0.6, 0, 1); tt = tt * tt * (3 - 2 * tt)
+            target = ball * HERO_R + HERO_C
+            pts = (pts * (1 - tt[:, None]) + target * tt[:, None]).astype(np.float32)
+        grains("chaos", pts, hue, radius)
     world((0.0015, 0.0013, 0.0015, 1), 1.0)
     # Haze: a thin scattering volume around the whole set, so the rim light blooms softly through the air.
     bpy.ops.mesh.primitive_cube_add(size=40, location=(0, 0, 0))
@@ -1068,7 +1094,13 @@ def build_hero():
     haze.data.materials.append(hm)
     haze.visible_shadow = False
     # Wordmark.
-    font = bpy.data.fonts.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts", "HankenGrotesk-ExtraBold.ttf"))
+    if args.word == "none":
+        font = None
+    else:
+        font = bpy.data.fonts.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts", "HankenGrotesk-ExtraBold.ttf"))
+    cu = bpy.data.curves.new("wordmark", "FONT") if font else None
+    if cu is None:
+        _hero_lights(); return
     cu = bpy.data.curves.new("wordmark", "FONT")
     cu.body = "LIAM HASSON"
     cu.font = font
@@ -1109,10 +1141,17 @@ def build_hero():
         em.inputs["Strength"].default_value = 0.0
         nt.links.new(em.outputs[0], out.inputs["Surface"])
     word.data.materials.append(m)
-    area_light("key", (-4.0, -7.0, 4.0), 3.5, 1900, (1.0, 0.82, 0.68))
-    area_light("rim", (1.5, 6.5, 2.5), 2.0, 1500, ROSE_SOFT)
-    area_light("fill", (3.5, -4.0, -1.0), 4.0, 80, (0.72, 0.78, 0.95))
-    camera((0, -9.5, 0.6), (0, 0, 0.1), lens=45, focus=9.3, fstop=11)
+    if args.word == "light":
+        em.inputs["Strength"].default_value *= args.light
+    _hero_lights()
+
+def _hero_lights():
+    k = args.light
+    area_light("key", (-4.0, -7.0, 4.0), 3.5, 1900 * k, (1.0, 0.82, 0.68))
+    area_light("rim", (1.5, 6.5, 2.5), 2.0, 1500 * k, ROSE_SOFT)
+    area_light("fill", (3.5, -4.0, -1.0), 4.0, 80 * k, (0.72, 0.78, 0.95))
+    focus = 9.5 if args.phase == "ball" else 9.3
+    camera((0, -9.5, 0.6), (0, 0, 0.1), lens=45, focus=focus, fstop=11)
 
 # ---------------------------------------------------------------- go
 
@@ -1124,7 +1163,7 @@ else:
     render_settings(512 if args.scene in ("glass", "studio") else 256)
 
 os.makedirs(args.out, exist_ok=True)
-tag = f"{args.scene}-{args.state}" if args.scene == "studio" else f"{args.scene}-{args.grid}" if args.scene == "bench" else f"{args.scene}-{args.word}" if args.scene == "hero" else args.scene
+tag = f"{args.scene}-{args.state}" if args.scene == "studio" else f"{args.scene}-{args.grid}" if args.scene == "bench" else f"{args.scene}-{args.phase}-{args.word}-L{args.light:g}" if args.scene == "hero" else args.scene
 path = os.path.abspath(os.path.join(args.out, f"{tag}{'-preview' if args.preview else ''}.png"))
 scene.render.filepath = path
 bpy.ops.render.render(write_still=True)
