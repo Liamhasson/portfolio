@@ -864,7 +864,7 @@ def pick(name, loc, rot_z, flip=False, tilt=0.0):
     ob = bpy.data.objects.new(name, me); scene.collection.objects.link(ob)
     ob.location = loc; ob.rotation_euler = ((math.pi if flip else 0) + tilt, tilt * 0.4, rot_z)
     bev = ob.modifiers.new("bevel", "BEVEL"); bev.width = 0.0003; bev.segments = 3
-    ob.data.materials.append(principled("pick_" + name, (0.006, 0.006, 0.007, 1), 0.3, **{"Coat Weight": 0.8, "Coat Roughness": 0.06}))
+    ob.data.materials.append(principled("pick_" + name, (0.05, 0.05, 0.055, 1), 0.3, **{"Coat Weight": 0.8, "Coat Roughness": 0.06}))
     bev.width = 0.00015; bev.segments = 2
     bev.harden_normals = True
     return ob
@@ -880,7 +880,7 @@ def build_desk():
     sheet("stack_2", (0.21, 0.297), (0.205, 0.175, -0.0004), 0.27, blank, curl=0.03, seed=5)
     sheet("stack_1", (0.21, 0.297), (0.198, 0.168, -0.0002), 0.35, blank, curl=0.05, seed=6)
     sheet("transcript", (0.21, 0.297), (0.2, 0.17, 0), 0.32, paper_material("transcript_m", PAPER, transcript_texture("transcript_t", 3)), curl=0.06, fold=0.34, seed=7)
-    sheet("card_b", (0.127, 0.076), (-0.175, 0.035, 0), 0.12, paper_material("card_b_m", CARD, scribble_texture("card_b_t", 3, 12)), curl=0.04, lift=0.0004, seed=12, dogear=(-1, -1))
+    sheet("card_b", (0.127, 0.076), (-0.175, 0.035, 0), 0.12, paper_material("card_b_m", CARD, scribble_texture("card_b_t", 3, 12)), curl=0.04, lift=0.0004, seed=12)
     sheet("card_a", (0.127, 0.076), (-0.135, 0.105, 0), -0.34, paper_material("card_a_m", CARD, scribble_texture("card_a_t", 4, 11)), curl=0.05, lift=0.0009, seed=11)
     # The hero sticky note: closest to the ball and to the camera, in focus.
     sheet("sticky_hero", (0.076, 0.076), (0.075, -0.095, 0.0008), -0.21, paper_material("sticky_hero_m", YELLOW, scribble_texture("sticky_hero_t", 3, 21)), curl=0.12)
