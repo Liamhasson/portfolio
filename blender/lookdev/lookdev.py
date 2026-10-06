@@ -870,6 +870,12 @@ def pick(name, loc, rot_z, flip=False, tilt=0.0):
     bev.harden_normals = True
     return ob
 
+HANDWRITING = os.path.join(os.path.dirname(os.path.abspath(__file__)), "handwriting")
+
+def handwriting(name):
+    """Liam's real handwriting, lifted from photos (see extract_ink.py): near-black ink as an alpha layer."""
+    return bpy.data.images.load(os.path.join(HANDWRITING, name + ".png"))
+
 def build_desk():
     """2.1 Finding the problem: a walnut desk at night, lit by a warm lamp off-frame. The ball hovers among the notes."""
     plane("desk", 3.0, (0, 0, 0), mat=walnut_material())
@@ -881,12 +887,12 @@ def build_desk():
     sheet("stack_2", (0.21, 0.297), (0.205, 0.175, -0.0004), 0.27, blank, curl=0.03, seed=5)
     sheet("stack_1", (0.21, 0.297), (0.198, 0.168, -0.0002), 0.35, blank, curl=0.05, seed=6)
     sheet("transcript", (0.21, 0.297), (0.2, 0.17, 0), 0.32, paper_material("transcript_m", PAPER, transcript_texture("transcript_t", 3)), curl=0.06, fold=0.34, seed=7)
-    sheet("card_b", (0.127, 0.076), (-0.175, 0.035, 0), 0.12, paper_material("card_b_m", CARD, scribble_texture("card_b_t", 3, 12)), curl=0.04, lift=0.0004, seed=12)
-    sheet("card_a", (0.127, 0.076), (-0.135, 0.105, 0), -0.34, paper_material("card_a_m", CARD, scribble_texture("card_a_t", 4, 11)), curl=0.05, lift=0.0009, seed=11)
+    sheet("card_b", (0.127, 0.076), (-0.175, 0.035, 0), 0.12, paper_material("card_b_m", CARD), curl=0.04, lift=0.0004, seed=12)
+    sheet("card_a", (0.127, 0.076), (-0.135, 0.105, 0), -0.34, paper_material("card_a_m", CARD, handwriting("check-commit-card")), curl=0.05, lift=0.0009, seed=11)
     # The hero sticky note: closest to the ball and to the camera, in focus.
-    sheet("sticky_hero", (0.076, 0.076), (0.075, -0.095, 0.0008), -0.21, paper_material("sticky_hero_m", YELLOW, scribble_texture("sticky_hero_t", 3, 21)), curl=0.12)
-    sheet("sticky_b", (0.076, 0.076), (-0.15, -0.03, 0.0010), 0.52, paper_material("sticky_b_m", PINK, scribble_texture("sticky_b_t", 2, 22)), curl=0.08)
-    sheet("sticky_c", (0.076, 0.076), (0.14, 0.045, 0.0012), -0.58, paper_material("sticky_c_m", YELLOW, scribble_texture("sticky_c_t", 3, 23)), curl=0.1)
+    sheet("sticky_hero", (0.076, 0.076), (0.075, -0.095, 0.0008), -0.21, paper_material("sticky_hero_m", YELLOW, handwriting("who-for")), curl=0.12)
+    sheet("sticky_b", (0.076, 0.076), (-0.15, -0.03, 0.0010), 0.52, paper_material("sticky_b_m", PINK, handwriting("make-fail")), curl=0.08)
+    sheet("sticky_c", (0.076, 0.076), (0.14, 0.045, 0.0012), -0.58, paper_material("sticky_c_m", YELLOW, handwriting("does-better")), curl=0.1)
     # Three black picks, off to the side (a nod to ten years with the bands).
     # Three picks in a loose pile at the back of the desk: out of focus, an aside, never the focus.
     pick("pick_a", (-0.235, 0.17, 0.0004), 0.9)
