@@ -675,7 +675,7 @@ def paper_material(name, base, overlay=None):
     nt.links.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
     return m
 
-def sheet(name, size, loc, rot_z, mat, curl=0.0, lift=0.0006, fold=None, seed=0):
+def sheet(name, size, loc, rot_z, mat, curl=0.0, lift=0.0006, fold=None, seed=0, dogear=False):
     """A thin, slightly curled sheet of paper or a sticky note."""
     bpy.ops.mesh.primitive_plane_add(size=1, location=(loc[0], loc[1], loc[2] + lift))
     ob = bpy.context.active_object
@@ -698,6 +698,28 @@ def sheet(name, size, loc, rot_z, mat, curl=0.0, lift=0.0006, fold=None, seed=0)
         v[:, 2] += 0.0006 * np.sin(v[:, 0] * 37 + seed) * np.sin(v[:, 1] * 29 + seed * 2)   # soft waviness
         ob.data.vertices.foreach_set("co", v.ravel())
         ob.data.update()
+    # Imperfect edges: the outline wanders by a fraction of a millimetre, like a real cut or torn sticky note.
+    co = np.empty(len(ob.data.vertices) * 3, np.float32)
+    ob.data.vertices.foreach_get("co", co)
+    v = co.reshape(-1, 3)
+    x0, x1, y0, y1 = v[:, 0].min(), v[:, 0].max(), v[:, 1].min(), v[:, 1].max()
+    eps = 1e-5
+    on_x = (np.abs(v[:, 0] - x0) < eps) | (np.abs(v[:, 0] - x1) < eps)
+    on_y = (np.abs(v[:, 1] - y0) < eps) | (np.abs(v[:, 1] - y1) < eps)
+    rng_e = np.random.default_rng(seed + 7)
+    jit = lambda q: 0.00025 * np.sin(q * 900 + seed) + 0.00015 * np.sin(q * 2300 + seed * 3) + rng_e.normal(0, 0.00006, len(q))
+    v[on_x, 0] += jit(v[on_x, 1]) * np.sign(v[on_x, 0])
+    v[on_y, 1] += jit(v[on_y, 0]) * np.sign(v[on_y, 1])
+    if dogear:
+        # One corner folded up: points beyond a diagonal near the corner lift and lean back toward the card.
+        u_ = (v[:, 0] - x0) / (x1 - x0); w_ = (v[:, 1] - y0) / (y1 - y0)
+        k = (u_ + w_) - 1.72
+        m_ = k > 0
+        v[m_, 2] += k[m_] * (x1 - x0) * 0.55
+        v[m_, 0] -= k[m_] * (x1 - x0) * 0.12
+        v[m_, 1] -= k[m_] * (y1 - y0) * 0.12
+    ob.data.vertices.foreach_set("co", v.ravel())
+    ob.data.update()
     if fold is not None:
         # A soft crease where the sheet was once folded: a shallow ridge along a line.
         co = np.empty(len(ob.data.vertices) * 3, np.float32)
@@ -720,7 +742,7 @@ def walnut_material():
     nt = m.node_tree
     N = nt.nodes; L = nt.links
     bsdf = N["Principled BSDF"]
-    bsdf.inputs["Coat Weight"].default_value = 0.2
+    bsdf.inputs["Coat Weight"].default_value = 0.08
     tc = N.new("ShaderNodeTexCoord")
     mp = N.new("ShaderNodeMapping"); mp.inputs["Scale"].default_value = (1.2, 1.2, 1.2)   # ~1 m tile on a 3 m desk... scaled below
     L.new(tc.outputs["Object"], mp.inputs["Vector"])
@@ -786,7 +808,7 @@ def walnut_material():
     r2b = N.new("ShaderNodeMath"); r2b.operation = "MULTIPLY"; r2b.inputs[1].default_value = 0.3
     L.new(dust.outputs["Result"], r2b.inputs[0]); L.new(r2b.outputs[0], r2.inputs[1])
     L.new(r2.outputs[0], bsdf.inputs["Roughness"])
-    cr = N.new("ShaderNodeMapRange"); cr.inputs["To Min"].default_value = 0.08; cr.inputs["To Max"].default_value = 0.45
+    cr = N.new("ShaderNodeMapRange"); cr.inputs["To Min"].default_value = 0.22; cr.inputs["To Max"].default_value = 0.55
     L.new(scratch.outputs["Result"], cr.inputs["Value"]); L.new(cr.outputs["Result"], bsdf.inputs["Coat Roughness"])
     nmap = N.new("ShaderNodeNormalMap"); L.new(nor.outputs["Color"], nmap.inputs["Color"])
     bump = N.new("ShaderNodeBump"); bump.inputs["Strength"].default_value = 0.25; bump.invert = True
@@ -843,18 +865,18 @@ def build_desk():
     sheet("stack_2", (0.21, 0.297), (0.205, 0.175, -0.0004), 0.27, blank, curl=0.03, seed=5)
     sheet("stack_1", (0.21, 0.297), (0.198, 0.168, -0.0002), 0.35, blank, curl=0.05, seed=6)
     sheet("transcript", (0.21, 0.297), (0.2, 0.17, 0), 0.32, paper_material("transcript_m", PAPER, transcript_texture("transcript_t", 3)), curl=0.06, fold=0.34, seed=7)
-    sheet("card_a", (0.127, 0.076), (-0.17, 0.14, 0), -0.18, paper_material("card_a_m", CARD, scribble_texture("card_a_t", 4, 11)), curl=0.05)
-    sheet("card_b", (0.127, 0.076), (-0.2, -0.02, 0.0004), 0.22, paper_material("card_b_m", CARD, scribble_texture("card_b_t", 3, 12)), curl=0.04)
+    sheet("card_b", (0.127, 0.076), (-0.175, 0.035, 0), 0.12, paper_material("card_b_m", CARD, scribble_texture("card_b_t", 3, 12)), curl=0.04, lift=0.0004, seed=12)
+    sheet("card_a", (0.127, 0.076), (-0.135, 0.105, 0), -0.34, paper_material("card_a_m", CARD, scribble_texture("card_a_t", 4, 11)), curl=0.05, lift=0.0009, seed=11, dogear=True)
     # The hero sticky note: closest to the ball and to the camera, in focus.
-    sheet("sticky_hero", (0.076, 0.076), (0.085, -0.1, 0.0008), -0.12, paper_material("sticky_hero_m", YELLOW, scribble_texture("sticky_hero_t", 3, 21)), curl=0.12)
-    sheet("sticky_b", (0.076, 0.076), (-0.09, -0.12, 0.0005), 0.3, paper_material("sticky_b_m", PINK, scribble_texture("sticky_b_t", 2, 22)), curl=0.08)
-    sheet("sticky_c", (0.076, 0.076), (0.22, -0.04, 0.0009), -0.4, paper_material("sticky_c_m", YELLOW, scribble_texture("sticky_c_t", 3, 23)), curl=0.1)
+    sheet("sticky_hero", (0.076, 0.076), (0.075, -0.095, 0.0008), -0.21, paper_material("sticky_hero_m", YELLOW, scribble_texture("sticky_hero_t", 3, 21)), curl=0.12)
+    sheet("sticky_b", (0.076, 0.076), (-0.15, -0.03, 0.0010), 0.52, paper_material("sticky_b_m", PINK, scribble_texture("sticky_b_t", 2, 22)), curl=0.08)
+    sheet("sticky_c", (0.076, 0.076), (0.14, 0.045, 0.0012), -0.58, paper_material("sticky_c_m", YELLOW, scribble_texture("sticky_c_t", 3, 23)), curl=0.1)
     # Three black picks, off to the side (a nod to ten years with the bands).
-    pick("pick_a", (-0.105, -0.035, 0.0006), 0.4)
-    pick("pick_b", (-0.072, -0.055, 0.0006), 2.3)
-    pick("pick_c", (-0.118, -0.068, 0.0014), -0.9, flip=True)
+    pick("pick_a", (-0.04, -0.13, 0.0006), 0.4)
+    pick("pick_b", (-0.008, -0.152, 0.0006), 2.3)
+    pick("pick_c", (-0.052, -0.163, 0.0014), -0.9, flip=True)
     # A pen lying across a card.
-    bpy.ops.mesh.primitive_cylinder_add(vertices=48, radius=0.0055, depth=0.145, location=(-0.15, 0.06, 0.0062), rotation=(0, math.pi / 2, 0.55))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=48, radius=0.0055, depth=0.145, location=(-0.12, 0.06, 0.0072), rotation=(0, math.pi / 2, 0.75))
     pen = bpy.context.active_object
     bpy.ops.object.shade_smooth()
     pen.data.materials.append(principled("pen", (0.02, 0.02, 0.025, 1), 0.25, **{"Coat Weight": 0.6}))
@@ -865,11 +887,12 @@ def build_desk():
     sp.color = (1.0, 0.74, 0.48)
     sp.spot_size = math.radians(85)
     sp.spot_blend = 0.85
-    sp.shadow_soft_size = 0.06
+    sp.shadow_soft_size = 0.2
     lamp = bpy.data.objects.new("lamp", sp)
     lamp.location = (-0.42, 0.3, 0.55)
     scene.collection.objects.link(lamp)
     aim(lamp, (0.0, 0.0, 0.0))
+    area_light("bounce", (0.45, -0.25, 0.25), 0.8, 6.0, (1.0, 0.85, 0.7), target=(0, 0.02, 0.05))
     camera((0.03, -0.62, 0.46), (0.0, 0.02, 0.03), lens=50, focus=0.74, fstop=3.2)
 
 def grid_material(kind):
