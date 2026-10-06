@@ -23,7 +23,8 @@ from mathutils import Vector
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 ap = argparse.ArgumentParser()
-ap.add_argument("--scene", choices=["ball", "chaos", "glass", "studio"], required=True)
+ap.add_argument("--scene", choices=["ball", "chaos", "glass", "studio", "desk", "bench", "canvas"], required=True)
+ap.add_argument("--grid", choices=["etched", "glow", "mat"], default="etched", help="bench scene only")
 ap.add_argument("--state", choices=["dense", "mid", "glass"], default="glass", help="studio scene only")
 ap.add_argument("--preview", action="store_true", help="small, fast, noisy render to check the setup")
 ap.add_argument("--out", default="blender/lookdev/renders")
@@ -182,6 +183,10 @@ def softbox(name, loc, w, h, strength, target=(0, 0, 0), color=(1, 0.97, 0.95, 1
     ob.visible_camera = visible
     return ob
 
+def csock(sockets, name):
+    """The RGBA socket called `name` (Mix nodes expose float, vector and colour sockets with identical names)."""
+    return next(s for s in sockets if s.name == name and s.type == "RGBA")
+
 def world(color, strength):
     w = bpy.data.worlds.new("world")
     w.use_nodes = True
@@ -228,10 +233,10 @@ def sand_material(transform=False):
         out = nt.nodes["Material Output"]
         drain = nt.nodes.new("ShaderNodeMix")
         drain.data_type = "RGBA"
-        drain.inputs["B"].default_value = (0.98, 0.84, 0.76, 1)
+        csock(drain.inputs, "B").default_value = (0.98, 0.84, 0.76, 1)
         nt.links.new(clear.outputs["Fac"], drain.inputs["Factor"])
-        nt.links.new(ramp.outputs["Color"], drain.inputs["A"])
-        nt.links.new(drain.outputs["Result"], bsdf.inputs["Base Color"])
+        nt.links.new(ramp.outputs["Color"], csock(drain.inputs, "A"))
+        nt.links.new(csock(drain.outputs, "Result"), bsdf.inputs["Base Color"])
         nt.links.new(clear.outputs["Fac"], mix.inputs["Fac"])
         nt.links.new(bsdf.outputs[0], mix.inputs[1])
         nt.links.new(glass.outputs[0], mix.inputs[2])
@@ -447,10 +452,10 @@ def glass_material(frost=False):
         nt.links.new(rough.outputs["Result"], bsdf.inputs["Roughness"])
         tint = nt.nodes.new("ShaderNodeMix")
         tint.data_type = "RGBA"
-        tint.inputs["A"].default_value = (0.86, 0.74, 0.74, 1)
-        tint.inputs["B"].default_value = (1, 1, 1, 1)
+        csock(tint.inputs, "A").default_value = (0.96, 0.82, 0.76, 1)
+        csock(tint.inputs, "B").default_value = (1, 1, 1, 1)
         nt.links.new(attr.outputs["Fac"], tint.inputs["Factor"])
-        nt.links.new(tint.outputs["Result"], bsdf.inputs["Base Color"])
+        nt.links.new(csock(tint.outputs, "Result"), bsdf.inputs["Base Color"])
         exists = nt.nodes.new("ShaderNodeMapRange")
         exists.inputs["From Min"].default_value = 0.0
         exists.inputs["From Max"].default_value = 0.06
@@ -558,16 +563,314 @@ def build_studio():
     else:
         glass_sphere(0.72)
 
+# ---------------------------------------------------------------- chapter 2 sets (real-world scale: metres)
+
+def dense_ball(center, R, flare=True, seed=2026):
+    """The living dense ball at real scale, with one solar-flare arc of grains lifting off its surface."""
+    full = 50_000 if args.preview else 520_000
+    p, hue = filament_points(full, seed=seed)
+    r = np.linalg.norm(p, axis=1, keepdims=True)
+    dirs = p / np.maximum(r, 1e-6)
+    pts = dirs * (r ** 0.3) * R
+    rng = np.random.default_rng(seed + 1)
+    radius = rng.uniform(0.004, 0.009, len(pts)) * R * (2.4 if args.preview else 1)
+    if flare:
+        # An arc of grains lifting off the upper-left limb and falling back, like a solar prominence.
+        k = 1100
+        t = rng.uniform(0, 1, k)
+        a0 = np.array([-0.62, -0.35, 0.70]); a0 /= np.linalg.norm(a0)
+        tang = np.cross(a0, [0, 0, 1.0]); tang /= np.linalg.norm(tang)
+        h = 0.22 * np.sin(np.pi * t) * rng.uniform(0.4, 1.0, k)
+        base = a0[None, :] + tang[None, :] * (t[:, None] - 0.5) * 0.55
+        base /= np.linalg.norm(base, axis=1, keepdims=True)
+        fp = base * (1 + h[:, None]) + rng.normal(0, 0.06, (k, 3)) * (0.3 + h[:, None] * 3)
+        pts = np.concatenate([pts, fp * R])
+        hue = np.concatenate([hue, rng.uniform(0.55, 1.0, k).astype(np.float32)])
+        radius = np.concatenate([radius, rng.uniform(0.004, 0.008, k) * R * (2.4 if args.preview else 1)])
+    grains("ball", (pts + np.array(center)).astype(np.float32), hue, radius)
+
+def image_from_array(name, rgba):
+    h, w = rgba.shape[:2]
+    img = bpy.data.images.new(name, w, h, alpha=True)
+    img.pixels.foreach_set(np.flipud(rgba).astype(np.float32).ravel())
+    img.pack()
+    return img
+
+def scribble_texture(name, lines, seed, ink=(0.08, 0.08, 0.1)):
+    """Placeholder handwriting: loose graphite scribble lines. Replaced later by photos of Liam's real notes."""
+    W = H = 512
+    rng = np.random.default_rng(seed)
+    a = np.zeros((H, W), np.float32)
+    yy, xx = np.mgrid[0:H, 0:W]
+    for i in range(lines):
+        y0 = 90 + i * (H - 160) / max(1, lines - 1)
+        x_end = rng.uniform(0.55, 0.88) * W
+        f1, f2, ph = rng.uniform(0.08, 0.14), rng.uniform(0.02, 0.04), rng.uniform(0, 6)
+        curve = y0 + 9 * np.sin(xx * f1 + ph) * np.sin(xx * f2) + rng.normal(0, 0.5)
+        gaps = (np.sin(xx * 0.045 + ph * 3) > -0.85)
+        stroke = np.exp(-((yy - curve) ** 2) / (2 * 2.2 ** 2)) * (xx > 60) * (xx < x_end) * gaps
+        a = np.maximum(a, stroke)
+    rgba = np.zeros((H, W, 4), np.float32)
+    rgba[..., 0], rgba[..., 1], rgba[..., 2] = ink
+    rgba[..., 3] = np.clip(a * 0.9, 0, 1)
+    return image_from_array(name, rgba)
+
+def transcript_texture(name, seed):
+    """An interview transcript: grey text bars and a few highlighter stripes."""
+    W, H = 512, 724
+    rng = np.random.default_rng(seed)
+    rgba = np.zeros((H, W, 4), np.float32)
+    y = 60
+    while y < H - 50:
+        n = rng.integers(5, 11)
+        x = 50
+        for _ in range(n):
+            w = rng.integers(18, 60)
+            if x + w > W - 50:
+                break
+            rgba[y:y + 7, x:x + w, :3] = 0.18
+            rgba[y:y + 7, x:x + w, 3] = 0.85
+            x += w + 9
+        if rng.uniform() < 0.12:
+            x0 = rng.integers(50, 250); x1 = min(W - 50, x0 + rng.integers(80, 220))
+            rgba[y - 4:y + 11, x0:x1, 0] = 0.95; rgba[y - 4:y + 11, x0:x1, 1] = 0.62; rgba[y - 4:y + 11, x0:x1, 2] = 0.62
+            rgba[y - 4:y + 11, x0:x1, 3] = 0.55
+        y += 22 if rng.uniform() > 0.15 else 40
+    return image_from_array(name, rgba)
+
+def paper_material(name, base, overlay=None):
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    nt = m.node_tree
+    bsdf = nt.nodes["Principled BSDF"]
+    bsdf.inputs["Roughness"].default_value = 0.78
+    bsdf.inputs["Subsurface Weight"].default_value = 0.06
+    noise = nt.nodes.new("ShaderNodeTexNoise")
+    noise.inputs["Scale"].default_value = 400.0
+    noise.inputs["Detail"].default_value = 6.0
+    mixc = nt.nodes.new("ShaderNodeMix"); mixc.data_type = "RGBA"
+    mixc.inputs["Factor"].default_value = 0.06
+    csock(mixc.inputs, "A").default_value = base
+    nt.links.new(noise.outputs["Color"], csock(mixc.inputs, "B"))
+    col = csock(mixc.outputs, "Result")
+    if overlay is not None:
+        tex = nt.nodes.new("ShaderNodeTexImage"); tex.image = overlay
+        ink = nt.nodes.new("ShaderNodeMix"); ink.data_type = "RGBA"
+        nt.links.new(tex.outputs["Alpha"], ink.inputs["Factor"])
+        nt.links.new(col, csock(ink.inputs, "A"))
+        nt.links.new(tex.outputs["Color"], csock(ink.inputs, "B"))
+        col = csock(ink.outputs, "Result")
+    nt.links.new(col, bsdf.inputs["Base Color"])
+    bump = nt.nodes.new("ShaderNodeBump"); bump.inputs["Strength"].default_value = 0.05
+    nt.links.new(noise.outputs["Fac"], bump.inputs["Height"])
+    nt.links.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
+    return m
+
+def sheet(name, size, loc, rot_z, mat, curl=0.0, lift=0.0006):
+    """A thin, slightly curled sheet of paper or a sticky note."""
+    bpy.ops.mesh.primitive_plane_add(size=1, location=(loc[0], loc[1], loc[2] + lift))
+    ob = bpy.context.active_object
+    ob.name = name
+    ob.scale = (size[0], size[1], 1)
+    ob.rotation_euler = (0, 0, rot_z)
+    bpy.ops.object.transform_apply(scale=True)
+    sub = ob.modifiers.new("sub", "SUBSURF"); sub.subdivision_type = "SIMPLE"; sub.levels = sub.render_levels = 4
+    if curl:
+        # A gentle lift of the paper's far edge: displace vertices by distance from the near edge (a few mm at most).
+        co = np.empty(len(ob.data.vertices) * 3, np.float32)
+        ob.data.vertices.foreach_get("co", co)
+        v = co.reshape(-1, 3)
+        span = v[:, 0].max() - v[:, 0].min() + 1e-9
+        u = (v[:, 0] - v[:, 0].min()) / span
+        v[:, 2] += curl * 0.02 * u ** 3
+        ob.data.vertices.foreach_set("co", v.ravel())
+        ob.data.update()
+    sol = ob.modifiers.new("thick", "SOLIDIFY"); sol.thickness = 0.0003
+    ob.data.materials.append(mat)
+    return ob
+
+def walnut_material():
+    m = bpy.data.materials.new("walnut")
+    m.use_nodes = True
+    nt = m.node_tree
+    bsdf = nt.nodes["Principled BSDF"]
+    bsdf.inputs["Roughness"].default_value = 0.42
+    bsdf.inputs["Coat Weight"].default_value = 0.25
+    bsdf.inputs["Coat Roughness"].default_value = 0.25
+    tc = nt.nodes.new("ShaderNodeTexCoord")
+    mp = nt.nodes.new("ShaderNodeMapping"); mp.inputs["Scale"].default_value = (2.2, 42.0, 1.0)
+    grain = nt.nodes.new("ShaderNodeTexNoise"); grain.inputs["Scale"].default_value = 4.0
+    grain.inputs["Detail"].default_value = 12.0; grain.inputs["Roughness"].default_value = 0.62; grain.inputs["Distortion"].default_value = 0.6
+    fine = nt.nodes.new("ShaderNodeTexNoise"); fine.inputs["Scale"].default_value = 160.0; fine.inputs["Detail"].default_value = 4.0
+    ramp = nt.nodes.new("ShaderNodeValToRGB")
+    els = ramp.color_ramp.elements
+    els[0].position, els[0].color = 0.32, srgb("#1c110b")
+    els[1].position, els[1].color = 0.68, srgb("#4b301f")
+    e = els.new(0.5); e.color = srgb("#33201a")
+    nt.links.new(tc.outputs["Object"], mp.inputs["Vector"])
+    nt.links.new(mp.outputs["Vector"], grain.inputs["Vector"])
+    nt.links.new(grain.outputs["Fac"], ramp.inputs["Fac"])
+    nt.links.new(ramp.outputs["Color"], bsdf.inputs["Base Color"])
+    bump = nt.nodes.new("ShaderNodeBump"); bump.inputs["Strength"].default_value = 0.04
+    nt.links.new(fine.outputs["Fac"], bump.inputs["Height"])
+    nt.links.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
+    return m
+
+def build_desk():
+    """2.1 Finding the problem: a walnut desk at night, lit by a warm lamp off-frame. The ball hovers among the notes."""
+    plane("desk", 3.0, (0, 0, 0), mat=walnut_material())
+    R = 0.07
+    ball_c = (0.0, 0.03, R + 0.028)
+    dense_ball(ball_c, R)
+    PAPER = srgb("#ece6da"); YELLOW = srgb("#e6c86a"); PINK = srgb("#e3a6a6"); CARD = srgb("#f1ede4")
+    sheet("transcript", (0.21, 0.297), (0.2, 0.17, 0), 0.32, paper_material("transcript_m", PAPER, transcript_texture("transcript_t", 3)), curl=0.06)
+    sheet("card_a", (0.127, 0.076), (-0.17, 0.14, 0), -0.18, paper_material("card_a_m", CARD, scribble_texture("card_a_t", 4, 11)), curl=0.05)
+    sheet("card_b", (0.127, 0.076), (-0.2, -0.02, 0.0004), 0.22, paper_material("card_b_m", CARD, scribble_texture("card_b_t", 3, 12)), curl=0.04)
+    # The hero sticky note: closest to the ball and to the camera, in focus.
+    sheet("sticky_hero", (0.076, 0.076), (0.085, -0.1, 0.0008), -0.12, paper_material("sticky_hero_m", YELLOW, scribble_texture("sticky_hero_t", 3, 21)), curl=0.12)
+    sheet("sticky_b", (0.076, 0.076), (-0.09, -0.12, 0.0005), 0.3, paper_material("sticky_b_m", PINK, scribble_texture("sticky_b_t", 2, 22)), curl=0.08)
+    sheet("sticky_c", (0.076, 0.076), (0.22, -0.04, 0.0009), -0.4, paper_material("sticky_c_m", YELLOW, scribble_texture("sticky_c_t", 3, 23)), curl=0.1)
+    # A pen lying across a card.
+    bpy.ops.mesh.primitive_cylinder_add(vertices=48, radius=0.0055, depth=0.145, location=(-0.15, 0.06, 0.0062), rotation=(0, math.pi / 2, 0.55))
+    pen = bpy.context.active_object
+    bpy.ops.object.shade_smooth()
+    pen.data.materials.append(principled("pen", (0.02, 0.02, 0.025, 1), 0.25, **{"Coat Weight": 0.6}))
+    world((0.0025, 0.0024, 0.003, 1), 1.0)
+    # The lamp: off-frame, upper left, warm. Its light defines the scene; the ball does not emit.
+    sp = bpy.data.lights.new("lamp", "SPOT")
+    sp.energy = 230
+    sp.color = (1.0, 0.74, 0.48)
+    sp.spot_size = math.radians(85)
+    sp.spot_blend = 0.85
+    sp.shadow_soft_size = 0.06
+    lamp = bpy.data.objects.new("lamp", sp)
+    lamp.location = (-0.42, 0.3, 0.55)
+    scene.collection.objects.link(lamp)
+    aim(lamp, (0.0, 0.0, 0.0))
+    camera((0.03, -0.62, 0.46), (0.0, 0.02, 0.03), lens=50, focus=0.74, fstop=3.2)
+
+def grid_material(kind):
+    """A grid in object space, so it follows the surface into the gravity well."""
+    m = bpy.data.materials.new("grid_" + kind)
+    m.use_nodes = True
+    nt = m.node_tree
+    bsdf = nt.nodes["Principled BSDF"]
+    tc = nt.nodes.new("ShaderNodeTexCoord")
+    sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+    nt.links.new(tc.outputs["Object"], sep.inputs[0])
+    def line(axis_out):
+        s = nt.nodes.new("ShaderNodeMath"); s.operation = "MULTIPLY"; s.inputs[1].default_value = 25.0  # 4 cm cells
+        fr = nt.nodes.new("ShaderNodeMath"); fr.operation = "FRACT"
+        lt = nt.nodes.new("ShaderNodeMath"); lt.operation = "LESS_THAN"; lt.inputs[1].default_value = 0.045
+        nt.links.new(axis_out, s.inputs[0]); nt.links.new(s.outputs[0], fr.inputs[0]); nt.links.new(fr.outputs[0], lt.inputs[0])
+        return lt.outputs[0]
+    mx = nt.nodes.new("ShaderNodeMath"); mx.operation = "MAXIMUM"
+    nt.links.new(line(sep.outputs["X"]), mx.inputs[0]); nt.links.new(line(sep.outputs["Y"]), mx.inputs[1])
+    mask = mx.outputs[0]
+    mix = nt.nodes.new("ShaderNodeMix"); mix.data_type = "RGBA"
+    nt.links.new(mask, mix.inputs["Factor"])
+    out = nt.nodes["Material Output"]
+    if kind == "etched":
+        csock(mix.inputs, "A").default_value = srgb("#cfd2d4"); csock(mix.inputs, "B").default_value = srgb("#8e9397")
+        bsdf.inputs["Roughness"].default_value = 0.5
+        bump = nt.nodes.new("ShaderNodeBump"); bump.inputs["Strength"].default_value = 0.6; bump.invert = True
+        nt.links.new(mask, bump.inputs["Height"]); nt.links.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
+    elif kind == "mat":
+        csock(mix.inputs, "A").default_value = srgb("#2b2f31"); csock(mix.inputs, "B").default_value = srgb("#c9ccc6")
+        bsdf.inputs["Roughness"].default_value = 0.85
+    else:  # glow
+        csock(mix.inputs, "A").default_value = srgb("#0b0c0e"); csock(mix.inputs, "B").default_value = srgb("#0b0c0e")
+        bsdf.inputs["Roughness"].default_value = 0.6
+        em = nt.nodes.new("ShaderNodeEmission"); em.inputs["Color"].default_value = (0.75, 0.86, 1.0, 1)
+        str_ = nt.nodes.new("ShaderNodeMath"); str_.operation = "MULTIPLY"; str_.inputs[1].default_value = 2.2
+        nt.links.new(mask, str_.inputs[0]); nt.links.new(str_.outputs[0], em.inputs["Strength"])
+        add = nt.nodes.new("ShaderNodeAddShader")
+        nt.links.new(bsdf.outputs[0], add.inputs[0]); nt.links.new(em.outputs[0], add.inputs[1])
+        nt.links.new(add.outputs[0], out.inputs["Surface"])
+    nt.links.new(csock(mix.outputs, "Result"), bsdf.inputs["Base Color"])
+    return m
+
+def well_surface(name, size, depth, sigma, mat, segments=260, edge_lift=0.0):
+    """A square surface that sinks into a smooth well under the ball (the 'gravity' of the idea)."""
+    bpy.ops.mesh.primitive_grid_add(x_subdivisions=segments, y_subdivisions=segments, size=size, location=(0, 0, 0))
+    ob = bpy.context.active_object
+    ob.name = name
+    co = np.empty(len(ob.data.vertices) * 3, np.float32)
+    ob.data.vertices.foreach_get("co", co)
+    v = co.reshape(-1, 3)
+    r2 = v[:, 0] ** 2 + v[:, 1] ** 2
+    v[:, 2] = -depth * np.exp(-r2 / (2 * sigma ** 2))
+    if edge_lift:
+        edge = np.maximum(np.abs(v[:, 0]), np.abs(v[:, 1])) / (size / 2)
+        v[:, 2] += edge_lift * np.clip((edge - 0.85) / 0.15, 0, 1) ** 2
+    ob.data.vertices.foreach_set("co", v.ravel())
+    ob.data.update()
+    bpy.ops.object.shade_smooth()
+    ob.data.materials.append(mat)
+    return ob
+
+def build_bench():
+    """2.2 Checking I'm right: the ball's 'gravity' bends the grid. Three grid styles to choose from."""
+    kind = args.grid
+    R = 0.085
+    if kind == "mat":
+        plane("bench", 4.0, (0, 0, -0.16), mat=principled("bench_top", srgb("#2a2e31"), 0.6))
+        well_surface("mat", 0.7, 0.085, 0.12, grid_material("mat"), edge_lift=0.0)
+    else:
+        well_surface("surface", 1.6, 0.11, 0.13, grid_material(kind))
+    dense_ball((0, 0, R + 0.03), R)
+    if kind == "glow":
+        world((0.0015, 0.0018, 0.0025, 1), 1.0)
+        area_light("key", (-0.6, -0.7, 0.9), 0.6, 55, (0.85, 0.92, 1.0))
+        area_light("rim", (0.5, 0.6, 0.35), 0.3, 25, ROSE_SOFT)
+    else:
+        world((0.02, 0.024, 0.03, 1), 1.0)
+        # Cool daylight from a big window to the left, plus a soft fill.
+        area_light("window", (-1.3, -0.4, 0.9), 1.4, 260, (0.86, 0.93, 1.0), size_y=1.0)
+        area_light("fill", (0.9, -0.9, 0.6), 1.0, 35, (1.0, 0.96, 0.92))
+        area_light("rim", (0.4, 0.8, 0.4), 0.4, 30, ROSE_SOFT)
+    camera((0.0, -0.92, 0.42), (0, 0, 0.0), lens=45, focus=0.98, fstop=4)
+
+def build_canvas():
+    """2.3 Building it: a dark design-tool canvas made of real beads, crowding toward the ball."""
+    plane("canvas", 4.0, (0, 0, 0), mat=principled("canvas_m", srgb("#1b1c1f"), 0.55))
+    R = 0.08
+    dense_ball((0.06, 0.0, R + 0.05), R)
+    # Bead grid: regular far away, pulled toward the ball near it (same mapping as the storyboard).
+    sp = 0.022
+    g = np.arange(-0.9, 0.9 + 1e-9, sp)
+    gx, gy = np.meshgrid(g, g)
+    gx, gy = gx.ravel() - 0.06, gy.ravel()
+    r = np.hypot(gx, gy) + 1e-9
+    r2 = r * (1 - 0.55 * np.exp(-r / (R * 2.6)))
+    keep = r2 > R * 0.9
+    x, y = 0.06 + gx[keep] * r2[keep] / r[keep], gy[keep] * r2[keep] / r[keep]
+    near = np.exp(-(r2[keep] - R) / (R * 1.6))
+    bead_r = 0.0016 + 0.0009 * near
+    pts = np.stack([x, y, bead_r], axis=1).astype(np.float32)
+    hue = (0.85 + 0.15 * near).astype(np.float32)
+    beads = grains("beads", pts, hue, bead_r * 1.0, jitter=0.05)
+    # Beads are a neutral, slightly warm porcelain, not sand-coloured.
+    mat = bpy.data.materials["sand"] if "sand" in bpy.data.materials else None
+    bm = principled("bead_m", srgb("#d8d3cd"), 0.35, **{"Coat Weight": 0.3})
+    beads.modifiers["grains"].node_group.nodes["Set Material"].inputs["Material"].default_value = bm
+    world((0.003, 0.003, 0.0035, 1), 1.0)
+    softbox("top", (-0.2, -0.3, 1.1), 1.2, 0.8, 9.0, target=(0.06, 0, 0))
+    area_light("key", (-0.7, -0.6, 0.7), 0.5, 45, (1.0, 0.9, 0.82))
+    area_light("rim", (0.6, 0.7, 0.35), 0.3, 22, ROSE_SOFT)
+    camera((0.05, -0.85, 0.55), (0.06, 0.0, 0.02), lens=45, focus=1.0, fstop=4)
+
 # ---------------------------------------------------------------- go
 
-{"ball": build_ball, "chaos": build_chaos, "glass": build_glass, "studio": build_studio}[args.scene]()
+{"ball": build_ball, "chaos": build_chaos, "glass": build_glass, "studio": build_studio,
+ "desk": build_desk, "bench": build_bench, "canvas": build_canvas}[args.scene]()
 if args.preview:
     render_settings(24, 480, 300)
 else:
     render_settings(512 if args.scene in ("glass", "studio") else 256)
 
 os.makedirs(args.out, exist_ok=True)
-tag = f"{args.scene}-{args.state}" if args.scene == "studio" else args.scene
+tag = f"{args.scene}-{args.state}" if args.scene == "studio" else f"{args.scene}-{args.grid}" if args.scene == "bench" else args.scene
 path = os.path.abspath(os.path.join(args.out, f"{tag}{'-preview' if args.preview else ''}.png"))
 scene.render.filepath = path
 bpy.ops.render.render(write_still=True)
