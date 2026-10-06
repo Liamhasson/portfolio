@@ -46,3 +46,5 @@ next-env.d.ts
 
 # raw media sources (re-downloadable)
 .media-src/
+blender/lookdev/renders/*.png
+blender/lookdev/renders/*.log
