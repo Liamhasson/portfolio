@@ -48,3 +48,4 @@ next-env.d.ts
 .media-src/
 blender/lookdev/renders/*.png
 blender/lookdev/renders/*.log
+blender/lookdev/textures/

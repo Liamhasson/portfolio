@@ -575,18 +575,25 @@ def dense_ball(center, R, flare=True, seed=2026):
     rng = np.random.default_rng(seed + 1)
     radius = rng.uniform(0.004, 0.009, len(pts)) * R * (2.4 if args.preview else 1)
     if flare:
-        # An arc of grains lifting off the upper-left limb and falling back, like a solar prominence.
-        k = 1100
-        t = rng.uniform(0, 1, k)
-        a0 = np.array([-0.62, -0.35, 0.70]); a0 /= np.linalg.norm(a0)
-        tang = np.cross(a0, [0, 0, 1.0]); tang /= np.linalg.norm(tang)
-        h = 0.22 * np.sin(np.pi * t) * rng.uniform(0.4, 1.0, k)
-        base = a0[None, :] + tang[None, :] * (t[:, None] - 0.5) * 0.55
-        base /= np.linalg.norm(base, axis=1, keepdims=True)
-        fp = base * (1 + h[:, None]) + rng.normal(0, 0.06, (k, 3)) * (0.3 + h[:, None] * 3)
+        # A solar-flare spray: many short, curved streamers lifting off a patch of the limb, thinning toward the tips.
+        axis = np.array([-0.62, -0.35, 0.70]); axis /= np.linalg.norm(axis)
+        u = np.cross(axis, [0, 0, 1.0]); u /= np.linalg.norm(u); w = np.cross(axis, u)
+        streams = 45
+        fp, fh, fr = [], [], []
+        for s in range(streams):
+            a1, a2 = rng.normal(0, 0.38, 2)
+            root = axis + u * a1 + w * a2; root /= np.linalg.norm(root)
+            length = rng.uniform(0.05, 0.3)
+            bend = (u * rng.normal(0, 1) + w * rng.normal(0, 1)) * length * 0.6
+            m = int(12 + 110 * length)
+            t_ = rng.uniform(0, 1, m) ** 1.6
+            path = root[None, :] * (1 + length * t_[:, None]) + bend[None, :] * (t_[:, None] ** 2)
+            path += rng.normal(0, 1, (m, 3)) * (0.004 + 0.03 * t_[:, None])
+            fp.append(path); fh.append(rng.uniform(0.5, 1.0, m)); fr.append(1 - 0.6 * t_)
+        fp, fh, fr = np.concatenate(fp), np.concatenate(fh), np.concatenate(fr)
         pts = np.concatenate([pts, fp * R])
-        hue = np.concatenate([hue, rng.uniform(0.55, 1.0, k).astype(np.float32)])
-        radius = np.concatenate([radius, rng.uniform(0.004, 0.008, k) * R * (2.4 if args.preview else 1)])
+        hue = np.concatenate([hue, fh.astype(np.float32)])
+        radius = np.concatenate([radius, rng.uniform(0.003, 0.006, len(fp)) * fr * R * (2.4 if args.preview else 1)])
     grains("ball", (pts + np.array(center)).astype(np.float32), hue, radius)
 
 def image_from_array(name, rgba):
@@ -644,7 +651,9 @@ def paper_material(name, base, overlay=None):
     nt = m.node_tree
     bsdf = nt.nodes["Principled BSDF"]
     bsdf.inputs["Roughness"].default_value = 0.78
-    bsdf.inputs["Subsurface Weight"].default_value = 0.06
+    bsdf.inputs["Subsurface Weight"].default_value = 0.12
+    bsdf.inputs["Subsurface Radius"].default_value = (0.004, 0.0035, 0.003)
+    bsdf.inputs["Transmission Weight"].default_value = 0.04
     noise = nt.nodes.new("ShaderNodeTexNoise")
     noise.inputs["Scale"].default_value = 400.0
     noise.inputs["Detail"].default_value = 6.0
@@ -666,7 +675,7 @@ def paper_material(name, base, overlay=None):
     nt.links.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
     return m
 
-def sheet(name, size, loc, rot_z, mat, curl=0.0, lift=0.0006):
+def sheet(name, size, loc, rot_z, mat, curl=0.0, lift=0.0006, fold=None, seed=0):
     """A thin, slightly curled sheet of paper or a sticky note."""
     bpy.ops.mesh.primitive_plane_add(size=1, location=(loc[0], loc[1], loc[2] + lift))
     ob = bpy.context.active_object
@@ -674,7 +683,7 @@ def sheet(name, size, loc, rot_z, mat, curl=0.0, lift=0.0006):
     ob.scale = (size[0], size[1], 1)
     ob.rotation_euler = (0, 0, rot_z)
     bpy.ops.object.transform_apply(scale=True)
-    sub = ob.modifiers.new("sub", "SUBSURF"); sub.subdivision_type = "SIMPLE"; sub.levels = sub.render_levels = 4
+    bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.subdivide(number_cuts=48); bpy.ops.object.mode_set(mode="OBJECT")
     if curl:
         # A gentle lift of the paper's far edge: displace vertices by distance from the near edge (a few mm at most).
         co = np.empty(len(ob.data.vertices) * 3, np.float32)
@@ -682,39 +691,146 @@ def sheet(name, size, loc, rot_z, mat, curl=0.0, lift=0.0006):
         v = co.reshape(-1, 3)
         span = v[:, 0].max() - v[:, 0].min() + 1e-9
         u = (v[:, 0] - v[:, 0].min()) / span
-        v[:, 2] += curl * 0.02 * u ** 3
+        rng_ = np.random.default_rng(seed + 101)
+        tw = rng_.uniform(-1, 1)
+        vv = (v[:, 1] - v[:, 1].min()) / (v[:, 1].max() - v[:, 1].min() + 1e-9)
+        v[:, 2] += curl * 0.02 * u ** 3 * (1 + 0.6 * tw * (vv - 0.5))      # uneven: one corner lifts more
+        v[:, 2] += 0.0006 * np.sin(v[:, 0] * 37 + seed) * np.sin(v[:, 1] * 29 + seed * 2)   # soft waviness
+        ob.data.vertices.foreach_set("co", v.ravel())
+        ob.data.update()
+    if fold is not None:
+        # A soft crease where the sheet was once folded: a shallow ridge along a line.
+        co = np.empty(len(ob.data.vertices) * 3, np.float32)
+        ob.data.vertices.foreach_get("co", co)
+        v = co.reshape(-1, 3)
+        d = v[:, 1] - (v[:, 1].min() + fold * (v[:, 1].max() - v[:, 1].min()))
+        v[:, 2] += 0.0018 * np.exp(-(d / 0.01) ** 2)
         ob.data.vertices.foreach_set("co", v.ravel())
         ob.data.update()
     sol = ob.modifiers.new("thick", "SOLIDIFY"); sol.thickness = 0.0003
     ob.data.materials.append(mat)
     return ob
 
+TEX = os.path.join(os.path.dirname(os.path.abspath(__file__)), "textures")
+
 def walnut_material():
+    """Scanned walnut (Poly Haven, CC0) darkened to dark walnut, with a plank seam, scratches, a coffee ring and dust."""
     m = bpy.data.materials.new("walnut")
     m.use_nodes = True
     nt = m.node_tree
-    bsdf = nt.nodes["Principled BSDF"]
-    bsdf.inputs["Roughness"].default_value = 0.42
-    bsdf.inputs["Coat Weight"].default_value = 0.25
-    bsdf.inputs["Coat Roughness"].default_value = 0.25
-    tc = nt.nodes.new("ShaderNodeTexCoord")
-    mp = nt.nodes.new("ShaderNodeMapping"); mp.inputs["Scale"].default_value = (2.2, 42.0, 1.0)
-    grain = nt.nodes.new("ShaderNodeTexNoise"); grain.inputs["Scale"].default_value = 4.0
-    grain.inputs["Detail"].default_value = 12.0; grain.inputs["Roughness"].default_value = 0.62; grain.inputs["Distortion"].default_value = 0.6
-    fine = nt.nodes.new("ShaderNodeTexNoise"); fine.inputs["Scale"].default_value = 160.0; fine.inputs["Detail"].default_value = 4.0
-    ramp = nt.nodes.new("ShaderNodeValToRGB")
-    els = ramp.color_ramp.elements
-    els[0].position, els[0].color = 0.32, srgb("#1c110b")
-    els[1].position, els[1].color = 0.68, srgb("#4b301f")
-    e = els.new(0.5); e.color = srgb("#33201a")
-    nt.links.new(tc.outputs["Object"], mp.inputs["Vector"])
-    nt.links.new(mp.outputs["Vector"], grain.inputs["Vector"])
-    nt.links.new(grain.outputs["Fac"], ramp.inputs["Fac"])
-    nt.links.new(ramp.outputs["Color"], bsdf.inputs["Base Color"])
-    bump = nt.nodes.new("ShaderNodeBump"); bump.inputs["Strength"].default_value = 0.04
-    nt.links.new(fine.outputs["Fac"], bump.inputs["Height"])
-    nt.links.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
+    N = nt.nodes; L = nt.links
+    bsdf = N["Principled BSDF"]
+    bsdf.inputs["Coat Weight"].default_value = 0.2
+    tc = N.new("ShaderNodeTexCoord")
+    mp = N.new("ShaderNodeMapping"); mp.inputs["Scale"].default_value = (1.2, 1.2, 1.2)   # ~1 m tile on a 3 m desk... scaled below
+    L.new(tc.outputs["Object"], mp.inputs["Vector"])
+    def img(name, non_color):
+        n = N.new("ShaderNodeTexImage")
+        n.image = bpy.data.images.load(os.path.join(TEX, name))
+        if non_color:
+            n.image.colorspace_settings.name = "Non-Color"
+        L.new(mp.outputs["Vector"], n.inputs["Vector"])
+        return n
+    diff, nor, rough = img("walnut_Diffuse.jpg", False), img("walnut_nor_gl.jpg", True), img("walnut_Rough.jpg", True)
+    # Darken toward dark walnut (keep the scan's figure).
+    hsv = N.new("ShaderNodeHueSaturation")
+    hsv.inputs["Value"].default_value = 0.16
+    hsv.inputs["Saturation"].default_value = 1.45
+    L.new(diff.outputs["Color"], hsv.inputs["Color"])
+    sep = N.new("ShaderNodeSeparateXYZ"); L.new(tc.outputs["Object"], sep.inputs[0])
+    # Plank seam: a thin dark groove across the desk.
+    seam_d = N.new("ShaderNodeMath"); seam_d.operation = "SUBTRACT"; seam_d.inputs[1].default_value = 0.31
+    L.new(sep.outputs["Y"], seam_d.inputs[0])
+    seam_a = N.new("ShaderNodeMath"); seam_a.operation = "ABSOLUTE"; L.new(seam_d.outputs[0], seam_a.inputs[0])
+    seam = N.new("ShaderNodeMath"); seam.operation = "LESS_THAN"; seam.inputs[1].default_value = 0.0012
+    L.new(seam_a.outputs[0], seam.inputs[0])
+    # Coffee ring: a faint thin ring stain.
+    ring_v = N.new("ShaderNodeVectorMath"); ring_v.operation = "DISTANCE"; ring_v.inputs[1].default_value = (-0.33, 0.22, 0)
+    L.new(tc.outputs["Object"], ring_v.inputs[0])
+    ring_n = N.new("ShaderNodeTexNoise"); ring_n.inputs["Scale"].default_value = 30.0
+    ring_r = N.new("ShaderNodeMath"); ring_r.operation = "SUBTRACT"; ring_r.inputs[1].default_value = 0.041
+    L.new(ring_v.outputs["Value"], ring_r.inputs[0])
+    ring_a = N.new("ShaderNodeMath"); ring_a.operation = "ABSOLUTE"; L.new(ring_r.outputs[0], ring_a.inputs[0])
+    ring = N.new("ShaderNodeMapRange"); ring.inputs["From Min"].default_value = 0.0035; ring.inputs["From Max"].default_value = 0.0
+    L.new(ring_a.outputs[0], ring.inputs["Value"])
+    ring_m = N.new("ShaderNodeMath"); ring_m.operation = "MULTIPLY"
+    L.new(ring.outputs["Result"], ring_m.inputs[0]); L.new(ring_n.outputs["Fac"], ring_m.inputs[1])
+    # Fine scratches: very stretched noise, thresholded into thin random lines.
+    sc_map = N.new("ShaderNodeMapping"); sc_map.inputs["Scale"].default_value = (900.0, 6.0, 1.0); sc_map.inputs["Rotation"].default_value = (0, 0, 0.3)
+    L.new(tc.outputs["Object"], sc_map.inputs["Vector"])
+    sc_n = N.new("ShaderNodeTexNoise"); sc_n.inputs["Scale"].default_value = 1.0; sc_n.inputs["Detail"].default_value = 2.0
+    L.new(sc_map.outputs["Vector"], sc_n.inputs["Vector"])
+    scratch = N.new("ShaderNodeMapRange"); scratch.inputs["From Min"].default_value = 0.71; scratch.inputs["From Max"].default_value = 0.75
+    L.new(sc_n.outputs["Fac"], scratch.inputs["Value"])
+    # Dust: sparse light speckles.
+    dust_n = N.new("ShaderNodeTexNoise"); dust_n.inputs["Scale"].default_value = 2200.0; dust_n.inputs["Detail"].default_value = 1.0
+    dust = N.new("ShaderNodeMapRange"); dust.inputs["From Min"].default_value = 0.68; dust.inputs["From Max"].default_value = 0.74
+    L.new(dust_n.outputs["Fac"], dust.inputs["Value"])
+    # Colour: wood, darkened in the seam and the ring, lightened by scratches and dust.
+    def mixc(a_out, color, fac_out, amount, blend="MIX"):
+        mx = N.new("ShaderNodeMix"); mx.data_type = "RGBA"; mx.blend_type = blend
+        f = N.new("ShaderNodeMath"); f.operation = "MULTIPLY"; f.inputs[1].default_value = amount
+        L.new(fac_out, f.inputs[0]); L.new(f.outputs[0], mx.inputs["Factor"])
+        L.new(a_out, csock(mx.inputs, "A")); csock(mx.inputs, "B").default_value = color
+        return csock(mx.outputs, "Result")
+    col = hsv.outputs["Color"]
+    col = mixc(col, (0.006, 0.004, 0.003, 1), seam.outputs[0], 1.0)
+    col = mixc(col, (0.03, 0.016, 0.008, 1), ring_m.outputs[0], 0.55)
+    col = mixc(col, (0.16, 0.12, 0.09, 1), scratch.outputs["Result"], 0.35)
+    col = mixc(col, (0.35, 0.33, 0.31, 1), dust.outputs["Result"], 0.5)
+    L.new(col, bsdf.inputs["Base Color"])
+    # Uneven varnish: scan roughness, pushed by scratches and dust.
+    r1 = N.new("ShaderNodeMapRange"); r1.inputs["To Min"].default_value = 0.28; r1.inputs["To Max"].default_value = 0.62
+    L.new(rough.outputs["Color"], r1.inputs["Value"])
+    r2 = N.new("ShaderNodeMath"); r2.operation = "ADD"; L.new(r1.outputs["Result"], r2.inputs[0])
+    r2b = N.new("ShaderNodeMath"); r2b.operation = "MULTIPLY"; r2b.inputs[1].default_value = 0.3
+    L.new(dust.outputs["Result"], r2b.inputs[0]); L.new(r2b.outputs[0], r2.inputs[1])
+    L.new(r2.outputs[0], bsdf.inputs["Roughness"])
+    cr = N.new("ShaderNodeMapRange"); cr.inputs["To Min"].default_value = 0.08; cr.inputs["To Max"].default_value = 0.45
+    L.new(scratch.outputs["Result"], cr.inputs["Value"]); L.new(cr.outputs["Result"], bsdf.inputs["Coat Roughness"])
+    nmap = N.new("ShaderNodeNormalMap"); L.new(nor.outputs["Color"], nmap.inputs["Color"])
+    bump = N.new("ShaderNodeBump"); bump.inputs["Strength"].default_value = 0.25; bump.invert = True
+    sum_ = N.new("ShaderNodeMath"); sum_.operation = "MAXIMUM"
+    L.new(seam.outputs[0], sum_.inputs[0]); L.new(scratch.outputs["Result"], sum_.inputs[1])
+    L.new(sum_.outputs[0], bump.inputs["Height"]); L.new(nmap.outputs["Normal"], bump.inputs["Normal"])
+    L.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
+    mp.inputs["Scale"].default_value = (2.4, 2.4, 2.4)   # one 4K tile ≈ 42 cm of wood: real grain scale
     return m
+
+def pick(name, loc, rot_z, flip=False):
+    """A black celluloid pick in the classic 351 shape (rounded triangle), 0.71 mm thick, slightly worn."""
+    import bmesh
+    # 351 outline: convex hull of two shoulder circles and a small tip circle (27.5 mm wide, 31 mm tall).
+    circles = [(-0.0074, 0.0072, 0.0064), (0.0074, 0.0072, 0.0064), (0.0, -0.0118, 0.0018)]
+    cand = [(cx + r * math.cos(a), cy + r * math.sin(a)) for cx, cy, r in circles for a in np.linspace(0, 2 * math.pi, 120, endpoint=False)]
+    cand = sorted(set((round(x, 7), round(y, 7)) for x, y in cand))
+    def cross(o, a_, b_):
+        return (a_[0] - o[0]) * (b_[1] - o[1]) - (a_[1] - o[1]) * (b_[0] - o[0])
+    lower, upper = [], []
+    for q in cand:
+        while len(lower) >= 2 and cross(lower[-2], lower[-1], q) <= 0:
+            lower.pop()
+        lower.append(q)
+    for q in reversed(cand):
+        while len(upper) >= 2 and cross(upper[-2], upper[-1], q) <= 0:
+            upper.pop()
+        upper.append(q)
+    pts = lower[:-1] + upper[:-1]
+    bm = bmesh.new()
+    verts = [bm.verts.new((x, y, 0)) for x, y in pts]
+    face = bm.faces.new(verts)
+    ext = bmesh.ops.extrude_face_region(bm, geom=[face])
+    for v in [e for e in ext["geom"] if isinstance(e, bmesh.types.BMVert)]:
+        v.co.z += 0.00071
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
+    ob = bpy.data.objects.new(name, me); scene.collection.objects.link(ob)
+    ob.location = loc; ob.rotation_euler = (math.pi if flip else 0, 0, rot_z)
+    bev = ob.modifiers.new("bevel", "BEVEL"); bev.width = 0.0003; bev.segments = 3
+    ob.data.materials.append(principled("pick_" + name, (0.006, 0.006, 0.007, 1), 0.22, **{"Specular IOR Level": 0.4}))
+    bev.width = 0.00015; bev.segments = 2
+    bev.harden_normals = True
+    return ob
 
 def build_desk():
     """2.1 Finding the problem: a walnut desk at night, lit by a warm lamp off-frame. The ball hovers among the notes."""
@@ -723,13 +839,20 @@ def build_desk():
     ball_c = (0.0, 0.03, R + 0.028)
     dense_ball(ball_c, R)
     PAPER = srgb("#ece6da"); YELLOW = srgb("#e6c86a"); PINK = srgb("#e3a6a6"); CARD = srgb("#f1ede4")
-    sheet("transcript", (0.21, 0.297), (0.2, 0.17, 0), 0.32, paper_material("transcript_m", PAPER, transcript_texture("transcript_t", 3)), curl=0.06)
+    blank = paper_material("blank_m", PAPER)
+    sheet("stack_2", (0.21, 0.297), (0.205, 0.175, -0.0004), 0.27, blank, curl=0.03, seed=5)
+    sheet("stack_1", (0.21, 0.297), (0.198, 0.168, -0.0002), 0.35, blank, curl=0.05, seed=6)
+    sheet("transcript", (0.21, 0.297), (0.2, 0.17, 0), 0.32, paper_material("transcript_m", PAPER, transcript_texture("transcript_t", 3)), curl=0.06, fold=0.34, seed=7)
     sheet("card_a", (0.127, 0.076), (-0.17, 0.14, 0), -0.18, paper_material("card_a_m", CARD, scribble_texture("card_a_t", 4, 11)), curl=0.05)
     sheet("card_b", (0.127, 0.076), (-0.2, -0.02, 0.0004), 0.22, paper_material("card_b_m", CARD, scribble_texture("card_b_t", 3, 12)), curl=0.04)
     # The hero sticky note: closest to the ball and to the camera, in focus.
     sheet("sticky_hero", (0.076, 0.076), (0.085, -0.1, 0.0008), -0.12, paper_material("sticky_hero_m", YELLOW, scribble_texture("sticky_hero_t", 3, 21)), curl=0.12)
     sheet("sticky_b", (0.076, 0.076), (-0.09, -0.12, 0.0005), 0.3, paper_material("sticky_b_m", PINK, scribble_texture("sticky_b_t", 2, 22)), curl=0.08)
     sheet("sticky_c", (0.076, 0.076), (0.22, -0.04, 0.0009), -0.4, paper_material("sticky_c_m", YELLOW, scribble_texture("sticky_c_t", 3, 23)), curl=0.1)
+    # Three black picks, off to the side (a nod to ten years with the bands).
+    pick("pick_a", (-0.105, -0.035, 0.0006), 0.4)
+    pick("pick_b", (-0.072, -0.055, 0.0006), 2.3)
+    pick("pick_c", (-0.118, -0.068, 0.0014), -0.9, flip=True)
     # A pen lying across a card.
     bpy.ops.mesh.primitive_cylinder_add(vertices=48, radius=0.0055, depth=0.145, location=(-0.15, 0.06, 0.0062), rotation=(0, math.pi / 2, 0.55))
     pen = bpy.context.active_object
