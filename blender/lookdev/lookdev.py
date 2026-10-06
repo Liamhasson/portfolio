@@ -35,6 +35,10 @@ def srgb(hex_):
     return tuple(((v + 0.055) / 1.055) ** 2.4 if v > 0.04045 else v / 12.92 for v in c) + (1.0,)
 
 MAGENTA = srgb("#7a2452")
+PLUM = srgb("#2e0d1c")
+DUSTY_ROSE = srgb("#8f4258")
+ROSE_GOLD = srgb("#b9725c")
+MUTED_GOLD = srgb("#b98a4a")
 ROSE = srgb("#bb687b")
 ROSE_SOFT = srgb("#cda2b9")
 GOLD = srgb("#cda265")
@@ -194,10 +198,10 @@ def sand_material():
     attr.attribute_name = "hue"
     ramp = nt.nodes.new("ShaderNodeValToRGB")
     els = ramp.color_ramp.elements
-    els[0].position, els[0].color = 0.0, MAGENTA
-    els[1].position, els[1].color = 0.45, ROSE
-    e = els.new(0.72); e.color = PEACH
-    e = els.new(1.0); e.color = GOLD
+    els[0].position, els[0].color = 0.0, PLUM
+    els[1].position, els[1].color = 0.42, DUSTY_ROSE
+    e = els.new(0.74); e.color = ROSE_GOLD
+    e = els.new(1.0); e.color = MUTED_GOLD
     nt.links.new(attr.outputs["Fac"], ramp.inputs["Fac"])
     nt.links.new(ramp.outputs["Color"], bsdf.inputs["Base Color"])
     # Solid, matte, crisp: no glow, a little sheen of specular only.
@@ -205,7 +209,7 @@ def sand_material():
     bsdf.inputs["Specular IOR Level"].default_value = 0.3
     return m
 
-def grains(name, pts, hue, radius, jitter=0.35):
+def grains(name, pts, hue, radius, jitter=0.22):
     """Instances a small faceted rock-like grain (icosphere, flat shaded, random squash and rotation) on every point."""
     me = bpy.data.meshes.new(name + "_pts")
     me.vertices.add(len(pts))
@@ -226,7 +230,8 @@ def grains(name, pts, hue, radius, jitter=0.35):
     m2p = n.new("GeometryNodeMeshToPoints")
     ico = n.new("GeometryNodeMeshIcoSphere")
     ico.inputs["Radius"].default_value = 1.0
-    ico.inputs["Subdivisions"].default_value = 1
+    ico.inputs["Subdivisions"].default_value = 2
+    smooth = n.new("GeometryNodeSetShadeSmooth")
     setm = n.new("GeometryNodeSetMaterial")
     setm.inputs["Material"].default_value = sand_material()
     inst = n.new("GeometryNodeInstanceOnPoints")
@@ -246,7 +251,8 @@ def grains(name, pts, hue, radius, jitter=0.35):
     vm.operation = "SCALE"
     l.new(gin.outputs[0], m2p.inputs["Mesh"])
     l.new(m2p.outputs["Points"], inst.inputs["Points"])
-    l.new(ico.outputs["Mesh"], setm.inputs["Geometry"])
+    l.new(ico.outputs["Mesh"], smooth.inputs["Geometry"])
+    l.new(smooth.outputs["Geometry"], setm.inputs["Geometry"])
     l.new(setm.outputs["Geometry"], inst.inputs["Instance"])
     l.new(squash.outputs[0], vm.inputs[0])
     l.new(sca.outputs["Attribute"], vm.inputs["Scale"])
@@ -273,11 +279,13 @@ def render_settings(samples, w=1600, h=1000):
     scene.render.resolution_x, scene.render.resolution_y = w, h
     scene.render.resolution_percentage = 100
     scene.render.film_transparent = False
-    try:
-        scene.view_settings.view_transform = "AgX"
-        scene.view_settings.look = "AgX - Medium High Contrast"
-    except TypeError:
-        pass
+    scene.view_settings.view_transform = "AgX"
+    for look in ("AgX - Punchy", "Punchy", "AgX - High Contrast", "High Contrast", "AgX - Medium High Contrast"):
+        try:
+            scene.view_settings.look = look
+            break
+        except TypeError:
+            continue
     scene.render.image_settings.file_format = "PNG"
 
 # ---------------------------------------------------------------- scenes
@@ -291,12 +299,10 @@ def build_ball():
     rng = np.random.default_rng(7)
     radius = rng.uniform(0.004, 0.009, len(pts)) * (2.4 if args.preview else 1)
     grains("ball", pts, hue, radius)
-    floor_mat = principled("floor", (0.012, 0.010, 0.010, 1), 0.45)
-    plane("floor", 60, (0, 0, -1.2), mat=floor_mat)
     world((0.004, 0.0035, 0.0035, 1), 1.0)
-    area_light("key", (-3.2, -3.0, 3.4), 2.6, 900, (1.0, 0.86, 0.76))
-    area_light("rim", (3.0, 3.2, 1.8), 1.6, 650, ROSE_SOFT)
-    area_light("fill", (2.8, -3.5, -0.4), 3.0, 120, (0.85, 0.85, 1.0))
+    area_light("key", (-3.2, -3.0, 3.4), 2.6, 1150, (1.0, 0.82, 0.68))
+    area_light("rim", (3.0, 3.2, 1.8), 1.4, 800, ROSE_SOFT)
+    area_light("fill", (2.8, -3.5, 0.6), 3.0, 60, (0.72, 0.78, 0.95))
     camera((0, -5.2, 0.55), (0, 0, 0), lens=55, focus=4.25, fstop=8)
 
 def build_chaos():
@@ -323,9 +329,9 @@ def build_chaos():
     radius = np.concatenate([radius, rng.uniform(0.012, 0.02, g) * (2.4 if args.preview else 1)])
     grains("chaos", pts, hue, radius)
     world((0.004, 0.0035, 0.0035, 1), 1.0)
-    area_light("key", (-4.0, -7.0, 4.0), 3.5, 1500, (1.0, 0.86, 0.76))
-    area_light("rim", (3.5, 4.0, 2.0), 2.5, 900, ROSE_SOFT)
-    area_light("fill", (3.5, -4.0, -1.0), 4.0, 160, (0.85, 0.85, 1.0))
+    area_light("key", (-4.0, -7.0, 4.0), 3.5, 1900, (1.0, 0.82, 0.68))
+    area_light("rim", (3.5, 4.0, 2.0), 2.2, 1100, ROSE_SOFT)
+    area_light("fill", (3.5, -4.0, -1.0), 4.0, 80, (0.72, 0.78, 0.95))
     # Focused on the cloud with a deep aperture: grains stay crisp, only the last ones by the lens go soft.
     camera((0, -9.5, 0.6), (0, 0, 0.1), lens=45, focus=9.3, fstop=11)
 
