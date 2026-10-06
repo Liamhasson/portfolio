@@ -216,14 +216,19 @@ def sand_material(transform=False):
         clear.attribute_name = "clear"
         glass = nt.nodes.new("ShaderNodeBsdfPrincipled")
         glass.inputs["Base Color"].default_value = (1, 1, 1, 1)
-        glass.inputs["Roughness"].default_value = 0.03
+        frost = nt.nodes.new("ShaderNodeMapRange")
+        frost.inputs["To Min"].default_value = 0.45
+        frost.inputs["To Max"].default_value = 0.04
+        nt.links.new(clear.outputs["Fac"], frost.inputs["Value"])
+        nt.links.new(frost.outputs["Result"], glass.inputs["Roughness"])
+        glass.inputs["Base Color"].default_value = (1.0, 0.9, 0.85, 1)
         glass.inputs["IOR"].default_value = 1.5
         glass.inputs["Transmission Weight"].default_value = 1.0
         mix = nt.nodes.new("ShaderNodeMixShader")
         out = nt.nodes["Material Output"]
         drain = nt.nodes.new("ShaderNodeMix")
         drain.data_type = "RGBA"
-        drain.inputs["B"].default_value = (0.82, 0.8, 0.8, 1)
+        drain.inputs["B"].default_value = (0.98, 0.84, 0.76, 1)
         nt.links.new(clear.outputs["Fac"], drain.inputs["Factor"])
         nt.links.new(ramp.outputs["Color"], drain.inputs["A"])
         nt.links.new(drain.outputs["Result"], bsdf.inputs["Base Color"])
@@ -495,7 +500,7 @@ def build_studio():
     if args.state in ("dense", "mid"):
         area_light("grain_key", (-3.2, -3.0, 3.4), 2.6, 1150, (1.0, 0.82, 0.68))
     if args.state in ("mid", "glass"):
-        ring_light(3.0, 2.2, 0.45, 1.6)
+        softbox("top", (-1.2, -2.6, 4.2), 4.2, 2.2, 4.0, color=(1, 0.97, 0.95, 1), edge=0.25)
         softbox("strip_l", (-3.0, -2.0, 0.2), 0.5, 3.2, 6.0, color=(1, 0.97, 0.95, 1), edge=0.35)
         softbox("strip_r", (3.0, -2.2, -0.2), 0.4, 2.6, 4.0, color=(1, 0.97, 0.95, 1), edge=0.35)
 
@@ -518,7 +523,7 @@ def build_studio():
             norm = (shell - shell.min()) / (shell.max() - shell.min())
             field = fbm(dirs[:, 0] * 1.7 + 3.0, dirs[:, 1] * 1.7, dirs[:, 2] * 1.7 + 5.0)
             rank = np.argsort(np.argsort(field)) / len(field)          # uniform 0..1 over the sphere
-            lo, hi = 0.40, 0.72                                          # transition band; above hi it's already glass
+            lo, hi = 0.62, 0.88                                          # transition band; above hi it's already glass
             keep = rank < hi
             dirs, norm, hue, radius, rank = dirs[keep], norm[keep], hue[keep], radius[keep], rank[keep]
             clear = np.clip((rank - lo) / (hi - lo), 0, 1) ** 1.4
@@ -527,7 +532,7 @@ def build_studio():
             grains("fusing", (dirs * rad[:, None]).astype(np.float32), hue, radius, clear=clear)
             def fld(d):
                 return fbm(d[:, 0] * 1.7 + 3.0, d[:, 1] * 1.7, d[:, 2] * 1.7 + 5.0)
-            f_lo, f_hi, f_top = np.quantile(field, [lo, hi, 0.95])
+            f_lo, f_hi, f_top = np.quantile(field, [lo, hi, 0.97])
             glass_sphere(R0 * 0.985, clear_fn=lambda d: np.clip((fld(d) - f_lo) / (f_top - f_lo), 0, 1))
     else:
         glass_sphere(0.72)
