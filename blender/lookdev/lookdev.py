@@ -23,8 +23,9 @@ from mathutils import Vector
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 ap = argparse.ArgumentParser()
-ap.add_argument("--scene", choices=["ball", "chaos", "glass", "studio", "desk", "bench", "canvas"], required=True)
+ap.add_argument("--scene", choices=["ball", "chaos", "glass", "studio", "desk", "bench", "canvas", "hero"], required=True)
 ap.add_argument("--grid", choices=["etched", "glow", "mat"], default="etched", help="bench scene only")
+ap.add_argument("--word", choices=["solid", "light", "cutout"], default="solid", help="hero scene only")
 ap.add_argument("--state", choices=["dense", "mid", "glass"], default="glass", help="studio scene only")
 ap.add_argument("--preview", action="store_true", help="small, fast, noisy render to check the setup")
 ap.add_argument("--out", default="blender/lookdev/renders")
@@ -1025,17 +1026,99 @@ def build_canvas():
     area_light("rim", (0.6, 0.7, 0.35), 0.3, 22, ROSE_SOFT)
     camera((0.05, -0.85, 0.55), (0.06, 0.0, 0.02), lens=45, focus=1.0, fstop=4)
 
+def chaos_points(n):
+    """The chaotic cloud (same construction as build_chaos), without the gust."""
+    p, hue = filament_points(n, seed=2026, sharp=10)
+    rng = np.random.default_rng(7)
+    r = np.linalg.norm(p, axis=1)
+    keep = rng.uniform(0, 1, len(p)) < (1 - 0.75 * r ** 2)
+    p, hue, r = p[keep], hue[keep], r[keep]
+    x, y, z = p[:, 0], p[:, 1], p[:, 2]
+    wx = x + (fbm(x * 0.9 + 2.0, y * 0.9, z * 0.9) - 0.5) * 1.8
+    wy = y + (fbm(x * 0.9, y * 0.9 + 6.0, z * 0.9) - 0.5) * 1.8
+    wz = z + (fbm(x * 0.9, y * 0.9, z * 0.9 + 9.0) - 0.5) * 1.8
+    spread = 1 + 0.6 * r ** 3
+    pts = np.stack([wx * 2.3 * spread, wz * 2.0 * spread, wy * 1.45 * spread], axis=1)
+    radius = rng.uniform(0.004, 0.009, len(pts)) * (2.4 if args.preview else 1)
+    return pts.astype(np.float32), hue, radius
+
+def build_hero():
+    """Ch1 hero, scroll 0%: the chaos in a pure dark void with light haze, and the LIAM HASSON wordmark in depth."""
+    pts, hue, radius = chaos_points(80_000 if args.preview else 520_000)
+    grains("chaos", pts, hue, radius)
+    world((0.0015, 0.0013, 0.0015, 1), 1.0)
+    # Haze: a thin scattering volume around the whole set, so the rim light blooms softly through the air.
+    bpy.ops.mesh.primitive_cube_add(size=40, location=(0, 0, 0))
+    haze = bpy.context.active_object
+    hm = bpy.data.materials.new("haze"); hm.use_nodes = True
+    for nd in list(hm.node_tree.nodes):
+        if nd.type != "OUTPUT_MATERIAL":
+            hm.node_tree.nodes.remove(nd)
+    vol = hm.node_tree.nodes.new("ShaderNodeVolumePrincipled")
+    vol.inputs["Density"].default_value = 0.0025
+    vol.inputs["Anisotropy"].default_value = 0.55
+    vol.inputs["Color"].default_value = (1.0, 0.9, 0.88, 1)
+    hm.node_tree.links.new(vol.outputs[0], hm.node_tree.nodes["Material Output"].inputs["Volume"])
+    haze.data.materials.append(hm)
+    haze.visible_shadow = False
+    # Wordmark.
+    font = bpy.data.fonts.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts", "HankenGrotesk-ExtraBold.ttf"))
+    cu = bpy.data.curves.new("wordmark", "FONT")
+    cu.body = "LIAM HASSON"
+    cu.font = font
+    cu.align_x, cu.align_y = "CENTER", "CENTER"
+    cu.size = 0.95
+    cu.space_character = 0.96
+    word = bpy.data.objects.new("wordmark", cu)
+    scene.collection.objects.link(word)
+    word.rotation_euler = (math.pi / 2, 0, 0)        # stand the letters up, facing the camera
+    m = bpy.data.materials.new("word_" + args.word); m.use_nodes = True
+    nt = m.node_tree; bsdf = nt.nodes["Principled BSDF"]; out = nt.nodes["Material Output"]
+    if args.word == "solid":
+        # Physical letters standing among the sand: dark, slightly satin, lit by the rim.
+        cu.extrude = 0.18
+        cu.bevel_depth = 0.012
+        word.location = (0, 0.4, 0.45)
+        bsdf.inputs["Base Color"].default_value = srgb("#1c1517")
+        bsdf.inputs["Roughness"].default_value = 0.42
+    elif args.word == "light":
+        # The name glows faintly far back in the haze, like a projection in the air.
+        word.location = (0, 4.5, 0.85)
+        cu.size = 1.35
+        for nd in list(nt.nodes):
+            if nd.type != "OUTPUT_MATERIAL":
+                nt.nodes.remove(nd)
+        em = nt.nodes.new("ShaderNodeEmission")
+        em.inputs["Color"].default_value = (1.0, 0.86, 0.8, 1)
+        em.inputs["Strength"].default_value = 0.55
+        nt.links.new(em.outputs[0], out.inputs["Surface"])
+    else:
+        # Cut out of the darkness: the letters are pure black and only show where sand passes behind them.
+        word.location = (0, -0.6, 0.45)
+        for nd in list(nt.nodes):
+            if nd.type != "OUTPUT_MATERIAL":
+                nt.nodes.remove(nd)
+        em = nt.nodes.new("ShaderNodeEmission")
+        em.inputs["Color"].default_value = (0, 0, 0, 1)
+        em.inputs["Strength"].default_value = 0.0
+        nt.links.new(em.outputs[0], out.inputs["Surface"])
+    word.data.materials.append(m)
+    area_light("key", (-4.0, -7.0, 4.0), 3.5, 1900, (1.0, 0.82, 0.68))
+    area_light("rim", (1.5, 6.5, 2.5), 2.0, 1500, ROSE_SOFT)
+    area_light("fill", (3.5, -4.0, -1.0), 4.0, 80, (0.72, 0.78, 0.95))
+    camera((0, -9.5, 0.6), (0, 0, 0.1), lens=45, focus=9.3, fstop=11)
+
 # ---------------------------------------------------------------- go
 
 {"ball": build_ball, "chaos": build_chaos, "glass": build_glass, "studio": build_studio,
- "desk": build_desk, "bench": build_bench, "canvas": build_canvas}[args.scene]()
+ "desk": build_desk, "bench": build_bench, "canvas": build_canvas, "hero": build_hero}[args.scene]()
 if args.preview:
     render_settings(24, 480, 300)
 else:
     render_settings(512 if args.scene in ("glass", "studio") else 256)
 
 os.makedirs(args.out, exist_ok=True)
-tag = f"{args.scene}-{args.state}" if args.scene == "studio" else f"{args.scene}-{args.grid}" if args.scene == "bench" else args.scene
+tag = f"{args.scene}-{args.state}" if args.scene == "studio" else f"{args.scene}-{args.grid}" if args.scene == "bench" else f"{args.scene}-{args.word}" if args.scene == "hero" else args.scene
 path = os.path.abspath(os.path.join(args.out, f"{tag}{'-preview' if args.preview else ''}.png"))
 scene.render.filepath = path
 bpy.ops.render.render(write_still=True)
