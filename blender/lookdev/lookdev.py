@@ -23,7 +23,8 @@ from mathutils import Vector
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 ap = argparse.ArgumentParser()
-ap.add_argument("--scene", choices=["ball", "chaos", "glass"], required=True)
+ap.add_argument("--scene", choices=["ball", "chaos", "glass", "studio"], required=True)
+ap.add_argument("--state", choices=["dense", "mid", "glass"], default="glass", help="studio scene only")
 ap.add_argument("--preview", action="store_true", help="small, fast, noisy render to check the setup")
 ap.add_argument("--out", default="blender/lookdev/renders")
 args = ap.parse_args(argv)
@@ -145,7 +146,7 @@ def plane(name, size, loc, rot=(0, 0, 0), mat=None):
         ob.data.materials.append(mat)
     return ob
 
-def softbox(name, loc, w, h, strength, target=(0, 0, 0)):
+def softbox(name, loc, w, h, strength, target=(0, 0, 0), color=(1, 0.97, 0.95, 1), visible=False, edge=0.5, peak=0.95):
     """An emissive panel that is bright in the middle and falls off to its edges, like a real softbox."""
     bpy.ops.mesh.primitive_plane_add(size=1, location=loc)
     ob = bpy.context.active_object
@@ -165,10 +166,11 @@ def softbox(name, loc, w, h, strength, target=(0, 0, 0)):
     grad = nt.nodes.new("ShaderNodeTexGradient")
     grad.gradient_type = "SPHERICAL"
     ramp = nt.nodes.new("ShaderNodeValToRGB")
-    ramp.color_ramp.elements[0].position = 0.5
+    ramp.color_ramp.interpolation = "EASE"
+    ramp.color_ramp.elements[0].position = edge
     ramp.color_ramp.elements[0].color = (0, 0, 0, 1)
-    ramp.color_ramp.elements[1].position = 0.95
-    ramp.color_ramp.elements[1].color = (1, 0.97, 0.95, 1)
+    ramp.color_ramp.elements[1].position = peak
+    ramp.color_ramp.elements[1].color = color
     em = nt.nodes.new("ShaderNodeEmission")
     em.inputs["Strength"].default_value = strength
     nt.links.new(tc.outputs["UV"], mp.inputs["Vector"])
@@ -177,7 +179,7 @@ def softbox(name, loc, w, h, strength, target=(0, 0, 0)):
     nt.links.new(ramp.outputs["Color"], em.inputs["Color"])
     nt.links.new(em.outputs[0], nt.nodes["Material Output"].inputs["Surface"])
     ob.data.materials.append(m)
-    ob.visible_camera = False
+    ob.visible_camera = visible
     return ob
 
 def world(color, strength):
@@ -390,16 +392,82 @@ def build_glass():
     area_light("wash", (0, 5.5, 5.5), 6.0, 380, (0.95, 0.92, 0.92), target=(0, 8.5, 1.5))
     camera((0, -6.2, 0.65), (0, 0, 0.05), lens=60)
 
+def glass_material():
+    m = bpy.data.materials.new("glass")
+    m.use_nodes = True
+    nt = m.node_tree
+    bsdf = nt.nodes["Principled BSDF"]
+    bsdf.inputs["Base Color"].default_value = (1, 1, 1, 1)
+    bsdf.inputs["Roughness"].default_value = 0.0
+    bsdf.inputs["IOR"].default_value = 1.5
+    bsdf.inputs["Transmission Weight"].default_value = 1.0
+    absorb = nt.nodes.new("ShaderNodeVolumeAbsorption")
+    absorb.inputs["Color"].default_value = (0.86, 0.92, 0.93, 1)
+    absorb.inputs["Density"].default_value = 0.35
+    nt.links.new(absorb.outputs[0], nt.nodes["Material Output"].inputs["Volume"])
+    return m
+
+def glass_sphere(radius):
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=160, ring_count=80, radius=radius, location=(0, 0, 0))
+    ob = bpy.context.active_object
+    bpy.ops.object.shade_smooth()
+    ob.data.materials.append(glass_material())
+    return ob
+
+def build_studio():
+    """Ch3: the sphere floats in a dark studio in front of a large soft gradient of light."""
+    cam_loc = (0, -6.4, 0.35)
+    world((0.002, 0.002, 0.002, 1), 1.0)
+    # The lit backdrop: a big panel, brightest in the middle, falling off to black. Warm neutral, no strong colour.
+    softbox("backdrop", (0, 7.0, 0.5), 7.5, 7.5, 1.6, target=cam_loc, color=(0.86, 0.76, 0.72, 1), visible=True, edge=0.5, peak=1.0)
+    # Dim bounce cards above and below, out of frame: the glass edges pick up soft light instead of going black.
+    softbox("card_top", (0, -0.5, 6.0), 9.0, 6.0, 1.3, target=(0, -0.5, 0), color=(0.9, 0.86, 0.84, 1), edge=0.2)
+    softbox("card_low", (0, -0.5, -6.0), 9.0, 6.0, 0.8, target=(0, -0.5, 0), color=(0.9, 0.84, 0.8, 1), edge=0.2)
+    softbox("key", (-3.2, -3.6, 3.0), 3.0, 2.0, 22.0)
+    area_light("rim_rose", (-3.4, 2.4, 0.8), 0.25, 380, ROSE, size_y=4.0)
+    area_light("rim_gold", (3.6, 2.6, 0.0), 0.25, 260, GOLD, size_y=3.0)
+    camera(cam_loc, (0, 0, 0), lens=62)
+    if args.state in ("dense", "mid"):
+        area_light("grain_key", (-3.2, -3.0, 3.4), 2.6, 1150, (1.0, 0.82, 0.68))
+
+    full = 60_000 if args.preview else 700_000
+    rng = np.random.default_rng(7)
+    if args.state in ("dense", "mid"):
+        p, hue = filament_points(full, seed=2026)
+        r = np.linalg.norm(p, axis=1, keepdims=True)
+        dirs = p / np.maximum(r, 1e-6)
+        shell = r[:, 0] ** 0.3
+        radius = rng.uniform(0.004, 0.009, len(p)) * (2.4 if args.preview else 1)
+        if args.state == "dense":
+            grains("ball", dirs * shell[:, None], hue, radius)
+        else:
+            # Mid-contraction: a glass core has formed; what's left of the sand is pulled in toward it, swirling.
+            # Only swirling ribbons of sand remain, wrapped around the glass core that has formed inside.
+            d0 = dirs
+            band = fbm(d0[:, 0] * 1.8 + 4.0, d0[:, 1] * 1.8 + d0[:, 2] * 2.6, d0[:, 2] * 1.8)
+            keep = (np.abs(band - np.median(band)) < 0.035) & (rng.uniform(0, 1, len(p)) < 0.85)
+            dirs, shell, hue, radius = dirs[keep], shell[keep], hue[keep], radius[keep] * 0.85
+            rad = 0.79 + (shell - shell.min()) / (shell.max() - shell.min()) * 0.13
+            ang = (rad - 0.8) * 5.0
+            x, y, z = dirs[:, 0], dirs[:, 1], dirs[:, 2]
+            xs, ys = x * np.cos(ang) - y * np.sin(ang), x * np.sin(ang) + y * np.cos(ang)
+            pts = np.stack([xs, ys, z], axis=1) * rad[:, None]
+            grains("swirl", pts.astype(np.float32), hue, radius)
+            glass_sphere(0.77)
+    else:
+        glass_sphere(0.72)
+
 # ---------------------------------------------------------------- go
 
-{"ball": build_ball, "chaos": build_chaos, "glass": build_glass}[args.scene]()
+{"ball": build_ball, "chaos": build_chaos, "glass": build_glass, "studio": build_studio}[args.scene]()
 if args.preview:
     render_settings(24, 480, 300)
 else:
-    render_settings(512 if args.scene == "glass" else 256)
+    render_settings(512 if args.scene in ("glass", "studio") else 256)
 
 os.makedirs(args.out, exist_ok=True)
-path = os.path.abspath(os.path.join(args.out, f"{args.scene}{'-preview' if args.preview else ''}.png"))
+tag = f"{args.scene}-{args.state}" if args.scene == "studio" else args.scene
+path = os.path.abspath(os.path.join(args.out, f"{tag}{'-preview' if args.preview else ''}.png"))
 scene.render.filepath = path
 bpy.ops.render.render(write_still=True)
 print("WROTE", path)
