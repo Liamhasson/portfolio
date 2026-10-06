@@ -190,8 +190,8 @@ def world(color, strength):
     bg.inputs["Strength"].default_value = strength
     scene.world = w
 
-def sand_material():
-    m = bpy.data.materials.new("sand")
+def sand_material(transform=False):
+    m = bpy.data.materials.new("sand_to_glass" if transform else "sand")
     m.use_nodes = True
     nt = m.node_tree
     bsdf = nt.nodes["Principled BSDF"]
@@ -209,9 +209,31 @@ def sand_material():
     # Solid, matte, crisp: no glow, a little sheen of specular only.
     bsdf.inputs["Roughness"].default_value = 0.62
     bsdf.inputs["Specular IOR Level"].default_value = 0.3
+    if transform:
+        # 'clear' 0 = sand, 1 = glass. The colour drains as the grain clears; no heat, no glow.
+        clear = nt.nodes.new("ShaderNodeAttribute")
+        clear.attribute_type = "INSTANCER"
+        clear.attribute_name = "clear"
+        glass = nt.nodes.new("ShaderNodeBsdfPrincipled")
+        glass.inputs["Base Color"].default_value = (1, 1, 1, 1)
+        glass.inputs["Roughness"].default_value = 0.03
+        glass.inputs["IOR"].default_value = 1.5
+        glass.inputs["Transmission Weight"].default_value = 1.0
+        mix = nt.nodes.new("ShaderNodeMixShader")
+        out = nt.nodes["Material Output"]
+        drain = nt.nodes.new("ShaderNodeMix")
+        drain.data_type = "RGBA"
+        drain.inputs["B"].default_value = (0.82, 0.8, 0.8, 1)
+        nt.links.new(clear.outputs["Fac"], drain.inputs["Factor"])
+        nt.links.new(ramp.outputs["Color"], drain.inputs["A"])
+        nt.links.new(drain.outputs["Result"], bsdf.inputs["Base Color"])
+        nt.links.new(clear.outputs["Fac"], mix.inputs["Fac"])
+        nt.links.new(bsdf.outputs[0], mix.inputs[1])
+        nt.links.new(glass.outputs[0], mix.inputs[2])
+        nt.links.new(mix.outputs[0], out.inputs["Surface"])
     return m
 
-def grains(name, pts, hue, radius, jitter=0.22):
+def grains(name, pts, hue, radius, jitter=0.22, clear=None):
     """Instances a small faceted rock-like grain (icosphere, flat shaded, random squash and rotation) on every point."""
     me = bpy.data.meshes.new(name + "_pts")
     me.vertices.add(len(pts))
@@ -220,6 +242,9 @@ def grains(name, pts, hue, radius, jitter=0.22):
     a.data.foreach_set("value", hue)
     s = me.attributes.new("gscale", "FLOAT", "POINT")
     s.data.foreach_set("value", radius.astype(np.float32))
+    if clear is not None:
+        c = me.attributes.new("clear", "FLOAT", "POINT")
+        c.data.foreach_set("value", clear.astype(np.float32))
     me.update()
     ob = bpy.data.objects.new(name, me)
     scene.collection.objects.link(ob)
@@ -235,7 +260,7 @@ def grains(name, pts, hue, radius, jitter=0.22):
     ico.inputs["Subdivisions"].default_value = 2
     smooth = n.new("GeometryNodeSetShadeSmooth")
     setm = n.new("GeometryNodeSetMaterial")
-    setm.inputs["Material"].default_value = sand_material()
+    setm.inputs["Material"].default_value = sand_material(transform=clear is not None)
     inst = n.new("GeometryNodeInstanceOnPoints")
     sca = n.new("GeometryNodeInputNamedAttribute")
     sca.data_type = "FLOAT"
@@ -392,8 +417,8 @@ def build_glass():
     area_light("wash", (0, 5.5, 5.5), 6.0, 380, (0.95, 0.92, 0.92), target=(0, 8.5, 1.5))
     camera((0, -6.2, 0.65), (0, 0, 0.05), lens=60)
 
-def glass_material():
-    m = bpy.data.materials.new("glass")
+def glass_material(frost=False):
+    m = bpy.data.materials.new("glass_frost" if frost else "glass")
     m.use_nodes = True
     nt = m.node_tree
     bsdf = nt.nodes["Principled BSDF"]
@@ -405,13 +430,53 @@ def glass_material():
     absorb.inputs["Color"].default_value = (0.86, 0.92, 0.93, 1)
     absorb.inputs["Density"].default_value = 0.35
     nt.links.new(absorb.outputs[0], nt.nodes["Material Output"].inputs["Volume"])
+    if frost:
+        # Where the surface has only just turned (clear near 0) it is frosted and faintly warm; it clears as clear -> 1.
+        attr = nt.nodes.new("ShaderNodeAttribute")
+        attr.attribute_type = "GEOMETRY"
+        attr.attribute_name = "clear"
+        rough = nt.nodes.new("ShaderNodeMapRange")
+        rough.inputs["To Min"].default_value = 0.5
+        rough.inputs["To Max"].default_value = 0.0
+        nt.links.new(attr.outputs["Fac"], rough.inputs["Value"])
+        nt.links.new(rough.outputs["Result"], bsdf.inputs["Roughness"])
+        tint = nt.nodes.new("ShaderNodeMix")
+        tint.data_type = "RGBA"
+        tint.inputs["A"].default_value = (0.86, 0.74, 0.74, 1)
+        tint.inputs["B"].default_value = (1, 1, 1, 1)
+        nt.links.new(attr.outputs["Fac"], tint.inputs["Factor"])
+        nt.links.new(tint.outputs["Result"], bsdf.inputs["Base Color"])
     return m
 
-def glass_sphere(radius):
+def glass_sphere(radius, clear_fn=None):
     bpy.ops.mesh.primitive_uv_sphere_add(segments=160, ring_count=80, radius=radius, location=(0, 0, 0))
     ob = bpy.context.active_object
     bpy.ops.object.shade_smooth()
-    ob.data.materials.append(glass_material())
+    if clear_fn is not None:
+        co = np.empty(len(ob.data.vertices) * 3, dtype=np.float32)
+        ob.data.vertices.foreach_get("co", co)
+        d = co.reshape(-1, 3)
+        d = d / np.maximum(np.linalg.norm(d, axis=1, keepdims=True), 1e-6)
+        a = ob.data.attributes.new("clear", "FLOAT", "POINT")
+        a.data.foreach_set("value", clear_fn(d).astype(np.float32))
+    ob.data.materials.append(glass_material(frost=clear_fn is not None))
+    return ob
+
+def ring_light(z, major, minor, strength):
+    bpy.ops.mesh.primitive_torus_add(major_radius=major, minor_radius=minor, location=(0, -0.6, z))
+    ob = bpy.context.active_object
+    m = bpy.data.materials.new("ring")
+    m.use_nodes = True
+    nt = m.node_tree
+    for nd in list(nt.nodes):
+        if nd.type != "OUTPUT_MATERIAL":
+            nt.nodes.remove(nd)
+    em = nt.nodes.new("ShaderNodeEmission")
+    em.inputs["Color"].default_value = (1, 0.97, 0.95, 1)
+    em.inputs["Strength"].default_value = strength
+    nt.links.new(em.outputs[0], nt.nodes["Material Output"].inputs["Surface"])
+    ob.data.materials.append(m)
+    ob.visible_camera = False
     return ob
 
 def build_studio():
@@ -429,6 +494,10 @@ def build_studio():
     camera(cam_loc, (0, 0, 0), lens=62)
     if args.state in ("dense", "mid"):
         area_light("grain_key", (-3.2, -3.0, 3.4), 2.6, 1150, (1.0, 0.82, 0.68))
+    if args.state in ("mid", "glass"):
+        ring_light(3.0, 2.2, 0.45, 1.6)
+        softbox("strip_l", (-3.0, -2.0, 0.2), 0.5, 3.2, 6.0, color=(1, 0.97, 0.95, 1), edge=0.35)
+        softbox("strip_r", (3.0, -2.2, -0.2), 0.4, 2.6, 4.0, color=(1, 0.97, 0.95, 1), edge=0.35)
 
     full = 60_000 if args.preview else 700_000
     rng = np.random.default_rng(7)
@@ -442,18 +511,24 @@ def build_studio():
             grains("ball", dirs * shell[:, None], hue, radius)
         else:
             # Mid-contraction: a glass core has formed; what's left of the sand is pulled in toward it, swirling.
-            # Only swirling ribbons of sand remain, wrapped around the glass core that has formed inside.
-            d0 = dirs
-            band = fbm(d0[:, 0] * 1.8 + 4.0, d0[:, 1] * 1.8 + d0[:, 2] * 2.6, d0[:, 2] * 1.8)
-            keep = (np.abs(band - np.median(band)) < 0.035) & (rng.uniform(0, 1, len(p)) < 0.85)
-            dirs, shell, hue, radius = dirs[keep], shell[keep], hue[keep], radius[keep] * 0.85
-            rad = 0.79 + (shell - shell.min()) / (shell.max() - shell.min()) * 0.13
-            ang = (rad - 0.8) * 5.0
-            x, y, z = dirs[:, 0], dirs[:, 1], dirs[:, 2]
-            xs, ys = x * np.cos(ang) - y * np.sin(ang), x * np.sin(ang) + y * np.cos(ang)
-            pts = np.stack([xs, ys, z], axis=1) * rad[:, None]
-            grains("swirl", pts.astype(np.float32), hue, radius)
-            glass_sphere(0.77)
+            # Inside out: the core has already become glass and the clarity is breaking through the surface in
+            # irregular patches. At the edge of each patch the grains themselves turn to glass (colour drains, they go
+            # transparent and sink into the surface). Elsewhere the sand is compacted, matte and rose. One material.
+            R0 = 0.84
+            norm = (shell - shell.min()) / (shell.max() - shell.min())
+            field = fbm(dirs[:, 0] * 1.7 + 3.0, dirs[:, 1] * 1.7, dirs[:, 2] * 1.7 + 5.0)
+            rank = np.argsort(np.argsort(field)) / len(field)          # uniform 0..1 over the sphere
+            lo, hi = 0.40, 0.72                                          # transition band; above hi it's already glass
+            keep = rank < hi
+            dirs, norm, hue, radius, rank = dirs[keep], norm[keep], hue[keep], radius[keep], rank[keep]
+            clear = np.clip((rank - lo) / (hi - lo), 0, 1) ** 1.4
+            rad = R0 * (0.985 + 0.03 * norm) - 0.03 * clear              # compacted shell; clearing grains sink in
+            radius = radius * (1 + 0.7 * clear)                         # and spread, fusing into the surface
+            grains("fusing", (dirs * rad[:, None]).astype(np.float32), hue, radius, clear=clear)
+            def fld(d):
+                return fbm(d[:, 0] * 1.7 + 3.0, d[:, 1] * 1.7, d[:, 2] * 1.7 + 5.0)
+            f_lo, f_hi, f_top = np.quantile(field, [lo, hi, 0.95])
+            glass_sphere(R0 * 0.985, clear_fn=lambda d: np.clip((fld(d) - f_lo) / (f_top - f_lo), 0, 1))
     else:
         glass_sphere(0.72)
 
