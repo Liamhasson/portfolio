@@ -441,8 +441,8 @@ def glass_material(frost=False):
         attr.attribute_type = "GEOMETRY"
         attr.attribute_name = "clear"
         rough = nt.nodes.new("ShaderNodeMapRange")
-        rough.inputs["To Min"].default_value = 0.5
-        rough.inputs["To Max"].default_value = 0.0
+        rough.inputs["To Min"].default_value = 0.6
+        rough.inputs["To Max"].default_value = 0.14
         nt.links.new(attr.outputs["Fac"], rough.inputs["Value"])
         nt.links.new(rough.outputs["Result"], bsdf.inputs["Roughness"])
         tint = nt.nodes.new("ShaderNodeMix")
@@ -451,6 +451,27 @@ def glass_material(frost=False):
         tint.inputs["B"].default_value = (1, 1, 1, 1)
         nt.links.new(attr.outputs["Fac"], tint.inputs["Factor"])
         nt.links.new(tint.outputs["Result"], bsdf.inputs["Base Color"])
+        exists = nt.nodes.new("ShaderNodeMapRange")
+        exists.inputs["From Min"].default_value = 0.0
+        exists.inputs["From Max"].default_value = 0.06
+        nt.links.new(attr.outputs["Fac"], exists.inputs["Value"])
+        transparent = nt.nodes.new("ShaderNodeBsdfTransparent")
+        mask = nt.nodes.new("ShaderNodeMixShader")
+        out = nt.nodes["Material Output"]
+        nt.links.new(exists.outputs["Result"], mask.inputs["Fac"])
+        nt.links.new(transparent.outputs[0], mask.inputs[1])
+        nt.links.new(bsdf.outputs[0], mask.inputs[2])
+        nt.links.new(mask.outputs[0], out.inputs["Surface"])
+        # Still forming: the clearing is a lit, translucent frost skin (like sugar glass) that only slowly gains
+        # transparency, so it reads as solid material catching the studio light, not a window into the ball.
+        bsdf.inputs["Subsurface Weight"].default_value = 1.0
+        bsdf.inputs["Subsurface Radius"].default_value = (0.4, 0.25, 0.2)
+        bsdf.inputs["Subsurface Scale"].default_value = 0.05
+        trans = nt.nodes.new("ShaderNodeMapRange")
+        trans.inputs["To Min"].default_value = 0.15
+        trans.inputs["To Max"].default_value = 0.7
+        nt.links.new(attr.outputs["Fac"], trans.inputs["Value"])
+        nt.links.new(trans.outputs["Result"], bsdf.inputs["Transmission Weight"])
     return m
 
 def glass_sphere(radius, clear_fn=None):
@@ -533,7 +554,7 @@ def build_studio():
             def fld(d):
                 return fbm(d[:, 0] * 1.7 + 3.0, d[:, 1] * 1.7, d[:, 2] * 1.7 + 5.0)
             f_lo, f_hi, f_top = np.quantile(field, [lo, hi, 0.97])
-            glass_sphere(R0 * 0.985, clear_fn=lambda d: np.clip((fld(d) - f_lo) / (f_top - f_lo), 0, 1))
+            glass_sphere(R0 * 1.012, clear_fn=lambda d: np.clip((fld(d) - f_lo) / (f_top - f_lo), 0, 1))
     else:
         glass_sphere(0.72)
 
