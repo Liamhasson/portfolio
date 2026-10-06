@@ -713,9 +713,9 @@ def sheet(name, size, loc, rot_z, mat, curl=0.0, lift=0.0006, fold=None, seed=0,
     if dogear:
         # One corner folded up: points beyond a diagonal near the corner lift and lean back toward the card.
         u_ = (v[:, 0] - x0) / (x1 - x0); w_ = (v[:, 1] - y0) / (y1 - y0)
-        k = (u_ + w_) - 1.72
+        k = (u_ + w_) - 1.5
         m_ = k > 0
-        v[m_, 2] += k[m_] * (x1 - x0) * 0.55
+        v[m_, 2] += k[m_] * (x1 - x0) * 0.75
         v[m_, 0] -= k[m_] * (x1 - x0) * 0.12
         v[m_, 1] -= k[m_] * (y1 - y0) * 0.12
     ob.data.vertices.foreach_set("co", v.ravel())
@@ -756,8 +756,8 @@ def walnut_material():
     diff, nor, rough = img("walnut_Diffuse.jpg", False), img("walnut_nor_gl.jpg", True), img("walnut_Rough.jpg", True)
     # Darken toward dark walnut (keep the scan's figure).
     hsv = N.new("ShaderNodeHueSaturation")
-    hsv.inputs["Value"].default_value = 0.16
-    hsv.inputs["Saturation"].default_value = 1.45
+    hsv.inputs["Value"].default_value = 0.11
+    hsv.inputs["Saturation"].default_value = 1.6
     L.new(diff.outputs["Color"], hsv.inputs["Color"])
     sep = N.new("ShaderNodeSeparateXYZ"); L.new(tc.outputs["Object"], sep.inputs[0])
     # Plank seam: a thin dark groove across the desk.
@@ -786,7 +786,7 @@ def walnut_material():
     L.new(sc_n.outputs["Fac"], scratch.inputs["Value"])
     # Dust: sparse light speckles.
     dust_n = N.new("ShaderNodeTexNoise"); dust_n.inputs["Scale"].default_value = 2200.0; dust_n.inputs["Detail"].default_value = 1.0
-    dust = N.new("ShaderNodeMapRange"); dust.inputs["From Min"].default_value = 0.68; dust.inputs["From Max"].default_value = 0.74
+    dust = N.new("ShaderNodeMapRange"); dust.inputs["From Min"].default_value = 0.74; dust.inputs["From Max"].default_value = 0.78
     L.new(dust_n.outputs["Fac"], dust.inputs["Value"])
     # Colour: wood, darkened in the seam and the ring, lightened by scratches and dust.
     def mixc(a_out, color, fac_out, amount, blend="MIX"):
@@ -799,7 +799,7 @@ def walnut_material():
     col = mixc(col, (0.006, 0.004, 0.003, 1), seam.outputs[0], 1.0)
     col = mixc(col, (0.03, 0.016, 0.008, 1), ring_m.outputs[0], 0.55)
     col = mixc(col, (0.16, 0.12, 0.09, 1), scratch.outputs["Result"], 0.35)
-    col = mixc(col, (0.35, 0.33, 0.31, 1), dust.outputs["Result"], 0.5)
+    col = mixc(col, (0.2, 0.18, 0.16, 1), dust.outputs["Result"], 0.12)
     L.new(col, bsdf.inputs["Base Color"])
     # Uneven varnish: scan roughness, pushed by scratches and dust.
     r1 = N.new("ShaderNodeMapRange"); r1.inputs["To Min"].default_value = 0.28; r1.inputs["To Max"].default_value = 0.62
@@ -819,7 +819,7 @@ def walnut_material():
     mp.inputs["Scale"].default_value = (2.4, 2.4, 2.4)   # one 4K tile ≈ 42 cm of wood: real grain scale
     return m
 
-def pick(name, loc, rot_z, flip=False):
+def pick(name, loc, rot_z, flip=False, tilt=0.0):
     """A black celluloid pick in the classic 351 shape (rounded triangle), 0.71 mm thick, slightly worn."""
     import bmesh
     # 351 outline: convex hull of two shoulder circles and a small tip circle (27.5 mm wide, 31 mm tall).
@@ -847,7 +847,7 @@ def pick(name, loc, rot_z, flip=False):
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
     ob = bpy.data.objects.new(name, me); scene.collection.objects.link(ob)
-    ob.location = loc; ob.rotation_euler = (math.pi if flip else 0, 0, rot_z)
+    ob.location = loc; ob.rotation_euler = ((math.pi if flip else 0) + tilt, tilt * 0.4, rot_z)
     bev = ob.modifiers.new("bevel", "BEVEL"); bev.width = 0.0003; bev.segments = 3
     ob.data.materials.append(principled("pick_" + name, (0.006, 0.006, 0.007, 1), 0.22, **{"Specular IOR Level": 0.4}))
     bev.width = 0.00015; bev.segments = 2
@@ -872,9 +872,10 @@ def build_desk():
     sheet("sticky_b", (0.076, 0.076), (-0.15, -0.03, 0.0010), 0.52, paper_material("sticky_b_m", PINK, scribble_texture("sticky_b_t", 2, 22)), curl=0.08)
     sheet("sticky_c", (0.076, 0.076), (0.14, 0.045, 0.0012), -0.58, paper_material("sticky_c_m", YELLOW, scribble_texture("sticky_c_t", 3, 23)), curl=0.1)
     # Three black picks, off to the side (a nod to ten years with the bands).
-    pick("pick_a", (-0.04, -0.13, 0.0006), 0.4)
-    pick("pick_b", (-0.008, -0.152, 0.0006), 2.3)
-    pick("pick_c", (-0.052, -0.163, 0.0014), -0.9, flip=True)
+    # Three picks in a loose pile at the back of the desk: out of focus, an aside, never the focus.
+    pick("pick_a", (-0.245, 0.275, 0.0004), 0.9)
+    pick("pick_b", (-0.236, 0.281, 0.0013), 2.6, tilt=0.07)
+    pick("pick_c", (-0.252, 0.268, 0.0024), -0.5, flip=True, tilt=-0.11)
     # A pen lying across a card.
     bpy.ops.mesh.primitive_cylinder_add(vertices=48, radius=0.0055, depth=0.145, location=(-0.12, 0.06, 0.0072), rotation=(0, math.pi / 2, 0.75))
     pen = bpy.context.active_object
