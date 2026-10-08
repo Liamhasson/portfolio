@@ -27,6 +27,8 @@ ap.add_argument("--scene", choices=["ball", "chaos", "glass", "studio", "desk", 
 ap.add_argument("--grid", choices=["etched", "glow", "mat"], default="etched", help="bench scene only")
 ap.add_argument("--word", choices=["solid", "light", "cutout", "none"], default="light", help="hero scene only")
 ap.add_argument("--phase", choices=["chaos", "mid", "ball"], default="chaos", help="hero scene only")
+ap.add_argument("--view", choices=["tq", "top", "side"], default="tq", help="desk scene only: three-quarter, top-down, low side")
+ap.add_argument("--dstate", choices=["dense", "attempt", "glass"], default="dense", help="desk scene only: the ball's state")
 ap.add_argument("--light", type=float, default=1.0, help="hero scene only: scale every light (loader fade-in)")
 ap.add_argument("--state", choices=["dense", "mid", "glass"], default="glass", help="studio scene only")
 ap.add_argument("--preview", action="store_true", help="small, fast, noisy render to check the setup")
@@ -114,6 +116,7 @@ def area_light(name, loc, size, energy, color=(1, 1, 1), size_y=None, target=(0,
         data.size = size
     ob = bpy.data.objects.new(name, data)
     ob.location = loc
+    ob.visible_camera = False   # a pitch black void: no light source is ever seen
     scene.collection.objects.link(ob)
     aim(ob, target)
     return ob
@@ -189,6 +192,46 @@ def softbox(name, loc, w, h, strength, target=(0, 0, 0), color=(1, 0.97, 0.95, 1
 def csock(sockets, name):
     """The RGBA socket called `name` (Mix nodes expose float, vector and colour sockets with identical names)."""
     return next(s for s in sockets if s.name == name and s.type == "RGBA")
+
+def reflection_env(strength, rot_z=0.0):
+    """Light that only reflections and refractions see: a few soft studio panels built in the shader, so the glass
+    reflects light, never a recognisable object. The camera, diffuse light and volumes never see it: the void stays
+    pitch black and the set's lighting is unchanged."""
+    w = scene.world
+    nt = w.node_tree
+    N, L = nt.nodes, nt.links
+    tc = N.new("ShaderNodeTexCoord")
+    rot = N.new("ShaderNodeVectorRotate"); rot.rotation_type = "Z_AXIS"; rot.inputs["Angle"].default_value = rot_z
+    L.new(tc.outputs["Generated"], rot.inputs["Vector"])
+    norm = N.new("ShaderNodeVectorMath"); norm.operation = "NORMALIZE"; L.new(rot.outputs["Vector"], norm.inputs[0])
+    def panel(direction, softness, power):
+        d = Vector(direction).normalized()
+        dot = N.new("ShaderNodeVectorMath"); dot.operation = "DOT_PRODUCT"; dot.inputs[1].default_value = d
+        L.new(norm.outputs["Vector"], dot.inputs[0])
+        mr = N.new("ShaderNodeMapRange"); mr.interpolation_type = "SMOOTHERSTEP"
+        mr.inputs["From Min"].default_value = 1.0 - softness; mr.inputs["From Max"].default_value = 1.0
+        mr.inputs["To Max"].default_value = power
+        L.new(dot.outputs["Value"], mr.inputs["Value"])
+        return mr.outputs["Result"]
+    terms = [panel((-0.6, -0.7, 0.75), 0.05, 9.0),    # key, upper left front: crisp-edged
+             panel((0.15, -0.1, 1.0), 0.025, 5.0),    # small overhead
+             panel((0.92, -0.3, 0.2), 0.012, 8.0),    # thin strip, right
+             panel((-0.95, 0.25, -0.1), 0.01, 5.0),   # thin strip, left
+             panel((0.3, -0.95, -0.5), 0.03, 2.5)]    # low front bounce: a crisp lower highlight (true to the dark set)
+    acc = terms[0]
+    for term in terms[1:]:
+        add = N.new("ShaderNodeMath"); add.operation = "ADD"
+        L.new(acc, add.inputs[0]); L.new(term, add.inputs[1]); acc = add.outputs[0]
+    bg = N["Background"]
+    tint = N.new("ShaderNodeMix"); tint.data_type = "RGBA"; tint.blend_type = "MULTIPLY"; tint.inputs["Factor"].default_value = 1.0
+    csock(tint.inputs, "B").default_value = (1.0, 0.97, 0.95, 1)
+    val = N.new("ShaderNodeCombineColor"); L.new(acc, val.inputs[0]); L.new(acc, val.inputs[1]); L.new(acc, val.inputs[2])
+    L.new(val.outputs[0], csock(tint.inputs, "A"))
+    L.new(csock(tint.outputs, "Result"), bg.inputs["Color"])
+    bg.inputs["Strength"].default_value = strength
+    v = w.cycles_visibility
+    v.camera = False; v.diffuse = False; v.scatter = False; v.shadow = False
+    v.glossy = True; v.transmission = True
 
 def world(color, strength):
     w = bpy.data.worlds.new("world")
@@ -516,9 +559,10 @@ def ring_light(z, major, minor, strength):
 def build_studio():
     """Ch3: the sphere floats in a dark studio in front of a large soft gradient of light."""
     cam_loc = (0, -6.4, 0.35)
-    world((0.002, 0.002, 0.002, 1), 1.0)
+    world((0.0, 0.0, 0.0, 1), 1.0)
     # The lit backdrop: a big panel, brightest in the middle, falling off to black. Warm neutral, no strong colour.
-    softbox("backdrop", (0, 7.0, 0.5), 7.5, 7.5, 1.6, target=cam_loc, color=(0.86, 0.76, 0.72, 1), visible=True, edge=0.5, peak=1.0)
+    bd = softbox("backdrop", (0, 7.0, 0.5), 7.5, 7.5, 1.6, target=cam_loc, color=(0.86, 0.76, 0.72, 1), visible=False, edge=0.5, peak=1.0)
+    bd.visible_transmission = False   # never seen through the glass either: a floating object in a pitch black void
     # Dim bounce cards above and below, out of frame: the glass edges pick up soft light instead of going black.
     softbox("card_top", (0, -0.5, 6.0), 9.0, 6.0, 1.3, target=(0, -0.5, 0), color=(0.9, 0.86, 0.84, 1), edge=0.2)
     softbox("card_low", (0, -0.5, -6.0), 9.0, 6.0, 0.8, target=(0, -0.5, 0), color=(0.9, 0.84, 0.8, 1), edge=0.2)
@@ -565,6 +609,11 @@ def build_studio():
             glass_sphere(R0 * 1.012, clear_fn=lambda d: np.clip((fld(d) - f_lo) / (f_top - f_lo), 0, 1))
     else:
         glass_sphere(0.72)
+        reflection_env(1.6, rot_z=0.0)
+        # The studio's panels light the glass but never appear in it as hard squares: only the soft env does.
+        for o in bpy.data.objects:
+            if o.type == "MESH" and o.name.split(".")[0] in ("backdrop", "card_top", "card_low", "key", "top", "strip_l", "strip_r"):
+                o.visible_glossy = False
 
 # ---------------------------------------------------------------- chapter 2 sets (real-world scale: metres)
 
@@ -755,17 +804,17 @@ def sheet(name, size, loc, rot_z, mat, curl=0.0, lift=0.0006, fold=None, seed=0,
 
 TEX = os.path.join(os.path.dirname(os.path.abspath(__file__)), "textures")
 
-def walnut_material():
+def walnut_material(prefix="walnut", value=0.075, coords="Object", tile=2.4, matte=False, plank_seam=True):
     """Scanned walnut (Poly Haven, CC0) darkened to dark walnut, with a plank seam, scratches, a coffee ring and dust."""
     m = bpy.data.materials.new("walnut")
     m.use_nodes = True
     nt = m.node_tree
     N = nt.nodes; L = nt.links
     bsdf = N["Principled BSDF"]
-    bsdf.inputs["Coat Weight"].default_value = 0.08
+    bsdf.inputs["Coat Weight"].default_value = 0.0 if matte else 0.08
     tc = N.new("ShaderNodeTexCoord")
     mp = N.new("ShaderNodeMapping"); mp.inputs["Scale"].default_value = (1.2, 1.2, 1.2)   # ~1 m tile on a 3 m desk... scaled below
-    L.new(tc.outputs["Object"], mp.inputs["Vector"])
+    L.new(tc.outputs[coords], mp.inputs["Vector"])
     def img(name, non_color):
         n = N.new("ShaderNodeTexImage")
         n.image = bpy.data.images.load(os.path.join(TEX, name))
@@ -773,10 +822,10 @@ def walnut_material():
             n.image.colorspace_settings.name = "Non-Color"
         L.new(mp.outputs["Vector"], n.inputs["Vector"])
         return n
-    diff, nor, rough = img("walnut_Diffuse.jpg", False), img("walnut_nor_gl.jpg", True), img("walnut_Rough.jpg", True)
+    diff, nor, rough = img(prefix + "_Diffuse.jpg", False), img(prefix + "_nor_gl.jpg", True), img(prefix + "_Rough.jpg", True)
     # Darken toward dark walnut (keep the scan's figure).
     hsv = N.new("ShaderNodeHueSaturation")
-    hsv.inputs["Value"].default_value = 0.075
+    hsv.inputs["Value"].default_value = value
     hsv.inputs["Saturation"].default_value = 1.6
     L.new(diff.outputs["Color"], hsv.inputs["Color"])
     sep = N.new("ShaderNodeSeparateXYZ"); L.new(tc.outputs["Object"], sep.inputs[0])
@@ -784,7 +833,7 @@ def walnut_material():
     seam_d = N.new("ShaderNodeMath"); seam_d.operation = "SUBTRACT"; seam_d.inputs[1].default_value = 0.31
     L.new(sep.outputs["Y"], seam_d.inputs[0])
     seam_a = N.new("ShaderNodeMath"); seam_a.operation = "ABSOLUTE"; L.new(seam_d.outputs[0], seam_a.inputs[0])
-    seam = N.new("ShaderNodeMath"); seam.operation = "LESS_THAN"; seam.inputs[1].default_value = 0.0012
+    seam = N.new("ShaderNodeMath"); seam.operation = "LESS_THAN"; seam.inputs[1].default_value = 0.0012 if plank_seam else 0.0
     L.new(seam_a.outputs[0], seam.inputs[0])
     # Coffee ring: a faint thin ring stain.
     ring_v = N.new("ShaderNodeVectorMath"); ring_v.operation = "DISTANCE"; ring_v.inputs[1].default_value = (-0.33, 0.22, 0)
@@ -822,7 +871,7 @@ def walnut_material():
     col = mixc(col, (0.2, 0.18, 0.16, 1), dust.outputs["Result"], 0.12)
     L.new(col, bsdf.inputs["Base Color"])
     # Uneven varnish: scan roughness, pushed by scratches and dust.
-    r1 = N.new("ShaderNodeMapRange"); r1.inputs["To Min"].default_value = 0.28; r1.inputs["To Max"].default_value = 0.62
+    r1 = N.new("ShaderNodeMapRange"); r1.inputs["To Min"].default_value = 0.5 if matte else 0.28; r1.inputs["To Max"].default_value = 0.82 if matte else 0.62
     L.new(rough.outputs["Color"], r1.inputs["Value"])
     r2 = N.new("ShaderNodeMath"); r2.operation = "ADD"; L.new(r1.outputs["Result"], r2.inputs[0])
     r2b = N.new("ShaderNodeMath"); r2b.operation = "MULTIPLY"; r2b.inputs[1].default_value = 0.3
@@ -836,7 +885,7 @@ def walnut_material():
     L.new(seam.outputs[0], sum_.inputs[0]); L.new(scratch.outputs["Result"], sum_.inputs[1])
     L.new(sum_.outputs[0], bump.inputs["Height"]); L.new(nmap.outputs["Normal"], bump.inputs["Normal"])
     L.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
-    mp.inputs["Scale"].default_value = (2.4, 2.4, 2.4)   # one 4K tile ≈ 42 cm of wood: real grain scale
+    mp.inputs["Scale"].default_value = (tile, tile, tile)   # walnut: one 4K tile ≈ 42 cm of wood
     return m
 
 def pick(name, loc, rot_z, flip=False, tilt=0.0):
@@ -869,7 +918,7 @@ def pick(name, loc, rot_z, flip=False, tilt=0.0):
     ob = bpy.data.objects.new(name, me); scene.collection.objects.link(ob)
     ob.location = loc; ob.rotation_euler = ((math.pi if flip else 0) + tilt, tilt * 0.4, rot_z)
     bev = ob.modifiers.new("bevel", "BEVEL"); bev.width = 0.0003; bev.segments = 3
-    ob.data.materials.append(principled("pick_" + name, (0.05, 0.05, 0.055, 1), 0.3, **{"Coat Weight": 0.8, "Coat Roughness": 0.06}))
+    ob.data.materials.append(principled("pick_" + name, (0.05, 0.05, 0.055, 1), 0.55, **{"Coat Weight": 0.3, "Coat Roughness": 0.4}))
     bev.width = 0.00015; bev.segments = 2
     bev.harden_normals = True
     return ob
@@ -880,12 +929,144 @@ def handwriting(name):
     """Liam's real handwriting, lifted from photos (see extract_ink.py): near-black ink as an alpha layer."""
     return bpy.data.images.load(os.path.join(HANDWRITING, name + ".png"))
 
+DESK = dict(x0=-0.6, x1=0.6, y0=-0.28, y1=0.32, height=0.74, t=0.035)
+
+def waterfall_desk():
+    """A waterfall slab (shape: Liam's oak desk references): a thick top whose grain wraps over both ends and runs
+    down the side panels. No legs. Floats in the black void. UVs follow the folded profile so the planks are continuous."""
+    import bmesh
+    d = DESK
+    x0, x1, H, T = d["x0"], d["x1"], d["height"], d["t"]
+    outer = [(x0, -H), (x0, 0.0), (x1, 0.0), (x1, -H)]
+    inner = [(x0 + T, -H), (x0 + T, -T), (x1 - T, -T), (x1 - T, -H)]
+    us = [0.0]
+    for i in range(1, 4):
+        us.append(us[-1] + math.dist(outer[i - 1], outer[i]))
+    bm = bmesh.new()
+    uv = bm.loops.layers.uv.new("UVMap")
+    def v(x, y, z):
+        return bm.verts.new((x, y, z))
+    Y = (d["y0"], d["y1"])
+    O = [[v(x, y, z) for (x, z) in outer] for y in Y]
+    I = [[v(x, y, z) for (x, z) in inner] for y in Y]
+    def quad(a, b, c, e, uvs):
+        f = bm.faces.new((a, b, c, e))
+        for loop, (u_, v_) in zip(f.loops, uvs):
+            loop[uv].uv = (u_, v_)
+        return f
+    for i in range(3):
+        u0, u1 = us[i], us[i + 1]
+        quad(O[0][i], O[0][i + 1], O[1][i + 1], O[1][i], [(u0, Y[0]), (u1, Y[0]), (u1, Y[1]), (u0, Y[1])])   # outer skin
+        quad(I[1][i], I[1][i + 1], I[0][i + 1], I[0][i], [(u0, Y[1]), (u1, Y[1]), (u1, Y[0]), (u0, Y[0])])   # inner skin
+        quad(I[0][i], I[0][i + 1], O[0][i + 1], O[0][i], [(u0, Y[0] - T), (u1, Y[0] - T), (u1, Y[0]), (u0, Y[0])])  # front edge
+        quad(O[1][i], O[1][i + 1], I[1][i + 1], I[1][i], [(u0, Y[1]), (u1, Y[1]), (u1, Y[1] + T), (u0, Y[1] + T)])  # back edge
+    for i in (0, 3):  # feet of the two panels
+        quad(O[0][i], O[1][i], I[1][i], I[0][i], [(us[i], Y[0]), (us[i], Y[1]), (us[i] + T, Y[1]), (us[i] + T, Y[0])])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new("desk"); bm.to_mesh(me); bm.free()
+    ob = bpy.data.objects.new("desk", me); scene.collection.objects.link(ob)
+    bev = ob.modifiers.new("bevel", "BEVEL"); bev.width = 0.0015; bev.segments = 3; bev.harden_normals = True
+    # Oak character (knots, wide planks, raw matte grain), darkened to the dark walnut colour.
+    ob.data.materials.append(walnut_material(prefix="oak", value=0.085, coords="UV", tile=0.9, matte=True, plank_seam=False))
+    return ob
+
+def text_obj(body, size, loc, font_file, emit=0.9, color=(1, 0.98, 0.96, 1), parent=None, align="LEFT"):
+    font = bpy.data.fonts.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts", font_file))
+    cu = bpy.data.curves.new("txt", "FONT"); cu.body = body; cu.font = font; cu.size = size; cu.align_x = align
+    ob = bpy.data.objects.new("txt", cu); scene.collection.objects.link(ob)
+    m = bpy.data.materials.new("txt_m"); m.use_nodes = True
+    for nd in list(m.node_tree.nodes):
+        if nd.type != "OUTPUT_MATERIAL":
+            m.node_tree.nodes.remove(nd)
+    em = m.node_tree.nodes.new("ShaderNodeEmission"); em.inputs["Color"].default_value = color; em.inputs["Strength"].default_value = emit
+    m.node_tree.links.new(em.outputs[0], m.node_tree.nodes["Material Output"].inputs["Surface"])
+    cu.materials.append(m)
+    if parent is not None:
+        ob.parent = parent
+    ob.location = loc
+    return ob
+
+def laptop(loc, rot_z, open_deg=108):
+    """An original, generic aluminium laptop (no brand marks). Its screen shows the project index (placeholder layout)."""
+    W, D, Hb, Hl = 0.304, 0.212, 0.0155, 0.006
+    alu = principled("alu", (0.42, 0.42, 0.44, 1), 0.48, **{"Metallic": 0.85})
+    root = bpy.data.objects.new("laptop", None); scene.collection.objects.link(root)
+    root.location = loc; root.rotation_euler = (0, 0, rot_z)
+    def box(name, size, at, mat, parent):
+        bpy.ops.mesh.primitive_cube_add(size=1)
+        o = bpy.context.active_object; o.name = name; o.scale = size   # primitive cube of size 1
+        bpy.ops.object.transform_apply(scale=True)
+        bv = o.modifiers.new("b", "BEVEL"); bv.width = min(size) * 0.45; bv.segments = 4; bv.harden_normals = True
+        o.data.materials.append(mat); o.parent = parent; o.location = at
+        return o
+    base = box("base", (W, D, Hb), (0, 0, Hb / 2), alu, root)
+    deck = principled("deck", (0.03, 0.03, 0.034, 1), 0.55)
+    box("keys", (W * 0.86, D * 0.42, 0.0008), (0, D * 0.12, Hb + 0.0002), deck, root)
+    box("pad", (W * 0.38, D * 0.3, 0.0006), (0, -D * 0.27, Hb + 0.0001), principled("pad", (0.16, 0.16, 0.17, 1), 0.25, **{"Metallic": 1.0}), root)
+    hinge = bpy.data.objects.new("hinge", None); scene.collection.objects.link(hinge)
+    hinge.parent = root; hinge.location = (0, D / 2, Hb)
+    hinge.rotation_euler = (math.radians(open_deg - 90) * -1 + 0.0, 0, 0)
+    hinge.rotation_euler = (math.radians(-(open_deg - 90)), 0, 0)
+    lid = box("lid", (W, Hl, D), (0, Hl / 2, D / 2), alu, hinge)
+    glass = principled("bezel", (0.004, 0.004, 0.005, 1), 0.05)
+    box("bezel", (W * 0.97, 0.0006, D * 0.95), (0, -0.0003, D / 2 + 0.002), glass, hinge)
+    # Display: near-black, the index lines glow on it (placeholder until the index is designed).
+    disp = box("display", (W * 0.92, 0.0004, D * 0.86), (0, -0.0007, D / 2 + 0.004), principled("disp", (0.0, 0.0, 0.0, 1), 0.04, **{"Specular IOR Level": 0.12, "Emission Color": (0.02, 0.022, 0.03, 1), "Emission Strength": 1.0}), hinge)
+    rows = ["Eventread · SaaS web app", "Cyvore · B2B website", "Pulse · Fitness app", "Nordic Logic · B2B website", "Stub · Coming soon"]
+    for i, r in enumerate(rows):
+        tx = text_obj(r, 0.0105, (-W * 0.4, -0.0011, D * 0.78 - i * 0.026), "HankenGrotesk-Regular.ttf", emit=2.2 if i < 3 else 0.9, parent=hinge)
+        tx.rotation_euler = (math.pi / 2, 0, 0)
+    # The screen's glow on the desk and the ball (the light itself is never seen).
+    gl = area_light("screen_glow", (0, 0, 0), 0.25, 1.6, (0.78, 0.84, 1.0), size_y=0.18)
+    gl.parent = hinge; gl.location = (0, -0.03, D / 2 + 0.004); gl.rotation_euler = (math.pi / 2, 0, 0)
+    gl.visible_glossy = False   # its glow lights the desk, but it never shows up as a reflection on the screen
+    return root
+
+def fusing_ball(center, R, lo, hi, seed=2026):
+    """Sand turning into glass from the inside out (the approved ch3 transformation), at any position and size.
+    lo/hi: the transition band on the sphere (uniform 0..1 rank); above hi it is already glass."""
+    full = 60_000 if args.preview else 700_000
+    rng = np.random.default_rng(7)
+    p, hue = filament_points(full, seed=seed)
+    r = np.linalg.norm(p, axis=1, keepdims=True)
+    dirs = p / np.maximum(r, 1e-6)
+    shell = r[:, 0] ** 0.3
+    radius = rng.uniform(0.004, 0.009, len(p)) * (2.4 if args.preview else 1)
+    R0 = 0.84
+    norm = (shell - shell.min()) / (shell.max() - shell.min())
+    field = fbm(dirs[:, 0] * 1.7 + 3.0, dirs[:, 1] * 1.7, dirs[:, 2] * 1.7 + 5.0)
+    rank = np.argsort(np.argsort(field)) / len(field)
+    keep = rank < hi
+    dirs, norm, hue, radius, rank = dirs[keep], norm[keep], hue[keep], radius[keep], rank[keep]
+    clear = np.clip((rank - lo) / (hi - lo), 0, 1) ** 1.4
+    rad = R0 * (0.985 + 0.03 * norm) - 0.03 * clear
+    radius = radius * (1 + 0.7 * clear)
+    g = grains("fusing", (dirs * rad[:, None]).astype(np.float32), hue, radius, clear=clear)
+    def fld(d):
+        return fbm(d[:, 0] * 1.7 + 3.0, d[:, 1] * 1.7, d[:, 2] * 1.7 + 5.0)
+    f_lo, f_top = np.quantile(field, [lo, 0.97])
+    s = glass_sphere(R0 * 1.012, clear_fn=lambda d: np.clip((fld(d) - f_lo) / (f_top - f_lo), 0, 1))
+    k = R / R0
+    for o in (g, s):
+        o.scale = (k, k, k); o.location = center
+    return g, s
+
 def build_desk():
     """2.1 Finding the problem: a walnut desk at night, lit by a warm lamp off-frame. The ball hovers among the notes."""
-    plane("desk", 3.0, (0, 0, 0), mat=walnut_material())
+    waterfall_desk()
     R = 0.07
-    ball_c = (0.0, 0.03, R + 0.028)
-    dense_ball(ball_c, R)
+    view, state = args.view, args.dstate
+    ball_c = {"tq": (0.0, 0.03, R + 0.028), "top": (0.0, 0.03, 0.2), "side": (0.47, -0.14, R + 0.0005)}[view]
+    if state == "dense":
+        dense_ball(ball_c, R)
+    elif state == "attempt":
+        fusing_ball(ball_c, R, lo=0.55, hi=0.86)    # an attempt: clarity breaking through from the core
+    else:
+        s = glass_sphere(R); s.location = ball_c      # it holds: glass, resting on the desk
+    if view == "side":
+        laptop((0.27, 0.04, 0.0), math.radians(-24))
+        # A soft fill from the front right, never seen: reveals the waterfall panel and the laptop in the low view.
+        area_light("side_fill", (1.35, -0.95, 0.45), 0.9, 38.0, (1.0, 0.86, 0.72), target=(0.55, 0.0, -0.12))
     PAPER = srgb("#ece6da"); YELLOW = srgb("#e6c86a"); PINK = srgb("#e3a6a6"); CARD = srgb("#f1ede4")
     blank = paper_material("blank_m", PAPER)
     sheet("stack_2", (0.21, 0.297), (0.205, 0.175, -0.0004), 0.27, blank, curl=0.03, seed=5)
@@ -907,7 +1088,9 @@ def build_desk():
     pen = bpy.context.active_object
     bpy.ops.object.shade_smooth()
     pen.data.materials.append(principled("pen", (0.02, 0.02, 0.025, 1), 0.25, **{"Coat Weight": 0.6}))
-    world((0.0025, 0.0024, 0.003, 1), 1.0)
+    world((0.0, 0.0, 0.0, 1), 1.0)   # the desk floats in a pitch black void
+    if state == "glass":
+        reflection_env(0.35, rot_z=math.radians(-40))
     # The lamp: off-frame, upper left, warm. Its light defines the scene; the ball does not emit.
     sp = bpy.data.lights.new("lamp", "SPOT")
     sp.energy = 230
@@ -923,7 +1106,12 @@ def build_desk():
     bl.energy = 3.5; bl.color = (1.0, 0.85, 0.7); bl.spot_size = math.radians(28); bl.spot_blend = 0.7; bl.shadow_soft_size = 0.15
     bounce = bpy.data.objects.new("bounce", bl); bounce.location = (0.45, -0.25, 0.25)
     scene.collection.objects.link(bounce); aim(bounce, (0.0, 0.05, 0.06))
-    camera((0.03, -0.62, 0.46), (0.0, 0.02, 0.03), lens=50, focus=0.74, fstop=4.0)
+    if view == "tq":
+        camera((0.03, -0.62, 0.46), (0.0, 0.02, 0.03), lens=50, focus=0.74, fstop=4.0)
+    elif view == "top":
+        camera((0.0, 0.02, 1.35), (0.0, 0.0201, 0.0), lens=45, focus=1.15, fstop=5.6)
+    else:
+        camera((1.28, -0.78, 0.15), (0.36, 0.0, 0.03), lens=50, focus=1.08, fstop=3.2)
 
 def grid_material(kind):
     """A grid in object space, so it follows the surface into the gravity well."""
@@ -1078,21 +1266,8 @@ def build_hero():
             target = ball * HERO_R + HERO_C
             pts = (pts * (1 - tt[:, None]) + target * tt[:, None]).astype(np.float32)
         grains("chaos", pts, hue, radius)
-    world((0.0015, 0.0013, 0.0015, 1), 1.0)
-    # Haze: a thin scattering volume around the whole set, so the rim light blooms softly through the air.
-    bpy.ops.mesh.primitive_cube_add(size=40, location=(0, 0, 0))
-    haze = bpy.context.active_object
-    hm = bpy.data.materials.new("haze"); hm.use_nodes = True
-    for nd in list(hm.node_tree.nodes):
-        if nd.type != "OUTPUT_MATERIAL":
-            hm.node_tree.nodes.remove(nd)
-    vol = hm.node_tree.nodes.new("ShaderNodeVolumePrincipled")
-    vol.inputs["Density"].default_value = 0.0025
-    vol.inputs["Anisotropy"].default_value = 0.55
-    vol.inputs["Color"].default_value = (1.0, 0.9, 0.88, 1)
-    hm.node_tree.links.new(vol.outputs[0], hm.node_tree.nodes["Material Output"].inputs["Volume"])
-    haze.data.materials.append(hm)
-    haze.visible_shadow = False
+    world((0.0, 0.0, 0.0, 1), 1.0)
+    # No haze: the void is pitch black and no light source may show. The wordmark is the one emitter.
     # Wordmark.
     if args.word == "none":
         font = None
@@ -1158,12 +1333,19 @@ def _hero_lights():
 {"ball": build_ball, "chaos": build_chaos, "glass": build_glass, "studio": build_studio,
  "desk": build_desk, "bench": build_bench, "canvas": build_canvas, "hero": build_hero}[args.scene]()
 if args.preview:
-    render_settings(24, 480, 300)
+    render_settings(24, *( (960, 600) if os.environ.get("LOOKDEV_BIGPREVIEW") else (480, 300) ))
 else:
     render_settings(512 if args.scene in ("glass", "studio") else 256)
 
+if os.environ.get("LOOKDEV_DEBUG"):
+    bpy.context.view_layer.update()
+    for o in bpy.data.objects:
+        if o.name.split(".")[0] in ("laptop", "base", "keys", "lid", "display", "hinge", "txt", "bezel"):
+            mw = o.matrix_world
+            print("DBG", o.name, "parent=", o.parent.name if o.parent else None, "world=", tuple(round(c, 3) for c in mw.translation), "dims=", tuple(round(c, 3) for c in o.dimensions))
+    sys.exit(0)
 os.makedirs(args.out, exist_ok=True)
-tag = f"{args.scene}-{args.state}" if args.scene == "studio" else f"{args.scene}-{args.grid}" if args.scene == "bench" else f"{args.scene}-{args.phase}-{args.word}-L{args.light:g}" if args.scene == "hero" else args.scene
+tag = f"{args.scene}-{args.state}" if args.scene == "studio" else f"{args.scene}-{args.grid}" if args.scene == "bench" else f"{args.scene}-{args.phase}-{args.word}-L{args.light:g}" if args.scene == "hero" else f"desk-{args.view}-{args.dstate}" if args.scene == "desk" else args.scene
 path = os.path.abspath(os.path.join(args.out, f"{tag}{'-preview' if args.preview else ''}.png"))
 scene.render.filepath = path
 bpy.ops.render.render(write_still=True)
