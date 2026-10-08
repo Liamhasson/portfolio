@@ -22,11 +22,7 @@ html,body { margin:0; height:100%; background:#000; }
 .row .line { font-size:1.55cqw; line-height:1.35; }
 .row.on { color:var(--ink); }
 .row.soon .line { font:400 1.15cqw/1.4 var(--mono); letter-spacing:.08em; text-transform:uppercase; }
-/* first reveal: the screen wakes, a soft band of light passes down the list, each row surfaces as it passes */
-.sweep { position:absolute; left:0; right:0; height:22cqw; top:-22cqw; pointer-events:none;
-  background:linear-gradient(to bottom, rgba(255,236,226,0), rgba(255,236,226,.07) 45%, rgba(255,236,226,.12) 50%, rgba(255,236,226,.07) 55%, rgba(255,236,226,0)); }
-.play .sweep { animation:sweep 1.5s cubic-bezier(.45,0,.2,1) .25s both; }
-@keyframes sweep { to { top:100%; } }
+/* first reveal: the screen wakes from black and each row surfaces in turn */
 .play .title, .play .count, .play .row { animation:surface .9s cubic-bezier(.22,1,.36,1) both; }
 .play .title { animation-delay:.2s } .play .count { animation-delay:.3s }
 .play .row:nth-child(1){animation-delay:.55s} .play .row:nth-child(2){animation-delay:.68s} .play .row:nth-child(3){animation-delay:.81s} .play .row:nth-child(4){animation-delay:.94s} .play .row:nth-child(5){animation-delay:1.07s}
@@ -35,7 +31,7 @@ html,body { margin:0; height:100%; background:#000; }
 .play .wake { animation:wake .6s ease-out both; }
 @keyframes wake { to { opacity:0; } }
 .replay { position:fixed; left:16px; bottom:16px; font:500 12px/1 var(--mono); letter-spacing:.08em; text-transform:uppercase; color:#f4f1ee; background:#1a1a1c; border:1px solid #333; border-radius:999px; padding:10px 14px; cursor:pointer; }
-@media (prefers-reduced-motion: reduce) { .play * { animation:none !important; } .sweep,.wake { display:none; } }
+@media (prefers-reduced-motion: reduce) { .play * { animation:none !important; } .wake { display:none; } }
 </style></head><body>
 <div class="screen" id="screen">
   <div class="top"><h1 class="title">Selected <i>work</i></h1><span class="count">05 PROJECTS</span></div>
@@ -46,7 +42,7 @@ html,body { margin:0; height:100%; background:#000; }
     <div class="row"><span class="n">04</span><span class="name">Nordic Logic<small>B2B website</small></span><span class="line">A carrier invoice audit startup that needed to build trust without any social proof or clients.</span></div>
     <div class="row soon"><span class="n">05</span><span class="name">Stub</span><span class="line">Coming soon</span></div>
   </div>
-  <div class="sweep"></div><div class="wake"></div>
+  <div class="wake"></div>
 </div>
 <button class="replay" id="replay">Replay reveal</button>
 <script>

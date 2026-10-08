@@ -515,12 +515,12 @@ def glass_material(frost=False):
         nt.links.new(mask.outputs[0], out.inputs["Surface"])
         # Still forming: the clearing is a lit, translucent frost skin (like sugar glass) that only slowly gains
         # transparency, so it reads as solid material catching the studio light, not a window into the ball.
-        bsdf.inputs["Subsurface Weight"].default_value = 0.55
+        bsdf.inputs["Subsurface Weight"].default_value = 0.35
         bsdf.inputs["Subsurface Radius"].default_value = (0.4, 0.25, 0.2)
         bsdf.inputs["Subsurface Scale"].default_value = 0.05
         trans = nt.nodes.new("ShaderNodeMapRange")
-        trans.inputs["To Min"].default_value = 0.35
-        trans.inputs["To Max"].default_value = 0.8
+        trans.inputs["To Min"].default_value = 0.55
+        trans.inputs["To Max"].default_value = 0.85
         nt.links.new(attr.outputs["Fac"], trans.inputs["Value"])
         nt.links.new(trans.outputs["Result"], bsdf.inputs["Transmission Weight"])
     return m
@@ -1005,7 +1005,6 @@ def laptop(loc, rot_z, open_deg=108):
     box("pad", (W * 0.38, D * 0.3, 0.0006), (0, -D * 0.27, Hb + 0.0001), principled("pad", (0.16, 0.16, 0.17, 1), 0.25, **{"Metallic": 1.0}), root)
     hinge = bpy.data.objects.new("hinge", None); scene.collection.objects.link(hinge)
     hinge.parent = root; hinge.location = (0, D / 2, Hb)
-    hinge.rotation_euler = (math.radians(open_deg - 90) * -1 + 0.0, 0, 0)
     hinge.rotation_euler = (math.radians(-(open_deg - 90)), 0, 0)
     lid = box("lid", (W, Hl, D), (0, Hl / 2, D / 2), alu, hinge)
     glass = principled("bezel", (0.004, 0.004, 0.005, 1), 0.45, **{"Specular IOR Level": 0.05})
@@ -1017,6 +1016,8 @@ def laptop(loc, rot_z, open_deg=108):
         tx = text_obj(r, 0.0105, (-W * 0.4, -0.0011, D * 0.78 - i * 0.026), "HankenGrotesk-Regular.ttf", emit=2.2 if i < 3 else 0.9, parent=hinge)
         tx.rotation_euler = (math.pi / 2, 0, 0)
     # The screen's glow on the desk and the ball (the light itself is never seen).
+    if open_deg < 30:
+        return root   # shut: the screen is off, no glow
     gl = area_light("screen_glow", (0, 0, 0), 0.25, 1.6, (0.78, 0.84, 1.0), size_y=0.18)
     gl.parent = hinge; gl.location = (0, -0.03, D / 2 + 0.004); gl.rotation_euler = (math.pi / 2, 0, 0)
     gl.visible_glossy = False   # its glow lights the desk, but it never shows up as a reflection on the screen
@@ -1065,11 +1066,12 @@ def build_desk():
     if state == "dense":
         dense_ball(ball_c, R)
     elif state == "attempt":
-        fusing_ball(ball_c, R, lo=0.78, hi=1.01, toward=(0, 0, 1) if view == "top" else (0.0, -0.8, 0.6))    # an attempt: clarity sweeping out from the core
+        fusing_ball(ball_c, R, lo=0.9, hi=1.01, toward=(0, 0, 1) if view == "top" else (0.0, -0.8, 0.6))    # an attempt: clarity sweeping out from the core
     else:
         s = glass_sphere(R); s.location = ball_c      # it holds: glass, resting on the desk
+    # The laptop is on the desk in every view: shut in steps 1 and 2, it opens in step 3 ("And I build it").
+    laptop((0.27, 0.04, 0.0), math.radians(-24), open_deg=108 if view == "side" else 0)
     if view == "side":
-        laptop((0.27, 0.04, 0.0), math.radians(-24))
         # A soft fill from the front right, never seen: reveals the waterfall panel and the laptop in the low view.
         area_light("side_fill", (1.35, -0.95, 0.45), 0.9, 38.0, (1.0, 0.86, 0.72), target=(0.55, 0.0, -0.12))
     PAPER = srgb("#ece6da"); YELLOW = srgb("#e6c86a"); PINK = srgb("#e3a6a6"); CARD = srgb("#f1ede4")
@@ -1082,7 +1084,7 @@ def build_desk():
     # The hero sticky note: closest to the ball and to the camera, in focus.
     sheet("sticky_hero", (0.076, 0.076), (0.075, -0.095, 0.0008), -0.21, paper_material("sticky_hero_m", YELLOW, handwriting("who-for")), curl=0.12)
     sheet("sticky_b", (0.076, 0.076), (-0.15, -0.03, 0.0010), 0.52, paper_material("sticky_b_m", PINK, handwriting("make-fail")), curl=0.08)
-    sheet("sticky_c", (0.076, 0.076), (0.14, 0.045, 0.0012), -0.58, paper_material("sticky_c_m", YELLOW, handwriting("does-better")), curl=0.1)
+    sheet("sticky_c", (0.076, 0.076), (0.04, 0.2, 0.0012), -0.35, paper_material("sticky_c_m", YELLOW, handwriting("does-better")), curl=0.1)
     # Three black picks, off to the side (a nod to ten years with the bands).
     # Three picks in a loose pile at the back of the desk: out of focus, an aside, never the focus.
     pick("pick_a", (-0.235, 0.17, 0.0004), 0.9)
