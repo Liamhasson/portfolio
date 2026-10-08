@@ -23,7 +23,7 @@ What to take from it:
 
 The object performs each step of "how I work"; the sets support it. **One location, always night, seen from three points of view** (Liam: day/night changes are a cliché). Scroll always moves the camera; no cuts.
 
-**The desk:** a **waterfall slab** (thick top, grain wrapping over the edge and down the sides, no legs; shape reference: Liam's two oak desk photos), floating in the black void. **Oak character** (knots, wide planks, raw matte grain) in the current **dark walnut colour**. Objects: the current ones only (handwritten notes, transcript stack, pen, three dark grey picks at the back) **plus a laptop for step 3**. One warm lamp off-frame, the only key light, in every view.
+**The desk:** a **waterfall slab** (thick top, grain wrapping over the edge and down the sides, no legs; shape reference: Liam's two oak desk photos), floating in the black void. **Oak character** (knots, wide planks, raw matte grain) in the current **dark walnut colour**. Objects: handwritten notes, pen, three dark grey picks at the back (the transcript stack was removed) and a **laptop in the form of a 14-inch MacBook Pro in Space Black**, on the desk in every view: shut in steps 2.1–2.2, open in 2.3. Its lid carries Liam's grain mark (from the chaos cloud's silhouette, 507 grains, 55 mm) as a flush, mirror-polished inlay, the material of the real logo. One warm lamp off-frame, the only key light, in every view.
 
 | # | Moment | Sphere | View | Camera |
 |---|---|---|---|---|
@@ -31,11 +31,11 @@ The object performs each step of "how I work"; the sets support it. **One locati
 | 1 | Hero: name, title, one line | chaos, moving around itself (never forms) | black void + glowing LIAM HASSON (the one light exception) | holds; cursor light + drift |
 | 1→2.1 | Pull-back | chaos | the void is the dark room above the desk | pulls back and tilts down; the lamp finds the desk beneath |
 | 2.1 | **I look for problems nobody pointed at** | chaos **compacts into the dense ball** (scroll-driven) | **three-quarter view** over the notes (the approved desk render) | settles |
-| 2.1→2.2 | Rise | ball | – | camera rises and turns to look straight down |
+| 2.1→2.2 | Rise | ball, rising with the camera | – | camera rises and turns to look straight down (`deskmove-rise`, approved) |
 | 2.2 | **Then I test solutions** | **three attempts**: clarity sweeps in from the core and collapses back; each attempt gets further; the third tips over | **top-down**: the ball over the notes, its shadow on them; the slab's edges fall off into black | holds |
-| 2.2→2.3 | Descend | the third attempt holds | – | camera drops to desk height and swings to the side |
-| 2.3 | **And I build it** | **turns fully into glass** and comes to rest beside the laptop (this is "it ships") | **low side view** at desk height: the waterfall edge in frame, the void beyond; laptop open, its screen glowing | settles |
-| 2.3→3 | Into the work | glass | the laptop screen shows the **project index** | camera pushes into the screen; the screen becomes the section |
+| 2.2→2.3 | Descend | the third attempt holds and travels to hover beside the laptop | the **lid opens on the way down**, passing behind the ball (kept: depth, not a product demo); the **screen wakes with the index reveal as the view settles** | camera drops to desk height and orbits to the side (`deskmove-descend`, approved) |
+| 2.3 | **And I build it** | two beats, one action each (see below): **build**, it turns fully into glass while still hovering; **ship**, only then does it fall and land beside the laptop | **low side view** at desk height: the waterfall edge in frame, the void beyond; laptop open, the index on its screen | settles |
+| 2.3→3 | Into the work | glass, at rest; passes in the foreground, refracting the screen | the laptop screen shows the **project index** | camera orbits square to the screen and pushes in until the 16:10 screen fills the frame; the live index takes over (`deskmove-push`, approved) |
 | 3.0 | Project index | glass, small, to one side | the index is the full screen | – |
 | 3.1–3.3 | Project full screens | glass (reflects each set) | per project | one push-in per project |
 | 3.4 | In progress | dense ball (not shipped) | two plinths | short push-in |
@@ -45,6 +45,14 @@ The object performs each step of "how I work"; the sets support it. **One locati
 | 7 | Contact | glass, at rest, one soft light | black void | final push-in |
 
 Removed: the gravity grid and bead-canvas stations (the bead canvas survives only in the toolkit), "And then it ships" as its own beat (merged into step 3), and the phone / A/B printouts / findings notes.
+
+**2.3, build then ship (approved 2026-10-08).** Through the whole page the sand is weightless: it drifts, compacts in mid-air, hovers through every attempt. The moment it becomes a product is the first time it has weight. The idea floats; the product lands. So the ball keeps its high hover after the descend (the drop is the meaning; a low hover would shrink the landing to a nudge), and the beat is split so each part reads:
+1. **Build:** the inside-out clearing completes while the ball hovers in place.
+2. **Ship:** only once it is fully glass, it falls: accelerating like a real fall (gravity curve on scroll, not an eased glide), one small soft settle on contact, glass on wood, no bounce. Its shadow shrinks and sharpens into a tight contact shadow as it falls; the shadow sells the weight.
+3. **Push:** the camera moves into the screen, the glass ball resting where it refracts the screen in the foreground.
+Never: glass and fall at once (two ideas blur), an eased drift down (reads as floating), a bounce. All scroll-driven; scrolling back lifts it off the desk, it loses its weight and turns back to sand.
+
+**Camera moves (built 2026-10-08).** The camera orbits a moving centre (distance, height angle and bearing interpolated, bearing turning only once the view has tipped off the vertical), so leaving the overhead view never spins the image. Each move exports per frame: camera position, rotation, lens, focus, the ball's centre and the screen's four corners. The live index sits on those corners during the push and takes over at the last frame, so the screen is never a baked image on the site (the review clips bake it, with the camera finish's vignette).
 
 Step 2 is the risk: a ball flickering between states reads as a glitch. It must read as progress: three distinct attempts, each clearing further than the last, each collapse visibly fighting back, all scrubbed by the visitor's scroll.
 
@@ -133,4 +141,8 @@ Open questions for the case studies are in §9; they must be answered before a c
 7. **Loader:** once per browser session.
 8. **Typeface:** decided from a side-by-side sheet (Hanken Grotesk and three alternatives next to Aeonik); Liam picks.
 
-**Status:** complete; build step 1 starts on Liam's go.
+10. **Laptop:** MacBook Pro form, Space Black, grain mark as a polished inlay at 55 mm; the mark's silhouette at distance is accepted as is.
+11. **Lid** opens during the descend; the **screen wakes** on arrival at 2.3 (the reveal plays as the side view settles).
+12. **2.3** is split into build (glass while hovering) and ship (a real fall and landing); the high hover stays.
+
+**Status:** complete; build step 1 in progress (pull-back and the three desk moves approved; next: the 2.2 attempts).
