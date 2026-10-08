@@ -25,7 +25,8 @@ const TIERS: readonly QualityTier[] = ["high", "mid", "low"];
 export function pickTier(s: TierSignals, override?: QualityTier): QualityTier {
   if (override) return override;
   if (s.automated) return "low";
-  if (s.isMobile) return s.cores >= 8 && s.memoryGb >= 6 ? "mid" : "low";
+  // current phones handle the mid tier; the governor steps a struggling one down. Only weak phones start low.
+  if (s.isMobile) return s.cores >= 4 && s.memoryGb >= 4 ? "mid" : "low";
   if (s.cores >= 8 && s.memoryGb >= 8 && s.maxTextureSize >= 16384) return "high";
   if (s.cores >= 4 && s.memoryGb >= 4) return "mid";
   return "low";

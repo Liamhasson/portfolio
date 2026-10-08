@@ -79,6 +79,7 @@ uniform float uDriftFreq;
 uniform float uDriftSpeed;
 uniform float uPointScale;   // pixels per world unit at distance 1 (viewport height / (2 tan(vfov/2)))
 uniform float uMinPx;
+uniform float uCountScale;   // fewer grains (lower tiers) are drawn a little larger, so the surface stays covered
 uniform vec2 uRadScale;    // chaos, ball
 uniform vec2 uEdge;        // soft rim in px, chaos, ball (the render's grains are softer where they stand alone)
 uniform float uChaosShare;   // the chaos holds fewer grains than the ball (render: ~286k vs 520k); the rest grow in
@@ -97,10 +98,16 @@ uniform vec3 uLightPos[3];
 uniform vec3 uLightCol[3];   // colour * power, calibrated
 uniform vec3 uRamp[4];
 uniform vec4 uRampAt;
+uniform vec3 uCursorPos;     // the cursor as a light (Lusion model), on a plane through the sand
+uniform vec3 uCursorCol;     // colour * intensity (fades with the pointer)
+uniform float uCursorReach;  // world units: how far its light carries
+uniform sampler2D uPaint;    // the cursor's drift field: CSS px / s
+uniform float uPaintScale;   // seconds: velocity -> offset
+uniform vec2 uViewport;      // CSS px
 
 out vec3 vAlbedo;
-out vec3 vL0; out vec3 vL1; out vec3 vL2;   // light directions, view space
-out vec3 vE0; out vec3 vE1; out vec3 vE2;
+out vec3 vL0; out vec3 vL1; out vec3 vL2; out vec3 vL3;   // light directions, view space (3 = cursor)
+out vec3 vE0; out vec3 vE1; out vec3 vE2; out vec3 vE3;
 out float vAlpha;
 out float vAmbient;
 out float vBounceW;
@@ -184,9 +191,16 @@ void main() {
   vL0 = normalize((viewMatrix * vec4(uLightPos[0], 1.0)).xyz - mv.xyz);
   vL1 = normalize((viewMatrix * vec4(uLightPos[1], 1.0)).xyz - mv.xyz);
   vL2 = normalize((viewMatrix * vec4(uLightPos[2], 1.0)).xyz - mv.xyz);
+  vL3 = normalize((viewMatrix * vec4(uCursorPos, 1.0)).xyz - mv.xyz);
+  float dc = distance(p, uCursorPos) / uCursorReach;
+  vE3 = uCursorCol / (1.0 + dc * dc * dc * dc) * cavity;
   vAlbedo = ramp(mix(aAttr.x, aAttr.y, t));
 
   gl_Position = projectionMatrix * mv;
+  // the cursor's drift: a push in screen space from the paint field, which decays on its own
+  vec2 suv = gl_Position.xy / gl_Position.w * 0.5 + 0.5;
+  vec2 push = texture(uPaint, suv).xy * uPaintScale;
+  gl_Position.xy += push / (uViewport * 0.5) * gl_Position.w;
   float packed = floor(aAttr.z * 255.0 + 0.5);
   float rad = mix(floor(packed / 16.0), mod(packed, 16.0), t) / 15.0;
   if (hash(aPosA + 9.1) > uChaosShare) rad *= smoothstep(0.05, 0.45, t);
@@ -195,7 +209,7 @@ void main() {
   vec2 squash = 1.0 + 0.22 * (vec2(h1, h2) * 2.0 - 1.0);
   float ang = h3 * 6.2831853;
   vEll = vec4(squash, cos(ang), sin(ang));
-  float px = 2.0 * rad * uRadMax * mix(uRadScale.x, uRadScale.y, t) * uPointScale / -mv.z * max(squash.x, squash.y);   // device pixels
+  float px = 2.0 * rad * uRadMax * mix(uRadScale.x, uRadScale.y, t) * uCountScale * uPointScale / -mv.z * max(squash.x, squash.y);   // device pixels
   // below a minimum the grain keeps its area through coverage, so it never shimmers
   vAlpha = clamp((px * px) / (uMinPx * uMinPx), 0.0, 1.0);
   gl_PointSize = max(px, uMinPx);
@@ -210,8 +224,8 @@ out highp vec4 pc_fragColor;
 #define gl_FragColor pc_fragColor
 
 in vec3 vAlbedo;
-in vec3 vL0; in vec3 vL1; in vec3 vL2;
-in vec3 vE0; in vec3 vE1; in vec3 vE2;
+in vec3 vL0; in vec3 vL1; in vec3 vL2; in vec3 vL3;
+in vec3 vE0; in vec3 vE1; in vec3 vE2; in vec3 vE3;
 in float vAlpha;
 in float vAmbient;
 in vec4 vEll;
@@ -237,10 +251,10 @@ void main() {
   vec3 n = normalize(vec3(mat2(vEll.z, vEll.w, -vEll.w, vEll.z) * ng, sqrt(1.0 - r2)));
   // matte: lambert, plus a faint broad sheen (roughness 0.62, specular 0.3 in the Cycles material)
   vec3 v = vec3(0.0, 0.0, 1.0);
-  vec3 L[3] = vec3[3](vL0, vL1, vL2);
-  vec3 E[3] = vec3[3](vE0, vE1, vE2);
+  vec3 L[4] = vec3[4](vL0, vL1, vL2, vL3);
+  vec3 E[4] = vec3[4](vE0, vE1, vE2, vE3);
   vec3 col = vec3(0.0);
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < 4; i++) {
     float ndl = max((dot(n, L[i]) + uWrap) / (1.0 + uWrap), 0.0);
     vec3 h = normalize(L[i] + v);
     float spec = pow(max(dot(n, h), 0.0), 12.0) * uSpec;
@@ -250,5 +264,102 @@ void main() {
   gl_FragColor = vec4(col, vAlpha * edge);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
+}
+`;
+
+/**
+ * Flares: every few seconds a loose spray of short streamers lifts off a patch of the ball and falls back (concept v3 §2,
+ * the dense ball's own streamers from `dense_points`). Grains further along a streamer leave later and land first.
+ * Same outputs as the sand, so they share its fragment shader and look.
+ */
+export const FLARE_VERTEX = /* glsl */ `
+precision highp float;
+
+in vec3 aF;       // extended position, unit ball
+in vec3 aD;       // root direction
+in vec4 aFAttr;   // hue, radius (of uFlareRadMax), how far along its streamer, -
+
+uniform vec3 uBallC;
+uniform float uBallR;
+uniform mat3 uFlareRot;     // where this flare lifts off
+uniform float uFlareE;      // 0 resting .. 1 fully extended
+uniform float uFlareVis;    // only once the ball has formed
+uniform float uFlareRadMax;
+uniform vec2 uRadScale;
+uniform float uPointScale;
+uniform float uMinPx;
+uniform float uCountScale;   // fewer grains (lower tiers) are drawn a little larger, so the surface stays covered
+uniform vec3 uLightPos[3];
+uniform vec3 uLightCol[3];
+uniform vec3 uRamp[4];
+uniform vec4 uRampAt;
+uniform vec3 uCursorPos;
+uniform vec3 uCursorCol;
+uniform float uCursorReach;
+uniform sampler2D uPaint;
+uniform float uPaintScale;
+uniform vec2 uViewport;
+uniform vec2 uEdge;
+
+out vec3 vAlbedo;
+out vec3 vL0; out vec3 vL1; out vec3 vL2; out vec3 vL3;
+out vec3 vE0; out vec3 vE1; out vec3 vE2; out vec3 vE3;
+out float vAlpha;
+out float vAmbient;
+out float vBounceW;
+out float vPx;
+out float vEdgePx;
+out vec4 vEll;
+
+vec3 ramp(float h) {
+  vec3 c = uRamp[0];
+  c = mix(c, uRamp[1], clamp((h - uRampAt.x) / (uRampAt.y - uRampAt.x), 0.0, 1.0));
+  c = mix(c, uRamp[2], clamp((h - uRampAt.y) / (uRampAt.z - uRampAt.y), 0.0, 1.0));
+  c = mix(c, uRamp[3], clamp((h - uRampAt.z) / (uRampAt.w - uRampAt.z), 0.0, 1.0));
+  return c;
+}
+float hash(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
+
+void main() {
+  // grains further along leave later: reveal runs from the root outward as the flare extends
+  float along = aFAttr.z;
+  float reveal = clamp((uFlareE - along * 0.55) / 0.45, 0.0, 1.0);
+  reveal = reveal * reveal * (3.0 - 2.0 * reveal);
+  vec3 u = mix(aD * 0.99, aF, reveal);
+  vec3 p = uBallC + uFlareRot * u * uBallR;
+
+  vec4 mv = modelViewMatrix * vec4(p, 1.0);
+  vec3 E[3];
+  for (int i = 0; i < 3; i++) {
+    float d = distance(p, uLightPos[i]);
+    E[i] = uLightCol[i] / (d * d);     // out in the open: no shadowing
+  }
+  vE0 = E[0]; vE1 = E[1]; vE2 = E[2];
+  vL0 = normalize((viewMatrix * vec4(uLightPos[0], 1.0)).xyz - mv.xyz);
+  vL1 = normalize((viewMatrix * vec4(uLightPos[1], 1.0)).xyz - mv.xyz);
+  vL2 = normalize((viewMatrix * vec4(uLightPos[2], 1.0)).xyz - mv.xyz);
+  vL3 = normalize((viewMatrix * vec4(uCursorPos, 1.0)).xyz - mv.xyz);
+  float dc = distance(p, uCursorPos) / uCursorReach;
+  vE3 = uCursorCol / (1.0 + dc * dc * dc * dc);
+  vAlbedo = ramp(aFAttr.x);
+  vAmbient = 0.0;
+  vBounceW = 0.3;
+
+  gl_Position = projectionMatrix * mv;
+  vec2 suv = gl_Position.xy / gl_Position.w * 0.5 + 0.5;
+  gl_Position.xy += texture(uPaint, suv).xy * uPaintScale / (uViewport * 0.5) * gl_Position.w;
+
+  float h1 = hash(aF + 1.7), h2 = hash(aF + 3.1), h3 = hash(aF + 5.3);
+  vec2 squash = 1.0 + 0.22 * (vec2(h1, h2) * 2.0 - 1.0);
+  float ang = h3 * 6.2831853;
+  vEll = vec4(squash, cos(ang), sin(ang));
+  float px = 2.0 * aFAttr.y * uFlareRadMax * uBallR * uRadScale.y * uCountScale * uPointScale / -mv.z * max(squash.x, squash.y);
+  // hidden until it leaves the surface, and until the ball has formed
+  float show = step(0.001, reveal) * uFlareVis;
+  px *= show;
+  vAlpha = show * clamp((px * px) / (uMinPx * uMinPx), 0.0, 1.0);
+  gl_PointSize = px > 0.0 ? max(px, uMinPx) : 0.0;
+  vPx = gl_PointSize;
+  vEdgePx = uEdge.y;
 }
 `;

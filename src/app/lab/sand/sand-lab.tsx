@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { Stage } from "@/three/stage";
 import { loadSand, SAND_BASE } from "@/three/sand/data";
 import { SandField, type SandState } from "@/three/sand/sand-field";
+import { PaintField } from "@/three/sand/paint";
+import * as THREE from "three";
 import { parseTierOverride, pickTier, readSignals } from "@/three/tier";
 
 type CompareTarget = "chaos" | "mid" | "ball";
@@ -35,6 +37,8 @@ export function SandLab() {
     let disposed = false;
     let stage: Stage | null = null;
     let field: SandField | null = null;
+    let paint: PaintField | null = null;
+    const listeners: [string, EventListener][] = [];
 
     (async () => {
       const data = await loadSand(SAND_BASE);
@@ -56,6 +60,7 @@ export function SandLab() {
       );
       field = new SandField(data);
       stage.scene.add(field.points);
+      stage.scene.add(field.flares);
       stage.onSettings((s) => {
         field!.setGrains(s.grains);
         field!.setShadowSteps(s.shadowSteps);
@@ -63,7 +68,7 @@ export function SandLab() {
         setStatus(`${s.tier} · ${s.grains.toLocaleString()} grains · ${s.shadowSteps} shadow steps · dpr ${s.pixelRatio}`);
       });
 
-      const state: SandState = { compact: 0, time: 0, ballSpin: 0, chaosSpin: 0 };
+      const state: SandState = { compact: 0, time: 0, ballSpin: 0, chaosSpin: 0, flares: false };
       if (compare) {
         // frozen, at the exact Blender camera: comparable pixel for pixel with the render
         state.compact = COMPACT_FOR[compare];
@@ -79,8 +84,52 @@ export function SandLab() {
       }
 
       const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      // ?still: no ambient motion (drift, spin, flares), so a test isolates what the cursor does
+      const still = new URLSearchParams(window.location.search).has("still");
+      state.flares = !reduced && !new URLSearchParams(window.location.search).has("still");
       let lastScroll = window.scrollY;
       let spinVel = 0;
+
+      // the cursor: a light (Lusion model) and, unless motion is reduced, a soft drift
+      paint = new PaintField();
+      const sizePaint = () => {
+        paint!.setSize(canvas.clientWidth, canvas.clientHeight);
+        field!.setPaint(paint!.texture, canvas.clientWidth, canvas.clientHeight);
+      };
+      sizePaint();
+      stage.onSettings(sizePaint);
+      if (reduced) field.setLook({ paintScale: 0 });
+      const pointer = { x: 0, y: 0, active: false, touch: false };
+      let cursorI = 0;
+      const on = (type: string, fn: EventListener) => {
+        window.addEventListener(type, fn, { passive: true });
+        listeners.push([type, fn]);
+      };
+      on("pointermove", ((e: PointerEvent) => {
+        pointer.x = e.clientX; pointer.y = e.clientY;
+        pointer.touch = e.pointerType === "touch";
+        // a mouse lights the sand wherever it is; a finger only while it touches
+        if (!pointer.touch || e.buttons) { pointer.active = true; paint!.move(e.clientX, e.clientY); }
+      }) as EventListener);
+      on("pointerdown", ((e: PointerEvent) => {
+        pointer.x = e.clientX; pointer.y = e.clientY; pointer.touch = e.pointerType === "touch";
+        pointer.active = true; paint!.move(e.clientX, e.clientY);
+      }) as EventListener);
+      const lift = ((e: PointerEvent) => {
+        if (e.pointerType === "touch") { pointer.active = false; paint!.release(); }
+      }) as EventListener;
+      on("pointerup", lift);
+      on("pointercancel", lift);
+      const leave = () => { pointer.active = false; paint!.release(); };
+      document.documentElement.addEventListener("mouseleave", leave);
+      listeners.push(["__leave", leave]);
+      const ndc = new THREE.Vector3();
+      const cursorWorld = new THREE.Vector3();
+      const focus = new THREE.Vector3();
+      const forward = new THREE.Vector3();
+      const chaosC = field.material.uniforms.uChaosC.value as THREE.Vector3;
+      const ballC = field.material.uniforms.uBallC.value as THREE.Vector3;
+
       stage.onFrame((dt) => {
         const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
         const progress = window.scrollY / max;
@@ -89,18 +138,38 @@ export function SandLab() {
         const scrolled = window.scrollY - lastScroll;
         lastScroll = window.scrollY;
         spinVel = damp(spinVel, scrolled * 0.004 / Math.max(dt, 1e-3), 4, dt);
-        if (!reduced) {
+        if (!reduced && !still) {
           state.time += dt;
           state.ballSpin += dt * 0.12 + spinVel * dt;
           state.chaosSpin += dt * 0.015;
         }
+        // the cursor light: on a camera-facing plane through the sand, a little in front of it
+        const cam = stage!.camera;
+        focus.lerpVectors(chaosC, ballC, state.compact);
+        cam.getWorldDirection(forward);
+        ndc.set((pointer.x / canvas.clientWidth) * 2 - 1, -(pointer.y / canvas.clientHeight) * 2 + 1, 0.5).unproject(cam);
+        const dir = ndc.sub(cam.position).normalize();
+        const dist = focus.clone().sub(cam.position).dot(forward) / Math.max(dir.dot(forward), 1e-4);
+        cursorWorld.copy(cam.position).addScaledVector(dir, dist - 0.45);
+        cursorI = damp(cursorI, pointer.active ? 1 : 0, pointer.active ? 5 : 2.5, dt);
+        field!.setCursor(cursorWorld, cursorI);
+        if (!reduced) {
+          paint!.update(stage!.renderer, dt);
+          field!.setPaint(paint!.texture, canvas.clientWidth, canvas.clientHeight);
+        }
         field!.update(state);
       });
       stage.start();
+      (window as unknown as { __sand?: unknown }).__sand = { stage, field, state };   // lab debugging
     })().catch((err) => setStatus(String(err)));
 
     return () => {
       disposed = true;
+      for (const [type, fn] of listeners) {
+        if (type === "__leave") document.documentElement.removeEventListener("mouseleave", fn);
+        else window.removeEventListener(type, fn);
+      }
+      paint?.dispose();
       field?.dispose();
       stage?.dispose();
     };

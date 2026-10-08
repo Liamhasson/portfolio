@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { SandData } from "./data";
-import { SAND_FRAGMENT, SAND_VERTEX } from "./shaders";
+import { FLARE_VERTEX, SAND_FRAGMENT, SAND_VERTEX } from "./shaders";
 
 /** What the page asks of the sand each frame. */
 export interface SandState {
@@ -12,7 +12,12 @@ export interface SandState {
   ballSpin: number;
   /** The chaos turning around itself, radians. */
   chaosSpin: number;
+  /** Flares on (off in compare mode and under reduced motion). */
+  flares: boolean;
 }
+
+/** The flare rhythm (concept v3: every few seconds a loose spray lifts off a patch and falls back). */
+export const FLARE = { every: [5, 8] as [number, number], rise: 1.1, hold: 0.35, fall: 1.7 };
 
 /** Calibrated against the Cycles renders (see the compare mode); light power is Blender's watts times this. */
 export const SAND_LOOK = {
@@ -41,6 +46,9 @@ export const SAND_LOOK = {
   drift: 0.012,
   driftFreq: 0.9,
   driftSpeed: 0.05,
+  cursor: 5.0,          // the cursor light's strength (fades with the pointer): ~2x the key on the grains it touches
+  cursorReach: 0.9,     // world units
+  paintScale: 0.1,      // seconds: drift velocity -> grain offset
 };
 
 const Y = new THREE.Vector3(0, 1, 0);
@@ -48,7 +56,14 @@ const Y = new THREE.Vector3(0, 1, 0);
 export class SandField {
   readonly points: THREE.Points;
   readonly material: THREE.ShaderMaterial;
+  readonly flares: THREE.Points;
+  private readonly flareMaterial: THREE.ShaderMaterial;
+  private readonly flareRot = new THREE.Matrix3();
+  private nextFlare = 2.5;
+  private flareStart = -100;
+  private flareCount = 0;
   private readonly data: SandData;
+  private look = { ...SAND_LOOK };
   private readonly ballRot = new THREE.Matrix3();
   private readonly chaosRot = new THREE.Matrix3();
   private readonly m4 = new THREE.Matrix4();
@@ -96,6 +111,7 @@ export class SandField {
         uDriftSpeed: { value: SAND_LOOK.driftSpeed },
         uPointScale: { value: 1 },
         uMinPx: { value: SAND_LOOK.minPx },
+        uCountScale: { value: 1 },
         uRadScale: { value: new THREE.Vector2(SAND_LOOK.radScaleChaos, SAND_LOOK.radScale) },
         uEdge: { value: new THREE.Vector2(SAND_LOOK.edgeChaos, SAND_LOOK.edgePx) },
         uChaosShare: { value: SAND_LOOK.chaosShare },
@@ -120,11 +136,57 @@ export class SandField {
         uRampAt: { value: new THREE.Vector4(ramp[0][0], ramp[1][0], ramp[2][0], ramp[3][0]) },
         uExposure: { value: SAND_LOOK.exposure },
         uSpec: { value: SAND_LOOK.spec },
+        uCursorPos: { value: new THREE.Vector3(0, 0, 100) },
+        uCursorCol: { value: new THREE.Vector3() },
+        uCursorReach: { value: SAND_LOOK.cursorReach },
+        uPaint: { value: null },
+        uPaintScale: { value: SAND_LOOK.paintScale },
+        uViewport: { value: new THREE.Vector2(1, 1) },
       },
     });
     this.points = new THREE.Points(geo, this.material);
     this.points.frustumCulled = false;
+
+    // flares share the sand's uniforms (lights, look, cursor, drift) plus their own
+    const f = data.flare;
+    const fgeo = new THREE.BufferGeometry();
+    fgeo.setAttribute("aF", new THREE.BufferAttribute(f.extended, 3));
+    fgeo.setAttribute("aD", new THREE.BufferAttribute(f.root, 3));
+    fgeo.setAttribute("aFAttr", new THREE.BufferAttribute(f.attributes, 4, true));
+    fgeo.setAttribute("position", new THREE.BufferAttribute(f.extended, 3));
+    const shared = this.material.uniforms;
+    this.flareMaterial = new THREE.ShaderMaterial({
+      glslVersion: THREE.GLSL3,
+      vertexShader: FLARE_VERTEX,
+      fragmentShader: SAND_FRAGMENT,
+      alphaToCoverage: true,
+      toneMapped: true,
+      uniforms: {
+        ...shared,
+        uFlareRot: { value: this.flareRot },
+        uFlareE: { value: 0 },
+        uFlareVis: { value: 0 },
+        uFlareRadMax: { value: meta.flare.radius_max },
+      },
+    });
+    this.flares = new THREE.Points(fgeo, this.flareMaterial);
+    this.flares.frustumCulled = false;
     this.setLook({});
+  }
+
+  /** The cursor as a light: world position and intensity 0..1 (fades with the pointer). */
+  setCursor(pos: THREE.Vector3, intensity: number): void {
+    const u = this.material.uniforms;
+    (u.uCursorPos.value as THREE.Vector3).copy(pos);
+    // warm white, a little cooler than the key so it reads as the visitor's own light
+    (u.uCursorCol.value as THREE.Vector3).set(1.0, 0.9, 0.82).multiplyScalar(this.look.cursor * intensity);
+  }
+
+  /** The cursor's drift field, and the viewport in CSS px it is measured in. */
+  setPaint(texture: THREE.Texture | null, cssWidth: number, cssHeight: number): void {
+    const u = this.material.uniforms;
+    u.uPaint.value = texture;
+    (u.uViewport.value as THREE.Vector2).set(cssWidth, cssHeight);
   }
 
   /** The chaos's own centre (its grains' mean), the point it turns around. */
@@ -140,7 +202,9 @@ export class SandField {
   }
 
   setGrains(count: number): void {
-    this.points.geometry.setDrawRange(0, Math.min(count, this.data.meta.count));
+    const n = Math.min(count, this.data.meta.count);
+    this.points.geometry.setDrawRange(0, n);
+    this.material.uniforms.uCountScale.value = Math.pow(this.data.meta.count / n, 0.35);
   }
 
   setShadowSteps(steps: number): void {
@@ -165,15 +229,44 @@ export class SandField {
     }
     this.ballRot.setFromMatrix4(this.m4.makeRotationAxis(Y, s.ballSpin));
     this.chaosRot.setFromMatrix4(this.m4.makeRotationAxis(Y, s.chaosSpin));
+    this.updateFlares(s);
+  }
+
+  /** Every few seconds, a spray from a new patch: rise fast, hang, fall back slower (it has weight). */
+  private updateFlares(s: SandState): void {
+    const fu = this.flareMaterial.uniforms;
+    const formed = THREE.MathUtils.smoothstep(s.compact, 0.85, 0.98);
+    fu.uFlareVis.value = s.flares ? formed : 0;
+    if (!s.flares) { fu.uFlareE.value = 0; return; }
+    if (s.time >= this.nextFlare && formed > 0.5) {
+      this.flareStart = s.time;
+      this.flareCount++;
+      const [a, b] = FLARE.every;
+      this.nextFlare = s.time + FLARE.rise + FLARE.hold + FLARE.fall + a + Math.random() * (b - a);
+      // a new patch, kept on the visible side: a turn about the vertical and a slight tilt
+      const yaw = (Math.random() * 2 - 1) * 1.3;
+      const tilt = (Math.random() * 2 - 1) * 0.35;
+      const m = new THREE.Matrix4().makeRotationY(yaw).multiply(new THREE.Matrix4().makeRotationX(tilt));
+      this.flareRot.setFromMatrix4(m);
+    }
+    const t = s.time - this.flareStart;
+    let e = 0;
+    if (t < FLARE.rise) { const x = t / FLARE.rise; e = 1 - (1 - x) * (1 - x); }               // ease out: thrown up
+    else if (t < FLARE.rise + FLARE.hold) e = 1;
+    else if (t < FLARE.rise + FLARE.hold + FLARE.fall) { const x = (t - FLARE.rise - FLARE.hold) / FLARE.fall; e = 1 - x * x; }   // ease in: falling
+    fu.uFlareE.value = e;
   }
 
   /** Lab calibration: override the look (compare mode). Light gains multiply Blender's calibrated power. */
   setLook(look: Partial<typeof SAND_LOOK>): void {
     const u = this.material.uniforms;
     const l = { ...SAND_LOOK, ...look };
+    this.look = l;
     u.uExposure.value = l.exposure;
     (u.uShadowK.value as THREE.Vector2).set(l.shadowKChaos, l.shadowK);
     u.uSpec.value = l.spec;
+    u.uCursorReach.value = l.cursorReach;
+    u.uPaintScale.value = l.paintScale;
     (u.uRadScale.value as THREE.Vector2).set(l.radScaleChaos, l.radScale);
     (u.uEdge.value as THREE.Vector2).set(l.edgeChaos, l.edgePx);
     u.uChaosShare.value = l.chaosShare;
@@ -193,6 +286,8 @@ export class SandField {
   dispose(): void {
     this.points.geometry.dispose();
     this.material.dispose();
+    this.flares.geometry.dispose();
+    this.flareMaterial.dispose();
     Object.values(this.data.volumes).forEach((t) => t.dispose());
   }
 }

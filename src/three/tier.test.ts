@@ -20,9 +20,10 @@ describe("pickTier", () => {
   test("a weak desktop is low", () => {
     expect(pickTier({ ...desktop, cores: 2, memoryGb: 4, maxTextureSize: 4096 })).toBe("low");
   });
-  test("a strong phone is mid, a normal phone is low", () => {
+  test("a current phone is mid, a weak phone is low", () => {
     expect(pickTier({ ...desktop, isMobile: true, cores: 8, memoryGb: 8 })).toBe("mid");
-    expect(pickTier({ ...desktop, isMobile: true, cores: 6, memoryGb: 4 })).toBe("low");
+    expect(pickTier({ ...desktop, isMobile: true, cores: 6, memoryGb: 4 })).toBe("mid");
+    expect(pickTier({ ...desktop, isMobile: true, cores: 2, memoryGb: 2 })).toBe("low");
   });
   test("automated browsers get low so tests stay fast, unless overridden", () => {
     expect(pickTier({ ...desktop, automated: true })).toBe("low");
