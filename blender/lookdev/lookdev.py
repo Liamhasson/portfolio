@@ -194,7 +194,7 @@ def csock(sockets, name):
     """The RGBA socket called `name` (Mix nodes expose float, vector and colour sockets with identical names)."""
     return next(s for s in sockets if s.name == name and s.type == "RGBA")
 
-def reflection_env(strength, rot_z=0.0):
+def reflection_env(strength, rot_z=0.0, dome=0.0):
     """Light that only reflections and refractions see: a few soft studio panels built in the shader, so the glass
     reflects light, never a recognisable object. The camera, diffuse light and volumes never see it: the void stays
     pitch black and the set's lighting is unchanged."""
@@ -219,6 +219,8 @@ def reflection_env(strength, rot_z=0.0):
              panel((0.92, -0.3, 0.2), 0.012, 8.0),    # thin strip, right
              panel((-0.95, 0.25, -0.1), 0.01, 5.0),   # thin strip, left
              panel((0.3, -0.95, -0.5), 0.03, 2.5)]    # low front bounce: a crisp lower highlight (true to the dark set)
+    if dome:
+        terms.append(panel((0.0, 0.25, 1.0), 0.75, dome))   # a dim, very soft ceiling: what a polished inlay catches at night
     acc = terms[0]
     for term in terms[1:]:
         add = N.new("ShaderNodeMath"); add.operation = "ADD"
@@ -990,36 +992,147 @@ def text_obj(body, size, loc, font_file, emit=0.9, color=(1, 0.98, 0.96, 1), par
     ob.location = loc
     return ob
 
+def rounded_rect(w, h, r, segs=10):
+    """Outline of a rounded rectangle centred on the origin, counter-clockwise."""
+    pts = []
+    for cx, cy, a0 in ((w / 2 - r, h / 2 - r, 0), (-w / 2 + r, h / 2 - r, 90), (-w / 2 + r, -h / 2 + r, 180), (w / 2 - r, -h / 2 + r, 270)):
+        for i in range(segs + 1):
+            a = math.radians(a0 + 90 * i / segs)
+            pts.append((cx + r * math.cos(a), cy + r * math.sin(a)))
+    return pts
+
+def slab(name, w, h, r, thick, z0=0.0, bevel=0.0012):
+    """A rounded-rectangle slab (in XY, from z0 to z0+thick) with softened edges, like a machined unibody part."""
+    import bmesh
+    bm = bmesh.new()
+    vs = [bm.verts.new((x, y, z0)) for x, y in rounded_rect(w, h, r)]
+    f = bm.faces.new(vs)
+    ext = bmesh.ops.extrude_face_region(bm, geom=[f])
+    for v in [e for e in ext["geom"] if isinstance(e, bmesh.types.BMVert)]:
+        v.co.z += thick
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
+    ob = bpy.data.objects.new(name, me); scene.collection.objects.link(ob)
+    if bevel:
+        bv = ob.modifiers.new("bevel", "BEVEL"); bv.width = bevel; bv.segments = 4
+        bv.limit_method = "ANGLE"; bv.angle_limit = math.radians(50); bv.harden_normals = True
+    for poly in ob.data.polygons:
+        poly.use_smooth = True
+    return ob
+
+def cut(target, cutter):
+    """Boolean difference, applied, cutter removed."""
+    m = target.modifiers.new("cut", "BOOLEAN"); m.operation = "DIFFERENCE"; m.object = cutter; m.solver = "EXACT"
+    bpy.context.view_layer.objects.active = target
+    target.modifiers.move(len(target.modifiers) - 1, 0)
+    bpy.ops.object.modifier_apply(modifier="cut")
+    bpy.data.objects.remove(cutter)
+
+def aluminium(name="alu", tone=0.78):
+    """Bead-blasted aluminium: metallic, softly rough, with a fine grain in the roughness."""
+    m = bpy.data.materials.new(name); m.use_nodes = True
+    nt = m.node_tree; bsdf = nt.nodes["Principled BSDF"]
+    bsdf.inputs["Base Color"].default_value = (tone, tone, tone * 1.01, 1)
+    bsdf.inputs["Metallic"].default_value = 1.0
+    nz = nt.nodes.new("ShaderNodeTexNoise"); nz.inputs["Scale"].default_value = 3000.0; nz.inputs["Detail"].default_value = 2.0
+    mr = nt.nodes.new("ShaderNodeMapRange"); mr.inputs["To Min"].default_value = 0.3; mr.inputs["To Max"].default_value = 0.4
+    nt.links.new(nz.outputs["Fac"], mr.inputs["Value"]); nt.links.new(mr.outputs["Result"], bsdf.inputs["Roughness"])
+    return m
+
 def laptop(loc, rot_z, open_deg=108):
-    """An original, generic aluminium laptop (no brand marks). Its screen shows the project index (placeholder layout)."""
-    W, D, Hb, Hl = 0.304, 0.212, 0.0155, 0.006
-    alu = principled("alu", (0.42, 0.42, 0.44, 1), 0.48, **{"Metallic": 0.85})
+    """A laptop in the form of a 14-inch MacBook Pro (312.6 x 221.2 mm, 15.5 mm closed): aluminium unibody, front notch,
+    side ports, key grid, glass trackpad. No Apple marks: the lid carries Liam's grain mark as flush polished inlays."""
+    import json as _json
+    W, D, Hb, Hl, Rc = 0.3126, 0.2212, 0.0108, 0.0047, 0.0095
+    alu = aluminium()
     root = bpy.data.objects.new("laptop", None); scene.collection.objects.link(root)
     root.location = loc; root.rotation_euler = (0, 0, rot_z)
-    def box(name, size, at, mat, parent):
-        bpy.ops.mesh.primitive_cube_add(size=1)
-        o = bpy.context.active_object; o.name = name; o.scale = size   # primitive cube of size 1
-        bpy.ops.object.transform_apply(scale=True)
-        bv = o.modifiers.new("b", "BEVEL"); bv.width = min(size) * 0.45; bv.segments = 4; bv.harden_normals = True
-        o.data.materials.append(mat); o.parent = parent; o.location = at
-        return o
-    base = box("base", (W, D, Hb), (0, 0, Hb / 2), alu, root)
-    deck = principled("deck", (0.03, 0.03, 0.034, 1), 0.55)
-    box("keys", (W * 0.86, D * 0.42, 0.0008), (0, D * 0.12, Hb + 0.0002), deck, root)
-    box("pad", (W * 0.38, D * 0.3, 0.0006), (0, -D * 0.27, Hb + 0.0001), principled("pad", (0.16, 0.16, 0.17, 1), 0.25, **{"Metallic": 1.0}), root)
+    # ---- base
+    base = slab("base", W, D, Rc, Hb)
+    # front notch (the scoop for opening the lid)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=48, ring_count=24, location=(0, -D / 2, Hb))
+    sc = bpy.context.active_object; sc.scale = (0.036, 0.009, 0.0042); cut(base, sc)
+    # ports: MagSafe, 2 x USB-C, headphone (left); HDMI, USB-C, SD (right)
+    def port(x_side, y, w, h, z=0.0045):
+        bpy.ops.mesh.primitive_cube_add(size=1, location=(x_side * (W / 2), y, z))
+        c = bpy.context.active_object; c.scale = (0.008, w, h)
+        bv = c.modifiers.new("b", "BEVEL"); bv.width = min(w, h) * 0.45; bv.segments = 6; bv.affect = "EDGES"
+        bpy.context.view_layer.objects.active = c; bpy.ops.object.modifier_apply(modifier="b")
+        cut(base, c)
+    for y in (0.07, 0.035, 0.02):
+        port(-1, y, 0.0084 if y != 0.07 else 0.0105, 0.0029)
+    for y, w in ((0.06, 0.0145), (0.035, 0.0084), (-0.05, 0.026)):
+        port(1, y, w, 0.0029 if w < 0.02 else 0.0018)
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.0018, depth=0.01, vertices=32, location=(-W / 2, -0.06, 0.0045), rotation=(0, math.pi / 2, 0))
+    cut(base, bpy.context.active_object)
+    base.data.materials.append(alu); base.parent = root
+    # keyboard: a slightly recessed black field with a real key grid
+    keys_mat = principled("keys", (0.018, 0.018, 0.02, 1), 0.55)
+    deck = principled("deck", (0.012, 0.012, 0.013, 1), 0.6)
+    kb_w, kb_d, kb_y = 0.276, 0.112, D / 2 - 0.074
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(0, kb_y, Hb - 0.0002)); kw = bpy.context.active_object
+    kw.scale = (kb_w + 0.004, kb_d + 0.004, 0.0004); kw.data.materials.append(deck); kw.parent = root
+    pitch = kb_w / 14
+    rows = [(14, 0.55), (14, 1), (14, 1), (13, 1), (12, 1), (11, 1)]
+    yk = kb_y + kb_d / 2 - 0.004
+    for n, hfac in rows:
+        kh = pitch * 0.88 * hfac; kwid = (kb_w - 0.0015 * (n - 1)) / n
+        for i in range(n):
+            x = -kb_w / 2 + kwid / 2 + i * (kwid + 0.0015)
+            bpy.ops.mesh.primitive_cube_add(size=1, location=(x, yk - kh / 2, Hb + 0.0002))
+            k = bpy.context.active_object; k.scale = (kwid, kh, 0.0006)
+            bv = k.modifiers.new("b", "BEVEL"); bv.width = 0.0012; bv.segments = 3
+            k.data.materials.append(keys_mat); k.parent = root
+        yk -= kh + 0.0015
+    # trackpad: glass, a touch darker than the aluminium
+    tp = slab("trackpad", 0.15, 0.094, 0.004, 0.0002, z0=Hb - 0.00005, bevel=0)
+    tp.location = (0, -D / 2 + 0.012 + 0.047, 0)
+    tp.data.materials.append(principled("trackpad", (0.6, 0.6, 0.61, 1), 0.12, **{"Metallic": 0.9, "Coat Weight": 0.6, "Coat Roughness": 0.08}))
+    tp.parent = root
+    # hinge barrel
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.0035, depth=W * 0.86, vertices=48, location=(0, D / 2 - 0.004, Hb), rotation=(0, math.pi / 2, 0))
+    hb = bpy.context.active_object; bpy.ops.object.shade_smooth()
+    hb.data.materials.append(aluminium("hinge_alu", 0.42)); hb.parent = root
+    # ---- lid, built standing up in hinge space (outer face +y, screen -y), rotated shut or open
     hinge = bpy.data.objects.new("hinge", None); scene.collection.objects.link(hinge)
-    hinge.parent = root; hinge.location = (0, D / 2, Hb)
+    hinge.parent = root; hinge.location = (0, D / 2 - 0.004, Hb)
     hinge.rotation_euler = (math.radians(-(open_deg - 90)), 0, 0)
-    lid = box("lid", (W, Hl, D), (0, Hl / 2, D / 2), alu, hinge)
-    glass = principled("bezel", (0.004, 0.004, 0.005, 1), 0.45, **{"Specular IOR Level": 0.05})
-    box("bezel", (W * 0.97, 0.0006, D * 0.95), (0, -0.0003, D / 2 + 0.002), glass, hinge)
-    # Display: near-black, the index lines glow on it (placeholder until the index is designed).
-    disp = box("display", (W * 0.92, 0.0004, D * 0.86), (0, -0.0007, D / 2 + 0.004), principled("disp", (0.0, 0.0, 0.0, 1), 0.55, **{"Specular IOR Level": 0.02, "Emission Color": (0.012, 0.013, 0.018, 1), "Emission Strength": 1.0}), hinge)
-    rows = ["Eventread · SaaS web app", "Cyvore · B2B website", "Pulse · Fitness app", "Nordic Logic · B2B website", "Stub · Coming soon"]
-    for i, r in enumerate(rows):
-        tx = text_obj(r, 0.0105, (-W * 0.4, -0.0011, D * 0.78 - i * 0.026), "HankenGrotesk-Regular.ttf", emit=2.2 if i < 3 else 0.9, parent=hinge)
-        tx.rotation_euler = (math.pi / 2, 0, 0)
-    # The screen's glow on the desk and the ball (the light itself is never seen).
+    lid = slab("lid", W, D, Rc, Hl)
+    lid.rotation_euler = (-math.pi / 2, 0, 0); lid.location = (0, 0, D / 2)   # spans y 0..Hl (outer face at Hl)
+    lid.data.materials.append(alu); lid.parent = hinge
+    # screen: black glass, the index design on the active area
+    disp_mat = bpy.data.materials.new("display"); disp_mat.use_nodes = True
+    nt = disp_mat.node_tree; bsdf = nt.nodes["Principled BSDF"]
+    bsdf.inputs["Base Color"].default_value = (0, 0, 0, 1); bsdf.inputs["Roughness"].default_value = 0.5
+    bsdf.inputs["Specular IOR Level"].default_value = 0.02
+    tex = nt.nodes.new("ShaderNodeTexImage")
+    tex.image = bpy.data.images.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), "textures-local", "work-index-screen.png"))
+    nt.links.new(tex.outputs["Color"], bsdf.inputs["Emission Color"]); bsdf.inputs["Emission Strength"].default_value = 1.1
+    glass = principled("bezel", (0.004, 0.004, 0.005, 1), 0.4, **{"Specular IOR Level": 0.05})
+    bz = slab("bezel", W - 0.0024, D - 0.0024, Rc - 0.0012, 0.0002, bevel=0)
+    bz.rotation_euler = (-math.pi / 2, 0, 0); bz.location = (0, -0.0001, D / 2)
+    bz.data.materials.append(glass); bz.parent = hinge
+    bpy.ops.mesh.primitive_plane_add(size=1)
+    sp = bpy.context.active_object; sp.name = "display"
+    aw, ah = W - 0.014, (W - 0.014) / 1.6
+    sp.scale = (aw, ah, 1); sp.rotation_euler = (math.pi / 2, 0, 0)
+    sp.location = (0, -0.00035, D / 2 - (D - ah) / 2 + 0.0035)
+    sp.data.materials.append(disp_mat); sp.parent = hinge
+    # the grain mark on the outer face: flush, mirror-polished inlays (the material the real logo is made of)
+    mark = _json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "mark", "stipple.json")))
+    box = 0.04
+    polished = principled("mark_polished", (0.92, 0.92, 0.93, 1), 0.1, **{"Metallic": 1.0})
+    import bmesh
+    bm = bmesh.new()
+    for x, y, r in mark["dots"]:
+        res = bmesh.ops.create_circle(bm, cap_ends=True, radius=r * box, segments=14)
+        for v in res["verts"]:
+            v.co.x += x * box; v.co.y += y * box
+    me = bpy.data.meshes.new("mark"); bm.to_mesh(me); bm.free()
+    mk = bpy.data.objects.new("mark", me); scene.collection.objects.link(mk)
+    mk.rotation_euler = (-math.pi / 2, 0, 0)    # mark x→+x, mark up→toward the hinge, facing out: reads right from the front
+    mk.location = (0, Hl + 0.00004, D / 2)
+    mk.data.materials.append(polished); mk.parent = hinge
     if open_deg < 30:
         return root   # shut: the screen is off, no glow
     gl = area_light("screen_glow", (0, 0, 0), 0.25, 1.6, (0.78, 0.84, 1.0), size_y=0.18)
@@ -1104,8 +1217,8 @@ def build_desk():
     bpy.ops.object.shade_smooth()
     pen.data.materials.append(principled("pen", (0.02, 0.02, 0.025, 1), 0.25, **{"Coat Weight": 0.6}))
     world((0.0, 0.0, 0.0, 1), 1.0)   # the desk floats in a pitch black void
-    if state == "glass":
-        reflection_env(0.35, rot_z=math.radians(-40))
+    # Reflection-only light (never seen, lights nothing): polished metal and glass read as polished, not black.
+    reflection_env(0.35, rot_z=math.radians(-40), dome=0.6)
     # The lamp: off-frame, upper left, warm. Its light defines the scene; the ball does not emit.
     sp = bpy.data.lights.new("lamp", "SPOT")
     sp.energy = 230
@@ -1121,7 +1234,11 @@ def build_desk():
     bl.energy = 3.5; bl.color = (1.0, 0.85, 0.7); bl.spot_size = math.radians(28); bl.spot_blend = 0.7; bl.shadow_soft_size = 0.15
     bounce = bpy.data.objects.new("bounce", bl); bounce.location = (0.45, -0.25, 0.25)
     scene.collection.objects.link(bounce); aim(bounce, (0.0, 0.05, 0.06))
-    if view == "tq":
+    if os.environ.get("LAPTOP_CLOSEUP") == "top":
+        camera((0.27, 0.039, 0.2), (0.27, 0.04, 0.0), lens=50, focus=0.18, fstop=8.0)
+    elif os.environ.get("LAPTOP_CLOSEUP"):
+        camera((0.12, -0.32, 0.32), (0.27, 0.04, 0.0), lens=60, focus=0.5, fstop=8.0)
+    elif view == "tq":
         camera((0.03, -0.62, 0.46), (0.0, 0.02, 0.03), lens=50, focus=0.74, fstop=4.0)
     elif view == "top":
         camera((0.0, 0.02, 1.35), (0.0, 0.0201, 0.0), lens=45, focus=1.15, fstop=5.6)

@@ -50,3 +50,4 @@ blender/lookdev/renders/*.png
 blender/lookdev/renders/*.log
 blender/lookdev/textures/
 blender/lookdev/renders/pullback-preview/
+blender/lookdev/textures-local/
