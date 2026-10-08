@@ -4,8 +4,32 @@
     {
       "name": "portfolio-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 3000
+    },
+    {
+      "name": "prototypes",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "-e",
+        "const h=require('http'),f=require('fs'),p=require('path'),r=p.resolve('docs/prototypes'),t={'.html':'text/html','.jpg':'image/jpeg','.png':'image/png','.css':'text/css','.js':'text/javascript'};h.createServer((q,s)=>{const u=decodeURIComponent(q.url.split('?')[0]);const x=p.join(r,u.endsWith('/')?u+'index.html':u);if(!x.startsWith(r))return s.writeHead(403).end();f.readFile(x,(e,d)=>e?s.writeHead(404).end():s.writeHead(200,{'content-type':t[p.extname(x)]||'application/octet-stream'}).end(d))}).listen(4321)"
+      ],
+      "port": 4321
+    },
+    {
+      "name": "sand-lab",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "-p",
+        "3100"
+      ],
+      "port": 3100
     }
   ]
 }

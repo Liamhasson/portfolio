@@ -23,7 +23,7 @@ from mathutils import Vector
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 ap = argparse.ArgumentParser()
-ap.add_argument("--scene", choices=["ball", "chaos", "glass", "studio", "desk", "bench", "canvas", "hero", "pullback", "deskmove", "attempts"], required=True)
+ap.add_argument("--scene", choices=["ball", "chaos", "glass", "studio", "desk", "bench", "canvas", "hero", "pullback", "deskmove", "attempts", "export"], required=True)
 ap.add_argument("--move", choices=["rise", "descend", "push"], default="rise", help="deskmove: which camera move")
 ap.add_argument("--grid", choices=["etched", "glow", "mat"], default="etched", help="bench scene only")
 ap.add_argument("--word", choices=["solid", "light", "cutout", "none"], default="light", help="hero scene only")
@@ -1755,11 +1755,122 @@ def build_attempts():
     os.environ["ATTEMPT"] = "1.0,0,0"
     build_desk()
 
+def build_export():
+    """Writes the live sand's data (build step 2) from the same functions as the renders, to args.out:
+      sand.bin    per grain, shuffled so any prefix is an even sample (a lower tier draws a prefix):
+                  chaos position, ball position (uint16 in the bounds box), chaos hue, ball hue, radius, delay (uint8)
+      flare.bin   the dense ball's flare streamers: root direction, extended position, hue, radius, stream, t
+      vol_*.bin   uint8 density volumes (chaos, halfway, ball) for the light march: optical depth per cell
+      sand.json   counts, bounds, scales, camera, lights, colour ramp, version
+    Blender is z up; three.js is y up: (x, y, z) -> (x, z, -y)."""
+    import json, gzip
+    N = int(os.environ.get("EXPORT_N", "400000"))
+    HERO_R, HERO_C = 1.1, np.array([0.0, 0.0, 0.1])
+    rng = np.random.default_rng(2027)
+    # chaos: chaos_points keeps a fraction of what it is given; ask for enough
+    if os.environ.get("EXPORT_COUNT_CHAOS"):
+        print("CHAOS_COUNT render", len(chaos_points(520_000)[0])); sys.exit(0)   # how many grains the hero render's chaos holds
+    pa, hue_a, rad_a, _ = chaos_points(int(N * 2.2))
+    pick = rng.permutation(len(pa))[:N]
+    pa, hue_a, rad_a = pa[pick], hue_a[pick], rad_a[pick]
+    # ball: the approved dense ball (no flares here; the flares are their own buffer)
+    pb, hue_b, rad_b = dense_points(HERO_R, flare=False, seed=2026)
+    pick = rng.permutation(len(pb))[:N] if len(pb) >= N else rng.integers(0, len(pb), N)
+    pb, hue_b, rad_b = pb[pick] + HERO_C, hue_b[pick], rad_b[pick]
+    # pair by direction from the cloud's centre, so each grain travels to a nearby spot on the ball
+    def key(p, c):
+        d = p - c
+        d = d / np.maximum(np.linalg.norm(d, axis=1, keepdims=True), 1e-9)
+        th = np.arccos(np.clip(d[:, 2], -1, 1)) / np.pi; ph = (np.arctan2(d[:, 1], d[:, 0]) / (2 * np.pi)) % 1.0
+        # Hilbert-like order: z-curve on a 1024 x 1024 grid of (theta, phi), interleaved bits
+        ti = (th * 1023).astype(np.uint32); pi_ = (ph * 1023).astype(np.uint32)
+        k = np.zeros(len(p), np.uint64)
+        for b in range(10):
+            k |= ((ti >> b) & 1).astype(np.uint64) << np.uint64(2 * b + 1)
+            k |= ((pi_ >> b) & 1).astype(np.uint64) << np.uint64(2 * b)
+        return k
+    ca = pa.mean(0)
+    oa, ob = np.argsort(key(pa, ca)), np.argsort(key(pb, HERO_C))
+    pa, hue_a, rad_a = pa[oa], hue_a[oa], rad_a[oa]
+    pb, hue_b, rad_b = pb[ob], hue_b[ob], rad_b[ob]
+    delay = rng.uniform(0, 1, N)
+    # one shuffle for everything: any prefix is an even sample
+    sh = rng.permutation(N)
+    pa, pb, hue_a, hue_b, rad_a, rad_b, delay = pa[sh], pb[sh], hue_a[sh], hue_b[sh], rad_a[sh], rad_b[sh], delay[sh]
+    to3 = lambda p: np.stack([p[:, 0], p[:, 2], -p[:, 1]], axis=1).astype(np.float64)
+    A, B = to3(pa), to3(pb)
+    lo = np.minimum(A.min(0), B.min(0)) - 0.05; hi = np.maximum(A.max(0), B.max(0)) + 0.05
+    q = lambda P: np.round((P - lo) / (hi - lo) * 65535).astype(np.uint16)
+    u8 = lambda v: np.round(np.clip(v, 0, 1) * 255).astype(np.uint8)
+    rmax = float(max(rad_a.max(), rad_b.max()))
+    os.makedirs(args.out, exist_ok=True)
+    def write(name, *arrays):
+        raw = b"".join(np.ascontiguousarray(a).tobytes() for a in arrays)
+        open(os.path.join(args.out, name), "wb").write(raw)
+        return len(raw)
+    sizes = {}
+    # interleave per grain for a single upload: [ax ay az bx by bz] uint16 then [hueA hueB rad delay] uint8
+    pos = np.concatenate([q(A), q(B)], axis=1)
+    # radius: chaos and ball radii packed as two 4-bit values (high nibble chaos), each a fraction of radius_max
+    nib = lambda r: np.clip(np.round(r / rmax * 15), 1, 15).astype(np.uint8)
+    attr = np.stack([u8(hue_a), u8(hue_b), (nib(rad_a) << 4) | nib(rad_b), u8(delay)], axis=1)
+    sizes["sand.bin"] = write("sand.bin", pos, attr)
+    # flares: the dense ball's streamers, unit-ball space (the shader scales by the ball radius)
+    p_all, h_all, r_all = dense_points(1.0, flare=True, seed=2026)
+    p_nof, _, _ = dense_points(1.0, flare=False, seed=2026)
+    fp, fh, fr = p_all[len(p_nof):], h_all[len(p_nof):], r_all[len(p_nof):]
+    fd = fp / np.maximum(np.linalg.norm(fp, axis=1, keepdims=True), 1e-9)
+    ext = np.clip(np.linalg.norm(fp, axis=1) - 1.0, 0, None)                     # how far out along its stream
+    tnorm = ext / max(ext.max(), 1e-6)
+    F = to3(fp); D = to3(fd)
+    sizes["flare.bin"] = write("flare.bin", F.astype(np.float32), D.astype(np.float32),
+                               np.stack([u8(fh), u8(fr / max(fr.max(), 1e-9)), u8(tnorm), np.zeros(len(fp), np.uint8)], axis=1))
+    # density volumes: optical depth from grain cross-sections, in the bounds box
+    VR = (128, 96, 96)
+    cell = (hi - lo) / np.array(VR)
+    def volume(P, rad):
+        idx = np.clip(((P - lo) / (hi - lo) * np.array(VR)).astype(int), 0, np.array(VR) - 1)
+        g = np.zeros(VR, np.float64)
+        np.add.at(g, (idx[:, 0], idx[:, 1], idx[:, 2]), np.pi * rad.astype(np.float64) ** 2)
+        g /= np.prod(cell)                       # sigma: cross-section per unit volume (1/length)
+        # a light blur so the march is smooth
+        for ax in range(3):
+            g = (np.roll(g, 1, ax) + 2 * g + np.roll(g, -1, ax)) / 4
+        return g
+    def mid_positions():
+        tt = np.clip((0.5 - delay * 0.4) / 0.6, 0, 1); tt = tt * tt * (3 - 2 * tt)
+        return A * (1 - tt[:, None]) + B * tt[:, None]
+    vols = {"chaos": volume(A, rad_a), "mid": volume(mid_positions(), (rad_a + rad_b) / 2), "ball": volume(B, rad_b)}
+    smax = max(v.max() for v in vols.values())
+    # store sqrt-compressed (more precision in the thin sand), uint8, x fastest (three's Data3DTexture order)
+    for k_, v in vols.items():
+        enc = np.round(np.sqrt(v / smax) * 255).astype(np.uint8)
+        sizes[f"vol_{k_}.bin"] = write(f"vol_{k_}.bin", np.transpose(enc, (2, 1, 0)))
+    cam_b = (Vector((0, -9.5, 0.6)), Vector((0, 0, 0.1)))
+    c3 = lambda v: [float(v[0]), float(v[2]), float(-v[1])]
+    lights = [dict(name="key", pos=c3((-4.0, -7.0, 4.0)), size=3.5, watts=1900, color=[1.0, 0.82, 0.68]),
+              dict(name="rim", pos=c3((1.5, 6.5, 2.5)), size=2.0, watts=1500, color=list(ROSE_SOFT[:3])),
+              dict(name="fill", pos=c3((3.5, -4.0, -1.0)), size=4.0, watts=80, color=[0.72, 0.78, 0.95])]
+    meta = dict(version=2, count=N, bounds=[lo.tolist(), hi.tolist()], radius_max=rmax,
+                ball=dict(center=c3(HERO_C), radius=HERO_R),
+                flare=dict(count=len(fp), radius_max=float(fr.max()), ext_max=float(ext.max())),
+                volume=dict(res=list(VR), sigma_max=float(smax), encoding="sqrt"),
+                camera=dict(position=c3(cam_b[0]), target=c3(cam_b[1]), lens_mm=45, sensor_mm=36, fit="horizontal",
+                            focus_m=9.3, fstop=11, render=[1600, 1000]),
+                lights=lights,
+                ramp=[[0.0, list(PLUM[:3])], [0.42, list(DUSTY_ROSE[:3])], [0.74, list(ROSE_GOLD[:3])], [1.0, list(MUTED_GOLD[:3])]],
+                material=dict(roughness=0.62, specular=0.3),
+                compaction=dict(delay_span=0.4, ramp=0.6),
+                files=sizes)
+    json.dump(meta, open(os.path.join(args.out, "sand.json"), "w"), indent=1)
+    print("EXPORT", json.dumps({k: v for k, v in meta.items() if k in ("count", "bounds", "files")}))
+    sys.exit(0)
+
 # ---------------------------------------------------------------- go
 
 {"ball": build_ball, "chaos": build_chaos, "glass": build_glass, "studio": build_studio,
  "desk": build_desk, "bench": build_bench, "canvas": build_canvas, "hero": build_hero, "pullback": build_pullback,
- "deskmove": build_deskmove, "attempts": build_attempts}[args.scene]()
+ "deskmove": build_deskmove, "attempts": build_attempts, "export": build_export}[args.scene]()
 if args.preview:
     render_settings(24, *( (960, 600) if os.environ.get("LOOKDEV_BIGPREVIEW") else (480, 300) ))
 elif os.environ.get("LOOKDEV_REVIEW"):
