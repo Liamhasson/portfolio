@@ -23,12 +23,13 @@ from mathutils import Vector
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 ap = argparse.ArgumentParser()
-ap.add_argument("--scene", choices=["ball", "chaos", "glass", "studio", "desk", "bench", "canvas", "hero"], required=True)
+ap.add_argument("--scene", choices=["ball", "chaos", "glass", "studio", "desk", "bench", "canvas", "hero", "pullback"], required=True)
 ap.add_argument("--grid", choices=["etched", "glow", "mat"], default="etched", help="bench scene only")
 ap.add_argument("--word", choices=["solid", "light", "cutout", "none"], default="light", help="hero scene only")
 ap.add_argument("--phase", choices=["chaos", "mid", "ball"], default="chaos", help="hero scene only")
 ap.add_argument("--view", choices=["tq", "top", "side"], default="tq", help="desk scene only: three-quarter, top-down, low side")
-ap.add_argument("--dstate", choices=["dense", "attempt", "glass"], default="dense", help="desk scene only: the ball's state")
+ap.add_argument("--frames", type=int, default=60, help="pullback: number of frames")
+ap.add_argument("--dstate", choices=["dense", "attempt", "glass", "chaos"], default="dense", help="desk scene only: the ball's state")
 ap.add_argument("--light", type=float, default=1.0, help="hero scene only: scale every light (loader fade-in)")
 ap.add_argument("--state", choices=["dense", "mid", "glass"], default="glass", help="studio scene only")
 ap.add_argument("--preview", action="store_true", help="small, fast, noisy render to check the setup")
@@ -929,6 +930,9 @@ def handwriting(name):
     """Liam's real handwriting, lifted from photos (see extract_ink.py): near-black ink as an alpha layer."""
     return bpy.data.images.load(os.path.join(HANDWRITING, name + ".png"))
 
+CHAOS_SCALE = 0.1                 # the hero cloud, in desk-room metres (about 0.46 m wide)
+CHAOS_C = (0.0, 0.03, 0.46)       # it hangs in the air above the spot where the ball forms, clear of the desk
+
 DESK = dict(x0=-0.6, x1=0.6, y0=-0.28, y1=0.32, height=0.74, t=0.035)
 
 def waterfall_desk():
@@ -1063,7 +1067,11 @@ def build_desk():
     R = 0.07
     view, state = args.view, args.dstate
     ball_c = {"tq": (0.0, 0.03, R + 0.028), "top": (0.0, 0.03, 0.2), "side": (0.47, -0.14, R + 0.0005)}[view]
-    if state == "dense":
+    if state == "chaos":
+        pts, hue, radius, _ = chaos_points(80_000 if args.preview else 520_000)
+        k = CHAOS_SCALE
+        grains("chaos", (pts * k + np.array(CHAOS_C)).astype(np.float32), hue, radius * k)
+    elif state == "dense":
         dense_ball(ball_c, R)
     elif state == "attempt":
         fusing_ball(ball_c, R, lo=0.9, hi=1.01, toward=(0, 0, 1) if view == "top" else (0.0, -0.8, 0.6))    # an attempt: clarity sweeping out from the core
@@ -1335,10 +1343,64 @@ def _hero_lights():
     focus = 9.5 if args.phase == "ball" else 9.3
     camera((0, -9.5, 0.6), (0, 0, 0.1), lens=45, focus=focus, fstop=11)
 
+def build_pullback():
+    """Hero → 2.1: one continuous camera move. Starts on the hero framing (the sand cloud, the name glowing behind it,
+    pitch black), pulls back and tilts down until the lamp-lit desk is revealed beneath. Writes a frame sequence and the
+    camera path (JSON) the live sphere follows."""
+    import json
+    args.view, args.dstate = "tq", "chaos"
+    build_desk()
+    for o in [o for o in bpy.data.objects if o.type == "CAMERA"]:
+        bpy.data.objects.remove(o)
+    k = CHAOS_SCALE
+    c = Vector(CHAOS_C)
+    area_light("rim", tuple(c + Vector((0.18, 0.78, 0.3))), 0.24, 26.0, ROSE_SOFT, target=tuple(c))
+    font = bpy.data.fonts.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts", "HankenGrotesk-ExtraBold.ttf"))
+    cu = bpy.data.curves.new("wordmark", "FONT"); cu.body = "LIAM HASSON"; cu.font = font
+    cu.align_x, cu.align_y = "CENTER", "CENTER"; cu.size = 1.35 * k; cu.space_character = 0.96
+    word = bpy.data.objects.new("wordmark", cu); scene.collection.objects.link(word)
+    word.rotation_euler = (math.pi / 2, 0, 0); word.location = c + Vector((0, 4.5 * k, 0.75 * k))
+    m = bpy.data.materials.new("word"); m.use_nodes = True
+    for nd in list(m.node_tree.nodes):
+        if nd.type != "OUTPUT_MATERIAL":
+            m.node_tree.nodes.remove(nd)
+    em = m.node_tree.nodes.new("ShaderNodeEmission"); em.inputs["Color"].default_value = (1.0, 0.86, 0.8, 1)
+    m.node_tree.links.new(em.outputs[0], m.node_tree.nodes["Material Output"].inputs["Surface"])
+    word.data.materials.append(m)
+    cam_d = bpy.data.cameras.new("cam"); cam_d.lens = 45; cam_d.sensor_width = 36
+    cam = bpy.data.objects.new("cam", cam_d); scene.collection.objects.link(cam); scene.camera = cam
+    tgt = bpy.data.objects.new("target", None); scene.collection.objects.link(tgt)
+    con = cam.constraints.new("TRACK_TO"); con.target = tgt; con.track_axis = "TRACK_NEGATIVE_Z"; con.up_axis = "UP_Y"
+    F = args.frames
+    scene.frame_start, scene.frame_end = 1, F
+    scene.render.fps = 24
+    keys = [
+        (1,               c + Vector((0, -9.5 * k, 0.01)), c + Vector((0, 0, 0.01)),    45, 0.55),   # level: void only
+        (round(F * 0.4),  c + Vector((0.02, -1.3, 0.12)),  c + Vector((0, 0.02, -0.12)), 46, 0.25),  # pulling back, tilting
+        (F,               Vector((0.05, -1.55, 1.08)),     Vector((0.0, 0.03, 0.2)),     50, 0.0),   # the desk revealed below
+    ]
+    for f, loc, look, lens, glow in keys:
+        cam.location = loc; cam.keyframe_insert("location", frame=f)
+        tgt.location = look; tgt.keyframe_insert("location", frame=f)
+        cam_d.lens = lens; cam_d.keyframe_insert("lens", frame=f)
+        em.inputs["Strength"].default_value = glow; em.inputs["Strength"].keyframe_insert("default_value", frame=f)
+    path = []
+    for f in range(1, F + 1):
+        scene.frame_set(f)
+        mw = cam.matrix_world
+        q = mw.to_quaternion()
+        path.append({"frame": f, "position": list(mw.translation), "quaternion": [q.w, q.x, q.y, q.z], "lens_mm": cam_d.lens, "sensor_mm": 36})
+    os.makedirs(args.out, exist_ok=True)
+    with open(os.path.join(args.out, "pullback-camera.json"), "w") as fh:
+        json.dump({"fps": 24, "frames": F, "units": "metres", "up": "z", "path": path}, fh)
+    scene.frame_set(int(os.environ.get("PULLBACK_FRAME", "1")))
+    if os.environ.get("PULLBACK_FRAME"):
+        scene.frame_start = scene.frame_end = scene.frame_current
+
 # ---------------------------------------------------------------- go
 
 {"ball": build_ball, "chaos": build_chaos, "glass": build_glass, "studio": build_studio,
- "desk": build_desk, "bench": build_bench, "canvas": build_canvas, "hero": build_hero}[args.scene]()
+ "desk": build_desk, "bench": build_bench, "canvas": build_canvas, "hero": build_hero, "pullback": build_pullback}[args.scene]()
 if args.preview:
     render_settings(24, *( (960, 600) if os.environ.get("LOOKDEV_BIGPREVIEW") else (480, 300) ))
 else:
@@ -1350,6 +1412,13 @@ if os.environ.get("LOOKDEV_DEBUG"):
         if o.name.split(".")[0] in ("laptop", "base", "keys", "lid", "display", "hinge", "txt", "bezel"):
             mw = o.matrix_world
             print("DBG", o.name, "parent=", o.parent.name if o.parent else None, "world=", tuple(round(c, 3) for c in mw.translation), "dims=", tuple(round(c, 3) for c in o.dimensions))
+    sys.exit(0)
+if args.scene == "pullback":
+    seq = os.path.abspath(os.path.join(args.out, "pullback" + ("-preview" if args.preview else ""), "f_"))
+    os.makedirs(os.path.dirname(seq), exist_ok=True)
+    scene.render.filepath = seq
+    bpy.ops.render.render(animation=True)
+    print("WROTE", os.path.dirname(seq))
     sys.exit(0)
 os.makedirs(args.out, exist_ok=True)
 tag = f"{args.scene}-{args.state}" if args.scene == "studio" else f"{args.scene}-{args.grid}" if args.scene == "bench" else f"{args.scene}-{args.phase}-{args.word}-L{args.light:g}" if args.scene == "hero" else f"desk-{args.view}-{args.dstate}" if args.scene == "desk" else args.scene
