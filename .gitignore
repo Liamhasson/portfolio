@@ -52,3 +52,8 @@ blender/lookdev/textures/
 blender/lookdev/renders/pullback-preview/
 blender/lookdev/textures-local/
 blender/lookdev/renders/deskmove-*-preview/
+blender/lookdev/renders/attempts-preview/
+blender/lookdev/renders/attempts/
+blender/lookdev/renders/deskmove-rise/
+blender/lookdev/renders/deskmove-descend/
+blender/lookdev/renders/deskmove-push/

@@ -23,7 +23,7 @@ from mathutils import Vector
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 ap = argparse.ArgumentParser()
-ap.add_argument("--scene", choices=["ball", "chaos", "glass", "studio", "desk", "bench", "canvas", "hero", "pullback", "deskmove"], required=True)
+ap.add_argument("--scene", choices=["ball", "chaos", "glass", "studio", "desk", "bench", "canvas", "hero", "pullback", "deskmove", "attempts"], required=True)
 ap.add_argument("--move", choices=["rise", "descend", "push"], default="rise", help="deskmove: which camera move")
 ap.add_argument("--grid", choices=["etched", "glow", "mat"], default="etched", help="bench scene only")
 ap.add_argument("--word", choices=["solid", "light", "cutout", "none"], default="light", help="hero scene only")
@@ -621,8 +621,21 @@ def build_studio():
 
 # ---------------------------------------------------------------- chapter 2 sets (real-world scale: metres)
 
-def dense_ball(center, R, flare=True, seed=2026):
+def roll_x(pts, deg):
+    """The ball rolling forward about the world x axis (same sense as Blender's rotation_euler.x)."""
+    if not deg:
+        return pts
+    c, s_ = math.cos(math.radians(deg)), math.sin(math.radians(deg))
+    return (pts @ np.array([[1, 0, 0], [0, c, -s_], [0, s_, c]], dtype=np.float64).T).astype(np.float32)
+
+def dense_ball(center, R, flare=True, seed=2026, roll=0.0):
     """The living dense ball at real scale, with one solar-flare arc of grains lifting off its surface."""
+    pts, hue, radius = dense_points(R, flare, seed)
+    grains("ball", (roll_x(pts, roll) + np.array(center)).astype(np.float32), hue, radius)
+
+def dense_points(R, flare=True, seed=2026):
+    """The dense ball's grains (relative to its centre, real scale): filament sand packed into the volume, plus the
+    flare spray. Shared by dense_ball and the 2.2 attempts, so the attempts are the same ball, grain for grain."""
     full = 50_000 if args.preview else 520_000
     p, hue = filament_points(full, seed=seed)
     r = np.linalg.norm(p, axis=1, keepdims=True)
@@ -650,7 +663,7 @@ def dense_ball(center, R, flare=True, seed=2026):
         pts = np.concatenate([pts, fp * R])
         hue = np.concatenate([hue, fh.astype(np.float32)])
         radius = np.concatenate([radius, rng.uniform(0.003, 0.006, len(fp)) * fr * R * (2.4 if args.preview else 1)])
-    grains("ball", (pts + np.array(center)).astype(np.float32), hue, radius)
+    return pts.astype(np.float32), hue.astype(np.float32), radius.astype(np.float32)
 
 def image_from_array(name, rgba):
     h, w = rgba.shape[:2]
@@ -1141,12 +1154,65 @@ def laptop(loc, rot_z, open_deg=108):
     gl.visible_glossy = False   # its glow lights the desk, but it never shows up as a reflection on the screen
     return root
 
-def fusing_ball(center, R, lo, hi, seed=2026, toward=None):
+_FIL_CACHE = {}
+
+def _attempt_on_dense(center, R, lo, hi, seed, toward, breakup, depth, roll):
+    key = ("dense", R, seed, args.preview)
+    if key not in _FIL_CACHE:
+        _FIL_CACHE[key] = dense_points(R, True, seed)
+    pts, hue, radius = _FIL_CACHE[key]
+    pts = roll_x(pts, roll).astype(np.float64) / R          # unit ball, world orientation
+    r = np.linalg.norm(pts, axis=1)
+    dirs = pts / np.maximum(r, 1e-6)[:, None]
+    tw = np.array(toward or (0, 0, 1), dtype=np.float64); tw /= np.linalg.norm(tw)
+    def fld(d):
+        f = (d @ tw) + 0.22 * (fbm(d[:, 0] * 1.7 + 3.0, d[:, 1] * 1.7, d[:, 2] * 1.7 + 5.0) - 0.5)
+        if breakup:
+            f = f + breakup * 0.55 * (fbm(d[:, 0] * 4.2 + 11.0, d[:, 1] * 4.2 + 2.0, d[:, 2] * 4.2 + 7.0) - 0.5)
+        return f
+    field = fld(dirs)
+    rank = np.argsort(np.argsort(field)) / len(field)
+    band = np.clip((rank - lo) / (hi - lo), 0, 1)
+    clear = band ** 1.4 * depth
+    pull = np.clip(band * 2.5, 0, 1); pull = pull * pull * (3 - 2 * pull)   # compaction leads the frost
+    # compacted grains sit in a thin band around the frost skin (1.012) and poke through it, sinking as it clears:
+    # grainy frost flush with the sand, never a smooth dome (the approved transformation)
+    u = np.random.default_rng(seed + 3).uniform(0, 1, len(r))
+    rad = r + (0.997 + 0.03 * u - 0.03 * clear - r) * pull
+    g = grains("fusing", (dirs * rad[:, None] * R + np.array(center)).astype(np.float32), hue,
+               radius * (1 + 0.7 * clear), clear=clear.astype(np.float32))
+    f_lo, f_top = np.quantile(field, [lo, 0.97])
+    s = glass_sphere(R * 1.012, clear_fn=lambda d: np.clip((fld(d) - f_lo) / (f_top - f_lo), 0, 1) * depth)
+    # the skin grows out of the sand: below the grains at the patch edge, at full height only toward the centre, so
+    # the frost is flush with the sand (no raised cap, no ledge)
+    co = np.empty(len(s.data.vertices) * 3, dtype=np.float32); s.data.vertices.foreach_get("co", co)
+    d = co.reshape(-1, 3).astype(np.float64); d /= np.maximum(np.linalg.norm(d, axis=1, keepdims=True), 1e-6)
+    v = np.clip((fld(d) - f_lo) / (f_top - f_lo) / 0.35, 0, 1); v = v * v * (3 - 2 * v)
+    # it tops out just under the compacted grains (0.997-1.027): the grains carry the transition, draining into frost,
+    # and the skin shows between them only as they sink (clarity), never as a lid of its own
+    s.data.vertices.foreach_set("co", (d * (R * (0.94 + 0.058 * v))[:, None]).astype(np.float32).ravel())
+    s.data.update()
+    for nd in s.data.materials[0].node_tree.nodes:   # fade the skin in over a wide band: no edge line
+        if nd.type == "MAP_RANGE" and abs(nd.inputs["From Max"].default_value - 0.06) < 1e-6:
+            nd.inputs["From Max"].default_value = 0.3
+    s.location = center
+    return g, s
+
+def fusing_ball(center, R, lo, hi, seed=2026, toward=None, breakup=0.0, depth=1.0, dense=False, roll=0.0):
     """Sand turning into glass from the inside out (the approved ch3 transformation), at any position and size.
-    lo/hi: the transition band on the sphere (uniform 0..1 rank); above hi it is already glass."""
+    lo/hi: the transition band on the sphere (uniform 0..1 rank); above hi it is already glass.
+    breakup: 0..1, a failing attempt: the patch fractures into islands the sand swallows, instead of shrinking cleanly.
+    depth: 0..1, how far the clearest point gets (2.2: an early attempt stays frost, only the third reaches clarity).
+    dense: start from the dense ball itself (dense_points, rolled by roll): inside the patch the grains first compact onto
+    the surface, closing the gaps, then drain into frost. At no clarity it is the dense ball, grain for grain."""
+    if dense:
+        return _attempt_on_dense(center, R, lo, hi, seed, toward, breakup, depth, roll)
     full = 60_000 if args.preview else 700_000
     rng = np.random.default_rng(7)
-    p, hue = filament_points(full, seed=seed)
+    key = (full, seed)
+    if key not in _FIL_CACHE:
+        _FIL_CACHE[key] = filament_points(full, seed=seed)
+    p, hue = _FIL_CACHE[key]
     r = np.linalg.norm(p, axis=1, keepdims=True)
     dirs = p / np.maximum(r, 1e-6)
     shell = r[:, 0] ** 0.3
@@ -1159,23 +1225,27 @@ def fusing_ball(center, R, lo, hi, seed=2026, toward=None):
             # One clearing growing from the point facing the camera, its edge softly irregular.
             tw = np.array(toward, dtype=np.float64); tw /= np.linalg.norm(tw)
             f = (d @ tw) + 0.22 * (f - 0.5)
+            if breakup:
+                b = fbm(d[:, 0] * 4.2 + 11.0, d[:, 1] * 4.2 + 2.0, d[:, 2] * 4.2 + 7.0)
+                f = f + breakup * 0.55 * (b - 0.5)
         return f
     field = fld(dirs)
     rank = np.argsort(np.argsort(field)) / len(field)
     keep = rank < hi
     dirs, norm, hue, radius, rank = dirs[keep], norm[keep], hue[keep], radius[keep], rank[keep]
-    clear = np.clip((rank - lo) / (hi - lo), 0, 1) ** 1.4
+    clear = np.clip((rank - lo) / (hi - lo), 0, 1) ** 1.4 * depth
     rad = R0 * (0.985 + 0.03 * norm) - 0.03 * clear
     radius = radius * (1 + 0.7 * clear)
     g = grains("fusing", (dirs * rad[:, None]).astype(np.float32), hue, radius, clear=clear)
     f_lo, f_top = np.quantile(field, [lo, 0.97])
-    s = glass_sphere(R0 * 1.012, clear_fn=lambda d: np.clip((fld(d) - f_lo) / (f_top - f_lo), 0, 1))
+    s = glass_sphere(R0 * 1.012, clear_fn=lambda d: np.clip((fld(d) - f_lo) / (f_top - f_lo), 0, 1) * depth)
     k = R / R0
     for o in (g, s):
         o.scale = (k, k, k); o.location = center
     return g, s
 
 MOVE_CTX = {}   # overrides and handles for the camera moves (build_deskmove)
+BALL_ROLL = 45.0   # degrees: scroll turns the ball; it rolls forward through the rise, so fewer gaps face the top view
 
 def build_desk():
     """2.1 Finding the problem: a walnut desk at night, lit by a warm lamp off-frame. The ball hovers among the notes."""
@@ -1189,9 +1259,11 @@ def build_desk():
         k = CHAOS_SCALE
         grains("chaos", (pts * k + np.array(CHAOS_C)).astype(np.float32), hue, radius * k)
     elif state == "dense":
-        dense_ball(ball_c, R)
+        dense_ball(ball_c, R, roll=BALL_ROLL if view != "tq" else 0.0)
     elif state == "attempt":
-        fusing_ball(ball_c, R, lo=0.9, hi=1.01, toward=(0, 0, 1) if view == "top" else (0.0, -0.8, 0.6))    # an attempt: clarity sweeping out from the core
+        lo, brk, dep = (float(v) for v in (os.environ.get("ATTEMPT", "0.9,0,1") + ",1").split(",")[:3])   # 2.2: how far, how broken, how clear
+        fusing_ball(ball_c, R, lo=lo, hi=1.01, toward=(0, 0, 1) if view == "top" else (0.0, -0.8, 0.6), breakup=brk, depth=dep,
+                    dense=True, roll=BALL_ROLL)    # an attempt: clarity sweeping out from the core
     else:
         s = glass_sphere(R); s.location = ball_c      # it holds: glass, resting on the desk
     MOVE_CTX["ball"] = [o for o in bpy.data.objects if o not in before]; MOVE_CTX["ball_c"] = ball_c   # the camera moves carry these
@@ -1534,6 +1606,7 @@ def build_deskmove():
     args.view, args.dstate = {"rise": ("tq", "dense"), "descend": ("top", "attempt"), "push": ("side", "glass")}[move]
     if move == "descend":
         MOVE_CTX["open"] = 108; MOVE_CTX["side_fill"] = True
+        os.environ["ATTEMPT"] = "0.68,0,1"     # the third attempt, held (the last frame of the 2.2 clip)
     build_desk()
     for o in [o for o in bpy.data.objects if o.type == "CAMERA"]:
         bpy.data.objects.remove(o)
@@ -1612,6 +1685,9 @@ def build_deskmove():
         cam_d.dof.aperture_fstop = lerp(a_[3], b_[3], tc)
         tb = ease(t, 0.0, 0.66) if move == "descend" else ease(t)
         rig.location = ball0.lerp(ball1, tb)
+        if move == "rise":
+            rig.rotation_euler.x = math.radians(BALL_ROLL) * tb   # scroll turns the ball: it rolls forward as it rises
+            rig.keyframe_insert("rotation_euler", frame=f)
         ball_d = (pos - rig.location).length + lerp(foff0, foff1, tb)
         if move == "push":
             sc, _, _ = screen_frame()
@@ -1644,13 +1720,50 @@ def build_deskmove():
     if one:
         scene.frame_start = scene.frame_end = scene.frame_current
 
+def attempt_keys():
+    """2.2 "Then I test solutions": three attempts, scrubbed by scroll (144 frames = the station's scroll length).
+    Each gets further in size and clarity; the first two collapse, breaking into islands the sand swallows (the sand
+    fighting back, never a clean undo); the third overshoots a touch, settles and holds. Per frame: (lo, breakup, depth)."""
+    def ss(t):
+        t = min(max(t, 0.0), 1.0); return t * t * t * (t * (t * 6 - 15) + 10)
+    def fall(t):
+        t = min(max(t, 0.0), 1.0); return t * t                      # collapse accelerates: it gives way
+    REST = (1.0, 0.0, 0.0)
+    A1, A2, A3 = (0.93, 0.0, 0.5), (0.82, 0.0, 0.72), (0.68, 0.0, 1.0)
+    def mix(a, b, t):
+        return tuple(x + (y - x) * t for x, y in zip(a, b))
+    def broken(a):
+        return (1.0, 1.0, a[2] * 0.4)
+    keys = []
+    for f in range(1, 145):
+        if f <= 22:    k = mix(REST, A1, ss((f - 1) / 21))
+        elif f <= 26:  k = A1
+        elif f <= 40:  k = mix(A1, broken(A1), fall((f - 26) / 14))
+        elif f <= 46:  k = REST
+        elif f <= 72:  k = mix(REST, A2, ss((f - 46) / 26))
+        elif f <= 76:  k = A2
+        elif f <= 94:  k = mix(A2, broken(A2), fall((f - 76) / 18))
+        elif f <= 100: k = REST
+        elif f <= 128: k = mix(REST, (0.655, 0.0, 1.0), ss((f - 100) / 28))   # it gets past where the others failed
+        else:          k = mix((0.655, 0.0, 1.0), A3, ss((f - 128) / 16))     # and settles: it holds
+        keys.append(k)
+    return keys
+
+def build_attempts():
+    """The 2.2 station as a clip: top-down view, the ball rebuilt every frame from attempt_keys()."""
+    args.view, args.dstate = "top", "attempt"
+    os.environ["ATTEMPT"] = "1.0,0,0"
+    build_desk()
+
 # ---------------------------------------------------------------- go
 
 {"ball": build_ball, "chaos": build_chaos, "glass": build_glass, "studio": build_studio,
  "desk": build_desk, "bench": build_bench, "canvas": build_canvas, "hero": build_hero, "pullback": build_pullback,
- "deskmove": build_deskmove}[args.scene]()
+ "deskmove": build_deskmove, "attempts": build_attempts}[args.scene]()
 if args.preview:
     render_settings(24, *( (960, 600) if os.environ.get("LOOKDEV_BIGPREVIEW") else (480, 300) ))
+elif os.environ.get("LOOKDEV_REVIEW"):
+    render_settings(48, 960, 600)   # review clips: full grain counts (previews misrepresent the frost), moderate sampling
 else:
     render_settings(512 if args.scene in ("glass", "studio") else 256)
 
@@ -1660,6 +1773,24 @@ if os.environ.get("LOOKDEV_DEBUG"):
         if o.name.split(".")[0] in ("laptop", "base", "keys", "lid", "display", "hinge", "txt", "bezel"):
             mw = o.matrix_world
             print("DBG", o.name, "parent=", o.parent.name if o.parent else None, "world=", tuple(round(c, 3) for c in mw.translation), "dims=", tuple(round(c, 3) for c in o.dimensions), "mats=", [s.material.name if s.material else None for s in o.material_slots])
+    sys.exit(0)
+if args.scene == "attempts":
+    d = os.path.abspath(os.path.join(args.out, "attempts" + ("-preview" if args.preview else "")))
+    os.makedirs(d, exist_ok=True)
+    ball = MOVE_CTX["ball"]
+    only = os.environ.get("ATTEMPT_FRAMES")    # e.g. "1-40": render part of the clip
+    lo_f, hi_f = (int(v) for v in only.split("-")) if only else (1, 144)
+    for f, (lo, brk, dep) in enumerate(attempt_keys(), 1):
+        if not lo_f <= f <= hi_f:
+            continue
+        for o in ball:
+            bpy.data.objects.remove(o, do_unlink=True)
+        before = set(bpy.data.objects)
+        fusing_ball(MOVE_CTX["ball_c"], 0.07, lo=lo, hi=1.01, toward=(0, 0, 1), breakup=brk, depth=dep, dense=True, roll=BALL_ROLL)
+        ball = [o for o in bpy.data.objects if o not in before]
+        scene.render.filepath = os.path.join(d, f"f_{f:04d}.png")
+        bpy.ops.render.render(write_still=True)
+        print("FRAME", f, lo, brk, dep, flush=True)
     sys.exit(0)
 if args.scene in ("pullback", "deskmove"):
     name = "pullback" if args.scene == "pullback" else f"deskmove-{args.move}"
