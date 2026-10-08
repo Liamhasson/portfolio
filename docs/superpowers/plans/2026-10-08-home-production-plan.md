@@ -83,9 +83,9 @@ Two things to decide on this table (see §9): whether the hero void is literally
 
 | Project | Title | Line | Pills | Impact |
 |---|---|---|---|---|
-| Eventread | Eventread · SaaS web app | The check every booker skips. | End-to-end design · API integration · Risk formula | Accurate search and results covering every industry that competes with live shows. *(tighten with Liam)* |
+| Eventread | Eventread · SaaS web app | The check every booker skips. | End-to-end design · API integration · Risk formula | Finds every competing event, ticketed or not, before the date is booked. |
 | Cyvore | Cyvore · B2B website | A cybersecurity startup needed a site investors would believe in. | Research · Information architecture · Micro-animations | Closed their first funding round. |
-| Pulse | Pulse · Fitness app | A goal-focused fitness app designed around four retention milestones. | Branding · **Retention research** *(proposed in place of "business-focused design", see §9)* · Cross-feature implementation | Designed around four retention milestones. |
+| Pulse | Pulse · Fitness app | A goal-focused fitness app designed around four retention milestones. | Branding · Retention research · Cross-feature implementation | Designed around four retention milestones. |
 | Nordic Logic | Nordic Logic · B2B website | A carrier invoice audit startup that needed to build trust without any social proof or clients. | 3D motion design · B2B website · UX research | In progress |
 | Stub | Stub | Coming soon | – | – |
 
@@ -121,13 +121,15 @@ Open questions for the case studies are in §9; they must be answered before a c
 5. Work section (footage capture first; Blender devices and sets), toolkit, about, testimonials, contact.
 6. Case studies (after their plan).
 
-## 9. Open questions (answer before step 1)
+## 9. Decisions (answered by Liam, 2026-10-08)
 
-1. **The hero void = the room above the desk?** The pull-back reveals the desk beneath the ball (one continuous space), versus the desk emerging from the depth as a separate station.
-2. **Does the glass return at Contact?** The table assumes yes, at rest, one soft light.
-3. **Pulse pill:** replace "business-focused design" with "Retention research" (what you described), or another wording?
-4. **Eventread impact line:** keep as written, or tighten (e.g. "Finds every competing event, ticketed or not, before a date is booked")?
-5. **Eventread calendar capture:** Berlin / Nov 2026 / Rock / 500–1,500 (the app's own example), or a different search?
-6. **Case studies:** do they keep their own visual worlds (Pulse blue, Cyvore violet, Eventread light) as the original spec says, or inherit the black void and the sphere? Does the sphere appear inside case studies at all?
-7. **Loader frequency:** once per session (current) or every visit.
-8. **Typeface:** Hanken Grotesk vs alternatives, decided side by side against Aeonik.
+1. **Hero → desk:** one continuous space. The hero's void is the dark room above the desk; the camera pulls back and tilts down, the ball shrinks, the lamp-lit desk fades up beneath it.
+2. **Contact:** the glass sphere returns, at rest, one soft light.
+3. **Pulse pill:** "Retention research".
+4. **Eventread impact:** "Finds every competing event, ticketed or not, before the date is booked."
+5. **Eventread calendar capture:** Berlin, November 2026, Rock, 500–1,500 (the app's own example).
+6. **Case studies:** their own visual worlds, no sphere (original spec). The sphere's story lives on the home page.
+7. **Loader:** once per browser session.
+8. **Typeface:** decided from a side-by-side sheet (Hanken Grotesk and three alternatives next to Aeonik); Liam picks.
+
+**Status:** approved for build step 1 once Liam confirms this document.
