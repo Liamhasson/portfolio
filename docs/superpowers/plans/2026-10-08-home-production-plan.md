@@ -19,31 +19,31 @@ What to take from it:
 - **Type carries hierarchy with size, italic and opacity, not weight.** Aeonik 400 nearly everywhere (verified in their CSS), 500 only on buttons, italic for emphasis, mono for labels, reduced opacity for staging.
 - **Cursor:** on the about hero the cursor is a light (grains near it brighten) plus a soft screen-space drift field. Not a repel, not a video (verified in their code). Approved for our sand.
 
-## 2. The sphere's journey (proposal: "stations in the dark")
+## 2. The story and the sphere's journey (restructured 2026-10-08)
 
-Scroll always moves the camera **forward** on z. The sets are stations in a black void; the next one emerges from the depth as the previous falls behind. The sphere is the constant, and it **changes position and depth at every station**. No cuts; every move is a rendered camera path (decision A) with parallax layers inside a set (decision B).
+The object performs each step of "how I work"; the sets support it, they don't carry it. One desk, three moments in the life of a project, the camera tracking along it. Scroll always moves the camera; no cuts.
 
-| # | Station | Sphere state | Sphere in frame | Camera move into it |
+| # | Moment | Sphere | Set / light | Camera |
 |---|---|---|---|---|
-| 0 | Loader (void) | chaos, drifting | fills the frame, centred | none: light finds the sand |
-| 1 | Hero (void + glowing name) | chaos → dense ball | large, exact centre, in front of the name | scroll compacts the sand; ball turns with scroll, idles after |
-| 1→2.1 | **Pull-back** (the Lusion move) | dense | shrinks toward the distance | camera pulls back and tilts down; the lamp-lit desk fades up beneath the ball: the hero's void was the dark room above the desk; the name recedes and dims |
-| 2.1 | Desk | dense, alive, flares | low right, close, hovering over the notes | holds; parallax on the notes with the cursor |
-| 2.1→2.2 | Rise | dense | lifts off the desk, small | camera rises and pushes forward into the dark; the glowing grid floor emerges below |
-| 2.2 | Gravity | dense | small and far, centred over the well | holds; the grid bends under it |
-| 2.2→2.3 | Drop | dense | grows, drifts left | camera drops to bead-canvas level, pushing forward |
-| 2.3 | Canvas | dense | mid-left, mid distance | holds; beads crowd it and part around the cursor |
-| 2.3→3.0 | Approach | dense | comes toward the camera, to centre | camera glides forward into the studio glow |
-| 3.0 | Studio | dense → **contracts into glass** | centre, then slightly smaller | holds through the transformation |
-| 3.0→3.1 | Index | glass | drifts to one side, small | camera pulls back; the project index fades in |
-| 3.1–3.3 | Project sets | glass (reflects each set) | varies per project: right/left/top, never the same twice | one push-in per project, device enters from the depth |
-| 3.4 | In progress | dense (not shipped) | two small balls on plinths | short push-in |
-| 4 | Toolkit | none | – | the bead canvas returns, logos burst from centre |
-| 5 | About | none | – | horizontal text travel (Lusion manifesto) |
-| 6 | Testimonials | none | – | – |
-| 7 | Contact | glass, at rest | centre, one soft light | final push-in, then stillness |
+| 0 | Loader | chaos, introduced | black void | none: the light finds the sand |
+| 1 | Hero: name, title, one line | chaos, moving around itself (never forms) | black void + glowing LIAM HASSON (the one light exception) | holds; cursor light + drift |
+| 1→2.1 | Pull-back | chaos | the void is the dark room above the desk | pulls back and tilts down; the lamp finds the desk beneath |
+| 2.1 | **I look for problems nobody pointed at** | chaos **compacts into the dense ball** (scroll-driven) | **night**: lamp, handwritten questions, transcript, picks | settles over the desk |
+| 2.1→2.2 | Track | ball | time passes | lateral dolly along the same desk |
+| 2.2 | **Then I check if I'm actually right** | **three attempts**: clarity sweeps in from the core and collapses back to sand; each attempt gets further; the third tips over | **daylight**: phone running a prototype, versions A and B, findings on sticky notes, cold coffee | slow track continues |
+| 2.2→2.3 | Track | the third attempt holds | daylight fades | lateral dolly |
+| 2.3 | **And I build it** | **turns fully into glass** and comes to rest (this is "it ships") | **late night**: desk cleared to a laptop, screen glow the only light | settles; the laptop screen hands off into the work |
+| 2.3→3 | Into the work | glass | – | push into the laptop screen → the work index |
+| 3.1–3.3 | Project sets | glass (reflects each set) | per project | one push-in per project |
+| 3.4 | In progress | dense ball (not shipped) | two plinths | short push-in |
+| 4 | Toolkit | – | bead canvas | logos burst from centre |
+| 5 | About | – | – | horizontal text travel |
+| 6 | Testimonials | – | – | – |
+| 7 | Contact | glass, at rest, one soft light | black void | final push-in |
 
-Two things to decide on this table (see §9): whether the hero void is literally the room above the desk, and whether the glass sphere returns at Contact.
+Removed: the gravity grid (2.2) and the bead-canvas set (2.3) as story stations, and "And then it ships" as its own beat (merged into step 3). The bead canvas survives only in the toolkit.
+
+Step 2 is the risk: a ball flickering between states reads as a glitch. It must read as progress: three distinct attempts, each clearing further than the last, each collapse visibly fighting back, all scrubbed by the visitor's scroll.
 
 ## 3. Pipeline
 
@@ -73,11 +73,9 @@ Two things to decide on this table (see §9): whether the hero void is literally
 
 **0 Loader (5.4s, max 6s, not skippable, once per session).** Darkness → the light finds the sand → "Hi, I'm Liam." types → the name glows up in the haze → "I build ambiguous ideas" rises → "Product Designer" label + scroll cue → scroll unlocks, nav last.
 
-**1 Hero.** Copy: "Hi, I'm Liam. I build ambiguous ideas → into products where design and user needs meet." Label: Product Designer.
+**1 Hero.** Name, title and one line, all at once (no word swap): "Hi, I'm Liam." / Product Designer / "I build ambiguous ideas into products where design and user needs meet."
 
-**2 How I work.** 2.1 "I go looking for problems." / 2.2 "Then I check if I'm actually right." / 2.3 "Then I build it." (Supporting lines as in concept v3.)
-
-**3.0 It ships.** "And then it ships."
+**2 How I work (one desk, three moments).** 2.1 "I look for problems nobody pointed at." / 2.2 "Then I check if I'm actually right." / 2.3 "And I build it." *(Exact wording to confirm with Liam.)*
 
 **3.1–3.4 The work.** First a compact **index** (all five, one line each). Then one full screen each for the live projects, each with: title, one line, three pills, impact.
 
