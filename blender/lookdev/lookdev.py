@@ -498,7 +498,7 @@ def glass_material(frost=False):
         nt.links.new(rough.outputs["Result"], bsdf.inputs["Roughness"])
         tint = nt.nodes.new("ShaderNodeMix")
         tint.data_type = "RGBA"
-        csock(tint.inputs, "A").default_value = (0.96, 0.82, 0.76, 1)
+        csock(tint.inputs, "A").default_value = (0.9, 0.62, 0.58, 1)
         csock(tint.inputs, "B").default_value = (1, 1, 1, 1)
         nt.links.new(attr.outputs["Fac"], tint.inputs["Factor"])
         nt.links.new(csock(tint.outputs, "Result"), bsdf.inputs["Base Color"])
@@ -515,12 +515,12 @@ def glass_material(frost=False):
         nt.links.new(mask.outputs[0], out.inputs["Surface"])
         # Still forming: the clearing is a lit, translucent frost skin (like sugar glass) that only slowly gains
         # transparency, so it reads as solid material catching the studio light, not a window into the ball.
-        bsdf.inputs["Subsurface Weight"].default_value = 1.0
+        bsdf.inputs["Subsurface Weight"].default_value = 0.55
         bsdf.inputs["Subsurface Radius"].default_value = (0.4, 0.25, 0.2)
         bsdf.inputs["Subsurface Scale"].default_value = 0.05
         trans = nt.nodes.new("ShaderNodeMapRange")
-        trans.inputs["To Min"].default_value = 0.15
-        trans.inputs["To Max"].default_value = 0.7
+        trans.inputs["To Min"].default_value = 0.35
+        trans.inputs["To Max"].default_value = 0.8
         nt.links.new(attr.outputs["Fac"], trans.inputs["Value"])
         nt.links.new(trans.outputs["Result"], bsdf.inputs["Transmission Weight"])
     return m
@@ -1065,7 +1065,7 @@ def build_desk():
     if state == "dense":
         dense_ball(ball_c, R)
     elif state == "attempt":
-        fusing_ball(ball_c, R, lo=0.8, hi=0.93, toward=(0, 0, 1) if view == "top" else (0.0, -0.8, 0.6))    # an attempt: clarity sweeping out from the core
+        fusing_ball(ball_c, R, lo=0.78, hi=1.01, toward=(0, 0, 1) if view == "top" else (0.0, -0.8, 0.6))    # an attempt: clarity sweeping out from the core
     else:
         s = glass_sphere(R); s.location = ball_c      # it holds: glass, resting on the desk
     if view == "side":
@@ -1074,9 +1074,9 @@ def build_desk():
         area_light("side_fill", (1.35, -0.95, 0.45), 0.9, 38.0, (1.0, 0.86, 0.72), target=(0.55, 0.0, -0.12))
     PAPER = srgb("#ece6da"); YELLOW = srgb("#e6c86a"); PINK = srgb("#e3a6a6"); CARD = srgb("#f1ede4")
     blank = paper_material("blank_m", PAPER)
-    sheet("stack_2", (0.21, 0.297), (0.205, 0.175, -0.0004), 0.27, blank, curl=0.03, seed=5)
-    sheet("stack_1", (0.21, 0.297), (0.198, 0.168, -0.0002), 0.35, blank, curl=0.05, seed=6)
-    sheet("transcript", (0.21, 0.297), (0.2, 0.17, 0), 0.32, paper_material("transcript_m", PAPER, transcript_texture("transcript_t", 3)), curl=0.06, fold=0.34, seed=7)
+    # (removed: "stack_2", a page with no real text)
+    # (removed: "stack_1", a page with no real text)
+    # (removed: "transcript", a page with no real text)
     sheet("card_b", (0.127, 0.076), (-0.175, 0.035, 0), 0.12, paper_material("card_b_m", CARD), curl=0.04, lift=0.0004, seed=12)
     sheet("card_a", (0.127, 0.076), (-0.135, 0.105, 0), -0.34, paper_material("card_a_m", CARD, handwriting("check-commit-card"), ink_power=0.4), curl=0.05, lift=0.0009, seed=11)
     # The hero sticky note: closest to the ball and to the camera, in focus.
