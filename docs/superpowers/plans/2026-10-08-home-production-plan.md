@@ -19,29 +19,32 @@ What to take from it:
 - **Type carries hierarchy with size, italic and opacity, not weight.** Aeonik 400 nearly everywhere (verified in their CSS), 500 only on buttons, italic for emphasis, mono for labels, reduced opacity for staging.
 - **Cursor:** on the about hero the cursor is a light (grains near it brighten) plus a soft screen-space drift field. Not a repel, not a video (verified in their code). Approved for our sand.
 
-## 2. The story and the sphere's journey (restructured 2026-10-08)
+## 2. The story and the sphere's journey (restructured 2026-10-08, revised)
 
-The object performs each step of "how I work"; the sets support it, they don't carry it. One desk, three moments in the life of a project, the camera tracking along it. Scroll always moves the camera; no cuts.
+The object performs each step of "how I work"; the sets support it. **One location, always night, seen from three points of view** (Liam: day/night changes are a cliché). Scroll always moves the camera; no cuts.
 
-| # | Moment | Sphere | Set / light | Camera |
+**The desk:** a **waterfall slab** (thick top, grain wrapping over the edge and down the sides, no legs; shape reference: Liam's two oak desk photos), floating in the black void. **Oak character** (knots, wide planks, raw matte grain) in the current **dark walnut colour**. Objects: the current ones only (handwritten notes, transcript stack, pen, three dark grey picks at the back) **plus a laptop for step 3**. One warm lamp off-frame, the only key light, in every view.
+
+| # | Moment | Sphere | View | Camera |
 |---|---|---|---|---|
 | 0 | Loader | chaos, introduced | black void | none: the light finds the sand |
 | 1 | Hero: name, title, one line | chaos, moving around itself (never forms) | black void + glowing LIAM HASSON (the one light exception) | holds; cursor light + drift |
 | 1→2.1 | Pull-back | chaos | the void is the dark room above the desk | pulls back and tilts down; the lamp finds the desk beneath |
-| 2.1 | **I look for problems nobody pointed at** | chaos **compacts into the dense ball** (scroll-driven) | **night**: lamp, handwritten questions, transcript, picks | settles over the desk |
-| 2.1→2.2 | Track | ball | time passes | lateral dolly along the same desk |
-| 2.2 | **Then I check if I'm actually right** | **three attempts**: clarity sweeps in from the core and collapses back to sand; each attempt gets further; the third tips over | **daylight**: phone running a prototype, versions A and B, findings on sticky notes, cold coffee | slow track continues |
-| 2.2→2.3 | Track | the third attempt holds | daylight fades | lateral dolly |
-| 2.3 | **And I build it** | **turns fully into glass** and comes to rest (this is "it ships") | **late night**: desk cleared to a laptop, screen glow the only light | settles; the laptop screen hands off into the work |
-| 2.3→3 | Into the work | glass | – | push into the laptop screen → the work index |
-| 3.1–3.3 | Project sets | glass (reflects each set) | per project | one push-in per project |
+| 2.1 | **I look for problems nobody pointed at** | chaos **compacts into the dense ball** (scroll-driven) | **three-quarter view** over the notes (the approved desk render) | settles |
+| 2.1→2.2 | Rise | ball | – | camera rises and turns to look straight down |
+| 2.2 | **Then I check if I'm actually right** | **three attempts**: clarity sweeps in from the core and collapses back; each attempt gets further; the third tips over | **top-down**: the ball over the notes, its shadow on them; the slab's edges fall off into black | holds |
+| 2.2→2.3 | Descend | the third attempt holds | – | camera drops to desk height and swings to the side |
+| 2.3 | **And I build it** | **turns fully into glass** and comes to rest beside the laptop (this is "it ships") | **low side view** at desk height: the waterfall edge in frame, the void beyond; laptop open, its screen glowing | settles |
+| 2.3→3 | Into the work | glass | the laptop screen shows the **project index** | camera pushes into the screen; the screen becomes the section |
+| 3.0 | Project index | glass, small, to one side | the index is the full screen | – |
+| 3.1–3.3 | Project full screens | glass (reflects each set) | per project | one push-in per project |
 | 3.4 | In progress | dense ball (not shipped) | two plinths | short push-in |
 | 4 | Toolkit | – | bead canvas | logos burst from centre |
 | 5 | About | – | – | horizontal text travel |
 | 6 | Testimonials | – | – | – |
 | 7 | Contact | glass, at rest, one soft light | black void | final push-in |
 
-Removed: the gravity grid (2.2) and the bead-canvas set (2.3) as story stations, and "And then it ships" as its own beat (merged into step 3). The bead canvas survives only in the toolkit.
+Removed: the gravity grid and bead-canvas stations (the bead canvas survives only in the toolkit), "And then it ships" as its own beat (merged into step 3), and the phone / A/B printouts / findings notes.
 
 Step 2 is the risk: a ball flickering between states reads as a glitch. It must read as progress: three distinct attempts, each clearing further than the last, each collapse visibly fighting back, all scrubbed by the visitor's scroll.
 
