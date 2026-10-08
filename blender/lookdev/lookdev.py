@@ -1029,7 +1029,7 @@ def cut(target, cutter):
     bpy.data.objects.remove(cutter)
 
 def aluminium(name="alu", tone=0.78):
-    """Bead-blasted aluminium: metallic, softly rough, with a fine grain in the roughness."""
+    """Bead-blasted aluminium: metallic, softly rough, with a fine grain in the roughness. Low tones give Space Black."""
     m = bpy.data.materials.new(name); m.use_nodes = True
     nt = m.node_tree; bsdf = nt.nodes["Principled BSDF"]
     bsdf.inputs["Base Color"].default_value = (tone, tone, tone * 1.01, 1)
@@ -1044,7 +1044,7 @@ def laptop(loc, rot_z, open_deg=108):
     side ports, key grid, glass trackpad. No Apple marks: the lid carries Liam's grain mark as flush polished inlays."""
     import json as _json
     W, D, Hb, Hl, Rc = 0.3126, 0.2212, 0.0108, 0.0047, 0.0095
-    alu = aluminium()
+    alu = aluminium("space_black", 0.055)   # Space Black: the ball stays the brightest thing on the desk, the polished mark reads
     root = bpy.data.objects.new("laptop", None); scene.collection.objects.link(root)
     root.location = loc; root.rotation_euler = (0, 0, rot_z)
     # ---- base
@@ -1065,7 +1065,7 @@ def laptop(loc, rot_z, open_deg=108):
         port(1, y, w, 0.0029 if w < 0.02 else 0.0018)
     bpy.ops.mesh.primitive_cylinder_add(radius=0.0018, depth=0.01, vertices=32, location=(-W / 2, -0.06, 0.0045), rotation=(0, math.pi / 2, 0))
     cut(base, bpy.context.active_object)
-    base.data.materials.append(alu); base.parent = root
+    base.data.materials.clear(); base.data.materials.append(alu); base.parent = root   # the cuts leave an empty slot: clear it, or the base renders default grey
     # keyboard: a slightly recessed black field with a real key grid
     keys_mat = principled("keys", (0.018, 0.018, 0.02, 1), 0.55)
     deck = principled("deck", (0.012, 0.012, 0.013, 1), 0.6)
@@ -1084,15 +1084,15 @@ def laptop(loc, rot_z, open_deg=108):
             bv = k.modifiers.new("b", "BEVEL"); bv.width = 0.0012; bv.segments = 3
             k.data.materials.append(keys_mat); k.parent = root
         yk -= kh + 0.0015
-    # trackpad: glass, a touch darker than the aluminium
+    # trackpad: dark glass, matching the Space Black body
     tp = slab("trackpad", 0.15, 0.094, 0.004, 0.0002, z0=Hb - 0.00005, bevel=0)
     tp.location = (0, -D / 2 + 0.012 + 0.047, 0)
-    tp.data.materials.append(principled("trackpad", (0.6, 0.6, 0.61, 1), 0.12, **{"Metallic": 0.9, "Coat Weight": 0.6, "Coat Roughness": 0.08}))
+    tp.data.materials.append(principled("trackpad", (0.04, 0.04, 0.045, 1), 0.12, **{"Metallic": 0.0, "Coat Weight": 0.6, "Coat Roughness": 0.08}))
     tp.parent = root
     # hinge barrel
     bpy.ops.mesh.primitive_cylinder_add(radius=0.0035, depth=W * 0.86, vertices=48, location=(0, D / 2 - 0.004, Hb), rotation=(0, math.pi / 2, 0))
     hb = bpy.context.active_object; bpy.ops.object.shade_smooth()
-    hb.data.materials.append(aluminium("hinge_alu", 0.42)); hb.parent = root
+    hb.data.materials.append(aluminium("hinge_alu", 0.035)); hb.parent = root
     # ---- lid, built standing up in hinge space (outer face +y, screen -y), rotated shut or open
     hinge = bpy.data.objects.new("hinge", None); scene.collection.objects.link(hinge)
     hinge.parent = root; hinge.location = (0, D / 2 - 0.004, Hb)
@@ -1120,7 +1120,7 @@ def laptop(loc, rot_z, open_deg=108):
     sp.data.materials.append(disp_mat); sp.parent = hinge
     # the grain mark on the outer face: flush, mirror-polished inlays (the material the real logo is made of)
     mark = _json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "mark", "stipple.json")))
-    box = 0.04
+    box = 0.055   # larger than a real logo so the grains still read as grains from the top view
     polished = principled("mark_polished", (0.92, 0.92, 0.93, 1), 0.1, **{"Metallic": 1.0})
     import bmesh
     bm = bmesh.new()
@@ -1241,7 +1241,7 @@ def build_desk():
     elif view == "tq":
         camera((0.03, -0.62, 0.46), (0.0, 0.02, 0.03), lens=50, focus=0.74, fstop=4.0)
     elif view == "top":
-        camera((0.0, 0.02, 1.35), (0.0, 0.0201, 0.0), lens=45, focus=1.15, fstop=5.6)
+        camera((0.0, 0.02, 1.35), (0.0, 0.0201, 0.0), lens=45, focus=1.24, fstop=7.1)   # focus between the ball and the lid: both hold
     else:
         camera((1.28, -0.78, 0.15), (0.36, 0.0, 0.03), lens=50, focus=1.08, fstop=3.2)
 
@@ -1529,7 +1529,7 @@ if os.environ.get("LOOKDEV_DEBUG"):
     for o in bpy.data.objects:
         if o.name.split(".")[0] in ("laptop", "base", "keys", "lid", "display", "hinge", "txt", "bezel"):
             mw = o.matrix_world
-            print("DBG", o.name, "parent=", o.parent.name if o.parent else None, "world=", tuple(round(c, 3) for c in mw.translation), "dims=", tuple(round(c, 3) for c in o.dimensions))
+            print("DBG", o.name, "parent=", o.parent.name if o.parent else None, "world=", tuple(round(c, 3) for c in mw.translation), "dims=", tuple(round(c, 3) for c in o.dimensions), "mats=", [s.material.name if s.material else None for s in o.material_slots])
     sys.exit(0)
 if args.scene == "pullback":
     seq = os.path.abspath(os.path.join(args.out, "pullback" + ("-preview" if args.preview else ""), "f_"))
