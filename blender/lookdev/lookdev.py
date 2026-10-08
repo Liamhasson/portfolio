@@ -1008,10 +1008,10 @@ def laptop(loc, rot_z, open_deg=108):
     hinge.rotation_euler = (math.radians(open_deg - 90) * -1 + 0.0, 0, 0)
     hinge.rotation_euler = (math.radians(-(open_deg - 90)), 0, 0)
     lid = box("lid", (W, Hl, D), (0, Hl / 2, D / 2), alu, hinge)
-    glass = principled("bezel", (0.004, 0.004, 0.005, 1), 0.05)
+    glass = principled("bezel", (0.004, 0.004, 0.005, 1), 0.45, **{"Specular IOR Level": 0.05})
     box("bezel", (W * 0.97, 0.0006, D * 0.95), (0, -0.0003, D / 2 + 0.002), glass, hinge)
     # Display: near-black, the index lines glow on it (placeholder until the index is designed).
-    disp = box("display", (W * 0.92, 0.0004, D * 0.86), (0, -0.0007, D / 2 + 0.004), principled("disp", (0.0, 0.0, 0.0, 1), 0.04, **{"Specular IOR Level": 0.12, "Emission Color": (0.02, 0.022, 0.03, 1), "Emission Strength": 1.0}), hinge)
+    disp = box("display", (W * 0.92, 0.0004, D * 0.86), (0, -0.0007, D / 2 + 0.004), principled("disp", (0.0, 0.0, 0.0, 1), 0.55, **{"Specular IOR Level": 0.02, "Emission Color": (0.012, 0.013, 0.018, 1), "Emission Strength": 1.0}), hinge)
     rows = ["Eventread · SaaS web app", "Cyvore · B2B website", "Pulse · Fitness app", "Nordic Logic · B2B website", "Stub · Coming soon"]
     for i, r in enumerate(rows):
         tx = text_obj(r, 0.0105, (-W * 0.4, -0.0011, D * 0.78 - i * 0.026), "HankenGrotesk-Regular.ttf", emit=2.2 if i < 3 else 0.9, parent=hinge)
@@ -1022,7 +1022,7 @@ def laptop(loc, rot_z, open_deg=108):
     gl.visible_glossy = False   # its glow lights the desk, but it never shows up as a reflection on the screen
     return root
 
-def fusing_ball(center, R, lo, hi, seed=2026):
+def fusing_ball(center, R, lo, hi, seed=2026, toward=None):
     """Sand turning into glass from the inside out (the approved ch3 transformation), at any position and size.
     lo/hi: the transition band on the sphere (uniform 0..1 rank); above hi it is already glass."""
     full = 60_000 if args.preview else 700_000
@@ -1034,7 +1034,14 @@ def fusing_ball(center, R, lo, hi, seed=2026):
     radius = rng.uniform(0.004, 0.009, len(p)) * (2.4 if args.preview else 1)
     R0 = 0.84
     norm = (shell - shell.min()) / (shell.max() - shell.min())
-    field = fbm(dirs[:, 0] * 1.7 + 3.0, dirs[:, 1] * 1.7, dirs[:, 2] * 1.7 + 5.0)
+    def fld(d):
+        f = fbm(d[:, 0] * 1.7 + 3.0, d[:, 1] * 1.7, d[:, 2] * 1.7 + 5.0)
+        if toward is not None:
+            # One clearing growing from the point facing the camera, its edge softly irregular.
+            tw = np.array(toward, dtype=np.float64); tw /= np.linalg.norm(tw)
+            f = (d @ tw) + 0.22 * (f - 0.5)
+        return f
+    field = fld(dirs)
     rank = np.argsort(np.argsort(field)) / len(field)
     keep = rank < hi
     dirs, norm, hue, radius, rank = dirs[keep], norm[keep], hue[keep], radius[keep], rank[keep]
@@ -1042,8 +1049,6 @@ def fusing_ball(center, R, lo, hi, seed=2026):
     rad = R0 * (0.985 + 0.03 * norm) - 0.03 * clear
     radius = radius * (1 + 0.7 * clear)
     g = grains("fusing", (dirs * rad[:, None]).astype(np.float32), hue, radius, clear=clear)
-    def fld(d):
-        return fbm(d[:, 0] * 1.7 + 3.0, d[:, 1] * 1.7, d[:, 2] * 1.7 + 5.0)
     f_lo, f_top = np.quantile(field, [lo, 0.97])
     s = glass_sphere(R0 * 1.012, clear_fn=lambda d: np.clip((fld(d) - f_lo) / (f_top - f_lo), 0, 1))
     k = R / R0
@@ -1060,7 +1065,7 @@ def build_desk():
     if state == "dense":
         dense_ball(ball_c, R)
     elif state == "attempt":
-        fusing_ball(ball_c, R, lo=0.55, hi=0.86)    # an attempt: clarity breaking through from the core
+        fusing_ball(ball_c, R, lo=0.8, hi=0.93, toward=(0, 0, 1) if view == "top" else (0.0, -0.8, 0.6))    # an attempt: clarity sweeping out from the core
     else:
         s = glass_sphere(R); s.location = ball_c      # it holds: glass, resting on the desk
     if view == "side":
