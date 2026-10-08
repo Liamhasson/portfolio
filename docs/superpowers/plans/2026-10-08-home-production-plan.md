@@ -32,7 +32,7 @@ The object performs each step of "how I work"; the sets support it. **One locati
 | 1→2.1 | Pull-back | chaos | the void is the dark room above the desk | pulls back and tilts down; the lamp finds the desk beneath |
 | 2.1 | **I look for problems nobody pointed at** | chaos **compacts into the dense ball** (scroll-driven) | **three-quarter view** over the notes (the approved desk render) | settles |
 | 2.1→2.2 | Rise | ball | – | camera rises and turns to look straight down |
-| 2.2 | **Then I check if I'm actually right** | **three attempts**: clarity sweeps in from the core and collapses back; each attempt gets further; the third tips over | **top-down**: the ball over the notes, its shadow on them; the slab's edges fall off into black | holds |
+| 2.2 | **Then I test solutions** | **three attempts**: clarity sweeps in from the core and collapses back; each attempt gets further; the third tips over | **top-down**: the ball over the notes, its shadow on them; the slab's edges fall off into black | holds |
 | 2.2→2.3 | Descend | the third attempt holds | – | camera drops to desk height and swings to the side |
 | 2.3 | **And I build it** | **turns fully into glass** and comes to rest beside the laptop (this is "it ships") | **low side view** at desk height: the waterfall edge in frame, the void beyond; laptop open, its screen glowing | settles |
 | 2.3→3 | Into the work | glass | the laptop screen shows the **project index** | camera pushes into the screen; the screen becomes the section |
@@ -78,7 +78,7 @@ Step 2 is the risk: a ball flickering between states reads as a glitch. It must 
 
 **1 Hero.** Name, title and one line, all at once (no word swap): "Hi, I'm Liam." / Product Designer / "I build ambiguous ideas into products where design and user needs meet."
 
-**2 How I work (one desk, three moments).** 2.1 "I look for problems nobody pointed at." / 2.2 "Then I check if I'm actually right." / 2.3 "And I build it." *(Exact wording to confirm with Liam.)*
+**2 How I work (one desk at night, three views).** 2.1 "I look for problems nobody pointed at." / 2.2 "Then I test solutions." / 2.3 "And I build it." (Approved by Liam, 2026-10-08.)
 
 **3.1–3.4 The work.** First a compact **index** (all five, one line each). Then one full screen each for the live projects, each with: title, one line, three pills, impact.
 
@@ -133,4 +133,4 @@ Open questions for the case studies are in §9; they must be answered before a c
 7. **Loader:** once per browser session.
 8. **Typeface:** decided from a side-by-side sheet (Hanken Grotesk and three alternatives next to Aeonik); Liam picks.
 
-**Status:** approved for build step 1 once Liam confirms this document.
+**Status:** complete; build step 1 starts on Liam's go.
