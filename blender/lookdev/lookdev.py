@@ -23,7 +23,8 @@ from mathutils import Vector
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 ap = argparse.ArgumentParser()
-ap.add_argument("--scene", choices=["ball", "chaos", "glass", "studio", "desk", "bench", "canvas", "hero", "pullback"], required=True)
+ap.add_argument("--scene", choices=["ball", "chaos", "glass", "studio", "desk", "bench", "canvas", "hero", "pullback", "deskmove"], required=True)
+ap.add_argument("--move", choices=["rise", "descend", "push"], default="rise", help="deskmove: which camera move")
 ap.add_argument("--grid", choices=["etched", "glow", "mat"], default="etched", help="bench scene only")
 ap.add_argument("--word", choices=["solid", "light", "cutout", "none"], default="light", help="hero scene only")
 ap.add_argument("--phase", choices=["chaos", "mid", "ball"], default="chaos", help="hero scene only")
@@ -1174,12 +1175,15 @@ def fusing_ball(center, R, lo, hi, seed=2026, toward=None):
         o.scale = (k, k, k); o.location = center
     return g, s
 
+MOVE_CTX = {}   # overrides and handles for the camera moves (build_deskmove)
+
 def build_desk():
     """2.1 Finding the problem: a walnut desk at night, lit by a warm lamp off-frame. The ball hovers among the notes."""
     waterfall_desk()
     R = 0.07
     view, state = args.view, args.dstate
     ball_c = {"tq": (0.0, 0.03, R + 0.028), "top": (0.0, 0.03, 0.2), "side": (0.47, -0.14, R + 0.0005)}[view]
+    before = set(bpy.data.objects)
     if state == "chaos":
         pts, hue, radius, _ = chaos_points(80_000 if args.preview else 520_000)
         k = CHAOS_SCALE
@@ -1190,9 +1194,10 @@ def build_desk():
         fusing_ball(ball_c, R, lo=0.9, hi=1.01, toward=(0, 0, 1) if view == "top" else (0.0, -0.8, 0.6))    # an attempt: clarity sweeping out from the core
     else:
         s = glass_sphere(R); s.location = ball_c      # it holds: glass, resting on the desk
+    MOVE_CTX["ball"] = [o for o in bpy.data.objects if o not in before]; MOVE_CTX["ball_c"] = ball_c   # the camera moves carry these
     # The laptop is on the desk in every view: shut in steps 1 and 2, it opens in step 3 ("And I build it").
-    laptop((0.27, 0.04, 0.0), math.radians(-24), open_deg=108 if view == "side" else 0)
-    if view == "side":
+    laptop((0.27, 0.04, 0.0), math.radians(-24), open_deg=MOVE_CTX.get("open", 108 if view == "side" else 0))
+    if view == "side" or MOVE_CTX.get("side_fill"):
         # A soft fill from the front right, never seen: reveals the waterfall panel and the laptop in the low view.
         area_light("side_fill", (1.35, -0.95, 0.45), 0.9, 38.0, (1.0, 0.86, 0.72), target=(0.55, 0.0, -0.12))
     PAPER = srgb("#ece6da"); YELLOW = srgb("#e6c86a"); PINK = srgb("#e3a6a6"); CARD = srgb("#f1ede4")
@@ -1515,10 +1520,135 @@ def build_pullback():
     if os.environ.get("PULLBACK_FRAME"):
         scene.frame_start = scene.frame_end = scene.frame_current
 
+def build_deskmove():
+    """The camera moves between the three desk views, one continuous space, no cuts:
+      rise     2.1 → 2.2  three-quarter → top-down; the dense ball rises with it
+      descend  2.2 → 2.3  top-down → low side; the third attempt travels beside the laptop, the lid opens on the way,
+                          and the screen wakes (the index's real reveal, captured frame by frame) as the view settles
+      push     2.3 → 3    low side → into the screen, ending square to it with the 16:10 screen filling the 16:10 frame
+    The camera orbits a moving centre (distance, height angle and bearing interpolated), so leaving the overhead view
+    never spins the image. Writes a frame sequence and a JSON path: camera, ball centre and the screen's four corners per
+    frame, so the live sphere follows the move and the live index can sit exactly on the screen and take over."""
+    import json
+    move = args.move
+    args.view, args.dstate = {"rise": ("tq", "dense"), "descend": ("top", "attempt"), "push": ("side", "glass")}[move]
+    if move == "descend":
+        MOVE_CTX["open"] = 108; MOVE_CTX["side_fill"] = True
+    build_desk()
+    for o in [o for o in bpy.data.objects if o.type == "CAMERA"]:
+        bpy.data.objects.remove(o)
+    R = 0.07
+    F = {"rise": 60, "descend": 100, "push": 72}[move]
+    scene.frame_start, scene.frame_end = 1, F
+    scene.render.fps = 24
+    def ease(t, a=0.0, b=1.0):
+        t = min(max((t - a) / (b - a), 0.0), 1.0)
+        return t * t * t * (t * (t * 6 - 15) + 10)   # smootherstep: no jolt at either end
+    def lerp(a, b, t):
+        return a + (b - a) * t
+    def sph(pos, target):
+        d = Vector(pos) - Vector(target)
+        return Vector(target), d.length, math.atan2(d.y, d.x), math.asin(max(-1.0, min(1.0, d.z / d.length)))
+    # ball rig: the ball's objects follow one empty
+    rig = bpy.data.objects.new("ball_rig", None); scene.collection.objects.link(rig)
+    rig.location = MOVE_CTX["ball_c"]; bpy.context.view_layer.update()
+    for o in MOVE_CTX["ball"]:
+        if o.parent is None:
+            o.parent = rig; o.matrix_parent_inverse = rig.matrix_world.inverted()
+    # the approved station cameras (position, target, lens, fstop)
+    TQ = ((0.03, -0.62, 0.46), (0.0, 0.02, 0.03), 50, 4.0)
+    TOP = ((0.0, 0.02, 1.35), (0.0, 0.0201, 0.0), 45, 7.1)
+    SIDE = ((1.28, -0.78, 0.15), (0.36, 0.0, 0.03), 50, 3.2)
+    disp = bpy.data.objects["display"]; hinge = bpy.data.objects["hinge"]
+    bpy.context.view_layer.update()
+    def screen_frame():
+        mw = disp.matrix_world
+        corners = [mw @ Vector((x, y, 0)) for x, y in ((-0.5, 0.5), (0.5, 0.5), (0.5, -0.5), (-0.5, -0.5))]
+        n = (mw.to_3x3() @ Vector((0, 0, 1))).normalized()
+        c = sum(corners, Vector()) / 4
+        if (Vector(SIDE[0]) - c).dot(n) < 0:
+            n = -n                                    # the normal that faces the viewer
+        return c, n, corners
+    if move == "push":
+        sc, sn, _ = screen_frame()
+        fit = disp.scale.x / (36.0 / 50.0)   # distance at which the screen exactly fills a 50 mm frame
+        END = (tuple(sc + sn * fit), tuple(sc), 50, 5.6)
+    a_, b_ = {"rise": (TQ, TOP), "descend": (TOP, SIDE)}.get(move) or (SIDE, END)
+    c0, r0, az0, el0 = sph(a_[0], a_[1]); c1, r1, az1, el1 = sph(b_[0], b_[1])
+    el0, el1 = min(el0, math.radians(89.9)), min(el1, math.radians(89.9))
+    # ball path and the focus offset at each end (top view focuses between the ball and the lid)
+    ball0 = Vector(MOVE_CTX["ball_c"])
+    ball1 = {"rise": Vector((0.0, 0.03, 0.2)), "descend": Vector((0.47, -0.14, 0.15)), "push": ball0}[move]
+    foff0, foff1 = {"rise": (0.0, 0.09), "descend": (0.09, 0.04), "push": (0.04, 0.0)}[move]
+    # descend: the lid opens on the way down, the side fill rises, the screen wakes as the view settles
+    if move == "descend":
+        shut, opened = math.radians(90), math.radians(-18)
+        fill = bpy.data.objects["side_fill"].data; fill_e = fill.energy
+        glow = bpy.data.objects["screen_glow"].data; glow_e = glow.energy
+        WAKE = 50                                     # the reveal starts as the camera settles (frames 50-100)
+        seq = os.path.join(os.path.dirname(os.path.abspath(__file__)), "textures-local", "reveal", "r_0001.png")
+        img = bpy.data.images.load(seq); img.source = "SEQUENCE"
+        tex = [n for n in bpy.data.materials["display"].node_tree.nodes if n.type == "TEX_IMAGE"][0]
+        tex.image = img; iu = tex.image_user
+        iu.frame_duration = 51; iu.frame_start = WAKE; iu.frame_offset = 0; iu.use_auto_refresh = True
+        emit = bpy.data.materials["display"].node_tree.nodes["Principled BSDF"].inputs["Emission Strength"]
+        emit_s = emit.default_value   # off until the wake: the sequence has no frame before it (and the reveal starts on black)
+    cam_d = bpy.data.cameras.new("cam"); cam_d.sensor_width = 36; cam_d.dof.use_dof = True
+    cam = bpy.data.objects.new("cam", cam_d); scene.collection.objects.link(cam); scene.camera = cam
+    cam.rotation_mode = "QUATERNION"
+    path = []
+    for f in range(1, F + 1):
+        t = (f - 1) / (F - 1)
+        if move == "rise":
+            tc = tr = te = ta = ease(t)
+        elif move == "descend":
+            tc = tr = ease(t, 0.0, 0.66); te = ease(t, 0.0, 0.6); ta = ease(t, 0.15, 0.66)   # bearing turns once the view has tipped off the vertical
+        else:
+            tc = ease(t, 0.0, 1.0); tr = ease(t, 0.08, 1.0); te = ta = ease(t, 0.0, 0.9)
+        c = c0.lerp(c1, tc); r = lerp(r0, r1, tr); el = lerp(el0, el1, te); az = lerp(az0, az1, ta)
+        pos = c + r * Vector((math.cos(el) * math.cos(az), math.cos(el) * math.sin(az), math.sin(el)))
+        cam.location = pos; cam.rotation_quaternion = (c - pos).to_track_quat("-Z", "Y")
+        cam_d.lens = lerp(a_[2], b_[2], ease(t, 0.0, 0.66) if move == "descend" else tc)
+        cam_d.dof.aperture_fstop = lerp(a_[3], b_[3], tc)
+        tb = ease(t, 0.0, 0.66) if move == "descend" else ease(t)
+        rig.location = ball0.lerp(ball1, tb)
+        ball_d = (pos - rig.location).length + lerp(foff0, foff1, tb)
+        if move == "push":
+            sc, _, _ = screen_frame()
+            cam_d.dof.focus_distance = lerp(ball_d, (pos - sc).length, ease(t, 0.2, 0.8))
+        else:
+            cam_d.dof.focus_distance = ball_d
+        for ob, prop in ((cam, "location"), (cam, "rotation_quaternion"), (rig, "location")):
+            ob.keyframe_insert(prop, frame=f)
+        cam_d.keyframe_insert("lens", frame=f); cam_d.dof.keyframe_insert("focus_distance", frame=f); cam_d.dof.keyframe_insert("aperture_fstop", frame=f)
+        if move == "descend":
+            hinge.rotation_euler.x = lerp(shut, opened, ease(t, 0.26, 0.6)); hinge.keyframe_insert("rotation_euler", frame=f)
+            fill.energy = fill_e * ease(t, 0.3, 0.66); fill.keyframe_insert("energy", frame=f)
+            glow.energy = glow_e * ease(f, WAKE, WAKE + 16); glow.keyframe_insert("energy", frame=f)
+            emit.default_value = emit_s if f >= WAKE else 0.0; emit.keyframe_insert("default_value", frame=f)
+    # export: evaluate every frame with the keys applied
+    for f in range(1, F + 1):
+        scene.frame_set(f)
+        mw = cam.matrix_world; q = mw.to_quaternion()
+        _, _, corners = screen_frame()
+        path.append({"frame": f, "position": list(mw.translation), "quaternion": [q.w, q.x, q.y, q.z],
+                     "lens_mm": cam_d.lens, "sensor_mm": 36, "focus_m": cam_d.dof.focus_distance,
+                     "ball": list(rig.matrix_world.translation), "ball_radius": R,
+                     "screen_corners": [list(v) for v in corners]})
+    os.makedirs(args.out, exist_ok=True)
+    with open(os.path.join(args.out, f"deskmove-{move}-camera.json"), "w") as fh:
+        json.dump({"move": move, "fps": 24, "frames": F, "units": "metres", "up": "z",
+                   "screen_corners_order": "top-left, top-right, bottom-right, bottom-left (as seen on the screen)", "path": path}, fh)
+    one = os.environ.get("MOVE_FRAME")
+    scene.frame_set(int(one or 1))
+    if one:
+        scene.frame_start = scene.frame_end = scene.frame_current
+
 # ---------------------------------------------------------------- go
 
 {"ball": build_ball, "chaos": build_chaos, "glass": build_glass, "studio": build_studio,
- "desk": build_desk, "bench": build_bench, "canvas": build_canvas, "hero": build_hero, "pullback": build_pullback}[args.scene]()
+ "desk": build_desk, "bench": build_bench, "canvas": build_canvas, "hero": build_hero, "pullback": build_pullback,
+ "deskmove": build_deskmove}[args.scene]()
 if args.preview:
     render_settings(24, *( (960, 600) if os.environ.get("LOOKDEV_BIGPREVIEW") else (480, 300) ))
 else:
@@ -1531,8 +1661,9 @@ if os.environ.get("LOOKDEV_DEBUG"):
             mw = o.matrix_world
             print("DBG", o.name, "parent=", o.parent.name if o.parent else None, "world=", tuple(round(c, 3) for c in mw.translation), "dims=", tuple(round(c, 3) for c in o.dimensions), "mats=", [s.material.name if s.material else None for s in o.material_slots])
     sys.exit(0)
-if args.scene == "pullback":
-    seq = os.path.abspath(os.path.join(args.out, "pullback" + ("-preview" if args.preview else ""), "f_"))
+if args.scene in ("pullback", "deskmove"):
+    name = "pullback" if args.scene == "pullback" else f"deskmove-{args.move}"
+    seq = os.path.abspath(os.path.join(args.out, name + ("-preview" if args.preview else ""), "f_"))
     os.makedirs(os.path.dirname(seq), exist_ok=True)
     scene.render.filepath = seq
     bpy.ops.render.render(animation=True)
