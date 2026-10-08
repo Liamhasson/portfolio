@@ -1341,7 +1341,8 @@ def _hero_lights():
     area_light("rim", (1.5, 6.5, 2.5), 2.0, 1500 * k, ROSE_SOFT)
     area_light("fill", (3.5, -4.0, -1.0), 4.0, 80 * k, (0.72, 0.78, 0.95))
     focus = 9.5 if args.phase == "ball" else 9.3
-    camera((0, -9.5, 0.6), (0, 0, 0.1), lens=45, focus=focus, fstop=11)
+    # MARK_SOURCE: the same angle, wide enough to hold the whole cloud (source for the lid mark's silhouette).
+    camera((0, -9.5, 0.6), (0, 0, 0.1), lens=18 if os.environ.get("MARK_SOURCE") else 45, focus=focus, fstop=11)
 
 def build_pullback():
     """Hero → 2.1: one continuous camera move. Starts on the hero framing (the sand cloud, the name glowing behind it,
