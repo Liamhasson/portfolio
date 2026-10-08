@@ -1181,7 +1181,7 @@ def _attempt_on_dense(center, R, lo, hi, seed, toward, breakup, depth, roll):
     rad = r + (0.997 + 0.03 * u - 0.03 * clear - r) * pull
     g = grains("fusing", (dirs * rad[:, None] * R + np.array(center)).astype(np.float32), hue,
                radius * (1 + 0.7 * clear), clear=clear.astype(np.float32))
-    f_lo, f_top = np.quantile(field, [lo, 0.97])
+    f_lo, f_top = np.quantile(field, [min(lo, 0.995), min(0.999, max(0.97, lo + 0.02))])   # top stays above the band: a tiny attempt never flips the scale
     s = glass_sphere(R * 1.012, clear_fn=lambda d: np.clip((fld(d) - f_lo) / (f_top - f_lo), 0, 1) * depth)
     # the skin grows out of the sand: below the grains at the patch edge, at full height only toward the centre, so
     # the frost is flush with the sand (no raised cap, no ledge)
@@ -1237,7 +1237,7 @@ def fusing_ball(center, R, lo, hi, seed=2026, toward=None, breakup=0.0, depth=1.
     rad = R0 * (0.985 + 0.03 * norm) - 0.03 * clear
     radius = radius * (1 + 0.7 * clear)
     g = grains("fusing", (dirs * rad[:, None]).astype(np.float32), hue, radius, clear=clear)
-    f_lo, f_top = np.quantile(field, [lo, 0.97])
+    f_lo, f_top = np.quantile(field, [min(lo, 0.995), min(0.999, max(0.97, lo + 0.02))])   # top stays above the band: a tiny attempt never flips the scale
     s = glass_sphere(R0 * 1.012, clear_fn=lambda d: np.clip((fld(d) - f_lo) / (f_top - f_lo), 0, 1) * depth)
     k = R / R0
     for o in (g, s):
