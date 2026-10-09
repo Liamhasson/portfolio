@@ -12,6 +12,10 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@mdx-js/loader": "^3.1.1",
+    "@mdx-js/react": "^3.1.1",
+    "@next/mdx": "^16.4.0",
+    "@types/mdx": "^2.0.14",
     "geist": "1.7.2",
     "gsap": "^3.15.0",
     "lenis": "1.3",
