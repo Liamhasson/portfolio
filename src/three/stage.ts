@@ -29,7 +29,8 @@ export class Stage {
   private last = 0;
   private running = false;
   private readonly resizeObserver: ResizeObserver;
-  private readonly hfov: number;
+  private hfov: number;
+  private readonly sensorMm: number;
   private readonly renderAspect: number;
 
   constructor(
@@ -51,6 +52,7 @@ export class Stage {
     this.renderer.setPixelRatio(this.settings.pixelRatio);
     this.camera.position.set(...cam.position);
     this.camera.lookAt(new THREE.Vector3(...cam.target));
+    this.sensorMm = cam.sensorMm;
     this.hfov = 2 * Math.atan(cam.sensorMm / 2 / cam.lensMm);
     this.renderAspect = cam.renderAspect;
     this.governor = new QualityGovernor(tier);
@@ -79,6 +81,17 @@ export class Stage {
     this.camera.fov = THREE.MathUtils.radToDeg(this.vfovFor(w / h));
     this.camera.updateProjectionMatrix();
     this.tierChanges.forEach((cb) => cb(this.settings));
+  }
+
+  /** Put the camera on a path frame (camera moves): position, orientation and lens. */
+  setView(position: THREE.Vector3, quaternion: THREE.Quaternion, lensMm: number): void {
+    this.camera.position.copy(position);
+    this.camera.quaternion.copy(quaternion);
+    this.hfov = 2 * Math.atan(this.sensorMm / 2 / lensMm);
+    const w = this.canvas.clientWidth || 1, h = this.canvas.clientHeight || 1;
+    this.camera.fov = THREE.MathUtils.radToDeg(this.vfovFor(w / h));
+    this.camera.updateProjectionMatrix();
+    this.camera.updateMatrixWorld();
   }
 
   /** Device pixels of the drawing buffer's height (for point sizes). */

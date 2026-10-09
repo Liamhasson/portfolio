@@ -9,8 +9,11 @@ import { useEffect, useRef } from "react";
 
 const RISE = "hero-rise";
 
-/** The copy holds while the sand compacts, then travels out to the left so the ball locks in alone (Liam, 2026-10-09). */
-export const HERO_EXIT = { start: 0.6, end: 0.9, stagger: 0.06 };
+/**
+ * The copy holds through the hero, then travels out to the left, line by line, as the pull-back begins; the next
+ * chapter's line enters from the right (Lusion's horizontal travel; Liam, 2026-10-09).
+ */
+const STAGGER = 0.15;
 
 function Line({ children, delay, className = "" }: { children: React.ReactNode; delay: number; className?: string }) {
   return (
@@ -22,34 +25,43 @@ function Line({ children, delay, className = "" }: { children: React.ReactNode; 
   );
 }
 
-function exitT(c: number, i: number): number {
-  const a = HERO_EXIT.start + i * HERO_EXIT.stagger;
-  const t = Math.min(Math.max((c - a) / (HERO_EXIT.end - HERO_EXIT.start - 2 * HERO_EXIT.stagger), 0), 1);
+function exitT(e: number, i: number): number {
+  const t = Math.min(Math.max((e - i * STAGGER) / (1 - 2 * STAGGER), 0), 1);
   return t * t * (3 - 2 * t);
 }
 
-/** `compact` reads the sand's current compaction (0 chaos .. 1 ball), damped like the sand itself. */
-export function HeroOverlay({ compact }: { compact: () => number }) {
+/**
+ * `exit`: 0 holding .. 1 gone (staggered per line). `scrolled`: 0 at the top .. (the scroll cue fades once it moves).
+ * `enter`: the next chapter's line, 0 off to the right .. 1 in place.
+ */
+export function HeroOverlay({ exit, scrolled, enter }: { exit: () => number; scrolled: () => number; enter?: () => number }) {
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
     let raf = 0;
     const tick = () => {
-      const c = compact();
+      const e = exit();
       const el = root.current;
       if (el) {
         el.querySelectorAll<HTMLElement>("[data-exit]").forEach((line) => {
-          const t = exitT(c, Number(line.dataset.exit));
+          const t = exitT(e, Number(line.dataset.exit));
           line.style.transform = t > 0 ? `translate3d(${-t * 55}vw,0,0)` : "";
           line.style.opacity = String(1 - t);
         });
         const cue = el.querySelector<HTMLElement>("[data-cue]");
-        if (cue) cue.style.opacity = String(1 - Math.min(c / 0.06, 1));   // its job is done once scrolling starts
+        if (cue) cue.style.opacity = String(1 - Math.min(scrolled() / 0.03, 1));   // its job is done once scrolling starts
+        const next = el.querySelector<HTMLElement>("[data-enter]");
+        if (next && enter) {
+          const t0 = Math.min(Math.max(enter(), 0), 1);
+          const t = 1 - Math.pow(1 - t0, 3);
+          next.style.transform = `translate3d(${(1 - t) * 55}vw,0,0)`;
+          next.style.opacity = String(t0);
+        }
       }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [compact]);
+  }, [exit, scrolled, enter]);
 
   return (
     <div ref={root} className="pointer-events-none fixed inset-0 z-10 text-[#f4efe9]" data-testid="hero-overlay">
@@ -87,6 +99,20 @@ export function HeroOverlay({ compact }: { compact: () => number }) {
           </span>
         </p>
       </div>
+      {/* 2.1: the next chapter's line, entering from the right over the dark room above the desk */}
+      {enter && (
+        <h2
+          data-enter
+          className="absolute isolate left-[4.9vw] top-[clamp(88px,15vh,170px)] max-w-[min(90vw,18ch)] text-[clamp(34px,4.6vw,72px)] font-normal leading-[1.08] tracking-[-0.015em] opacity-0"
+        >
+          <span
+            aria-hidden
+            className="absolute -bottom-[40%] -left-[12vw] -right-[30%] -top-[40%] -z-10"
+            style={{ background: "radial-gradient(ellipse 60% 55% at 35% 50%, rgba(0,0,0,0.7), rgba(0,0,0,0.4) 45%, transparent 75%)" }}
+          />
+          I look for problems <em className="italic">nobody</em> pointed at.
+        </h2>
+      )}
       {/* the scroll cue: bottom right on desktop, centred on phones */}
       <div data-cue className="absolute bottom-[clamp(20px,3vw,44px)] left-0 right-0 text-center text-[clamp(13px,4vw,16px)] uppercase md:left-auto md:right-[4.9vw] md:text-right md:text-[clamp(14px,1.75vw,25px)]">
         <Line delay={800}>Scroll to explore</Line>

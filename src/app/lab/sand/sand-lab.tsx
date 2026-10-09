@@ -7,6 +7,7 @@ import { SandField, type SandState } from "@/three/sand/sand-field";
 import { PaintField } from "@/three/sand/paint";
 import { Wordmark } from "@/three/sand/wordmark";
 import { HeroOverlay } from "./hero-overlay";
+import { Pullback } from "@/three/sand/pullback";
 import * as THREE from "three";
 import { parseTierOverride, pickTier, readSignals, settingsFor } from "@/three/tier";
 
@@ -18,6 +19,14 @@ function compactFor(progress: number): number {
   const t = Math.min(Math.max((progress - 0.12) / 0.7, 0), 1);
   return t * t * (3 - 2 * t);
 }
+
+/**
+ * The hero page's scroll timeline (?hero): the hero holds, its copy leaves as the pull-back begins, the camera pulls
+ * back and down to the desk, the 2.1 line enters as the desk arrives. The ball forms on the desk in 2.1 (next step),
+ * so here the sand stays chaos (Liam, 2026-10-09: "on the desk, as planned").
+ */
+const TL = { exit: [0.1, 0.26], pullback: [0.16, 0.8], enter: [0.58, 0.78] } as const;
+const span = (p: number, [a, b]: readonly [number, number]) => Math.min(Math.max((p - a) / (b - a), 0), 1);
 
 /** Frame-rate-independent damping toward a target. */
 function damp(current: number, target: number, lambda: number, dt: number): number {
@@ -34,7 +43,14 @@ export function SandLab() {
   // ?hero: the hero's front layer over the sand (the lab's status line hidden)
   const [hero] = useState(() => new URLSearchParams(window.location.search).has("hero"));
   const compactRef = useRef(0);
-  const readCompact = useCallback(() => compactRef.current, []);
+  const progressRef = useRef(0);   // damped scroll progress 0..1
+  // the hero copy: in the lab's compaction mode it leaves as the ball forms; on the hero page, as the pull-back begins
+  const readExit = useCallback(
+    () => (hero ? span(progressRef.current, TL.exit) : Math.min(Math.max((compactRef.current - 0.6) / 0.3, 0), 1)),
+    [hero],
+  );
+  const readScrolled = useCallback(() => progressRef.current, []);
+  const readEnter = useCallback(() => span(progressRef.current, TL.enter), []);
   const [status, setStatus] = useState("loading sand");
   // no WebGL2 (or the sand failed to load): the approved renders as stills, chaos then ball with scroll
   const [fallback, setFallback] = useState(false);
@@ -75,6 +91,20 @@ export function SandLab() {
       );
       field = new SandField(data);
       stage.scene.add(field.points);
+      const pullback = hero && !compare ? await Pullback.load() : null;
+      if (disposed) return;
+      if (pullback) stage.scene.add(pullback.plate);
+      const heroLights = field.heroLights();
+      const g = field.lookGains;
+      // the desk set, calibrated 2026-10-09 against the pull-back render with sand at frame 60 (scripts/lab/pb-calib.mjs)
+      let desk = pullback?.deskLights(g.wattsToIrradiance, [0.55, 0.03, 0.4]);
+      // lab calibration: ?pbframe=N holds the camera on a path frame; __pbGains sets the desk lights' gains
+      let lampSat = 0.6;
+      (window as unknown as { __pbSat?: (v: number) => void }).__pbSat = (v) => { lampSat = v; };
+      const pbFrame = Number(new URLSearchParams(window.location.search).get("pbframe") || NaN);
+      (window as unknown as { __pbGains?: (a: number, b: number, c: number) => void }).__pbGains = (a, b, c) => {
+        desk = pullback?.deskLights(g.wattsToIrradiance, [a, b, c]);
+      };
       // ?weight=bold|black|ultrablack: compare the wordmark's weight (default black); ?wordmark=0 hides it
       const params = new URLSearchParams(window.location.search);
       if (params.get("wordmark") !== "0" && !compare) {
@@ -151,7 +181,8 @@ export function SandLab() {
       };
       sizePaint();
       stage.onSettings(sizePaint);
-      if (reduced) field.setLook({ paintScale: 0 });
+      const baseLook = reduced ? { paintScale: 0 } : {};
+      field.setLook(baseLook);
       const pointer = { x: 0, y: 0, active: false, touch: false };
       let cursorI = 0;
       const on = (type: string, fn: EventListener) => {
@@ -186,8 +217,39 @@ export function SandLab() {
       stage.onFrame((dt) => {
         const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
         const progress = window.scrollY / max;
-        state.compact = damp(state.compact, compactFor(progress), 6, dt);
+        progressRef.current = damp(progressRef.current, progress, 6, dt);
+        state.compact = pullback ? 0 : damp(state.compact, compactFor(progress), 6, dt);
         compactRef.current = state.compact;
+        if (pullback && desk) {
+          const deskNow = desk;
+          const hl = THREE.MathUtils.smoothstep(span(progressRef.current, TL.pullback), 0.15, 0.85);
+          // the desk lamp is close and soft: the sand's own shading softens with it (shadow strength, wrap)
+          if (!Number.isFinite(pbFrame) || pbFrame < 0) field!.setLook({ ...baseLook, shadowKChaos: 2.2 + (0.45 - 2.2) * hl, wrap: 0.1 + (0.9 - 0.1) * hl });
+          // the camera on the exported path; the plate cropped to its view; the lights handed to the desk lamp
+          const t = Number.isFinite(pbFrame) ? (pbFrame - 1) / (pullback.data.frames - 1) : span(progressRef.current, TL.pullback);
+          const f = t * (pullback.data.frames - 1);
+          const v = pullback.view(f);
+          stage!.setView(v.position, v.quaternion, v.lens);
+          const tanV = Math.tan(THREE.MathUtils.degToRad(stage!.camera.fov) / 2);
+          pullback.show(f, tanV * stage!.camera.aspect, tanV, v.lens);
+          field!.setPointScale(stage!.bufferHeight, THREE.MathUtils.degToRad(stage!.camera.fov));
+          const h = THREE.MathUtils.smoothstep(t, 0.15, 0.85);
+          field!.setLights(
+            heroLights.map((l, i) => {
+              // blend what reaches the sand (irradiance at its centre), not the raw power: a light swinging past the
+              // sand mid-move would otherwise flare
+              const d = deskNow.lights[i];
+              const pos = l.pos.clone().lerp(d.pos, h);
+              const r2 = (v: THREE.Vector3) => Math.max(v.distanceToSquared(chaosC), 1e-3);
+              const col = l.col.clone().divideScalar(r2(l.pos)).lerp(d.col.clone().divideScalar(r2(d.pos)), h).multiplyScalar(r2(pos));
+              return { pos, col, r: (d.r ?? 0) * h };
+            }),
+            { dir: deskNow.spot.dir, cos: new THREE.Vector2(-3, -2).lerp(deskNow.spot.cos, h) },
+            lampSat * h,
+          );
+          // the name dims as the camera pulls away (the approved clip's glow keys: 0.55 -> 0.25 at 40% -> 0)
+          wordmark?.setFade(t < 0.4 ? 1 - (0.3 / 0.55) * (t / 0.4) : (0.25 / 0.55) * (1 - (t - 0.4) / 0.6));
+        }
         // scroll turns the ball; when scrolling stops it keeps a slow idle spin
         const scrolled = window.scrollY - lastScroll;
         lastScroll = window.scrollY;
@@ -233,7 +295,7 @@ export function SandLab() {
       field?.dispose();
       stage?.dispose();
     };
-  }, [compare]);
+  }, [compare, hero]);
 
   useEffect(() => {
     if (!fallback) return;
@@ -295,10 +357,10 @@ export function SandLab() {
   }
 
   return (
-    <div className="bg-black" style={{ height: "400vh" }}>
+    <div className="bg-black" style={{ height: hero ? "700vh" : "400vh" }}>
       <canvas ref={canvasRef} className="fixed inset-0 h-screen w-screen" data-testid="sand-canvas" />
       {hero ? (
-        <HeroOverlay compact={readCompact} />
+        <HeroOverlay exit={readExit} scrolled={readScrolled} enter={readEnter} />
       ) : (
         <div className="pointer-events-none fixed left-3 top-3 font-mono text-[11px] uppercase tracking-wider text-white/60">
           sand lab · {status}

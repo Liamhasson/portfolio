@@ -144,6 +144,7 @@ uniform vec2 uViewport;      // device px of the canvas
 uniform float uCursorGain;
 uniform vec3 uRamp[4];
 uniform float uDpr;
+uniform float uFade;         // the camera pulling away (pull-back): the name dims out
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float vnoise(vec2 p) {
@@ -190,7 +191,7 @@ void main() {
 
   float light = clamp(wave + cursor, 0.0, 1.6);
   vec3 col = glow(min(light, 1.0)) * light * 2.2 + vec3(0.18, 0.1, 0.12) * uBase;
-  gl_FragColor = vec4(col * stroke, 1.0);
+  gl_FragColor = vec4(col * stroke * uFade, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }
@@ -237,12 +238,18 @@ export class Wordmark {
         uCursorGain: { value: WORDMARK.cursorGain },
         uRamp: { value: meta.ramp.map(([, c]) => new THREE.Vector3(...c)) },
         uDpr: { value: 1 },
+        uFade: { value: 1 },
       },
     });
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), material);
     mesh.position.set(...WORDMARK.position);
     mesh.renderOrder = -1;   // before the sand, which then covers it where it passes in front
     return new Wordmark(mesh, material);
+  }
+
+  setFade(f: number): void {
+    this.material.uniforms.uFade.value = f;
+    this.mesh.visible = f > 0.001;
   }
 
   /** The cursor's drift field (shared with the sand) and the canvas size in device px. */

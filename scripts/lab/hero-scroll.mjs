@@ -1,8 +1,9 @@
 // The hero across the scroll: frames at several scroll positions, desktop and phone.
 import { chromium, devices } from "playwright";
-const stops = [0, 0.47, 0.58, 0.66, 1];
+const stops = (process.argv[2] ?? "0,0.47,0.58,0.66,1").split(",").map(Number);
+const only = process.argv[3];   // desktop | phone
 const browser = await chromium.launch({ args: ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"] });
-for (const [dev, opts] of [["desktop", { viewport: { width: 1440, height: 900 } }], ["phone", { ...devices["iPhone 13"] }]]) {
+for (const [dev, opts] of [["desktop", { viewport: { width: 1440, height: 900 } }], ["phone", { ...devices["iPhone 13"] }]].filter(([d]) => !only || d === only)) {
   const ctx = await browser.newContext(opts); const page = await ctx.newPage();
   page.on("console", (m) => m.type() === "error" && console.error(dev, m.text().slice(0, 200)));
   await page.goto("http://localhost:3100/lab/sand?hero&tier=mid");

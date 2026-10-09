@@ -1551,6 +1551,13 @@ def build_pullback():
     k = CHAOS_SCALE
     c = Vector(CHAOS_C)
     area_light("rim", tuple(c + Vector((0.18, 0.78, 0.3))), 0.24, 26.0, ROSE_SOFT, target=tuple(c))
+    # PULLBACK_PLATE: the backplate for the live site: no sand and no wordmark (both are live layers), and a lens 1.5x
+    # wider so the plate covers any screen shape (the site crops it to the live camera's view)
+    plate = bool(os.environ.get("PULLBACK_PLATE"))
+    OVERSCAN = 1.5
+    if plate:
+        for o in [o for o in bpy.data.objects if o.name.split(".")[0] == "chaos"]:
+            bpy.data.objects.remove(o, do_unlink=True)
     font = bpy.data.fonts.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts", "HankenGrotesk-ExtraBold.ttf"))
     cu = bpy.data.curves.new("wordmark", "FONT"); cu.body = "LIAM HASSON"; cu.font = font
     cu.align_x, cu.align_y = "CENTER", "CENTER"; cu.size = 1.35 * k; cu.space_character = 0.96
@@ -1563,6 +1570,8 @@ def build_pullback():
     em = m.node_tree.nodes.new("ShaderNodeEmission"); em.inputs["Color"].default_value = (1.0, 0.86, 0.8, 1)
     m.node_tree.links.new(em.outputs[0], m.node_tree.nodes["Material Output"].inputs["Surface"])
     word.data.materials.append(m)
+    if plate:
+        bpy.data.objects.remove(word, do_unlink=True)
     cam_d = bpy.data.cameras.new("cam"); cam_d.lens = 45; cam_d.sensor_width = 36
     cam = bpy.data.objects.new("cam", cam_d); scene.collection.objects.link(cam); scene.camera = cam
     tgt = bpy.data.objects.new("target", None); scene.collection.objects.link(tgt)
@@ -1571,24 +1580,30 @@ def build_pullback():
     scene.frame_start, scene.frame_end = 1, F
     scene.render.fps = 24
     keys = [
-        (1,               c + Vector((0, -9.5 * k, 0.01)), c + Vector((0, 0, 0.01)),    45, 0.55),   # level: void only
+        (1,               c + Vector((0, -9.5 * k, 0.6 * k)), c + Vector((0, 0, 0.1 * k)), 45, 0.55),   # the hero camera exactly
         (round(F * 0.4),  c + Vector((0.02, -1.3, 0.12)),  c + Vector((0, 0.02, -0.12)), 46, 0.25),  # pulling back, tilting
         (F,               Vector((0.05, -1.55, 1.08)),     Vector((0.0, 0.03, 0.2)),     50, 0.0),   # the desk revealed below
     ]
     for f, loc, look, lens, glow in keys:
         cam.location = loc; cam.keyframe_insert("location", frame=f)
         tgt.location = look; tgt.keyframe_insert("location", frame=f)
-        cam_d.lens = lens; cam_d.keyframe_insert("lens", frame=f)
+        cam_d.lens = lens / OVERSCAN if plate else lens; cam_d.keyframe_insert("lens", frame=f)
         em.inputs["Strength"].default_value = glow; em.inputs["Strength"].keyframe_insert("default_value", frame=f)
     path = []
     for f in range(1, F + 1):
         scene.frame_set(f)
         mw = cam.matrix_world
         q = mw.to_quaternion()
-        path.append({"frame": f, "position": list(mw.translation), "quaternion": [q.w, q.x, q.y, q.z], "lens_mm": cam_d.lens, "sensor_mm": 36})
+        path.append({"frame": f, "position": list(mw.translation), "quaternion": [q.w, q.x, q.y, q.z],
+                     "lens_mm": cam_d.lens * (OVERSCAN if plate else 1), "sensor_mm": 36})
     os.makedirs(args.out, exist_ok=True)
     with open(os.path.join(args.out, "pullback-camera.json"), "w") as fh:
-        json.dump({"fps": 24, "frames": F, "units": "metres", "up": "z", "path": path}, fh)
+        # chaos_center / chaos_scale: the live site works in the hero's units, hero = (desk - chaos_center) / chaos_scale
+        json.dump({"fps": 24, "frames": F, "units": "metres", "up": "z", "path": path, "plate_overscan": OVERSCAN if plate else 1,
+                   "chaos_center": list(c), "chaos_scale": k,
+                   "lights": {"lamp": dict(pos=[-0.42, 0.3, 0.55], target=[0, 0, 0], watts=230, color=[1.0, 0.74, 0.48], spot_deg=85, blend=0.85),
+                              "rim": dict(pos=list(c + Vector((0.18, 0.78, 0.3))), watts=26, color=list(ROSE_SOFT[:3])),
+                              "bounce": dict(pos=[0.45, -0.25, 0.25], watts=3.5, color=[1.0, 0.85, 0.7])}}, fh)
     scene.frame_set(int(os.environ.get("PULLBACK_FRAME", "1")))
     if os.environ.get("PULLBACK_FRAME"):
         scene.frame_start = scene.frame_end = scene.frame_current
@@ -1929,7 +1944,10 @@ if args.scene == "attempts":
         print("FRAME", f, lo, brk, dep, flush=True)
     sys.exit(0)
 if args.scene in ("pullback", "deskmove"):
-    name = "pullback" if args.scene == "pullback" else f"deskmove-{args.move}"
+    name = ("pullback-plate" if os.environ.get("PULLBACK_PLATE") else "pullback") if args.scene == "pullback" else f"deskmove-{args.move}"
+    if os.environ.get("PULLBACK_PLATE") and not args.preview:
+        render_settings(64, 1920, 1200)
+    scene.render.use_overwrite = False   # a crashed run resumes where it stopped
     seq = os.path.abspath(os.path.join(args.out, name + ("-preview" if args.preview else ""), "f_"))
     os.makedirs(os.path.dirname(seq), exist_ok=True)
     scene.render.filepath = seq

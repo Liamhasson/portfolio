@@ -132,6 +132,10 @@ export class SandField {
         uRampAt: { value: new THREE.Vector4(ramp[0][0], ramp[1][0], ramp[2][0], ramp[3][0]) },
         uExposure: { value: SAND_LOOK.exposure },
         uSpec: { value: SAND_LOOK.spec },
+        uSpotDir: { value: new THREE.Vector3(0, 0, -1) },
+        uSpotCos: { value: new THREE.Vector2(-3, -2) },   // no cone: a plain point light
+        uLightR2: { value: new THREE.Vector3(0, 0, 0) },
+        uLampSat: { value: 0 },
         uCursorPos: { value: new THREE.Vector3(0, 0, 100) },
         uCursorCol: { value: new THREE.Vector3() },
         uCursorReach: { value: SAND_LOOK.cursorReach },
@@ -145,6 +149,41 @@ export class SandField {
     this.points.frustumCulled = false;
 
     this.setLook({});
+  }
+
+  /**
+   * Override the three set lights (camera moves hand the hero's lights over to the desk lamp). Each: position, colour x
+   * power (already in the shader's units, gains applied); light 0 may be a spot (direction + cone cosines).
+   */
+  setLights(
+    lights: { pos: THREE.Vector3; col: THREE.Vector3; r?: number }[],
+    spot?: { dir: THREE.Vector3; cos: THREE.Vector2 },
+    lampSat = 0,
+  ): void {
+    const u = this.material.uniforms;
+    u.uLampSat.value = lampSat;
+    lights.forEach((l, i) => {
+      (u.uLightPos.value[i] as THREE.Vector3).copy(l.pos);
+      (u.uLightCol.value[i] as THREE.Vector3).copy(l.col);
+      (u.uLightR2.value as THREE.Vector3).setComponent(i, (l.r ?? 0) ** 2);
+    });
+    if (spot) {
+      (u.uSpotDir.value as THREE.Vector3).copy(spot.dir);
+      (u.uSpotCos.value as THREE.Vector2).copy(spot.cos);
+    } else (u.uSpotCos.value as THREE.Vector2).set(-3, -2);
+  }
+
+  /** The hero lights in the shader's units (positions and calibrated colour x power), for blending toward another set. */
+  heroLights(): { pos: THREE.Vector3; col: THREE.Vector3 }[] {
+    const gains = [this.look.key, this.look.rim, this.look.fill];
+    return this.data.meta.lights.map((l, i) => ({
+      pos: new THREE.Vector3(...l.pos),
+      col: new THREE.Vector3(...l.color).multiplyScalar(l.watts * this.look.wattsToIrradiance * gains[i]),
+    }));
+  }
+
+  get lookGains(): { key: number; rim: number; fill: number; wattsToIrradiance: number } {
+    return this.look;
   }
 
   /** The cursor as a light: world position and intensity 0..1 (fades with the pointer). */

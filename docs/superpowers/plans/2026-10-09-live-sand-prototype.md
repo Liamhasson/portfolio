@@ -58,3 +58,13 @@ The sand and the ball, live, in the black void, on a hidden page (`/lab/sand`, n
 - **Matching Cycles in real time.** Real shadows inside the ball are what make it read as a mass. Mitigation: the baked per-grain shade (Lusion's own approach); if still flat, a cheap screen-space occlusion pass on the high tier.
 - **400k impostors with depth writes** can be heavy on integrated GPUs. Mitigation: tiers draw a prefix; depth correction only on high; governor.
 - **The paint field drift fighting the scroll compaction.** The drift is screen-space and decays in half a second; it offsets grains, never their targets, so compaction always wins.
+
+## 6. Build step 3: the pull-back, live (2026-10-09)
+
+Decided with Liam: the ball forms **on the desk in 2.1**, as the approved plan says; the hero stays chaos. The hero copy leaves left as the pull-back begins, the 2.1 line ("I look for problems nobody pointed at.") enters from the right as the desk arrives.
+
+- **Plate:** `lookdev.py --scene pullback` with `PULLBACK_PLATE=1`: the desk only (no sand, no wordmark: both live), lens 1.5x wider than the path's so it covers any screen shape, 60 frames at 1920x1200, 64 samples. Frame 1 now matches the hero camera exactly. `scripts/lab/plate-convert.sh` → `public/lab/pullback/` (JPEG + `camera.json`).
+- **Live layers in the hero's units:** hero = (desk − chaos centre) / 0.1, Blender z-up → three y-up. The camera follows the converted path (position, rotation, lens); the plate is cropped to the live camera's view per frame (`src/three/sand/pullback.ts`), blending neighbouring frames.
+- **Light handover:** the sand's three lights blend from the hero set to the desk set (lamp as a spot with Blender's cone and blend, rim, bounce; power scaled by 1/0.1²). Calibrated against `PULLBACK_FRAME=30/60` renders with sand.
+- **Wordmark:** a live layer that recedes with the move and dims along the approved glow keys.
+- **Open:** camera FX (grain, vignette) as one screen-space pass over plate and live layers, so they read as one image; the settle from the pull-back's end to the 2.1 three-quarter camera; sand shadows on the desk (judge on the plate first).

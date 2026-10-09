@@ -98,6 +98,9 @@ uniform vec2 uCavity;     // ball: grains below the surface are shaded by their 
 
 uniform vec3 uLightPos[3];
 uniform vec3 uLightCol[3];   // colour * power, calibrated
+uniform vec3 uSpotDir;       // light 0 as a spot (the desk lamp): its direction, and the cone's cosines (outer, inner)
+uniform vec2 uSpotCos;
+uniform vec3 uLightR2;       // each light's radius squared: a sized light can't blow up at close range (0 = point)
 uniform vec3 uRamp[4];
 uniform vec4 uRampAt;
 uniform vec3 uCursorPos;     // the cursor as a light (Lusion model), on a plane through the sand
@@ -184,8 +187,9 @@ void main() {
     vec3 lp = mix(uChaosC + chaosInv * (uLightPos[i] - uChaosC), uBallC + ballInv * (uLightPos[i] - uBallC), t);
     float d = distance(p, uLightPos[i]);
     float T = transmittance(pv, lp, min(d, mix(8.5, 3.0, t)), j, mix(uShadowK.x, uShadowK.y, t));
-    E[i] = uLightCol[i] * T / (d * d);
+    E[i] = uLightCol[i] * T / (d * d + uLightR2[i]);
   }
+  E[0] *= smoothstep(uSpotCos.x, uSpotCos.y, dot(normalize(p - uLightPos[0]), uSpotDir));
   // how much sand stands between this grain and the viewer: the cursor can only reach the front layer
   vec3 cv = mix(uChaosC + chaosInv * (cameraPosition - uChaosC), uBallC + ballInv * (cameraPosition - uBallC), t);
   float toCam = transmittance(pv, cv, mix(8.5, 3.0, t), j, uFront.x);
@@ -251,6 +255,7 @@ uniform float uExposure;
 uniform float uSpec;
 uniform float uWrap;     // light reaching past the terminator: grains are lit by the bounce off their neighbours
 uniform float uBounce;   // light that has hit two grains (Cycles' multiple scattering): saturates toward the sand's colour
+uniform float uLampSat;  // the desk lamp: light that reaches a grain through the sand is filtered by it (warmer, deeper)
 
 void main() {
   vec2 c = gl_PointCoord * 2.0 - 1.0;
@@ -272,7 +277,8 @@ void main() {
     float ndl = max((dot(n, L[i]) + uWrap) / (1.0 + uWrap), 0.0);
     vec3 h = normalize(L[i] + v);
     float spec = pow(max(dot(n, h), 0.0), 12.0) * uSpec;
-    col += E[i] * (vAlbedo * ndl / 3.14159265 + spec * ndl + vAlbedo * vAlbedo * uBounce * vBounceW);
+    vec3 alb = i == 0 ? mix(vAlbedo, vAlbedo * vAlbedo * 2.2, uLampSat) : vAlbedo;
+    col += E[i] * (alb * ndl / 3.14159265 + spec * ndl + vAlbedo * vAlbedo * uBounce * vBounceW);
   }
   col *= uExposure;
   gl_FragColor = vec4(col, vAlpha * edge);
