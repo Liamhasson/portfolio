@@ -24,6 +24,11 @@ describe("danger score factors", () => {
     expect(timingWeight("20:00", "10:00")).toBe(0.3);
     expect(timingWeight("20:00", "")).toBe(1.0);
   });
+
+  test("timing: an empty start time counts as midnight, as in Eventread", () => {
+    expect(timingWeight("", "00:00")).toBe(1.0);
+    expect(timingWeight("", "20:00")).toBe(0.3);
+  });
 });
 
 describe("the Berlin example (eventread.vercel.app hero, 18 Nov 2026)", () => {

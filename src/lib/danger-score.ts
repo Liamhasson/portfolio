@@ -73,6 +73,7 @@ export function genreWeight(yours: string, theirs: string, category = ""): numbe
 }
 
 const toMinutes = (t: string) => {
+  if (!t) return 0;
   const [h, m] = t.split(":").map((n) => parseInt(n, 10) || 0);
   return h * 60 + m;
 };
