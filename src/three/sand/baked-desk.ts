@@ -547,6 +547,16 @@ export class BakedDesk {
     VIEW.uShLamp.value.copy(this.shadow.lamp).applyMatrix4(v);
   };
 
+  /** The screen's corners in the world (hero units): top-left, top-right, bottom-right, bottom-left of the index. */
+  screenCorners(): THREE.Vector3[] | null {
+    if (!this.lid?.screen) return null;
+    this.lid.pivot.updateWorldMatrix(true, false);
+    const m = this.lid.pivot.matrixWorld;
+    const [O, OU, OV] = this.lid.screen;
+    const BR = OU.clone().add(OV).sub(O);
+    return [O, OU, BR, OV].map((v) => v.clone().applyMatrix4(m));
+  }
+
   /** The ball's shadow on the desk and the laptop: ball centre and radius, lamp centre and radius (the hero's units),
    *  and the lamp's share of the light where it falls (0 for none). */
   setBallShadow(ball: THREE.Vector3, ballR: number, lamp: THREE.Vector3, lampR: number, k: number, ao = 0, reflect = k, lights = k): void {

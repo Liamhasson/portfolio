@@ -7,6 +7,7 @@ import { SAND_LOOK, SandField, type SandState } from "@/three/sand/sand-field";
 import { PaintField } from "@/three/sand/paint";
 import { Wordmark } from "@/three/sand/wordmark";
 import { HeroOverlay } from "./hero-overlay";
+import { WorkIndex, type WorkIndexHandle } from "./work-index";
 import { BallShadow } from "@/three/sand/ball-shadow";
 import { FrostSkin } from "@/three/sand/frost-skin";
 import { attemptAt } from "@/three/sand/attempts";
@@ -40,12 +41,14 @@ const TL = {
   attempts: [0.71, 0.97],                                                      // 2.2: three attempts
   leave22: [0.975, 1.03], descend: [0.99, 1.122], enter23: [1.09, 1.135],      // 2.2 -> 2.3: down to the side view
   build: [1.15, 1.3], ship: [1.32, 1.38],                                      // 2.3: it turns to glass, then lands
+  leave23: [1.42, 1.46], push: [1.43, 1.6],                                     // 2.3 -> 3: into the screen
+  takeover: [1.565, 1.6], indexIn: [1.6, 1.64],                                 // the live index takes over, settles
 } as const;
 /**
  * The page's length. Progress is measured in units of the first 1600vh of scroll (the timeline above was laid out on
  * a 1700vh page), so each chapter added after it keeps the earlier ones' pace.
  */
-const PAGE_VH = 2400;
+const PAGE_VH = 2800;
 const PROGRESS_SCALE = (PAGE_VH - 100) / 1600;
 /**
  * The descend (lookdev.py deskmove --move descend, 100 frames): the scroll carries the camera to its arrival (frame 66,
@@ -104,6 +107,9 @@ export function SandLab() {
   const readEnter22 = useCallback(() => span(progressRef.current, TL.enter22), []);
   const readLeave22 = useCallback(() => span(progressRef.current, TL.leave22), []);
   const readEnter23 = useCallback(() => span(progressRef.current, TL.enter23), []);
+  const readLeave23 = useCallback(() => span(progressRef.current, TL.leave23), []);
+  const indexRef = useRef<WorkIndexHandle | null>(null);
+  const bindIndex = useCallback((h: WorkIndexHandle) => { indexRef.current = h; }, []);
   const [status, setStatus] = useState("loading sand");
   // no WebGL2 (or the sand failed to load): the approved renders as stills, chaos then ball with scroll
   const [fallback, setFallback] = useState(false);
@@ -174,12 +180,16 @@ export function SandLab() {
       if (desk3d) stage.scene.add(desk3d.group);
       // 2.2 -> 2.3: the descend to the low side view (the 3D desk only: no plates were rendered for it)
       const descend = desk3d ? await Pullback.load("/lab/descend", false).catch(() => null) : null;
+      // 2.3 -> 3: the push into the screen (lookdev.py deskmove --move push, approved)
+      const push = desk3d ? await Pullback.load("/lab/push", false).catch(() => null) : null;
       if (disposed) return;
       // the screen's reveal: seconds since it woke; and how far it has gone back to sleep (scrolling back up)
       let revealT = 0, sleep = 1;
       // ?dsframe=N holds the camera on a descend frame; ?reveal=S holds the screen's reveal at S seconds (calibration)
       const dsFrame = Number(new URLSearchParams(window.location.search).get("dsframe") || NaN);
-      const holdDescend = Number.isFinite(dsFrame);
+      const pushFrame = Number(new URLSearchParams(window.location.search).get("pushframe") || NaN);   // calibration
+      const indexMix = Number(new URLSearchParams(window.location.search).get("indexmix") || NaN);   // calibration: the index's opacity
+      const holdDescend = Number.isFinite(dsFrame) || Number.isFinite(pushFrame);
       const lidHold = Number(new URLSearchParams(window.location.search).get("lid") || NaN);   // ?lid=deg (calibration)
       const revealHold = Number(new URLSearchParams(window.location.search).get("reveal") || NaN);
       let fillGain = 1;
@@ -362,6 +372,7 @@ export function SandLab() {
         progressRef.current = damp(progressRef.current, hero ? progress * PROGRESS_SCALE : progress, 6, dt);
         // ?dsframe holds a descend frame: everything before it (the ball, the third attempt) as the page has it there
         if (holdDescend) progressRef.current = TL.descend[0] + 0.01;
+        if (Number.isFinite(pushFrame)) progressRef.current = TL.push[0] + (TL.push[1] - TL.push[0]) * Math.max((pushFrame - 1) / 71, 1e-4);
         state.compact = pullback
           ? (() => { const x = span(progressRef.current, TL.compact); return x * x * (3 - 2 * x); })()
           : damp(state.compact, compactFor(progress), 6, dt);
@@ -391,8 +402,10 @@ export function SandLab() {
           const rtFrame = Number(new URLSearchParams(window.location.search).get("rtframe") || NaN);
           const rt = rise ? (Number.isFinite(rtFrame) ? Math.max((rtFrame - 1) / (rise.data.frames - 1), 1e-4) : span(progressRef.current, TL.rise)) : 0;
           const ds = descend ? (Number.isFinite(dsFrame) ? Math.max((dsFrame - 1) / DESCEND.arrive, 1e-4) : span(progressRef.current, TL.descend)) : 0;
-          const move = descend && ds > 0 ? descend : rise && rt > 0 ? rise : settle && st > 0 ? settle : pullback;
-          const f = move === descend ? (Number.isFinite(dsFrame) ? dsFrame - 1 : ds * DESCEND.arrive)
+          const pt = push ? (Number.isFinite(pushFrame) ? Math.max((pushFrame - 1) / (push.data.frames - 1), 1e-4) : span(progressRef.current, TL.push)) : 0;
+          const move = push && pt > 0 ? push : descend && ds > 0 ? descend : rise && rt > 0 ? rise : settle && st > 0 ? settle : pullback;
+          const f = move === push ? pt * (push!.data.frames - 1)
+            : move === descend ? (Number.isFinite(dsFrame) ? dsFrame - 1 : ds * DESCEND.arrive)
             : move === rise ? rt * (rise.data.frames - 1) : move === settle ? st * (settle!.data.frames - 1) : t * (pullback.data.frames - 1);
           if (rise) {
             rise.plate.visible = move === rise;
@@ -401,10 +414,11 @@ export function SandLab() {
             const fi = Math.min(Math.max(Math.round(f), 0), rise.data.frames - 1);
             const fr = rise.data.path[move === rise ? fi : 0] as unknown as { ball: number[]; ball_roll: number };
             const end = rise.data.path[rise.data.frames - 1] as unknown as { ball_roll: number };
-            if (move === descend && descend) {
-              const a = descend.data.path[Math.min(Math.floor(f), descend.data.frames - 2)] as unknown as { ball: number[] };
-              const b = descend.data.path[Math.min(Math.floor(f) + 1, descend.data.frames - 1)] as unknown as { ball: number[] };
-              field!.setBallTarget(descend.toHero(a.ball).lerp(descend.toHero(b.ball), f - Math.floor(f)), 0.07 / descend.data.chaos_scale);
+            if ((move === descend || move === push) && descend) {
+              const fd = move === push ? descend.data.frames - 1 : f;
+              const a = descend.data.path[Math.min(Math.floor(fd), descend.data.frames - 2)] as unknown as { ball: number[] };
+              const b = descend.data.path[Math.min(Math.floor(fd) + 1, descend.data.frames - 1)] as unknown as { ball: number[] };
+              field!.setBallTarget(descend.toHero(a.ball).lerp(descend.toHero(b.ball), Math.min(fd - Math.floor(fd), 1)), 0.07 / descend.data.chaos_scale);
               state.ballRoll = end.ball_roll;
             } else {
               field!.setBallTarget(rise.toHero(fr.ball), 0.07 / rise.data.chaos_scale);
@@ -414,10 +428,10 @@ export function SandLab() {
           // 2.3's arrival: the lid opens, the low view's fill rises, the screen wakes and plays the index's reveal
           let openF = 0;
           if (desk3d) {
-            const tb = move === descend ? f / (descend!.data.frames - 1) : 0;
+            const tb = move === push ? 1 : move === descend ? f / (descend!.data.frames - 1) : 0;
             openF = ease(tb, DESCEND.open);
             desk3d.setLid(Number.isFinite(lidHold) ? lidHold : DESCEND.openDeg * ease(tb, DESCEND.lid));
-            const awake = move === descend && f >= DESCEND.wake;
+            const awake = move === push || (move === descend && f >= DESCEND.wake);
             if (Number.isFinite(revealHold)) { revealT = revealHold; sleep = 0; }
             else if (awake) { sleep = Math.max(sleep - dt / 0.35, 0); if (sleep === 0 || revealT > 0) revealT += dt; }
             else { sleep = Math.min(sleep + dt / 0.35, 1); if (sleep === 1) revealT = 0; }
@@ -432,6 +446,31 @@ export function SandLab() {
           field!.setAttempt(span(progressRef.current, TL.attempts) > 0 ? lo : 1, brk, dep);
           const v = move.view(f);
           stage!.setView(v.position, v.quaternion, v.lens);
+          // 3: the live index over the screen's quad, crossfading in where they coincide, then settling into the view
+          const ix = indexRef.current;
+          if (ix && desk3d && push) {
+            const take = ease(span(progressRef.current, TL.takeover), [0, 1]);
+            const sett = ease(span(progressRef.current, TL.indexIn), [0, 1]);
+            if (pt > 0) {
+              const cam = stage!.camera;
+              cam.updateMatrixWorld();
+              const W = canvas.clientWidth, H = canvas.clientHeight;
+              const proj = (desk3d.screenCorners() ?? []).map((p) => {
+                const q = p.clone().project(cam);
+                return [(q.x + 1) / 2 * W, (1 - q.y) / 2 * H] as [number, number];
+              });
+              if (proj.length === 4) {
+                // where it settles: the 16:10 index contained in the view, centred
+                const { w, h } = ix.size();
+                const s = Math.min(W / w, H / h), cw = w * s, ch = h * s, x0 = (W - cw) / 2, y0 = (H - ch) / 2;
+                const rest: [number, number][] = [[x0, y0], [x0 + cw, y0], [x0 + cw, y0 + ch], [x0, y0 + ch]];
+                const quad = proj.map((p, i) => [p[0] + (rest[i][0] - p[0]) * sett, p[1] + (rest[i][1] - p[1]) * sett]) as [[number, number], [number, number], [number, number], [number, number]];
+                ix.place(quad);
+              }
+            }
+            ix.show(pt > 0 ? (Number.isFinite(indexMix) ? indexMix : take) : 0, pt > 0 ? sett : 0);
+            ix.interactive(sett > 0.999);
+          }
           const tanV = Math.tan(THREE.MathUtils.degToRad(stage!.camera.fov) / 2);
           move.show(f, tanV * stage!.camera.aspect, tanV, v.lens);
           pullback.plate.visible = move === pullback;
@@ -617,10 +656,11 @@ export function SandLab() {
   return (
     <div className="bg-black" style={{ height: hero ? `${PAGE_VH}vh` : "400vh" }}>
       <canvas ref={canvasRef} className="fixed inset-0 h-screen w-screen" data-testid="sand-canvas" />
+      {hero && <WorkIndex bind={bindIndex} />}
       {hero ? (
         <HeroOverlay
           exit={readExit} scrolled={readScrolled}
-          enter={readEnter} leave={readLeave21} enter2={readEnter22} leave2={readLeave22} enter3={readEnter23}
+          enter={readEnter} leave={readLeave21} enter2={readEnter22} leave2={readLeave22} enter3={readEnter23} leave3={readLeave23}
         />
       ) : (
         <div className="pointer-events-none fixed left-3 top-3 font-mono text-[11px] uppercase tracking-wider text-white/60">

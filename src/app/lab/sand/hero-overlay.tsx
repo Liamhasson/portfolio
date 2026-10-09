@@ -36,10 +36,11 @@ function exitT(e: number, i: number): number {
  * Chapter lines: 2.1 (enter, leave), 2.2 (enter2, leave2), 2.3 (enter3), one at a time.
  */
 export function HeroOverlay({
-  exit, scrolled, enter, leave, enter2, leave2, enter3,
+  exit, scrolled, enter, leave, enter2, leave2, enter3, leave3,
 }: {
   exit: () => number; scrolled: () => number;
   enter?: () => number; leave?: () => number; enter2?: () => number; leave2?: () => number; enter3?: () => number;
+  leave3?: () => number;
 }) {
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -65,7 +66,7 @@ export function HeroOverlay({
         };
         if (enter) travel(el.querySelector<HTMLElement>("[data-enter]"), enter(), leave ? leave() : 0);
         if (enter2) travel(el.querySelector<HTMLElement>("[data-enter2]"), enter2(), leave2 ? leave2() : 0);
-        if (enter3) travel(el.querySelector<HTMLElement>("[data-enter3]"), enter3(), 0);
+        if (enter3) travel(el.querySelector<HTMLElement>("[data-enter3]"), enter3(), leave3 ? leave3() : 0);
         const scrim = el.querySelector<HTMLElement>("[data-scrim]");
         if (scrim && enter) scrim.style.opacity = String(Math.min(Math.max(enter(), 0), 1));
       }
@@ -73,7 +74,7 @@ export function HeroOverlay({
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [exit, scrolled, enter, leave, enter2, leave2, enter3]);
+  }, [exit, scrolled, enter, leave, enter2, leave2, enter3, leave3]);
 
   return (
     <div ref={root} className="pointer-events-none fixed inset-0 z-10 text-[#f4efe9]" data-testid="hero-overlay">
