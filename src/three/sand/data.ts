@@ -4,6 +4,10 @@ import * as THREE from "three";
 export interface SandMeta {
   version: number;
   count: number;
+  /** The grains split by tier: a device fetches only the parts it draws. */
+  parts: { file: string; start: number; count: number }[];
+  chaos_box: [[number, number, number], [number, number, number]];
+  ball_pos_max: number;
   bounds: [[number, number, number], [number, number, number]];
   radius_max: number;
   ball: { center: [number, number, number]; radius: number };
@@ -26,8 +30,10 @@ export interface SandMeta {
 
 export interface SandData {
   meta: SandMeta;
-  /** Per grain: chaos xyz, ball xyz, uint16 normalised in `meta.bounds`. */
-  positions: Uint16Array;
+  /** How many grains were loaded (the parts covering the tier's count). */
+  count: number;
+  /** Per grain: packed chaos position, packed ball position (see the shader's decode). */
+  words: Uint32Array;
   /** Per grain: chaos hue, ball hue, radius (of radius_max), compaction delay; uint8 normalised. */
   attributes: Uint8Array;
   volumes: { chaos: THREE.Data3DTexture; mid: THREE.Data3DTexture; ball: THREE.Data3DTexture };
@@ -53,16 +59,25 @@ function volumeTexture(data: Uint8Array, [w, h, d]: [number, number, number]): T
   return tex;
 }
 
-export async function loadSand(base = SAND_BASE): Promise<SandData> {
+/** Loads the sand: only the parts needed to draw `grains` (the tier's count), and the density volumes. */
+export async function loadSand(grains: number, base = SAND_BASE): Promise<SandData> {
   const meta = (await (await fetch(`${base}/sand.json`)).json()) as SandMeta;
-  const [sand, chaos, mid, ball] = await Promise.all(
-    ["sand.bin", "vol_chaos.bin", "vol_mid.bin", "vol_ball.bin"].map((f) => bytes(`${base}/${f}`)),
+  const parts = meta.parts.filter((p) => p.start < grains);
+  const n = parts.reduce((s, p) => s + p.count, 0);
+  const [chaos, mid, ball, ...partBufs] = await Promise.all(
+    ["vol_chaos.bin", "vol_mid.bin", "vol_ball.bin", ...parts.map((p) => p.file)].map((f) => bytes(`${base}/${f}`)),
   );
-  const n = meta.count;
+  const words = new Uint32Array(n * 2);
+  const attributes = new Uint8Array(n * 4);
+  parts.forEach((p, i) => {
+    words.set(new Uint32Array(partBufs[i], 0, p.count * 2), p.start * 2);
+    attributes.set(new Uint8Array(partBufs[i], p.count * 8, p.count * 4), p.start * 4);
+  });
   return {
     meta,
-    positions: new Uint16Array(sand, 0, n * 6),
-    attributes: new Uint8Array(sand, n * 12, n * 4),
+    count: n,
+    words,
+    attributes,
     volumes: {
       chaos: volumeTexture(new Uint8Array(chaos), meta.volume.res),
       mid: volumeTexture(new Uint8Array(mid), meta.volume.res),

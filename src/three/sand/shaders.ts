@@ -59,12 +59,14 @@ export const SAND_VERTEX = /* glsl */ `
 precision highp float;
 precision highp sampler3D;
 
-in vec3 aPosA;        // chaos, normalised in the bounds box
-in vec3 aPosB;        // ball
+in uvec2 aPos;        // packed: chaos 11/10/11 bits in its box; ball octahedral direction 12+12 bits, distance 8 bits
 in vec4 aAttr;        // hue chaos, hue ball, radii (chaos high nibble, ball low nibble, of uRadMax), compaction delay
 
 uniform vec3 uLo;
 uniform vec3 uSize;
+uniform vec3 uChaosLo;
+uniform vec3 uChaosSize;
+uniform float uBallPosMax;
 uniform float uRadMax;
 uniform float uCompact;      // 0 chaos .. 1 ball
 uniform float uDelaySpan;
@@ -152,8 +154,15 @@ float transmittance(vec3 p, vec3 lightPos, float dist, float jitter, float k) {
 float hash(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
 
 void main() {
-  vec3 A = uLo + aPosA * uSize;
-  vec3 B = uLo + aPosB * uSize;
+  vec3 A = uChaosLo + vec3(float(aPos.x & 2047u) / 2047.0, float((aPos.x >> 11) & 1023u) / 1023.0,
+                           float(aPos.x >> 21) / 2047.0) * uChaosSize;
+  vec2 oc = vec2(float(aPos.y & 4095u), float((aPos.y >> 12) & 4095u)) / 4095.0 * 2.0 - 1.0;
+  vec3 dir = vec3(oc, 1.0 - abs(oc.x) - abs(oc.y));
+  float fold = max(-dir.z, 0.0);
+  dir.xy -= sign(dir.xy) * fold;
+  vec3 B = uBallC + normalize(dir) * (float(aPos.y >> 24) / 255.0 * uBallPosMax);
+  vec3 aPosA = (A - uLo) / uSize;    // normalised, as seeds for the per-grain randomness
+  vec3 aPosB = (B - uLo) / uSize;
   // the chaos turns around itself; the ball spins
   A = uChaosC + uChaosRot * (A - uChaosC);
   vec3 Bw = uBallC + uBallRot * (B - uBallC);

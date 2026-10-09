@@ -7,7 +7,7 @@ import { SandField, type SandState } from "@/three/sand/sand-field";
 import { PaintField } from "@/three/sand/paint";
 import { Wordmark } from "@/three/sand/wordmark";
 import * as THREE from "three";
-import { parseTierOverride, pickTier, readSignals } from "@/three/tier";
+import { parseTierOverride, pickTier, readSignals, settingsFor } from "@/three/tier";
 
 type CompareTarget = "chaos" | "mid" | "ball";
 const COMPACT_FOR: Record<CompareTarget, number> = { chaos: 0, mid: 0.5, ball: 1 };
@@ -31,6 +31,9 @@ export function SandLab() {
   });
   const [split, setSplit] = useState(50);
   const [status, setStatus] = useState("loading sand");
+  // no WebGL2 (or the sand failed to load): the approved renders as stills, chaos then ball with scroll
+  const [fallback, setFallback] = useState(false);
+  const [stillBall, setStillBall] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -43,11 +46,16 @@ export function SandLab() {
     const listeners: [string, EventListener][] = [];
 
     (async () => {
-      const data = await loadSand(SAND_BASE);
+      // the tier first: it decides how much sand to download
+      const probe = document.createElement("canvas").getContext("webgl2");
+      if (!probe || new URLSearchParams(window.location.search).has("nogl")) {
+        setFallback(true);
+        return;
+      }
+      const tier = pickTier(readSignals(probe), parseTierOverride(window.location.search));
+      const data = await loadSand(settingsFor(tier, window.devicePixelRatio || 1).grains, SAND_BASE);
       if (disposed) return;
       const { camera } = data.meta;
-      const probe = document.createElement("canvas").getContext("webgl2");
-      const tier = pickTier(readSignals(probe), parseTierOverride(window.location.search));
       stage = new Stage(
         canvas,
         {
@@ -171,7 +179,10 @@ export function SandLab() {
       });
       stage.start();
       (window as unknown as { __sand?: unknown }).__sand = { stage, field, state };   // lab debugging
-    })().catch((err) => setStatus(String(err)));
+    })().catch((err) => {
+      setStatus(String(err));
+      setFallback(true);
+    });
 
     return () => {
       disposed = true;
@@ -185,6 +196,34 @@ export function SandLab() {
       stage?.dispose();
     };
   }, [compare]);
+
+  useEffect(() => {
+    if (!fallback) return;
+    const onScroll = () => {
+      const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+      setStillBall(window.scrollY / max > 0.5);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [fallback]);
+
+  if (fallback && !compare) {
+    return (
+      <div className="bg-black" style={{ height: "400vh" }} data-testid="sand-fallback">
+        {(["chaos", "ball"] as const).map((k) => (
+          // eslint-disable-next-line @next/next/no-img-element -- lab fallback stills
+          <img
+            key={k}
+            src={`${SAND_BASE}/targets/${k}.jpg`}
+            alt=""
+            className="fixed inset-0 h-screen w-screen object-cover transition-opacity duration-700"
+            style={{ opacity: (k === "ball") === stillBall ? 1 : 0 }}
+          />
+        ))}
+      </div>
+    );
+  }
 
   if (compare) {
     return (

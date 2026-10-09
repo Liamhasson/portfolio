@@ -76,6 +76,17 @@ Every transition is driven by scroll and reverses when scrolling back. The only 
 - Sets for chapters 2 and 3 are rendered in Blender as backplates with matching cameras; the live sphere is composited in front and lit to match.
 - Every real-time frame is compared side by side with its target render before Liam approves it.
 
+## 5a. The live sand, as built and approved (build step 2, 2026-10-09)
+
+Lab page `/lab/sand` (noindex). Decisions Liam approved while reviewing it on his own devices:
+
+- **Material:** matched to the Cycles renders by measurement (`scripts/lab/sweep.sh`): total light per colour channel within about 5% in the chaos, the halfway state and the ball; grain and structure contrast matched on the ball. Self-shadowing from density volumes baked by the same Python as the renders.
+- **Ambient life:** a slow drift and an idle spin; scroll turns the ball. **No flares** (removed: they read as static, an event the visitor didn't cause).
+- **The cursor:** a light (grains near it brighten) plus a soft drift of the grains along its trail, with Lusion's ScreenPaint constants. The drift reaches **only the front layer**: grains with sand between them and the viewer stay put, so the ball keeps its shape. On phones the light follows the finger while it touches.
+- **The wordmark:** LIAM HASSON in heavy Geist (Black) as dark outlines behind the sand, the one deliberate exception to the type weights. Light in the sand's colours travels through the strokes: a wave that comes in from a different spot each time, takes over the letters (~3s each), and moves on, every 15s; plus the cursor lighting the strokes along its trail.
+- **Weight:** the grains download per tier (low 0.72 MB, mid 1.9 MB, high 4.8 MB, packed to under a pixel of precision, proven identical in the compare tool); density volumes ~0.45 MB with brotli.
+- **Fallbacks:** reduced motion keeps the scroll compaction, drops drift, spin and the wave; no WebGL shows the approved renders as stills, crossfading chaos to ball with scroll.
+
 ## 6. Open items
 
 1. The final typeface (side-by-side test).

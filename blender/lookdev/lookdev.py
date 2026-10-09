@@ -1758,8 +1758,9 @@ def build_attempts():
 
 def build_export():
     """Writes the live sand's data (build step 2) from the same functions as the renders, to args.out:
-      sand.bin    per grain, shuffled so any prefix is an even sample (a lower tier draws a prefix):
-                  chaos position, ball position (uint16 in the bounds box), chaos hue, ball hue, radius, delay (uint8)
+      sand_0..2.bin  per grain, shuffled so any prefix is an even sample, split at the tier counts (60k, 160k, all):
+                  uint32 chaos position (11/10/11 bits), uint32 ball position (octahedral 12+12, distance 8),
+                  then uint8 chaos hue, ball hue, radii (two nibbles), delay. 12 bytes a grain
       vol_*.bin   uint8 density volumes (chaos, halfway, ball) for the light march: optical depth per cell
       sand.json   counts, bounds, scales, camera, lights, colour ramp, version
     Blender is z up; three.js is y up: (x, y, z) -> (x, z, -y)."""
@@ -1810,11 +1811,45 @@ def build_export():
         return len(raw)
     sizes = {}
     # interleave per grain for a single upload: [ax ay az bx by bz] uint16 then [hueA hueB rad delay] uint8
-    pos = np.concatenate([q(A), q(B)], axis=1)
+    # positions packed to under a pixel at the hero camera (~0.0047 units per px at the ball, closer grains ~0.0025):
+    #   chaos: 11 / 10 / 11 bits for x / y / z in the chaos's own box (0.004 / 0.0057 / 0.004 units)
+    #   ball:  octahedral direction 12 + 12 bits from the ball's centre (0.0006 units), distance 8 bits (0.0043 units)
+    clo = A.min(0) - 1e-4; chi = A.max(0) + 1e-4
+    cq = (A - clo) / (chi - clo)
+    cx = np.round(cq[:, 0] * 2047).astype(np.uint32); cy = np.round(cq[:, 1] * 1023).astype(np.uint32)
+    cz = np.round(cq[:, 2] * 2047).astype(np.uint32)
+    chaos_word = cx | (cy << np.uint32(11)) | (cz << np.uint32(21))
+    bc = np.array([HERO_C[0], HERO_C[2], -HERO_C[1]], dtype=np.float64); rel = B - bc   # three.js axes
+    rb = np.linalg.norm(rel, axis=1); rmax_b = float(rb.max()) + 1e-6
+    n = rel / np.maximum(rb, 1e-9)[:, None]
+    n = n / np.abs(n).sum(1, keepdims=True)                      # octahedral map
+    ox, oy = n[:, 0].copy(), n[:, 1].copy()
+    neg = n[:, 2] < 0
+    ox[neg] = (1 - np.abs(n[neg, 1])) * np.sign(n[neg, 0] + 1e-12)
+    oy[neg] = (1 - np.abs(n[neg, 0])) * np.sign(n[neg, 1] + 1e-12)
+    bu = np.round((ox * 0.5 + 0.5) * 4095).astype(np.uint32); bv = np.round((oy * 0.5 + 0.5) * 4095).astype(np.uint32)
+    br = np.round(rb / rmax_b * 255).astype(np.uint32)
+    ball_word = bu | (bv << np.uint32(12)) | (br << np.uint32(24))
+    words = np.stack([chaos_word, ball_word], axis=1).astype(np.uint32)
     # radius: chaos and ball radii packed as two 4-bit values (high nibble chaos), each a fraction of radius_max
     nib = lambda r: np.clip(np.round(r / rmax * 15), 1, 15).astype(np.uint8)
     attr = np.stack([u8(hue_a), u8(hue_b), (nib(rad_a) << 4) | nib(rad_b), u8(delay)], axis=1)
-    sizes["sand.bin"] = write("sand.bin", pos, attr)
+    # split by tier: a device downloads only the grains it draws (prefixes stay even samples: the data is shuffled)
+    cuts = [0, 60_000, 160_000, N]
+    parts = []
+    for i in range(3):
+        a, b = cuts[i], cuts[i + 1]
+        name = f"sand_{i}.bin"
+        sizes[name] = write(name, words[a:b], attr[a:b])
+        parts.append(dict(file=name, start=a, count=b - a))
+    # the precision check: worst decode error, in units
+    def oct_dec(u, v):
+        x = u / 4095 * 2 - 1; y = v / 4095 * 2 - 1; z = 1 - np.abs(x) - np.abs(y)
+        t = np.clip(-z, 0, None); x = x - np.sign(x) * t; y = y - np.sign(y) * t
+        d = np.stack([x, y, z], 1); return d / np.linalg.norm(d, axis=1, keepdims=True)
+    Bd = bc + oct_dec(bu.astype(float), bv.astype(float)) * (br / 255 * rmax_b)[:, None]
+    Ad = clo + np.stack([cx / 2047, cy / 1023, cz / 2047], 1) * (chi - clo)
+    print("PACK max error chaos %.4f ball %.4f units" % (np.abs(Ad - A).max(), np.linalg.norm(Bd - B, axis=1).max()))
     # density volumes: optical depth from grain cross-sections, in the bounds box
     VR = (128, 96, 96)
     cell = (hi - lo) / np.array(VR)
@@ -1841,7 +1876,8 @@ def build_export():
     lights = [dict(name="key", pos=c3((-4.0, -7.0, 4.0)), size=3.5, watts=1900, color=[1.0, 0.82, 0.68]),
               dict(name="rim", pos=c3((1.5, 6.5, 2.5)), size=2.0, watts=1500, color=list(ROSE_SOFT[:3])),
               dict(name="fill", pos=c3((3.5, -4.0, -1.0)), size=4.0, watts=80, color=[0.72, 0.78, 0.95])]
-    meta = dict(version=3, count=N, bounds=[lo.tolist(), hi.tolist()], radius_max=rmax,
+    meta = dict(version=4, count=N, bounds=[lo.tolist(), hi.tolist()], radius_max=rmax, parts=parts,
+                chaos_box=[clo.tolist(), chi.tolist()], ball_pos_max=rmax_b,
                 ball=dict(center=c3(HERO_C), radius=HERO_R),
                 volume=dict(res=list(VR), sigma_max=float(smax), encoding="sqrt"),
                 camera=dict(position=c3(cam_b[0]), target=c3(cam_b[1]), lens_mm=45, sensor_mm=36, fit="horizontal",

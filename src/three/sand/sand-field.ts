@@ -61,14 +61,14 @@ export class SandField {
 
   constructor(data: SandData) {
     this.data = data;
-    const { meta, positions, attributes } = data;
+    const { meta, words, attributes } = data;
     const geo = new THREE.BufferGeometry();
-    const posBuf = new THREE.InterleavedBuffer(positions, 6);
-    geo.setAttribute("aPosA", new THREE.InterleavedBufferAttribute(posBuf, 3, 0, true));
-    geo.setAttribute("aPosB", new THREE.InterleavedBufferAttribute(posBuf, 3, 3, true));
+    const pos = new THREE.BufferAttribute(words, 2);
+    pos.gpuType = THREE.IntType;   // read as uvec2 in the shader (integer attribute, no float conversion)
+    geo.setAttribute("aPos", pos);
     geo.setAttribute("aAttr", new THREE.BufferAttribute(attributes, 4, true));
     // three needs a position attribute for bounds; the shader never reads it
-    geo.setAttribute("position", new THREE.InterleavedBufferAttribute(posBuf, 3, 0, true));
+    geo.setAttribute("position", pos);
     const [lo, hi] = meta.bounds;
     geo.boundingSphere = new THREE.Sphere(
       new THREE.Vector3((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2),
@@ -88,6 +88,11 @@ export class SandField {
       uniforms: {
         uLo: { value: new THREE.Vector3(...lo) },
         uSize: { value: new THREE.Vector3(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) },
+        uChaosLo: { value: new THREE.Vector3(...meta.chaos_box[0]) },
+        uChaosSize: {
+          value: new THREE.Vector3(...meta.chaos_box[1]).sub(new THREE.Vector3(...meta.chaos_box[0])),
+        },
+        uBallPosMax: { value: meta.ball_pos_max },
         uRadMax: { value: meta.radius_max },
         uCompact: { value: 0 },
         uDelaySpan: { value: meta.compaction.delay_span },
@@ -159,18 +164,18 @@ export class SandField {
 
   /** The chaos's own centre (its grains' mean), the point it turns around. */
   private chaosCentre(): THREE.Vector3 {
-    const { positions, meta } = this.data;
-    const [lo, hi] = meta.bounds;
-    const step = 97;
+    const { words, count, meta } = this.data;
+    const [lo, hi] = meta.chaos_box;
     let x = 0, y = 0, z = 0, n = 0;
-    for (let i = 0; i < meta.count; i += step) {
-      x += positions[i * 6] / 65535; y += positions[i * 6 + 1] / 65535; z += positions[i * 6 + 2] / 65535; n++;
+    for (let i = 0; i < count; i += 97) {
+      const w = words[i * 2];
+      x += (w & 2047) / 2047; y += ((w >>> 11) & 1023) / 1023; z += (w >>> 21) / 2047; n++;
     }
     return new THREE.Vector3(lo[0] + (x / n) * (hi[0] - lo[0]), lo[1] + (y / n) * (hi[1] - lo[1]), lo[2] + (z / n) * (hi[2] - lo[2]));
   }
 
   setGrains(count: number): void {
-    const n = Math.min(count, this.data.meta.count);
+    const n = Math.min(count, this.data.count);
     this.points.geometry.setDrawRange(0, n);
     this.material.uniforms.uCountScale.value = Math.pow(this.data.meta.count / n, 0.35);
   }
