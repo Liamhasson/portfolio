@@ -1,9 +1,7 @@
 import { render, screen } from "@testing-library/react";
-import { expect, test, vi } from "vitest";
+import { expect, test } from "vitest";
 import { pulse } from "@/content/case-studies/pulse";
 import { CaseStudyPage } from "./case-study-page";
-
-vi.mock("next/navigation", () => ({ usePathname: () => "/pulse" }));
 
 test("the frame in order: hero, at a glance, middle, challenges, outcome, next", () => {
   const Middle = () => <section aria-label="Middle">middle</section>;
