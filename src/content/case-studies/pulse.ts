@@ -18,14 +18,14 @@ export const pulse: CaseStudy = {
       kind: "user",
       title: "The Injury Log read as medical advice",
       happened: "4 of 6 testers took the Injury Log's results as medical advice: a liability risk.",
-      did: "I renamed and reframed it as the Training Log: how sessions felt, milestones, progression. Habits, not health.",
-      changed: "The liability risk is gone, and the log now feeds the habit the app is built around.",
+      did: "I removed the Injury Log and reframed it as the Training Log: progress and habit-building instead of analysis and guidance.",
+      changed: "Nothing in the app reads as medical guidance any more: the log tracks how sessions felt, milestones and progression.",
     },
     {
       kind: "user",
       title: "People wanted to set a goal first",
       happened: "5 of 6 testers expected to set a goal during onboarding.",
-      did: "I rebuilt onboarding around goals, activity preferences and booking habits, before anything else.",
+      did: "I redesigned onboarding around goals, activity preferences and booking habits, before anything else.",
       changed: "The goal-based onboarding shown above.",
     },
     {
@@ -33,7 +33,7 @@ export const pulse: CaseStudy = {
       title: "Challenges looked public",
       happened: "4 of 6 testers thought Challenges were public.",
       did: "I gave each feature a one-screen introduction.",
-      changed: "Challenges read as private, progress-based and unlimited.",
+      changed: "In round 2, 6 of 6 testers understood that Challenges are private.",
     },
   ],
   outcome: {

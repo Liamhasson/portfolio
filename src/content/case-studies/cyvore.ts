@@ -19,7 +19,7 @@ export const cyvore: CaseStudy = {
       title: "The CEO wanted the full video on the site",
       happened: "The CEO wanted the full product video on the site.",
       did: "I argued for a 7-second animation of the product's mission, with the video one click away. In a meeting you present with visual support; you don't narrate over a video. And investors had likely seen the only public product video already.",
-      changed: "The mission reads in about 7 seconds, and the full video stays one click away.",
+      changed: "My 7-second animation shipped on the site, with a button on the screen that opens the full video on YouTube.",
     },
     {
       kind: "user",
