@@ -53,16 +53,9 @@
 
 ---
 
-### Task 0: Confirm the JamBase line with Liam
+### Task 0: JamBase line (done 2026-10-09)
 
-Eventread replaced PredictHQ with JamBase on 2026-10-09 (commit `f2c172d` in `~/Documents/Eventread project/eventread`). The spec now reads "Ticketmaster for ticketed events, JamBase for everything else". JamBase is a concert database, so "everything else" may be wrong.
-
-- [ ] **Step 1:** Ask Liam: "What does JamBase cover that Ticketmaster doesn't, in one line?" Use his words in `docs/superpowers/specs/2026-10-09-case-studies-design.md` §5.1 (Supporting row) and in Task 4's MDX.
-- [ ] **Step 2: Commit**
-
-```bash
-git commit -m "docs: case-study spec: JamBase replaces PredictHQ" -- docs/superpowers/specs/2026-10-09-case-studies-design.md
-```
+Resolved with Liam: JamBase catches the smaller, local shows Ticketmaster doesn't list. Reasoning and numbers from Eventread commits `f2c172d` and `7666fbc` are in spec §5.1 and in Task 7's `eventread.mdx`. Nothing to do.
 
 ### Task 1: MDX support
 
@@ -1100,7 +1093,7 @@ On the live product's own example, a 1,000-cap rock show in Berlin on 18 Novembe
 
 <MiddleBlock kind="supporting" title="One search, two sources">
 
-Ticketmaster covers ticketed events. JamBase fills in what Ticketmaster doesn't list. One search checks both, and followed dates send an update when something new lands on your night.
+Ticketmaster covers the big ticketed shows. JamBase catches the smaller, local ones Ticketmaster doesn't list. For Berlin in November 2026 that's 487 shows against Ticketmaster's 93, and 436 of them aren't on Ticketmaster at all. One search checks both, and followed dates send an update when something new lands on your night.
 
 Under the hood: "Cambridge" returned 124 events across the UK and the US until places carried their country (21 after the fix), and tour shows wanting the same night are assigned in two passes.
 
