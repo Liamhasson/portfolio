@@ -6,6 +6,7 @@ import { loadSand, SAND_BASE } from "@/three/sand/data";
 import { SandField, type SandState } from "@/three/sand/sand-field";
 import { PaintField } from "@/three/sand/paint";
 import { Wordmark } from "@/three/sand/wordmark";
+import { HeroOverlay } from "./hero-overlay";
 import * as THREE from "three";
 import { parseTierOverride, pickTier, readSignals, settingsFor } from "@/three/tier";
 
@@ -30,6 +31,8 @@ export function SandLab() {
     return v === "chaos" || v === "mid" || v === "ball" ? v : null;
   });
   const [split, setSplit] = useState(50);
+  // ?hero: the hero's front layer over the sand (the lab's status line hidden)
+  const [hero] = useState(() => new URLSearchParams(window.location.search).has("hero"));
   const [status, setStatus] = useState("loading sand");
   // no WebGL2 (or the sand failed to load): the approved renders as stills, chaos then ball with scroll
   const [fallback, setFallback] = useState(false);
@@ -77,6 +80,38 @@ export function SandLab() {
         wordmark = await Wordmark.create(data.meta, `/lab/fonts/Geist-${weight}.ttf`);
         if (disposed) return;
         stage.scene.add(wordmark.mesh);
+        // ?wm=bottom: Lusion's placement, the name across the full width at the bottom (behind the sand)
+        if (params.get("wm") === "bottom") {
+          const mesh = wordmark.mesh;
+          const geoW = (mesh.geometry as THREE.PlaneGeometry).parameters.width;
+          const place = () => {
+            const cam = stage!.camera;
+            cam.updateMatrixWorld();
+            const at = (nx: number, ny: number) => {
+              const v = new THREE.Vector3(nx, ny, 0.5).unproject(cam).sub(cam.position).normalize();
+              const s = (mesh.position.z - cam.position.z) / v.z;
+              return cam.position.clone().addScaledVector(v, s);
+            };
+            mesh.position.z = -4.5;
+            const left = at(-0.902, -0.62), right = at(0.902, -0.62);
+            mesh.scale.setScalar(right.distanceTo(left) / (geoW * 0.95));
+            mesh.position.set((left.x + right.x) / 2, left.y, -4.5);
+          };
+          place();
+          stage.onSettings(place);
+        } else {
+          // the approved placement; on portrait screens it shrinks to fit the width (it overflowed both sides)
+          const mesh = wordmark.mesh;
+          const geoW = (mesh.geometry as THREE.PlaneGeometry).parameters.width;
+          const fit = () => {
+            const cam = stage!.camera;
+            const dist = cam.position.z - mesh.position.z;
+            const viewW = 2 * dist * Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2) * cam.aspect;
+            mesh.scale.setScalar(Math.min(1, (viewW * 0.9) / (geoW * 0.95)));
+          };
+          fit();
+          stage.onSettings(fit);
+        }
       }
       stage.onSettings((s) => {
         field!.setGrains(s.grains);
@@ -259,9 +294,13 @@ export function SandLab() {
   return (
     <div className="bg-black" style={{ height: "400vh" }}>
       <canvas ref={canvasRef} className="fixed inset-0 h-screen w-screen" data-testid="sand-canvas" />
-      <div className="pointer-events-none fixed left-3 top-3 font-mono text-[11px] uppercase tracking-wider text-white/60">
-        sand lab · {status}
-      </div>
+      {hero ? (
+        <HeroOverlay />
+      ) : (
+        <div className="pointer-events-none fixed left-3 top-3 font-mono text-[11px] uppercase tracking-wider text-white/60">
+          sand lab · {status}
+        </div>
+      )}
     </div>
   );
 }
