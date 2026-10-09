@@ -1266,7 +1266,7 @@ git commit -m "test: e2e for the case-study frame and loop" -- e2e/case-studies.
 
 ### Task 9: Eventread calendar capture
 
-The hero shows the month calendar from the live app. The live app's month URL takes `range=month` and `date=YYYY-MM`; the Berlin place parameters match its own example link.
+The hero shows the month calendar from the live app. The live app's month URL takes `range=month` and `date=YYYY-MM-01` (a bare `YYYY-MM` crashes the results page); the Berlin place parameters match its own example link.
 
 **Files:** Create `scripts/capture/eventread-calendar.mjs`. Output: `public/case-studies/eventread/calendar-berlin-2026-11.png`.
 
@@ -1286,7 +1286,7 @@ const params = new URLSearchParams({
   placeId: "hero-berlin",
   lat: "52.52",
   lon: "13.405",
-  date: "2026-11",
+  date: "2026-11-01",
   range: "month",
   genre: "Rock",
   capacity: "1000",
@@ -1324,6 +1324,20 @@ git commit -m "chore: Eventread calendar capture for the case-study hero" -- scr
 ### Task 11: Copy review with Liam (gate)
 
 - [ ] **Step 1:** Start the dev server (`preview_start` with `portfolio-dev`) and open `/eventread`, `/cyvore`, `/pulse`. The pages are unstyled; this review is about words only.
+- [ ] **Step 1b: Open questions from the Task 4 fact check** (raise these first):
+  - Eventread: "The formula produced only 27 distinct values, and none fell between 35–45 or 64–80" comes from the August build sessions, not the spec. Keep?
+  - Eventread: is the UI string really "No coverage here"? Check the live app.
+  - Eventread: "The search stays one form: place, date, genre, capacity" is inferred from the app's search form. Keep or reword?
+  - Eventread: the approved impact line says "every competing event", while the same page shows "Not checked" states. Keep "every"?
+  - Cyvore: challenge 2's "what it changed" restates the method rather than a result; challenge 1's "happened" repeats its title.
+  - Cyvore: the outcome's timing sentence should name who was measured ("3 stakeholders: about 35s → about 8s").
+  - Pulse: "The goal-based onboarding shown above" depends on layout; confirm once Part B places the blocks.
+  - Eventread MDX: "mostly sold through one company" paraphrases the live page's "54,000 events. 151 million fans. One company." (Live Nation's own figures). Confirm the source and wording.
+  - Pulse MDX: "BEAT81 and Urban Sports Club sell the classes, but neither is built around keeping you coming back" is a claim about competitors the live page doesn't make. Keep, soften, or cut.
+  - Pulse MDX: the "80% more likely to still be active six months later (Lucid)" stat: confirm the source link for a footnote.
+  - Eventread: the spec titles the supporting block "One search, two APIs"; the draft says "two sources". Pick one.
+  - Eventread: the spec's problem block mentions the live page's personas; the draft leaves them out (framed instead as ten years booking bands). Confirm.
+  - Eventread hero capture: every November day reads Threat or Critical, the detail panel opens on 1 Nov (All Saints' Day), and the 30th is cut off. Open the panel on 18 Nov (the Muse example) instead?
 - [ ] **Step 2:** Walk Liam through every line of the content files and MDX, one study at a time. Apply his edits in `src/content/case-studies/*.ts` and `*.mdx`; re-run `npx vitest run src/content` after each study (the validator catches a broken frame).
 - [ ] **Step 3: Commit** after each approved study: `git commit -m "content: <study> copy approved by Liam" -- src/content/case-studies/`
 

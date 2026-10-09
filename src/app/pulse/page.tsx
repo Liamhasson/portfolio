@@ -1,13 +1,11 @@
 import type { Metadata } from "next";
-import { BackButton } from "@/components/shell/back-button";
+import { CaseStudyPage } from "@/components/case-study/case-study-page";
+import { caseStudies } from "@/content/case-studies";
 
-export const metadata: Metadata = { title: "Pulse case study" };
+const { study, Middle } = caseStudies.pulse;
+
+export const metadata: Metadata = { title: `${study.title} case study`, description: study.line };
 
 export default function PulsePage() {
-  return (
-    <article className="min-h-[200dvh] px-16 pb-32 pt-32">
-      <BackButton slug="pulse" />
-      <h1 className="text-6xl font-bold uppercase">Pulse</h1>
-    </article>
-  );
+  return <CaseStudyPage study={study} Middle={Middle} />;
 }

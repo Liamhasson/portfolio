@@ -54,6 +54,8 @@ There is no "What I'd do next" section: on a portfolio it reads as a to-do list 
 
 **3.5 Voice.** Light and personal, first person, one idea per line. The page shows; it doesn't claim.
 
+**3.6 Visuals show the final result only.** No before/after images or earlier versions; how the work got there is told in text (Liam, 2026-10-09). Pulse shows the Training Log screen, not the old Injury Log; Cyvore has no old-site slider.
+
 ## 4. Shared blocks
 
 **Hero.** Title with descriptor ("Eventread · SaaS web app"), the one-line description approved for the home page, the hero media (device or video), and a link out where a live product exists.
@@ -89,8 +91,8 @@ There is no "What I'd do next" section: on a portfolio it reads as a to-do list 
 | At a glance | Research, information architecture, prototype and investor presentations · About 1 month, part of a 2025–26 project-based contract · Solo, reviewed with the CTO, a developer and DevOps · Figma, Figma MCP, Claude Code |
 | Problem: a linear site vs an investor meeting | Why a scroll-through website fails when a founder presents live. Liam pitched the fix unasked. |
 | Signature: one screen, everything | A working replica of the four-tab hero (Security · Exposure · Coverage · Enables). |
-| Supporting: before / after | A drag slider, old site vs new: navigation and micro-animation. The design system (a third of the live page) shrinks to one strip: type, tokens, states. The live page's "Main CFA" typo becomes "Main CTA". |
-| What got in the way | 1. **The CEO wanted the full product video on the site** → Liam argued for a ~7-second animation of the product's mission with the video one click away: in a meeting you present with visual support rather than narrate over a video, and investors had likely seen the only public product video already. 2. **No investors to test with** → tested with the three people who'd present it (CTO, developer, DevOps), four navigation tasks, task order counterbalanced. |
+| Supporting: "Motion with a job" | The final site only (rule §3.6): the micro-animations and the 7-second mission animation (the shipped Zoom-call phishing sequence, `zoom animation.mov`, trimmed to ~8s with the BLOCK frame as poster). The design system (a third of the live page) shrinks to one strip: type, tokens, states. The live page's "Main CFA" typo becomes "Main CTA". The old linear site appears only in the problem block's text. |
+| What got in the way | 1. **The CEO wanted the full product video on the site** → Liam argued for a ~7-second animation of the product's mission with the video one click away: in a meeting you present with visual support rather than narrate over a video, and investors had likely seen the only public product video already. Result, a compromise: the animation shipped on the site, with an on-screen button that opens the full video on YouTube. 2. **No investors to test with** → tested with the three people who'd present it (CTO, developer, DevOps), four navigation tasks, task order counterbalanced. |
 | Outcome | Used as the live product presentation in investor meetings (not a public site). 3 of 3 stakeholders completed all four tasks; time to find a section ~35s → ~8s. The CTO's words, exactly as on the home page: "We weren't looking for a designer. Liam reached us and thanks to his work, we closed our first funding round." Yoav Rotem, CTO, Cyvore. |
 | Next project | → Pulse |
 
@@ -100,10 +102,10 @@ There is no "What I'd do next" section: on a portfolio it reads as a to-do list 
 |---|---|
 | Hero | Pulse · Fitness app. "A goal-focused fitness app designed around four retention milestones." Phone video. |
 | At a glance | UX design, research and branding · Dec 2025 – Feb 2026 · Solo, with a CareerFoundry mentor · Figma, Figma MCP, Claude Code · CareerFoundry final project, prototype |
-| Problem: users quit before the habit | Fitness apps lose users before a habit forms (competitors BEAT81, Urban Sports; the cited first-week engagement stat with its source). The four milestones, Day 7 · 30 · 60 · 90, shown as the design's **targets**, labelled as such. |
+| Problem: users quit before the habit | Fitness apps lose users before a habit forms (competitors BEAT81, Urban Sports Club). Evidence: Fitbod study, 389,481 users, first-28-day consistency is the strongest predictor of adherence (Conti et al., 2026). The four milestones, Day 7 · 30 · 60 · 90, each with a job and no percentages: first habit loop, routine, habit (66-day median, Lally et al., 2010), staying power. The live page's baselines (20/10/5/3%) are dropped: they trace to an unsourced blog post and Day 60/90 match no benchmark. |
 | Signature: goal-based onboarding | The 12 onboarding screens (framing and personalisation 1–3, the booking loop 4–9, tour, permission and close 10–12), pinned, stepping through with captions as the visitor scrolls. |
 | Supporting: challenges without pressure | Overview, reflect, progress; private Challenges. The brand (logo, billboard, app icon) shrinks to one strip and leaves the opening. |
-| What got in the way | From two rounds of usability testing with people from the target group: 1. **The Injury Log read as medical advice** (4 of 6), a liability risk → renamed and reframed as the Training Log: how sessions felt, milestones, progression; habits, not health. 2. **5 of 6 expected to set a goal first** → goal-based onboarding (the flow above). 3. **4 of 6 thought Challenges were public** → a one-screen intro for each feature; Challenges are private, progress-based and unlimited. |
+| What got in the way | From two rounds of usability testing with people from the target group: 1. **The Injury Log read as medical advice** (4 of 6), a liability risk → the Injury Log was removed and reframed as the Training Log: progress and habit-building instead of analysis and guidance. 2. **5 of 6 expected to set a goal first** → goal-based onboarding (the flow above). 3. **4 of 6 thought Challenges were public** → a one-screen intro for each feature; Challenges are private, progress-based and unlimited; in round 2, 6 of 6 testers understood they are private. |
 | Outcome | A tested prototype. After the fixes, 6 of 6 testers in round 2 (returning and new) completed every scenario task. |
 | Next project | → Eventread |
 
@@ -136,7 +138,6 @@ Case studies are MDX content files sharing one shell (back button, pill nav with
 | `DangerScore` | Eventread's live calculator |
 | `CyvoreTabs` | Working replica of the four-tab hero |
 | `FlowSequence` | Pulse's pinned 12-screen step-through |
-| `BeforeAfter` | Drag-to-compare slider |
 | `ChallengeList` | "What got in the way" items (happened → did → changed) |
 | `Outcome` | Outcome block, with optional `Quote` |
 | `NextProject` | The looping next-case-study preview and transition |
