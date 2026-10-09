@@ -1,5 +1,5 @@
 {
- "version": 2,
+ "version": 3,
  "count": 400000,
  "bounds": [
   [
@@ -21,11 +21,6 @@
    -0.0
   ],
   "radius": 1.1
- },
- "flare": {
-  "count": 1291,
-  "radius_max": 0.00599459046497941,
-  "ext_max": 0.41477763652801514
  },
  "volume": {
   "res": [
@@ -148,7 +143,6 @@
  },
  "files": {
   "sand.bin": 6400000,
-  "flare.bin": 36148,
   "vol_chaos.bin": 1179648,
   "vol_mid.bin": 1179648,
   "vol_ball.bin": 1179648

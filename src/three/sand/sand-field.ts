@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { SandData } from "./data";
-import { FLARE_VERTEX, SAND_FRAGMENT, SAND_VERTEX } from "./shaders";
+import { SAND_FRAGMENT, SAND_VERTEX } from "./shaders";
 
 /** What the page asks of the sand each frame. */
 export interface SandState {
@@ -12,12 +12,7 @@ export interface SandState {
   ballSpin: number;
   /** The chaos turning around itself, radians. */
   chaosSpin: number;
-  /** Flares on (off in compare mode and under reduced motion). */
-  flares: boolean;
 }
-
-/** The flare rhythm (concept v3: every few seconds a loose spray lifts off a patch and falls back). */
-export const FLARE = { every: [5, 8] as [number, number], rise: 1.1, hold: 0.35, fall: 1.7 };
 
 /** Calibrated against the Cycles renders (see the compare mode); light power is Blender's watts times this. */
 export const SAND_LOOK = {
@@ -56,12 +51,6 @@ const Y = new THREE.Vector3(0, 1, 0);
 export class SandField {
   readonly points: THREE.Points;
   readonly material: THREE.ShaderMaterial;
-  readonly flares: THREE.Points;
-  private readonly flareMaterial: THREE.ShaderMaterial;
-  private readonly flareRot = new THREE.Matrix3();
-  private nextFlare = 2.5;
-  private flareStart = -100;
-  private flareCount = 0;
   private readonly data: SandData;
   private look = { ...SAND_LOOK };
   private readonly ballRot = new THREE.Matrix3();
@@ -147,30 +136,6 @@ export class SandField {
     this.points = new THREE.Points(geo, this.material);
     this.points.frustumCulled = false;
 
-    // flares share the sand's uniforms (lights, look, cursor, drift) plus their own
-    const f = data.flare;
-    const fgeo = new THREE.BufferGeometry();
-    fgeo.setAttribute("aF", new THREE.BufferAttribute(f.extended, 3));
-    fgeo.setAttribute("aD", new THREE.BufferAttribute(f.root, 3));
-    fgeo.setAttribute("aFAttr", new THREE.BufferAttribute(f.attributes, 4, true));
-    fgeo.setAttribute("position", new THREE.BufferAttribute(f.extended, 3));
-    const shared = this.material.uniforms;
-    this.flareMaterial = new THREE.ShaderMaterial({
-      glslVersion: THREE.GLSL3,
-      vertexShader: FLARE_VERTEX,
-      fragmentShader: SAND_FRAGMENT,
-      alphaToCoverage: true,
-      toneMapped: true,
-      uniforms: {
-        ...shared,
-        uFlareRot: { value: this.flareRot },
-        uFlareE: { value: 0 },
-        uFlareVis: { value: 0 },
-        uFlareRadMax: { value: meta.flare.radius_max },
-      },
-    });
-    this.flares = new THREE.Points(fgeo, this.flareMaterial);
-    this.flares.frustumCulled = false;
     this.setLook({});
   }
 
@@ -229,32 +194,6 @@ export class SandField {
     }
     this.ballRot.setFromMatrix4(this.m4.makeRotationAxis(Y, s.ballSpin));
     this.chaosRot.setFromMatrix4(this.m4.makeRotationAxis(Y, s.chaosSpin));
-    this.updateFlares(s);
-  }
-
-  /** Every few seconds, a spray from a new patch: rise fast, hang, fall back slower (it has weight). */
-  private updateFlares(s: SandState): void {
-    const fu = this.flareMaterial.uniforms;
-    const formed = THREE.MathUtils.smoothstep(s.compact, 0.85, 0.98);
-    fu.uFlareVis.value = s.flares ? formed : 0;
-    if (!s.flares) { fu.uFlareE.value = 0; return; }
-    if (s.time >= this.nextFlare && formed > 0.5) {
-      this.flareStart = s.time;
-      this.flareCount++;
-      const [a, b] = FLARE.every;
-      this.nextFlare = s.time + FLARE.rise + FLARE.hold + FLARE.fall + a + Math.random() * (b - a);
-      // a new patch, kept on the visible side: a turn about the vertical and a slight tilt
-      const yaw = (Math.random() * 2 - 1) * 1.3;
-      const tilt = (Math.random() * 2 - 1) * 0.35;
-      const m = new THREE.Matrix4().makeRotationY(yaw).multiply(new THREE.Matrix4().makeRotationX(tilt));
-      this.flareRot.setFromMatrix4(m);
-    }
-    const t = s.time - this.flareStart;
-    let e = 0;
-    if (t < FLARE.rise) { const x = t / FLARE.rise; e = 1 - (1 - x) * (1 - x); }               // ease out: thrown up
-    else if (t < FLARE.rise + FLARE.hold) e = 1;
-    else if (t < FLARE.rise + FLARE.hold + FLARE.fall) { const x = (t - FLARE.rise - FLARE.hold) / FLARE.fall; e = 1 - x * x; }   // ease in: falling
-    fu.uFlareE.value = e;
   }
 
   /** Lab calibration: override the look (compare mode). Light gains multiply Blender's calibrated power. */
@@ -286,8 +225,6 @@ export class SandField {
   dispose(): void {
     this.points.geometry.dispose();
     this.material.dispose();
-    this.flares.geometry.dispose();
-    this.flareMaterial.dispose();
     Object.values(this.data.volumes).forEach((t) => t.dispose());
   }
 }

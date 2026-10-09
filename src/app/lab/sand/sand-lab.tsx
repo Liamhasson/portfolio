@@ -60,7 +60,6 @@ export function SandLab() {
       );
       field = new SandField(data);
       stage.scene.add(field.points);
-      stage.scene.add(field.flares);
       stage.onSettings((s) => {
         field!.setGrains(s.grains);
         field!.setShadowSteps(s.shadowSteps);
@@ -68,7 +67,7 @@ export function SandLab() {
         setStatus(`${s.tier} · ${s.grains.toLocaleString()} grains · ${s.shadowSteps} shadow steps · dpr ${s.pixelRatio}`);
       });
 
-      const state: SandState = { compact: 0, time: 0, ballSpin: 0, chaosSpin: 0, flares: false };
+      const state: SandState = { compact: 0, time: 0, ballSpin: 0, chaosSpin: 0 };
       if (compare) {
         // frozen, at the exact Blender camera: comparable pixel for pixel with the render
         state.compact = COMPACT_FOR[compare];
@@ -84,9 +83,8 @@ export function SandLab() {
       }
 
       const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      // ?still: no ambient motion (drift, spin, flares), so a test isolates what the cursor does
+      // ?still: no ambient motion (drift, spin), so a test isolates what the cursor does
       const still = new URLSearchParams(window.location.search).has("still");
-      state.flares = !reduced && !new URLSearchParams(window.location.search).has("still");
       let lastScroll = window.scrollY;
       let spinVel = 0;
 

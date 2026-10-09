@@ -628,12 +628,12 @@ def roll_x(pts, deg):
     c, s_ = math.cos(math.radians(deg)), math.sin(math.radians(deg))
     return (pts @ np.array([[1, 0, 0], [0, c, -s_], [0, s_, c]], dtype=np.float64).T).astype(np.float32)
 
-def dense_ball(center, R, flare=True, seed=2026, roll=0.0):
+def dense_ball(center, R, flare=False, seed=2026, roll=0.0):   # flares removed 2026-10-09 (Liam): static, an event that pulls the eye
     """The living dense ball at real scale, with one solar-flare arc of grains lifting off its surface."""
     pts, hue, radius = dense_points(R, flare, seed)
     grains("ball", (roll_x(pts, roll) + np.array(center)).astype(np.float32), hue, radius)
 
-def dense_points(R, flare=True, seed=2026):
+def dense_points(R, flare=False, seed=2026):
     """The dense ball's grains (relative to its centre, real scale): filament sand packed into the volume, plus the
     flare spray. Shared by dense_ball and the 2.2 attempts, so the attempts are the same ball, grain for grain."""
     full = 50_000 if args.preview else 520_000
@@ -1159,7 +1159,7 @@ _FIL_CACHE = {}
 def _attempt_on_dense(center, R, lo, hi, seed, toward, breakup, depth, roll):
     key = ("dense", R, seed, args.preview)
     if key not in _FIL_CACHE:
-        _FIL_CACHE[key] = dense_points(R, True, seed)
+        _FIL_CACHE[key] = dense_points(R, False, seed)
     pts, hue, radius = _FIL_CACHE[key]
     pts = roll_x(pts, roll).astype(np.float64) / R          # unit ball, world orientation
     r = np.linalg.norm(pts, axis=1)
@@ -1759,7 +1759,6 @@ def build_export():
     """Writes the live sand's data (build step 2) from the same functions as the renders, to args.out:
       sand.bin    per grain, shuffled so any prefix is an even sample (a lower tier draws a prefix):
                   chaos position, ball position (uint16 in the bounds box), chaos hue, ball hue, radius, delay (uint8)
-      flare.bin   the dense ball's flare streamers: root direction, extended position, hue, radius, stream, t
       vol_*.bin   uint8 density volumes (chaos, halfway, ball) for the light march: optical depth per cell
       sand.json   counts, bounds, scales, camera, lights, colour ramp, version
     Blender is z up; three.js is y up: (x, y, z) -> (x, z, -y)."""
@@ -1815,16 +1814,6 @@ def build_export():
     nib = lambda r: np.clip(np.round(r / rmax * 15), 1, 15).astype(np.uint8)
     attr = np.stack([u8(hue_a), u8(hue_b), (nib(rad_a) << 4) | nib(rad_b), u8(delay)], axis=1)
     sizes["sand.bin"] = write("sand.bin", pos, attr)
-    # flares: the dense ball's streamers, unit-ball space (the shader scales by the ball radius)
-    p_all, h_all, r_all = dense_points(1.0, flare=True, seed=2026)
-    p_nof, _, _ = dense_points(1.0, flare=False, seed=2026)
-    fp, fh, fr = p_all[len(p_nof):], h_all[len(p_nof):], r_all[len(p_nof):]
-    fd = fp / np.maximum(np.linalg.norm(fp, axis=1, keepdims=True), 1e-9)
-    ext = np.clip(np.linalg.norm(fp, axis=1) - 1.0, 0, None)                     # how far out along its stream
-    tnorm = ext / max(ext.max(), 1e-6)
-    F = to3(fp); D = to3(fd)
-    sizes["flare.bin"] = write("flare.bin", F.astype(np.float32), D.astype(np.float32),
-                               np.stack([u8(fh), u8(fr / max(fr.max(), 1e-9)), u8(tnorm), np.zeros(len(fp), np.uint8)], axis=1))
     # density volumes: optical depth from grain cross-sections, in the bounds box
     VR = (128, 96, 96)
     cell = (hi - lo) / np.array(VR)
@@ -1851,9 +1840,8 @@ def build_export():
     lights = [dict(name="key", pos=c3((-4.0, -7.0, 4.0)), size=3.5, watts=1900, color=[1.0, 0.82, 0.68]),
               dict(name="rim", pos=c3((1.5, 6.5, 2.5)), size=2.0, watts=1500, color=list(ROSE_SOFT[:3])),
               dict(name="fill", pos=c3((3.5, -4.0, -1.0)), size=4.0, watts=80, color=[0.72, 0.78, 0.95])]
-    meta = dict(version=2, count=N, bounds=[lo.tolist(), hi.tolist()], radius_max=rmax,
+    meta = dict(version=3, count=N, bounds=[lo.tolist(), hi.tolist()], radius_max=rmax,
                 ball=dict(center=c3(HERO_C), radius=HERO_R),
-                flare=dict(count=len(fp), radius_max=float(fr.max()), ext_max=float(ext.max())),
                 volume=dict(res=list(VR), sigma_max=float(smax), encoding="sqrt"),
                 camera=dict(position=c3(cam_b[0]), target=c3(cam_b[1]), lens_mm=45, sensor_mm=36, fit="horizontal",
                             focus_m=9.3, fstop=11, render=[1600, 1000]),

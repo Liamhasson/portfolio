@@ -7,7 +7,6 @@ export interface SandMeta {
   bounds: [[number, number, number], [number, number, number]];
   radius_max: number;
   ball: { center: [number, number, number]; radius: number };
-  flare: { count: number; radius_max: number; ext_max: number };
   volume: { res: [number, number, number]; sigma_max: number; encoding: "sqrt" };
   camera: {
     position: [number, number, number];
@@ -32,8 +31,6 @@ export interface SandData {
   /** Per grain: chaos hue, ball hue, radius (of radius_max), compaction delay; uint8 normalised. */
   attributes: Uint8Array;
   volumes: { chaos: THREE.Data3DTexture; mid: THREE.Data3DTexture; ball: THREE.Data3DTexture };
-  /** The dense ball's flare streamers: extended position and root direction (unit ball), hue/radius/along (uint8). */
-  flare: { extended: Float32Array; root: Float32Array; attributes: Uint8Array };
 }
 
 export const SAND_BASE = "/lab/sand";
@@ -58,11 +55,10 @@ function volumeTexture(data: Uint8Array, [w, h, d]: [number, number, number]): T
 
 export async function loadSand(base = SAND_BASE): Promise<SandData> {
   const meta = (await (await fetch(`${base}/sand.json`)).json()) as SandMeta;
-  const [sand, chaos, mid, ball, flare] = await Promise.all(
-    ["sand.bin", "vol_chaos.bin", "vol_mid.bin", "vol_ball.bin", "flare.bin"].map((f) => bytes(`${base}/${f}`)),
+  const [sand, chaos, mid, ball] = await Promise.all(
+    ["sand.bin", "vol_chaos.bin", "vol_mid.bin", "vol_ball.bin"].map((f) => bytes(`${base}/${f}`)),
   );
   const n = meta.count;
-  const fn = meta.flare.count;
   return {
     meta,
     positions: new Uint16Array(sand, 0, n * 6),
@@ -71,11 +67,6 @@ export async function loadSand(base = SAND_BASE): Promise<SandData> {
       chaos: volumeTexture(new Uint8Array(chaos), meta.volume.res),
       mid: volumeTexture(new Uint8Array(mid), meta.volume.res),
       ball: volumeTexture(new Uint8Array(ball), meta.volume.res),
-    },
-    flare: {
-      extended: new Float32Array(flare, 0, fn * 3),
-      root: new Float32Array(flare, fn * 12, fn * 3),
-      attributes: new Uint8Array(flare, fn * 24, fn * 4),
     },
   };
 }
