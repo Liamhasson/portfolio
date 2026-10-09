@@ -1266,7 +1266,7 @@ git commit -m "test: e2e for the case-study frame and loop" -- e2e/case-studies.
 
 ### Task 9: Eventread calendar capture
 
-The hero shows the month calendar from the live app. The live app's month URL takes `range=month` and `date=YYYY-MM`; the Berlin place parameters match its own example link.
+The hero shows the month calendar from the live app. The live app's month URL takes `range=month` and `date=YYYY-MM-01` (a bare `YYYY-MM` crashes the results page); the Berlin place parameters match its own example link.
 
 **Files:** Create `scripts/capture/eventread-calendar.mjs`. Output: `public/case-studies/eventread/calendar-berlin-2026-11.png`.
 
@@ -1286,7 +1286,7 @@ const params = new URLSearchParams({
   placeId: "hero-berlin",
   lat: "52.52",
   lon: "13.405",
-  date: "2026-11",
+  date: "2026-11-01",
   range: "month",
   genre: "Rock",
   capacity: "1000",
