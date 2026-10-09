@@ -5,9 +5,10 @@ import type { SandMeta } from "./data";
  * LIAM HASSON behind the sand: heavy Geist letters as dark outlines in the void, light travelling through their strokes
  * (reference: the outlined titles on lusion.co/about). Approved by Liam 2026-10-09: heavy weight, dark fill, light on the
  * stroke paths, the sand's own colours (not Lusion's RGB), and both kinds of light:
- *   - an ambient light that spreads through the strokes like water from a different spot each time, fills the letters
- *     it reaches and slowly ebbs, its edge bent by flowing noise (Liam 2026-10-09: "spreading and taking over the
- *     characters slowly and gradually, like a wave, not a scan"); alive on every device, phones included,
+ *   - an ambient wave of light that spreads through the strokes from a different spot each time: it comes in, takes
+ *     over the letters it reaches, and moves on, leaving them dark behind it; both edges soft and bent by flowing noise
+ *     (Liam 2026-10-09: "comes in, takes over the letters, and then waves out", "like a wave, not a scan"); alive on
+ *     every device, phones included,
  *   - the cursor's drift field lighting the strokes along its trail (Lusion's model), fading in about half a second.
  * One deliberate exception to the type rules (no weights above 500): this is a lit object in the scene, not text.
  *
@@ -24,9 +25,8 @@ export const WORDMARK = {
   strokePx: 0.6, // half-width of the outline, in screen pixels
   base: 0.14, // how visible the dark outline is at rest (Lusion: faint, never gone)
   waveCycle: 15, // seconds from one wave's start to the next
-  waveSpread: 10, // seconds for a wave to spread across the name (fast at first, slowing as it reaches further)
-  waveHold: 1.5, // seconds fully spread before it ebbs
-  waveEbb: 5, // seconds to fade back to the dark outline
+  waveTravel: 11, // seconds for the wave to come in, pass over every letter, and leave
+  waveBand: 1.9, // how wide the lit band is (name heights): each letter stays lit ~3s as it passes
   waveGain: 1.1,
   cursorGain: 1.6,
 };
@@ -133,7 +133,8 @@ uniform vec2 uTexSize;
 uniform float uStrokePx;
 uniform float uBase;
 uniform vec2 uWaveO;         // where this wave starts (uv)
-uniform float uWaveR;        // how far it has spread (name heights)
+uniform float uWaveR;        // how far its front has spread (name heights)
+uniform float uWaveBand;     // how far behind the front the light has already moved on
 uniform float uWaveFade;     // 1 while spreading, ebbing to 0
 uniform float uWaveGain;
 uniform float uTime;
@@ -174,8 +175,10 @@ void main() {
   vec2 o = vec2(uWaveO.x * uAspect, uWaveO.y);
   float warp = (fbm(p * 0.9 + vec2(uTime * 0.05, -uTime * 0.03)) - 0.5) * 1.6;
   float d = length(p - o) + warp;                              // name heights, uneven
-  float inside = 1.0 - smoothstep(uWaveR - 0.9, uWaveR + 0.15, d);   // a wide, soft edge
-  float front = exp(-pow((d - uWaveR + 0.25) / 0.45, 2.0)) * 0.5;    // a little brighter where it is arriving
+  float arrived = 1.0 - smoothstep(uWaveR - 0.8, uWaveR + 0.15, d);              // the front: soft, arriving
+  float stayed = smoothstep(uWaveR - uWaveBand - 1.1, uWaveR - uWaveBand + 0.2, d);   // the back: softer, ebbing
+  float inside = arrived * stayed;
+  float front = exp(-pow((d - uWaveR + 0.3) / 0.45, 2.0)) * 0.45 * stayed;   // a little brighter where it arrives
   // the light inside flows and breathes along the strokes
   float flow = 0.12 + 0.88 * smoothstep(0.3, 0.72, fbm(p * 2.8 + vec2(-uTime * 0.16, uTime * 0.1)));
   float wave = (inside * flow + front) * uWaveFade * uWaveGain;
@@ -223,7 +226,8 @@ export class Wordmark {
         uStrokePx: { value: WORDMARK.strokePx },
         uBase: { value: WORDMARK.base },
         uWaveO: { value: new THREE.Vector2(0.52, 0.45) },   // the first wave spreads from the middle, both ways
-        uWaveR: { value: 0 },
+        uWaveR: { value: -10 },
+        uWaveBand: { value: WORDMARK.waveBand },
         uWaveFade: { value: 0 },
         uTime: { value: 0 },
         uAspect: { value: w / h },
@@ -263,13 +267,13 @@ export class Wordmark {
       t = 0;
     }
     const aspect = u.uAspect.value as number;
-    const reach = aspect * 0.95 + 1.0;   // far enough to cover the whole name from any start, plus the warp
-    const x = Math.min(t / WORDMARK.waveSpread, 1);
-    u.uWaveR.value = t < 0 ? -1 : reach * (1 - Math.pow(1 - x, 1.6));   // fast at first, slowing as it reaches further
-    const ebbAt = WORDMARK.waveSpread + WORDMARK.waveHold;
-    const e = Math.min(Math.max((t - ebbAt) / WORDMARK.waveEbb, 0), 1);
-    const rise = Math.min(Math.max(t, 0) / 1.2, 1);
-    u.uWaveFade.value = rise * rise * (3 - 2 * rise) * (1 - e * e * (3 - 2 * e));
+    // the front travels far enough that the back edge also clears the whole name from any start
+    const reach = aspect * 0.95 + WORDMARK.waveBand + 1.6;
+    const x = Math.min(Math.max(t, 0) / WORDMARK.waveTravel, 1);
+    const eased = x < 0 ? 0 : 1 - Math.pow(1 - x, 1.35);      // a touch faster as it comes in, easing as it leaves
+    u.uWaveR.value = t < 0 ? -10 : -0.4 + (reach + 0.4) * eased;
+    const rise = Math.min(Math.max(t, 0) / 1.0, 1);
+    u.uWaveFade.value = rise * rise * (3 - 2 * rise);
   }
 
   dispose(): void {
