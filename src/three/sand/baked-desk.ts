@@ -3,6 +3,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { EXRLoader } from "three/addons/loaders/EXRLoader.js";
 import { RectAreaLightUniformsLib } from "three/addons/lights/RectAreaLightUniformsLib.js";
 import { REVEAL, type RevealFrame } from "./screen-reveal";
+import type { GlassLights } from "./glass-ball";
 
 /**
  * The desk as a real 3D object (lookdev.py --scene bakedesk), drawn the way Cycles drew the plates:
@@ -173,6 +174,9 @@ const VIEW = {
   uScrGain: { value: 0 },
   uShBall: { value: new THREE.Vector3() }, uShBallR: { value: 1 },
   uShLamp: { value: new THREE.Vector3() }, uShLampR: { value: 1 }, uShK: { value: 0 },
+  uShAO: { value: 0 },   // the ball's occlusion of the rest of the light (its contact shadow), strength
+  uShR: { value: 0 },    // how dark the ball reads in a reflection (the glass mirrors the bright room: little)
+  uShL: { value: 0 },    // how much of the panels' light it blocks (sand: as the lamp; glass: little, it focuses them through)
   uLidDebug: { value: 0 },   // lab: 1 draws what the lid blocks (red)
 };
 
@@ -202,14 +206,18 @@ float lidPass(vec3 P, vec3 L, float soft) {
   return 1.0 - smoothstep(-spread, spread, inside);
 }
 `;
-/** three's light loop, each light shadowed by the lid (the spot and point lights soft by the lamp's 0.2 m). */
-const LIGHTS_BEGIN_LID = THREE.ShaderChunk.lights_fragment_begin
-  .replace("getPointLightInfo( pointLight, geometryPosition, directLight );",
-    "getPointLightInfo( pointLight, geometryPosition, directLight );\n\t\tdirectLight.color *= lidPass( geometryPosition, pointLight.position, 2.0 );")
-  .replace("getSpotLightInfo( spotLight, geometryPosition, directLight );",
-    "getSpotLightInfo( spotLight, geometryPosition, directLight );\n\t\tdirectLight.color *= lidPass( geometryPosition, spotLight.position, 2.0 );")
-  .replace("rectAreaLight = rectAreaLights[ i ];",
-    "rectAreaLight = rectAreaLights[ i ];\n\t\trectAreaLight.color *= lidPass( geometryPosition, rectAreaLight.position, length( rectAreaLight.halfWidth ) );");
+/**
+ * three's light loop, each light shadowed by what stands in its way (occPass: the lid, the ball); the spot and point
+ * lights soft by the lamp's 0.2 m, the panels by their own size.
+ */
+const LIGHTS_BEGIN_OCC = [
+  [/getPointLightInfo\( pointLight, geometryPosition, directLight \);/,
+    "getPointLightInfo( pointLight, geometryPosition, directLight );\n\t\tdirectLight.color *= occPass( geometryPosition, pointLight.position, 2.0, uShK );"],
+  [/getSpotLightInfo\( spotLight, geometryPosition, directLight \);/,
+    "getSpotLightInfo( spotLight, geometryPosition, directLight );\n\t\tdirectLight.color *= occPass( geometryPosition, spotLight.position, 2.0, uShK );"],
+  [/rectAreaLight = rectAreaLights\[ i \];/,
+    "rectAreaLight = rectAreaLights[ i ];\n\t\trectAreaLight.color *= occPass( geometryPosition, rectAreaLight.position, length( rectAreaLight.halfWidth ), uShL );"],
+].reduce((src, [re, to]) => patchChunk(src, re as RegExp, to as string), THREE.ShaderChunk.lights_fragment_begin);
 
 function withLidOcclusion(material: THREE.Material): void {
   tagShader(material, "lid");
@@ -218,10 +226,10 @@ function withLidOcclusion(material: THREE.Material): void {
     prev.call(material, shader, renderer);
     Object.assign(shader.uniforms, VIEW);
     shader.fragmentShader =
-      "uniform vec3 uLidO;\nuniform vec3 uLidU;\nuniform vec3 uLidV;\nuniform float uLidDebug;\n" +
+      "#define LID_OCC\nuniform vec3 uLidO;\nuniform vec3 uLidU;\nuniform vec3 uLidV;\nuniform float uLidDebug;\n" +
       "uniform vec3 uScrO;\nuniform vec3 uScrU;\nuniform vec3 uScrV;\nuniform vec3 uScrN;\nuniform sampler2D uScrTex;\nuniform float uScrGain;\n" +
       LID_PASS +
-      shader.fragmentShader.replace("#include <lights_fragment_begin>", LIGHTS_BEGIN_LID).replace(
+      shader.fragmentShader.replace(
         "#include <aomap_fragment>",
         `{
           vec3 P = -vViewPosition;
@@ -277,10 +285,40 @@ function withLidOcclusion(material: THREE.Material): void {
   };
 }
 
+const DISC_COVER = /* glsl */ `
+// the share of a light's disc (angular radius rL, direction toL) that a ball's disc (rB, toB) hides: the exact overlap
+float discCover(vec3 toB, vec3 toL, float rB, float rL) {
+  float dB = length(toB), dL = length(toL);
+  if (dB >= dL) return 0.0;
+  float r1 = asin(clamp(rB / dB, 0.0, 1.0)), r2 = max(asin(clamp(rL / dL, 0.0, 1.0)), 1e-3);
+  float d = acos(clamp(dot(toB / dB, toL / dL), -1.0, 1.0));
+  if (d >= r1 + r2) return 0.0;
+  if (d <= abs(r1 - r2)) return min(r1 * r1, r2 * r2) / (r2 * r2);
+  float c1 = clamp((d * d + r1 * r1 - r2 * r2) / (2.0 * d * r1), -1.0, 1.0);
+  float c2 = clamp((d * d + r2 * r2 - r1 * r1) / (2.0 * d * r2), -1.0, 1.0);
+  float area = r1 * r1 * acos(c1) + r2 * r2 * acos(c2)
+    - 0.5 * sqrt(max((-d + r1 + r2) * (d + r1 - r2) * (d - r1 + r2) * (d + r1 + r2), 0.0));
+  return area / (3.14159265 * r2 * r2);
+}
+`;
+const OCC_PASS = /* glsl */ `
+// how much of a light at L (radius soft) reaches P past the lid and the ball (the ball blocking that share of it)
+float occPass(vec3 P, vec3 L, float soft, float ball) {
+  float k = 1.0;
+  #ifdef LID_OCC
+  k *= lidPass(P, L, soft);
+  #endif
+  if (ball > 0.0) k *= 1.0 - ball * discCover(uShBall - P, L - P, uShBallR, soft);
+  return k;
+}
+`;
+
 /**
- * The ball's shadow, on whatever the lamp lights: for each point, the share of the lamp's disc the ball's disc hides (the
- * exact overlap of two discs, so it is as soft as Cycles' and falls where its does), taking that share of the lamp's
- * part of the baked light away. Surfaces facing away from the lamp are left alone.
+ * The ball's shadow, on whatever the lights reach: for each point and each light, the share of the light's disc the
+ * ball's disc hides (the exact overlap of two discs, so it is as soft as Cycles' and falls where its does). The lamp's
+ * part of the baked light loses that share; each live light (the sheen, the reflections) loses it too; the reflection
+ * ray is blocked where it meets the ball; and the rest of the room's light loses the share of the sky the ball takes
+ * (its contact shadow). Surfaces facing away from the lamp keep its baked light.
  */
 function withBallShadow(material: THREE.Material): void {
   tagShader(material, "shadow");
@@ -289,29 +327,41 @@ function withBallShadow(material: THREE.Material): void {
     prev.call(material, shader, renderer);
     Object.assign(shader.uniforms, VIEW);
     shader.fragmentShader =
-      "uniform vec3 uShBall;\nuniform float uShBallR;\nuniform vec3 uShLamp;\nuniform float uShLampR;\nuniform float uShK;\n" +
-      shader.fragmentShader.replace(
+      "uniform vec3 uShBall;\nuniform float uShBallR;\nuniform vec3 uShLamp;\nuniform float uShLampR;\nuniform float uShK;\nuniform float uShAO;\nuniform float uShR;\nuniform float uShL;\n" +
+      DISC_COVER +
+      shader.fragmentShader
+        .replace("void main() {", OCC_PASS + "void main() {")
+        .replace("#include <lights_fragment_begin>", LIGHTS_BEGIN_OCC)
+        .replace(
+          "#include <aomap_fragment>",
+          `if (uShK > 0.0) {
+            // the reflection ray meeting the ball (its edge as soft as the lobe is wide there)
+            vec3 P = -vViewPosition;
+            vec3 R = reflect(-normalize(vViewPosition), normal);
+            vec3 oc = P - uShBall;
+            float b = dot(oc, R);
+            if (b < 0.0) {
+              float miss = sqrt(max(dot(oc, oc) - b * b, 0.0));
+              float spread = -b * max(material.roughness * material.roughness * 1.2, 0.02);
+              float cover = 1.0 - smoothstep(uShBallR - spread, uShBallR + spread, miss);
+              reflectedLight.indirectSpecular *= 1.0 - uShR * cover;
+            }
+          }
+          #include <aomap_fragment>`,
+        )
+        .replace(
         "#include <lights_physical_fragment>",
         `if (uShK > 0.0) {
           vec3 P = -vViewPosition;
-          vec3 toB = uShBall - P, toL = uShLamp - P;
-          float dB = length(toB), dL = length(toL);
-          float facing = smoothstep(0.0, 0.2, dot(normal, toL / dL));
-          if (dB < dL && facing > 0.0) {
-            float r1 = asin(clamp(uShBallR / dB, 0.0, 1.0)), r2 = asin(clamp(uShLampR / dL, 0.0, 1.0));
-            float d = acos(clamp(dot(toB / dB, toL / dL), -1.0, 1.0));
-            float cover;
-            if (d >= r1 + r2) cover = 0.0;
-            else if (d <= abs(r1 - r2)) cover = min(r1 * r1, r2 * r2) / (r2 * r2);
-            else {
-              float c1 = clamp((d * d + r1 * r1 - r2 * r2) / (2.0 * d * r1), -1.0, 1.0);
-              float c2 = clamp((d * d + r2 * r2 - r1 * r1) / (2.0 * d * r2), -1.0, 1.0);
-              float area = r1 * r1 * acos(c1) + r2 * r2 * acos(c2)
-                - 0.5 * sqrt(max((-d + r1 + r2) * (d + r1 - r2) * (d - r1 + r2) * (d + r1 + r2), 0.0));
-              cover = area / (3.14159265 * r2 * r2);
-            }
-            totalEmissiveRadiance *= 1.0 - uShK * cover * facing;
-          }
+          vec3 toL = uShLamp - P;
+          float facing = smoothstep(0.0, 0.2, dot(normal, normalize(toL)));
+          totalEmissiveRadiance *= 1.0 - uShK * discCover(uShBall - P, toL, uShBallR, uShLampR) * facing;
+          // and the rest of the light (the room, the bounce): the share of the sky the ball takes, cosine-weighted
+          // ((R/d)^2 cos for a sphere above the horizon); right under a resting ball it closes to a contact shadow
+          vec3 toC = uShBall - P;
+          float dC = max(length(toC), uShBallR);
+          float occ = (uShBallR * uShBallR) / (dC * dC) * clamp(dot(normal, toC / dC), 0.0, 1.0);
+          totalEmissiveRadiance *= 1.0 - uShAO * occ;
         }
         #include <lights_physical_fragment>`,
       );
@@ -432,7 +482,36 @@ function fitScreen(mesh: THREE.Mesh): THREE.Vector3[] {
 export class BakedDesk {
   readonly group = new THREE.Group();
   readonly materials: THREE.MeshPhysicalMaterial[] = [];
-  readonly lights: { name: string; light: THREE.SpotLight | THREE.RectAreaLight | THREE.PointLight; base: number; follows?: string }[] = [];
+  readonly lights: { name: string; light: THREE.SpotLight | THREE.RectAreaLight | THREE.PointLight; base: number; follows?: string; watts: number; radius: number }[] = [];
+  /** For the glass: the room unfiltered (equirectangular, scene-linear), the view transform and its grey-axis inverse. */
+  env: THREE.DataTexture | null = null;
+  lut: THREE.Data3DTexture | null = null;
+  invLut: THREE.DataTexture | null = null;
+  /** Hero units per metre. */
+  heroPerMetre = 10;
+
+  /** The lights as the glass sees them (it shows them in reflection and through it): the lamp as its sphere, the
+   *  panels as rectangles, each at its radiance now. */
+  glassLights(): GlassLights {
+    this.group.updateMatrixWorld(true);
+    const lamp = this.lights.find((l) => l.name === "lamp")!;
+    const r = lamp.radius;                                        // metres
+    const lampRad = new THREE.Vector3(lamp.light.color.r, lamp.light.color.g, lamp.light.color.b)
+      .multiplyScalar(lamp.watts / (4 * Math.PI * Math.PI * r * r));   // a sphere light's radiance
+    const q = new THREE.Quaternion();
+    const rects = this.lights.filter((l) => l.light instanceof THREE.RectAreaLight).map((l) => {
+      const light = l.light as THREE.RectAreaLight;
+      light.getWorldQuaternion(q);
+      return {
+        center: light.getWorldPosition(new THREE.Vector3()),
+        halfU: new THREE.Vector3(1, 0, 0).applyQuaternion(q).multiplyScalar(light.width / 2),
+        halfV: new THREE.Vector3(0, 1, 0).applyQuaternion(q).multiplyScalar(light.height / 2),
+        dir: new THREE.Vector3(0, 0, -1).applyQuaternion(q),
+        radiance: new THREE.Vector3(light.color.r, light.color.g, light.color.b).multiplyScalar(light.intensity),
+      };
+    });
+    return { lamp: { pos: lamp.light.getWorldPosition(new THREE.Vector3()), radius: r * this.heroPerMetre, radiance: lampRad }, rects };
+  }
   screen: { material: THREE.MeshPhysicalMaterial; emission: number; reveal: Record<string, THREE.IUniform> } | null = null;
   /** The lid on its hinge; its rectangle and the screen's, as corners (origin, along U, along V) in the pivot's frame. */
   private lid: { pivot: THREE.Object3D; q0: THREE.Quaternion; bakedDeg: number; corners: THREE.Vector3[]; screen: THREE.Vector3[] | null } | null = null;
@@ -470,10 +549,12 @@ export class BakedDesk {
 
   /** The ball's shadow on the desk and the laptop: ball centre and radius, lamp centre and radius (the hero's units),
    *  and the lamp's share of the light where it falls (0 for none). */
-  setBallShadow(ball: THREE.Vector3, ballR: number, lamp: THREE.Vector3, lampR: number, k: number): void {
+  setBallShadow(ball: THREE.Vector3, ballR: number, lamp: THREE.Vector3, lampR: number, k: number, ao = 0, reflect = k, lights = k): void {
+    VIEW.uShR.value = reflect;
+    VIEW.uShL.value = lights;
     const sh = this.shadow;
     sh.ball.copy(ball); sh.lamp.copy(lamp); sh.ballR = ballR; sh.lampR = lampR; sh.k = k;
-    VIEW.uShBallR.value = ballR; VIEW.uShLampR.value = lampR; VIEW.uShK.value = k;
+    VIEW.uShBallR.value = ballR; VIEW.uShLampR.value = lampR; VIEW.uShK.value = k; VIEW.uShAO.value = ao;
     this.viewStamp = -1;
   }
 
@@ -540,13 +621,29 @@ export class BakedDesk {
     lut.minFilter = lut.magFilter = THREE.LinearFilter;
     lut.wrapS = lut.wrapT = lut.wrapR = THREE.ClampToEdgeWrapping;
     lut.needsUpdate = true;
+    // its grey axis inverted (display -> scene-linear), for the glass reading what the desk drew
+    const grey: number[] = [];
+    for (let i = 0; i < LUT_N; i++) {
+      const o = ((i * LUT_N + i) * LUT_N + i) * 3;
+      grey.push((rgb[o] + rgb[o + 1] + rgb[o + 2]) / (3 * 255));
+    }
+    const inv = new Float32Array(256);
+    for (let j = 0; j < 256; j++) {
+      const dv = j / 255;
+      let i = 0;
+      while (i < LUT_N - 2 && grey[i + 1] < dv) i++;
+      const f = Math.min(Math.max((dv - grey[i]) / Math.max(grey[i + 1] - grey[i], 1e-6), 0), 1);
+      const x = (i + f) / (LUT_N - 1);
+      inv[j] = 2 ** (LUT_MIN + x * (LUT_MAX - LUT_MIN));
+    }
+    const invLut = new THREE.DataTexture(inv, 256, 1, THREE.RedFormat, THREE.FloatType);
+    invLut.minFilter = invLut.magFilter = THREE.LinearFilter;
+    invLut.needsUpdate = true;
 
     const pmrem = new THREE.PMREMGenerator(renderer);
     const prefilter = (t: THREE.DataTexture) => {
       t.mapping = THREE.EquirectangularReflectionMapping;
-      const out = pmrem.fromEquirectangular(t).texture;
-      t.dispose();
-      return out;
+      return pmrem.fromEquirectangular(t).texture;   // the source stays: the glass reflects the room sharp
     };
     const envMap = prefilter(probe);
     pmrem.dispose();
@@ -554,6 +651,7 @@ export class BakedDesk {
     const sanitize = (n: string) => THREE.PropertyBinding.sanitizeNodeName(n);
     const metaByNode = new Map(Object.entries(meta.materials).map(([k, v]) => [sanitize(k), v]));
     const d = new BakedDesk();
+    d.env = probe; d.lut = lut; d.invLut = invLut; d.heroPerMetre = 1 / meta.chaos_scale;
     const pending: Promise<void>[] = [];
     gltf.scene.traverse((o) => {
       const mesh = o as THREE.Mesh;
@@ -658,7 +756,7 @@ export class BakedDesk {
           if (L.up) light.up.copy(toY(L.up));
           light.lookAt(pos.clone().add(dir));
           d.group.add(light);
-          d.lights.push({ name, light, base, follows: L.follows });
+          d.lights.push({ name, light, base, follows: L.follows, watts: L.watts, radius: L.radius });
         } else {
           const base = L.watts / (4 * Math.PI) / (k * k);
           const light = L.type === "SPOT"
@@ -670,7 +768,7 @@ export class BakedDesk {
             d.group.add(light.target);
           }
           d.group.add(light);
-          d.lights.push({ name, light, base, follows: L.follows });
+          d.lights.push({ name, light, base, follows: L.follows, watts: L.watts, radius: L.radius });
         }
       }
     }

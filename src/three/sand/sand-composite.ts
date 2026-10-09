@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { GLASS_LAYER, type GlassBall } from "./glass-ball";
 
 /**
  * The sand as Cycles sees it: drawn into its own multisampled layer in linear light (no tone mapping yet), softened by
@@ -46,8 +47,25 @@ void main() {
 }
 `;
 
+const COPY_FRAGMENT = /* glsl */ `
+precision highp float;
+out highp vec4 pc_fragColor;
+#define gl_FragColor pc_fragColor
+in vec2 vUv;
+uniform sampler2D uTex;
+void main() { gl_FragColor = vec4(texture(uTex, vUv).rgb, 1.0); }
+`;
+
 export class SandComposite {
   private readonly rt: THREE.WebGLRenderTarget;
+  /** 2.3: the glass, drawn between the desk and the sand; it looks through the desk as drawn into `bg`. */
+  glass: GlassBall | null = null;
+  private bg: THREE.WebGLRenderTarget | null = null;
+  private readonly copyScene = new THREE.Scene();
+  private readonly copy = new THREE.ShaderMaterial({
+    glslVersion: THREE.GLSL3, vertexShader: VERTEX, fragmentShader: COPY_FRAGMENT,
+    depthTest: false, depthWrite: false, toneMapped: false, uniforms: { uTex: { value: null } },
+  });
   private readonly quad: THREE.Mesh;
   private readonly material: THREE.ShaderMaterial;
   private readonly scene = new THREE.Scene();
@@ -75,6 +93,21 @@ export class SandComposite {
     this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.material);
     this.quad.frustumCulled = false;
     this.scene.add(this.quad);
+    const copyQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.copy);
+    copyQuad.frustumCulled = false;
+    this.copyScene.add(copyQuad);
+  }
+
+  /** The desk drawn into a target with its depth (display values, as drawn), for the glass to look through. */
+  private background(size: THREE.Vector2): THREE.WebGLRenderTarget {
+    if (!this.bg || this.bg.width !== size.x || this.bg.height !== size.y) {
+      this.bg?.dispose();
+      const depth = new THREE.DepthTexture(size.x, size.y);
+      depth.type = THREE.FloatType;
+      this.bg = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.UnsignedByteType, samples: 4, depthBuffer: true, depthTexture: depth });
+      this.bg.texture.colorSpace = THREE.NoColorSpace;   // the desk writes display values already: stored as they are
+    }
+    return this.bg;
   }
 
   /** Renders the frame: the sand layer into its target, the rest to the screen, then the filtered sand over it. */
@@ -95,9 +128,24 @@ export class SandComposite {
     renderer.setClearColor(clear, clearA);
     camera.layers.mask = mask;
     camera.layers.disable(SAND_LAYER);
-    renderer.render(scene, camera);
-    camera.layers.mask = mask;
+    camera.layers.disable(GLASS_LAYER);
     const autoClear = renderer.autoClear;
+    if (this.glass?.visible) {
+      // the desk into its target (with depth), onto the screen as is, then the glass looking through it
+      const bg = this.background(size);
+      renderer.setRenderTarget(bg);
+      renderer.render(scene, camera);
+      renderer.setRenderTarget(null);
+      this.copy.uniforms.uTex.value = bg.texture;
+      renderer.render(this.copyScene, this.ortho);
+      this.glass.setBackground(bg.texture, bg.depthTexture!, size.x, size.y, camera as THREE.PerspectiveCamera);
+      camera.layers.set(GLASS_LAYER);
+      renderer.autoClear = false;
+      renderer.render(scene, camera);
+    } else {
+      renderer.render(scene, camera);
+    }
+    camera.layers.mask = mask;
     renderer.autoClear = false;
     renderer.render(this.scene, this.ortho);
     renderer.autoClear = autoClear;
@@ -105,6 +153,8 @@ export class SandComposite {
 
   dispose(): void {
     this.rt.dispose();
+    this.bg?.dispose();
+    this.copy.dispose();
     this.material.dispose();
     this.quad.geometry.dispose();
   }

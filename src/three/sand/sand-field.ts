@@ -107,6 +107,8 @@ export class SandField {
         uAttLo: { value: 1 },
         uAttBreak: { value: 0 },
         uAttDepth: { value: 0 },
+        uAttFull: { value: 0 },
+        uDrain: { value: 0 },
         uClearAlb: { value: new THREE.Vector3(0.58, 0.44, 0.36) },   // calibrated with the frost skin (frost-skin.ts)
         uBallRot: { value: this.ballRot },
         uChaosC: { value: this.chaosCentre() },
@@ -222,6 +224,14 @@ export class SandField {
   }
 
   /** 2.2: the current attempt (lo 1 = none; lower = a bigger patch), how broken, how clear; `up` faces the patch. */
+  /** 2.3 build: how far the held attempt's clearing has swept over the whole ball (0..1), and how far the cleared
+   *  grains have drained into the skin (0..1, gone at 1). */
+  setBuild(full: number, drain: number): void {
+    const u = this.material.uniforms;
+    u.uAttFull.value = full;
+    u.uDrain.value = drain;
+  }
+
   setAttempt(lo: number, breakup: number, depth: number, up?: THREE.Vector3): void {
     const u = this.material.uniforms;
     u.uAttLo.value = lo;

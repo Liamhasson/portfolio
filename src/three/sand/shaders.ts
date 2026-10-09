@@ -65,6 +65,7 @@ uniform vec3 uAttUp;
 uniform float uAttLo;        // 1 = no attempt; lower = a bigger patch
 uniform float uAttBreak;     // 0..1: the patch fractures into islands
 uniform float uAttDepth;     // 0..1: how clear its centre gets
+uniform float uAttFull;      // 2.3 build: 0..1, the held attempt's clearing sweeps on over the whole ball
 float attField(vec3 d) {
   float f = dot(d, uAttUp) + 0.22 * (0.5 * snoise(d * 1.7 + vec3(3.0, 0.0, 5.0)));
   f += uAttBreak * 0.55 * (0.5 * snoise(d * 4.2 + vec3(11.0, 2.0, 7.0)));
@@ -72,7 +73,10 @@ float attField(vec3 d) {
 }
 float attBand(vec3 d) {
   float rank = clamp(attField(d) * 0.5 + 0.5, 0.0, 1.0);
-  return clamp((rank - uAttLo) / max(1.01 - uAttLo, 1e-3), 0.0, 1.0);
+  float band = clamp((rank - uAttLo) / max(1.01 - uAttLo, 1e-3), 0.0, 1.0);
+  // the build: a front leaves the patch and runs down to the far side, everything behind it fully clear
+  float front = mix(uAttLo + 0.05, -0.35, uAttFull);
+  return uAttFull > 0.0 ? max(band, smoothstep(front, front + 0.3, rank)) : band;
 }
 `;
 
@@ -93,6 +97,7 @@ uniform float uCompact;      // 0 chaos .. 1 ball
 uniform float uDelaySpan;
 uniform float uRampLen;
 uniform vec3 uBallC;
+uniform float uDrain;        // 2.3 build: 0..1, the cleared grains drain into the skin (gone at 1)
 uniform vec3 uBallVolC;      // the ball the density volume was baked for (the hero's): retargeted balls map into it
 uniform float uBallVolS;     // volume units per world unit (hero radius / this ball's radius)
 uniform float uBallGrain;    // grain size scale for a retargeted ball (its radius / the hero's)
@@ -217,6 +222,11 @@ void main() {
     p = uBallC + dir * rr * uBallR;
     vClear = clear;
     attGrow = 1.0 + 0.7 * clear;
+    // the build: cleared grains sink into the skin one by one (each at its own moment), leaving glass
+    if (uDrain > 0.0) {
+      float when = 0.15 + 0.7 * hash(aPosB + 3.1) + 0.3 * (1.0 - clear);
+      attGrow *= 1.0 - smoothstep(when - 0.15, when, uDrain * 1.15);
+    }
   }
 
   // shadows: march in the volumes' own (unturned) frame, so shadows turn with the chaos and with the ball

@@ -12,6 +12,8 @@ import { FrostSkin } from "@/three/sand/frost-skin";
 import { attemptAt } from "@/three/sand/attempts";
 import { BakedDesk } from "@/three/sand/baked-desk";
 import { revealAt } from "@/three/sand/screen-reveal";
+import { GlassBall } from "@/three/sand/glass-ball";
+import { EXRLoader } from "three/addons/loaders/EXRLoader.js";
 import { SAND_ENCODE, SAND_LAYER, SandComposite } from "@/three/sand/sand-composite";
 import { Pullback } from "@/three/sand/pullback";
 import * as THREE from "three";
@@ -37,12 +39,13 @@ const TL = {
   leave21: [0.54, 0.6], rise: [0.56, 0.68], enter22: [0.64, 0.7],               // 2.1 -> 2.2
   attempts: [0.71, 0.97],                                                      // 2.2: three attempts
   leave22: [0.975, 1.03], descend: [0.99, 1.122], enter23: [1.09, 1.135],      // 2.2 -> 2.3: down to the side view
+  build: [1.15, 1.3], ship: [1.32, 1.38],                                      // 2.3: it turns to glass, then lands
 } as const;
 /**
  * The page's length. Progress is measured in units of the first 1600vh of scroll (the timeline above was laid out on
  * a 1700vh page), so each chapter added after it keeps the earlier ones' pace.
  */
-const PAGE_VH = 2000;
+const PAGE_VH = 2400;
 const PROGRESS_SCALE = (PAGE_VH - 100) / 1600;
 /**
  * The descend (lookdev.py deskmove --move descend, 100 frames): the scroll carries the camera to its arrival (frame 66,
@@ -52,6 +55,21 @@ const PROGRESS_SCALE = (PAGE_VH - 100) / 1600;
 const DESCEND = { arrive: 65, wake: 49, lid: [0.26, 0.6], open: [0.3, 0.66], openDeg: 108 } as const;
 /** The low view's fill (lookdev.py: area light, 0.9 m, 38 W), lighting the sand from the camera's side. */
 const SIDE_FILL = { pos: [1.35, -0.95, 0.45], watts: 38, color: [1.0, 0.86, 0.72], radius: 4.5 };
+/**
+ * 2.3 (production plan §2): build, then ship. Build: the held attempt's clearing sweeps on over the whole ball, the
+ * grains drain into the skin, the frost melts into glass, all while it hovers. Ship: only then it falls, like a real fall
+ * (height goes with the square of the scroll: constant scrolling is constant time), and the last millimetre is absorbed
+ * in a quick soft stop: glass on wood, no bounce. Scroll back and it lifts, loses its weight and turns back to sand.
+ */
+const BUILD = { sweep: [0, 0.4], drain: [0.42, 0.85], glassIn: [0.36, 0.42], melt: [0.4, 0.95] } as const;   // overlapped: never a plain frost ball
+const SHIP = { hover: 0.15, rest: 0.0705, contact: 0.9, settleM: 0.0012 } as const;   // metres (lookdev.py: the side view)
+/** Ship progress 0..1 -> how far down it has come, 0..1. */
+function fall(s: number): number {
+  const eps = SHIP.settleM / (SHIP.hover - SHIP.rest);
+  if (s <= SHIP.contact) { const u = s / SHIP.contact; return u * u * (1 - eps); }
+  const x = (s - SHIP.contact) / (1 - SHIP.contact) * 6;   // critically damped: the wood takes the last millimetre
+  return Math.min(1 - eps * (1 + x) * Math.exp(-x), 1);
+}
 /** smootherstep of t over [a, b] (Blender's ease in lookdev.py). */
 function ease(t: number, [a, b]: readonly [number, number]): number {
   const x = Math.min(Math.max((t - a) / (b - a), 0), 1);
@@ -165,6 +183,22 @@ export function SandLab() {
       const lidHold = Number(new URLSearchParams(window.location.search).get("lid") || NaN);   // ?lid=deg (calibration)
       const revealHold = Number(new URLSearchParams(window.location.search).get("reveal") || NaN);
       let fillGain = 1;
+      // 2.3: the finished glass, between the desk and the sand
+      const glass = desk3d && composite && desk3d.env && desk3d.lut && desk3d.invLut
+        ? new GlassBall(desk3d.env, desk3d.lut, desk3d.invLut, desk3d.glassLights(), desk3d.heroPerMetre) : null;
+      if (glass && composite) {
+        stage.scene.add(glass.mesh);
+        composite.glass = glass;
+        // what the glass sees from its own place, hovering and landed (lookdev.py PROBE_AT; the lights in them)
+        Promise.all(["hover", "land"].map((n) => new EXRLoader().loadAsync(`/lab/glass/probe-${n}.exr`)))
+          .then(([h, l]) => glass.setProbes(h, l))
+          .catch(() => {});   // without them it reads the desk's probe and draws the lights itself
+      }
+      // ?build=B / ?ship=S hold 2.3's beats (calibration)
+      const buildHold = Number(new URLSearchParams(window.location.search).get("build") || NaN);
+      const shipHold = Number(new URLSearchParams(window.location.search).get("ship") || NaN);
+      const glassLook = { shadow: 0.88, ao: 0.6, lampR: 2.0, reflect: 0.3, lights: 0.3, radius: 1.0 };
+      (window as unknown as { __glass?: (l: Partial<typeof glassLook>) => void }).__glass = (l) => Object.assign(glassLook, l);
       (window as unknown as { __fill?: (g: number) => void }).__fill = (g) => { fillGain = g; };
       (window as unknown as { __desk3d?: unknown }).__desk3d = desk3d;
       // 2.2: the frost skin that grows out of the sand inside each attempt
@@ -408,13 +442,38 @@ export function SandLab() {
             if (settle) settle.plate.visible = false;
             if (rise) rise.plate.visible = false;
           }
+          // 2.3: build, then ship
+          const b = Number.isFinite(buildHold) ? buildHold : Number.isFinite(shipHold) ? 1 : span(progressRef.current, TL.build);
+          const sp = Number.isFinite(shipHold) ? shipHold : span(progressRef.current, TL.ship);
+          const glassF = ease(b, BUILD.glassIn);
+          if (descend && glass) {
+            field!.setBuild(ease(b, BUILD.sweep), ease(b, BUILD.drain));
+            frost?.setDissolve(ease(b, BUILD.melt));
+            const end = descend.data.path[descend.data.frames - 1] as unknown as { ball: number[] };
+            const c = descend.toHero([end.ball[0], end.ball[1], SHIP.hover - (SHIP.hover - SHIP.rest) * fall(sp)]);
+            glass.update(c, 0.07 / descend.data.chaos_scale, glassF);
+            glass.probeMix = fall(sp);
+            if (glassF > 0) desk3d!.glassLights().rects.forEach((r, i) => glass.setRectRadiance(i, r.radiance));
+          }
           if (shadow && deskNow) {
             // the lamp's real size (0.2 m soft radius, 2 hero units) sets the softness; ~85% of the desk's light is the lamp
             const ballC = field!.material.uniforms.uBallC.value as THREE.Vector3;
-            const k = move !== pullback ? shadowK[1] * state.compact : 0;
-            const ballR = field!.material.uniforms.uBallR.value * shadowK[2];
+            let k = move !== pullback ? shadowK[1] * state.compact : 0;
+            let ballR = field!.material.uniforms.uBallR.value * shadowK[2];
+            let at = ballC, ao = 0, lampR = shadowK[0], refl = k, lit = k;
+            if (glass && glassF > 0) {
+              // the glass: a whole sphere (no sparse edge) that lets some of the lamp through, and its contact shadow
+              const gu = glass.material.uniforms;
+              at = gu.uC.value as THREE.Vector3;
+              ballR = THREE.MathUtils.lerp(ballR, gu.uR.value * glassLook.radius, glassF);
+              k = THREE.MathUtils.lerp(k, glassLook.shadow, glassF);
+              ao = glassLook.ao * glassF;
+              lampR = THREE.MathUtils.lerp(lampR, glassLook.lampR, glassF);
+              refl = THREE.MathUtils.lerp(refl, glassLook.reflect, glassF);
+              lit = THREE.MathUtils.lerp(lit, glassLook.lights, glassF);
+            }
             // on the 3D desk the shadow falls on whatever the lamp lights (the laptop too); on the plates, a plane
-            if (desk3d) { desk3d.setBallShadow(ballC, ballR, deskNow.lights[0].pos, shadowK[0], k); shadow.update(ballC, ballR, deskNow.lights[0].pos, shadowK[0], 0); }
+            if (desk3d) { desk3d.setBallShadow(at, ballR, deskNow.lights[0].pos, lampR, k, ao, refl, lit); shadow.update(at, ballR, deskNow.lights[0].pos, lampR, 0); }
             else shadow.update(ballC, ballR, deskNow.lights[0].pos, shadowK[0], k);
           }
           field!.setPointScale(stage!.bufferHeight, THREE.MathUtils.degToRad(stage!.camera.fov));

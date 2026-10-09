@@ -2018,6 +2018,10 @@ def build_deskmove():
     if move == "descend":
         MOVE_CTX["open"] = 108; MOVE_CTX["side_fill"] = True
         os.environ["ATTEMPT"] = "0.68,0,1"     # the third attempt, held (the last frame of the 2.2 clip)
+        # 2.3 references for the live glass (MOVE_FRAME=100 = the arrival view): DESCEND_BALL=glass swaps the ball for
+        # the finished glass, BALL1_Z sets where it ends (0.15 hovering, 0.0705 landed), NO_DOF renders it sharp
+        if os.environ.get("DESCEND_BALL") == "glass":
+            args.dstate = "glass"
     # DESKMOVE_PLATE=1: the backplate for the site: desk only (the ball is live), lens 1.5x wider, and the same rim light
     # as the settle plate (the plates meet edge to edge)
     plate = bool(os.environ.get("DESKMOVE_PLATE"))
@@ -2027,7 +2031,7 @@ def build_deskmove():
     build_desk()
     for o in [o for o in bpy.data.objects if o.type == "CAMERA"]:
         bpy.data.objects.remove(o)
-    if plate:
+    if plate or os.environ.get("DESCEND_BALL"):
         c_ = Vector(CHAOS_C)
         area_light("rim", tuple(c_ + Vector((0.18, 0.78, 0.3))), 0.24, 26.0, ROSE_SOFT, target=tuple(c_))
     R = 0.07
@@ -2071,7 +2075,7 @@ def build_deskmove():
     el0, el1 = min(el0, math.radians(89.9)), min(el1, math.radians(89.9))
     # ball path and the focus offset at each end (top view focuses between the ball and the lid)
     ball0 = Vector(MOVE_CTX["ball_c"])
-    ball1 = {"rise": Vector((0.0, 0.03, 0.2)), "descend": Vector((0.47, -0.14, 0.15)), "push": ball0}[move]
+    ball1 = {"rise": Vector((0.0, 0.03, 0.2)), "descend": Vector((0.47, -0.14, float(os.environ.get("BALL1_Z", "0.15")))), "push": ball0}[move]
     foff0, foff1 = {"rise": (0.0, 0.09), "descend": (0.09, 0.04), "push": (0.04, 0.0)}[move]
     # descend: the lid opens on the way down, the side fill rises, the screen wakes as the view settles
     if move == "descend":
@@ -2086,7 +2090,7 @@ def build_deskmove():
         iu.frame_duration = 51; iu.frame_start = WAKE; iu.frame_offset = 0; iu.use_auto_refresh = True
         emit = bpy.data.materials["display"].node_tree.nodes["Principled BSDF"].inputs["Emission Strength"]
         emit_s = emit.default_value   # off until the wake: the sequence has no frame before it (and the reveal starts on black)
-    cam_d = bpy.data.cameras.new("cam"); cam_d.sensor_width = 36; cam_d.dof.use_dof = True
+    cam_d = bpy.data.cameras.new("cam"); cam_d.sensor_width = 36; cam_d.dof.use_dof = not os.environ.get("NO_DOF")
     cam = bpy.data.objects.new("cam", cam_d); scene.collection.objects.link(cam); scene.camera = cam
     cam.rotation_mode = "QUATERNION"
     path = []
@@ -2147,6 +2151,43 @@ def build_deskmove():
     scene.frame_set(int(one or 1))
     if one:
         scene.frame_start = scene.frame_end = scene.frame_current
+    if os.environ.get("GLASS_ALONE"):
+        # diagnosis: the glass alone in the room's light (everything else hidden, the lights and the world kept)
+        keep = set(MOVE_CTX["ball"])
+        for o in bpy.data.objects:
+            if o.type == "MESH" and o not in keep:
+                o.hide_render = True
+            if o.type == "LIGHT" and os.environ.get("GLASS_ALONE") == "world":
+                o.hide_render = True
+            if o.type == "LIGHT" and os.environ.get("ONLY_LIGHT") and o.name.split(".")[0] != os.environ["ONLY_LIGHT"]:
+                o.hide_render = True
+        if os.environ.get("GLASS_ALONE") == "lights":
+            scene.world.node_tree.nodes["Background"].inputs["Strength"].default_value = 0.0
+    probe_at = os.environ.get("PROBE_AT")
+    if probe_at:
+        # the room as the glass sees it from where it is (2.3): a 360 from the ball's centre, the ball itself hidden, the
+        # lights and the reflection-only environment visible (refraction and reflection rays see both in Cycles)
+        for o in MOVE_CTX["ball"]:
+            o.hide_render = True
+        for o in bpy.data.objects:
+            if o.type == "LIGHT":
+                o.visible_camera = True
+        scene.world.cycles_visibility.camera = True
+        pc = bpy.data.cameras.new("glass_probe"); pc.type = "PANO"
+        try:
+            pc.panorama_type = "EQUIRECTANGULAR"
+        except Exception:
+            pc.cycles.panorama_type = "EQUIRECTANGULAR"
+        pr = bpy.data.objects.new("glass_probe", pc); scene.collection.objects.link(pr)
+        pr.location = tuple(float(v) for v in probe_at.split(","))
+        pr.rotation_euler = (math.pi / 2, 0, -math.pi / 2)   # as the desk's probe: the site reads both the same way
+        scene.camera = pr
+        render_settings(int(os.environ.get("PROBE_SAMPLES", "256")), 2048, 1024)
+        scene.render.image_settings.file_format = "OPEN_EXR"; scene.render.image_settings.color_depth = "16"
+        scene.render.filepath = os.path.join(args.out, os.environ.get("PROBE_NAME", "glass-probe") + ".exr")
+        bpy.ops.render.render(write_still=True)
+        print("WROTE", scene.render.filepath)
+        sys.exit(0)
 
 def attempt_keys():
     """2.2 "Then I test solutions": three attempts, scrubbed by scroll (144 frames = the station's scroll length).
@@ -2360,7 +2401,7 @@ if args.scene == "attempts":
         print("FRAME", f, lo, brk, dep, flush=True)
     sys.exit(0)
 if args.scene in ("pullback", "deskmove", "settle"):
-    name = (("pullback-plate" if os.environ.get("PULLBACK_PLATE") else "pullback") if args.scene == "pullback"
+    name = os.environ.get("MOVE_NAME") or (("pullback-plate" if os.environ.get("PULLBACK_PLATE") else "pullback") if args.scene == "pullback"
             else ("settle-plate" if os.environ.get("SETTLE_PLATE") else "settle") if args.scene == "settle"
             else (f"{args.move}-plate" if os.environ.get("DESKMOVE_PLATE") else f"deskmove-{args.move}"))
     if (os.environ.get("PULLBACK_PLATE") or os.environ.get("SETTLE_PLATE") or os.environ.get("DESKMOVE_PLATE")) and not args.preview:

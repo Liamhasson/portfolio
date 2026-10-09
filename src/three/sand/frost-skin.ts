@@ -97,9 +97,18 @@ uniform vec2 uAlpha;       // opacity: just formed, clear
 uniform float uSpecK;
 uniform vec3 uClearTint;   // the colour it clears toward (warm: the sand and desk show through the glass)
 uniform float uClearDark;  // clearing glass reads darker: it shows the ball's interior, not a lit surface
+uniform float uDissolve;   // 2.3 build: 0..1, the frost melts away in an uneven front, the glass beneath it
 void main() {
   float clear = vBand * uAttDepth;                     // linear across the skin (the grains use band^1.4)
   float exists = smoothstep(0.0, 0.3, vBand) * step(0.001, uAttDepth) * step(uAttLo, 0.999);
+  float melt = 0.0;   // 1 at the melting edge: a thin bright rim of frost, as at the edge of melting ice
+  if (uDissolve > 0.0) {
+    // where it melts first: noise over the ball, so the glass opens in pools that join, never a wipe
+    float n = 0.5 + 0.5 * snoise(vDir * 2.3 + vec3(1.7, 4.1, 2.9)) * 0.8 + 0.1 * snoise(vDir * 7.0);
+    float th = uDissolve * 1.25 - 0.1;
+    exists *= 1.0 - smoothstep(n - 0.02, n + 0.02, th);
+    melt = 1.0 - smoothstep(0.0, 0.07, n - th);
+  }
   if (exists < 0.01) discard;
   vec3 n = normalize(vDir);
   vec3 v = normalize(cameraPosition - vWorld);
@@ -123,6 +132,7 @@ void main() {
   float fres = pow(1.0 - max(dot(n, v), 0.0), 4.0);
   col += fres * 0.02 * tint;
   col *= uExposure * uOutScale * uFrostGain * mix(1.0, uClearDark, clear);
+  col = mix(col, col / max(mix(1.0, uClearDark, clear), 1e-3) * 1.6, melt);   // the rim: lit frost, not see-through
   // frost is nearly opaque; as it clears it lets the grains and the desk through
   float alpha = exists * mix(uAlpha.x, uAlpha.y, clear);
   gl_FragColor = vec4(col, alpha);
@@ -146,7 +156,8 @@ export class FrostSkin {
       toneMapped: true,
       uniforms: {
         uBallC: u.uBallC, uBallR: u.uBallR,
-        uAttUp: u.uAttUp, uAttLo: u.uAttLo, uAttBreak: u.uAttBreak, uAttDepth: u.uAttDepth,
+        uAttUp: u.uAttUp, uAttLo: u.uAttLo, uAttBreak: u.uAttBreak, uAttDepth: u.uAttDepth, uAttFull: u.uAttFull,
+        uDissolve: { value: 0 },
         uLightPos: u.uLightPos, uLightCol: u.uLightCol, uLightR2: u.uLightR2, uSpotDir: u.uSpotDir, uSpotCos: u.uSpotCos,
         uGroundCol: u.uGroundCol, uExposure: u.uExposure, uOutScale: u.uOutScale,
         // calibrated 2026-10-09 against the approved attempts clip (frames 24, 74, 144): brightness within 8%, warmth 0.04
@@ -161,6 +172,12 @@ export class FrostSkin {
     });
     this.mesh = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 48), this.material);
     this.mesh.frustumCulled = false;
+  }
+
+  /** 2.3 build: the frost melting into the glass, 0..1. */
+  setDissolve(v: number): void {
+    this.material.uniforms.uDissolve.value = v;
+    this.mesh.visible = v < 0.999;
   }
 
   /** Calibration: the frost's look (gain, tint, wrap, alpha [formed, clear], spec). */

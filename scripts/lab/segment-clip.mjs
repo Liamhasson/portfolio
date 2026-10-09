@@ -5,9 +5,8 @@ import { chromium, devices } from "playwright";
 import fs from "node:fs";
 const [dev = "desktop", from = "0.95", to = "1.1875", seconds = "9", hold = "4"] = process.argv.slice(2);
 const out = process.argv[7] ?? `test-results/hero/segment-${dev}.webm`;
-const PROGRESS_SCALE = (2000 - 100) / 1600;   // sand-lab.tsx PAGE_VH
 const dir = `test-results/hero/video-seg-${dev}`; fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir, { recursive: true });
-const size = dev === "phone" ? { width: 390, height: 844 } : { width: 1280, height: 800 };
+const size = dev === "phone" ? devices["iPhone 13"].viewport : { width: 1280, height: 800 };   // the video is the viewport
 const browser = await chromium.launch({ args: ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"] });
 const ctx = await browser.newContext({ ...(dev === "phone" ? devices["iPhone 13"] : { viewport: size }), recordVideo: { dir, size } });
 const page = await ctx.newPage();
@@ -16,6 +15,9 @@ await page.goto(`http://localhost:3100/lab/sand?hero&tier=mid`);
 await page.waitForFunction(() => window.__sand?.state && window.__desk3d, null, { timeout: 120000 });
 await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
 const max = await page.evaluate(() => document.documentElement.scrollHeight - innerHeight);
+// sand-lab.tsx: progress is in units of the first 1600vh of scroll (PROGRESS_SCALE = (PAGE_VH - 100) / 1600)
+const pageVh = await page.evaluate(() => (document.documentElement.scrollHeight / innerHeight) * 100);
+const PROGRESS_SCALE = (pageVh - 100) / 1600;
 const y = (p) => Math.min((p / PROGRESS_SCALE) * max, max);
 await page.evaluate((v) => window.scrollTo(0, v), y(Number(from)));
 await page.waitForTimeout(3500);   // the damped progress settles at the start
