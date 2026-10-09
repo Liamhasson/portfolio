@@ -60,3 +60,6 @@ blender/lookdev/renders/deskmove-push/
 
 # brainstorming companion mockups
 .superpowers/
+
+# isolated worktrees for parallel chats
+.claude/worktrees/
