@@ -7,6 +7,7 @@ src=blender/lookdev/renders/$move-plate
 dst=public/lab/$move
 mkdir -p "$dst"
 cp "blender/lookdev/renders/$move-camera.json" "$dst/camera.json"
+[ -f "blender/lookdev/renders/$move-depth.bin" ] && cp "blender/lookdev/renders/$move-depth.bin" "$dst/depth.bin"
 for f in "$src"/f_*.png; do
   out="$dst/$(basename "${f%.png}").jpg"
   [ -f "$out" ] && [ "$out" -nt "$f" ] && continue

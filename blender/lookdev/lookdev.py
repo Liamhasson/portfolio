@@ -23,8 +23,9 @@ from mathutils import Vector
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 ap = argparse.ArgumentParser()
-ap.add_argument("--scene", choices=["ball", "chaos", "glass", "studio", "desk", "bench", "canvas", "hero", "pullback", "deskmove", "attempts", "export", "settle"], required=True)
+ap.add_argument("--scene", choices=["ball", "chaos", "glass", "studio", "desk", "bench", "canvas", "hero", "pullback", "deskmove", "attempts", "export", "settle", "raygrid"], required=True)
 ap.add_argument("--move", choices=["rise", "descend", "push"], default="rise", help="deskmove: which camera move")
+ap.add_argument("--move-name", dest="move_name", default="pullback", help="raygrid: which move's camera path (pullback, settle)")
 ap.add_argument("--grid", choices=["etched", "glow", "mat"], default="etched", help="bench scene only")
 ap.add_argument("--word", choices=["solid", "light", "cutout", "none"], default="light", help="hero scene only")
 ap.add_argument("--phase", choices=["chaos", "mid", "ball"], default="chaos", help="hero scene only")
@@ -1254,7 +1255,9 @@ def build_desk():
     view, state = args.view, args.dstate
     ball_c = {"tq": (0.0, 0.03, R + 0.028), "top": (0.0, 0.03, 0.2), "side": (0.47, -0.14, R + 0.0005)}[view]
     before = set(bpy.data.objects)
-    if state == "chaos":
+    if os.environ.get("LOOKDEV_NO_SAND") or os.environ.get("PULLBACK_PLATE") or os.environ.get("SETTLE_PLATE"):
+        pass   # backplates and ray grids: the sand is live on the site; don't build it just to delete it
+    elif state == "chaos":
         pts, hue, radius, _ = chaos_points(80_000 if args.preview else 520_000)
         k = CHAOS_SCALE
         grains("chaos", (pts * k + np.array(CHAOS_C)).astype(np.float32), hue, radius * k)
@@ -1663,6 +1666,55 @@ def build_settle():
     if one:
         scene.frame_start = scene.frame_end = scene.frame_current
 
+def build_raygrid():
+    """Depth for a camera move's backplate (no rendering: rays are traced against the desk): for every frame of the move
+    (renders/<move>-camera.json) and every point of a GWxGH grid over the plate's view, the distance to the first
+    surface. The site lays each plate frame onto this shape and views it through the live camera, so the plate moves in
+    3D between frames (sharp edges at any scroll position) instead of cross-fading two flat pictures.
+    Writes renders/<move>-depth.bin (uint16 mm, 0 = nothing hit) and adds its grid to the camera JSON."""
+    import json
+    move = args.move_name
+    args.view, args.dstate = "tq", "chaos"
+    os.environ["LOOKDEV_NO_SAND"] = "1"
+    build_desk()
+    cam_json = os.path.join(os.path.dirname(os.path.abspath(__file__)), "renders", f"{move}-camera.json")
+    d = json.load(open(cam_json))
+    GW, GH = 192, 120
+    deps = bpy.context.evaluated_depsgraph_get()
+    tanH = 18.0 / (d["path"][0]["lens_mm"] / d["plate_overscan"])
+    out = np.zeros((d["frames"], GH, GW), np.uint16)
+    us = (np.arange(GW) + 0.5) / GW * 2 - 1
+    vs = 1 - (np.arange(GH) + 0.5) / GH * 2                      # row 0 at the top of the image
+    for fi, fr in enumerate(d["path"]):
+        tanH = 18.0 / (fr["lens_mm"] / d["plate_overscan"])
+        from mathutils import Quaternion
+        q = Quaternion(fr["quaternion"]); o = Vector(fr["position"])
+        for j, v in enumerate(vs):
+            for i, u in enumerate(us):
+                dirc = Vector((u * tanH, v * tanH / 1.6, -1.0)).normalized()
+                hit, loc, *_ = scene.ray_cast(deps, o, q @ dirc, distance=50.0)
+                if hit:
+                    out[fi, j, i] = min(int((loc - o).length * 1000), 65535)
+        print("RAYS", move, fi + 1, flush=True)
+    # the void (no hit) takes the depth of the nearest surface, so the black travels with the desk's edge instead of
+    # stretching between the edge and infinity
+    for fi in range(out.shape[0]):
+        f = out[fi].astype(np.int64)
+        for _ in range(GW + GH):
+            if (f > 0).all():
+                break
+            g = f.copy()
+            for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                sh = np.roll(f, (dy, dx), (0, 1))
+                g = np.where((g == 0) & (sh > 0), sh, g)
+            f = g
+        out[fi] = np.where(f > 0, f, 8000).astype(np.uint16)
+    out.tofile(os.path.join(os.path.dirname(cam_json), f"{move}-depth.bin"))
+    d["depth"] = {"file": "depth.bin", "gw": GW, "gh": GH, "unit": "mm", "plate_aspect": 1.6}
+    json.dump(d, open(cam_json, "w"))
+    print("WROTE depth", move, out.shape)
+    sys.exit(0)
+
 def build_deskmove():
     """The camera moves between the three desk views, one continuous space, no cuts:
       rise     2.1 → 2.2  three-quarter → top-down; the dense ball rises with it
@@ -1966,7 +2018,7 @@ def build_export():
 {"ball": build_ball, "chaos": build_chaos, "glass": build_glass, "studio": build_studio,
  "desk": build_desk, "bench": build_bench, "canvas": build_canvas, "hero": build_hero, "pullback": build_pullback,
  "deskmove": build_deskmove, "attempts": build_attempts, "export": build_export,
- "settle": build_settle}[args.scene]()
+ "settle": build_settle, "raygrid": build_raygrid}[args.scene]()
 if args.preview:
     render_settings(24, *( (960, 600) if os.environ.get("LOOKDEV_BIGPREVIEW") else (480, 300) ))
 elif os.environ.get("LOOKDEV_REVIEW"):
@@ -2004,6 +2056,10 @@ if args.scene in ("pullback", "deskmove", "settle"):
             else ("settle-plate" if os.environ.get("SETTLE_PLATE") else "settle") if args.scene == "settle" else f"deskmove-{args.move}")
     if (os.environ.get("PULLBACK_PLATE") or os.environ.get("SETTLE_PLATE")) and not args.preview:
         render_settings(64, 1920, 1200)
+        # speed: keep the static desk between frames (no rebuild per frame) and stop sampling pixels that have converged
+        scene.render.use_persistent_data = True
+        scene.cycles.use_adaptive_sampling = True
+        scene.cycles.adaptive_threshold = 0.02
     scene.render.use_overwrite = False   # a crashed run resumes where it stopped
     seq = os.path.abspath(os.path.join(args.out, name + ("-preview" if args.preview else ""), "f_"))
     os.makedirs(os.path.dirname(seq), exist_ok=True)

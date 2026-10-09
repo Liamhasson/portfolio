@@ -14,6 +14,8 @@ export interface PullbackPath {
   chaos_center: [number, number, number];
   chaos_scale: number;
   path: { frame: number; position: [number, number, number]; quaternion: [number, number, number, number]; lens_mm: number }[];
+  /** Ray-traced depth per frame (lookdev.py --scene raygrid): the plate is laid onto it and viewed by the live camera. */
+  depth?: { file: string; gw: number; gh: number; unit: "mm"; plate_aspect: number };
   lights: {
     lamp: { pos: number[]; target: number[]; watts: number; color: number[]; spot_deg: number; blend: number };
     rim: { pos: number[]; watts: number; color: number[] };
@@ -47,8 +49,69 @@ void main() {
 }
 `;
 
+const REPROJECT_VERTEX = /* glsl */ `
+out vec2 vUv;
+void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+`;
+const REPROJECT_FRAGMENT = /* glsl */ `
+precision highp float;
+out highp vec4 pc_fragColor;
+#define gl_FragColor pc_fragColor
+in vec2 vUv;
+uniform sampler2D uMap;
+uniform float uOpacity;
+void main() {
+  gl_FragColor = vec4(texture(uMap, vUv).rgb, uOpacity);
+  #include <colorspace_fragment>
+}
+`;
+
+/** One plate frame laid onto its depth: a grid mesh in the hero's units, rebuilt when the frame changes. */
+class ReprojectedFrame {
+  readonly mesh: THREE.Mesh;
+  readonly material: THREE.ShaderMaterial;
+  readonly texture = new THREE.Texture();
+  shown = -1;
+  constructor(gw: number, gh: number, order: number, transparent: boolean) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(gw * gh * 3), 3));
+    const uv = new Float32Array(gw * gh * 2);
+    for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
+      uv[(j * gw + i) * 2] = (i + 0.5) / gw;
+      uv[(j * gw + i) * 2 + 1] = 1 - (j + 0.5) / gh;
+    }
+    geo.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+    const idx: number[] = [];
+    for (let j = 0; j < gh - 1; j++) for (let i = 0; i < gw - 1; i++) {
+      const a = j * gw + i, b = a + 1, c = a + gw, d = c + 1;
+      idx.push(a, c, b, b, c, d);
+    }
+    geo.setIndex(idx);
+    this.texture.colorSpace = THREE.SRGBColorSpace;
+    this.texture.minFilter = THREE.LinearFilter;
+    this.texture.generateMipmaps = false;
+    this.material = new THREE.ShaderMaterial({
+      glslVersion: THREE.GLSL3,
+      vertexShader: REPROJECT_VERTEX,
+      fragmentShader: REPROJECT_FRAGMENT,
+      side: THREE.DoubleSide,
+      depthTest: false,
+      depthWrite: false,
+      transparent,
+      toneMapped: false,
+      uniforms: { uMap: { value: this.texture }, uOpacity: { value: 1 } },
+    });
+    this.mesh = new THREE.Mesh(geo, this.material);
+    this.mesh.frustumCulled = false;
+    this.mesh.renderOrder = order;
+  }
+}
+
 export class Pullback {
-  readonly plate: THREE.Mesh;
+  readonly plate: THREE.Object3D;
+  private readonly flat: THREE.Mesh;
+  private readonly frames: [ReprojectedFrame, ReprojectedFrame] | null = null;
+  private depth: Uint16Array | null = null;
   private readonly material: THREE.ShaderMaterial;
   private readonly images: (HTMLImageElement | null)[];
   private readonly texA = new THREE.Texture();
@@ -75,9 +138,16 @@ export class Pullback {
       toneMapped: false, // the plate is already tone mapped (AgX in Blender)
       uniforms: { uA: { value: this.texA }, uB: { value: this.texB }, uMix: { value: 0 }, uScale: { value: new THREE.Vector2(1, 1) }, uOpacity: { value: 1 } },
     });
-    this.plate = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.material);
-    this.plate.frustumCulled = false;
-    this.plate.renderOrder = -100;
+    this.flat = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.material);
+    this.flat.frustumCulled = false;
+    this.flat.renderOrder = -100;
+    this.plate = new THREE.Group();
+    this.plate.add(this.flat);
+    if (data.depth) {
+      this.frames = [new ReprojectedFrame(data.depth.gw, data.depth.gh, -101, false), new ReprojectedFrame(data.depth.gw, data.depth.gh, -100, true)];
+      this.frames.forEach((r) => this.plate.add(r.mesh));
+      this.frames.forEach((r) => (r.mesh.visible = false));
+    }
     // the frames load in the background, the start of the move first
     this.images = new Array(data.frames).fill(null);
     for (let i = 0; i < data.frames; i++) {
@@ -90,7 +160,41 @@ export class Pullback {
 
   static async load(base = PULLBACK_BASE): Promise<Pullback> {
     const data = (await (await fetch(`${base}/camera.json`)).json()) as PullbackPath;
-    return new Pullback(data, (i) => `${base}/f_${String(i).padStart(4, "0")}.jpg`);
+    const pb = new Pullback(data, (i) => `${base}/f_${String(i).padStart(4, "0")}.jpg`);
+    if (data.depth) {
+      fetch(`${base}/${data.depth.file}`)
+        .then((r) => (r.ok ? r.arrayBuffer() : null))
+        .then((buf) => { if (buf) pb.depth = new Uint16Array(buf); })
+        .catch(() => {});
+    }
+    return pb;
+  }
+
+  /** Lay frame `i` onto its depth: grid points along the frame camera's rays, in the hero's units. */
+  private build(r: ReprojectedFrame, i: number): void {
+    const dd = this.data.depth!, depth = this.depth!;
+    const { gw, gh } = dd;
+    const fr = this.data.path[i];
+    const o = new THREE.Vector3(...fr.position);
+    const q = new THREE.Quaternion(fr.quaternion[1], fr.quaternion[2], fr.quaternion[3], fr.quaternion[0]);
+    const tanH = 18 / (fr.lens_mm / this.data.plate_overscan);
+    const pos = r.mesh.geometry.getAttribute("position") as THREE.BufferAttribute;
+    const arr = pos.array as Float32Array;
+    const d = new THREE.Vector3(), p = new THREE.Vector3();
+    const base = i * gw * gh;
+    for (let j = 0; j < gh; j++) {
+      const v = 1 - ((j + 0.5) / gh) * 2;
+      for (let k = 0; k < gw; k++) {
+        const u = ((k + 0.5) / gw) * 2 - 1;
+        d.set(u * tanH, (v * tanH) / dd.plate_aspect, -1).normalize().applyQuaternion(q);
+        const dist = depth[base + j * gw + k] / 1000;
+        p.copy(o).addScaledVector(d, dist);
+        const h = this.toHero([p.x, p.y, p.z]);
+        const n = (j * gw + k) * 3;
+        arr[n] = h.x; arr[n + 1] = h.y; arr[n + 2] = h.z;
+      }
+    }
+    pos.needsUpdate = true;
   }
 
   /** A desk-space (Blender, z up, metres) point in the hero's units (three, y up). */
@@ -127,6 +231,24 @@ export class Pullback {
     };
     const ia = near(i), ib = near(i + 1);
     if (ia < 0) { this.material.uniforms.uOpacity.value = 0; return; }
+    if (this.frames && this.depth) {
+      // the two nearest frames, each laid onto its own depth and seen by the live camera: aligned, so blending them
+      // only evens out the small view-dependent differences (no double edges)
+      this.flat.visible = false;
+      const [ra, rb] = this.frames;
+      for (const [r, j] of [[ra, ia], [rb, ib]] as const) {
+        r.mesh.visible = true;
+        if (r.shown !== j) {
+          this.build(r, j);
+          r.texture.image = this.images[j];
+          r.texture.needsUpdate = true;
+          r.shown = j;
+        }
+      }
+      rb.material.uniforms.uOpacity.value = ib !== ia ? x - i : 0;
+      rb.mesh.visible = ib !== ia;
+      return;
+    }
     this.material.uniforms.uOpacity.value = 1;
     if (ia !== this.shownA) { this.texA.image = this.images[ia]; this.texA.needsUpdate = true; this.shownA = ia; }
     if (ib !== this.shownB) { this.texB.image = this.images[ib]; this.texB.needsUpdate = true; this.shownB = ib; }
@@ -165,8 +287,9 @@ export class Pullback {
   }
 
   dispose(): void {
-    this.plate.geometry.dispose();
+    this.flat.geometry.dispose();
     this.material.dispose();
+    this.frames?.forEach((r) => { r.mesh.geometry.dispose(); r.material.dispose(); r.texture.dispose(); });
     this.texA.dispose();
     this.texB.dispose();
   }
