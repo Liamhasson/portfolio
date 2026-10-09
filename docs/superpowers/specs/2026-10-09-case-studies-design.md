@@ -52,9 +52,9 @@ There is no "What I'd do next" section: on a portfolio it reads as a to-do list 
 - Each project brings its own colour world: **Eventread** light with navy, **Cyvore** deep violet, **Pulse** deep blue.
 - Project fonts (Cyvore's Michroma and Iceland, Pulse's Plus Jakarta Sans) appear **only inside the product**: screens, logo, brand strip. Never in headings or body.
 
-**3.6 Visuals show the final result only.** No before/after images or earlier versions; how the work got there is told in text (Liam, 2026-10-09). Pulse shows the Training Log screen, not the old Injury Log; Cyvore has no old-site slider.
-
 **3.5 Voice.** Light and personal, first person, one idea per line. The page shows; it doesn't claim.
+
+**3.6 Visuals show the final result only.** No before/after images or earlier versions; how the work got there is told in text (Liam, 2026-10-09). Pulse shows the Training Log screen, not the old Injury Log; Cyvore has no old-site slider.
 
 ## 4. Shared blocks
 
