@@ -1335,6 +1335,9 @@ git commit -m "chore: Eventread calendar capture for the case-study hero" -- scr
   - Eventread MDX: "mostly sold through one company" paraphrases the live page's "54,000 events. 151 million fans. One company." (Live Nation's own figures). Confirm the source and wording.
   - Pulse MDX: "BEAT81 and Urban Sports Club sell the classes, but neither is built around keeping you coming back" is a claim about competitors the live page doesn't make. Keep, soften, or cut.
   - Pulse MDX: the "80% more likely to still be active six months later (Lucid)" stat: confirm the source link for a footnote.
+  - Eventread: the spec titles the supporting block "One search, two APIs"; the draft says "two sources". Pick one.
+  - Eventread: the spec's problem block mentions the live page's personas; the draft leaves them out (framed instead as ten years booking bands). Confirm.
+  - Eventread hero capture: every November day reads Threat or Critical, the detail panel opens on 1 Nov (All Saints' Day), and the 30th is cut off. Open the panel on 18 Nov (the Muse example) instead?
 - [ ] **Step 2:** Walk Liam through every line of the content files and MDX, one study at a time. Apply his edits in `src/content/case-studies/*.ts` and `*.mdx`; re-run `npx vitest run src/content` after each study (the validator catches a broken frame).
 - [ ] **Step 3: Commit** after each approved study: `git commit -m "content: <study> copy approved by Liam" -- src/content/case-studies/`
 
