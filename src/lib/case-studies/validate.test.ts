@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import type { CaseStudy, Challenge } from "./types";
-import { SCREEN_CAP, STANDARD_BUDGET, validateCaseStudy } from "./validate";
+import { SCREEN_CAP, STANDARD_BUDGET } from "./budget";
+import { validateCaseStudy } from "./validate";
 
 const design: Challenge = { kind: "design", title: "t", happened: "h", did: "d", changed: "c" };
 const engineering: Challenge = { ...design, kind: "engineering" };
@@ -39,6 +40,14 @@ describe("validateCaseStudy", () => {
     );
   });
 
+  test("exactly 3 challenges is valid", () => {
+    expect(validateCaseStudy({ ...base, challenges: [design, design, engineering] })).toEqual([]);
+  });
+
+  test("a budget totalling exactly the cap is valid", () => {
+    expect(validateCaseStudy({ ...base, budget: { ...STANDARD_BUDGET, signature: 2.5 } })).toEqual([]);
+  });
+
   test("rejects a budget over the cap", () => {
     expect(validateCaseStudy({ ...base, budget: { ...STANDARD_BUDGET, signature: 3 } })).toContain(
       "pulse: 8.5 screens (cap 8)",
@@ -51,6 +60,24 @@ describe("validateCaseStudy", () => {
       outcome: { lines: ["80% of testers expected a goal step."] },
     });
     expect(problems).toContain('pulse: percentage of a small sample: "80% of testers expected a goal step."');
+  });
+
+  test('rejects "percent" spelled out with a modifier before the noun', () => {
+    const text = "80 percent of our testers expected a goal step.";
+    const problems = validateCaseStudy({ ...base, outcome: { lines: [text] } });
+    expect(problems).toContain(`pulse: percentage of a small sample: "${text}"`);
+  });
+
+  test("rejects a spaced % sign in a challenge's did", () => {
+    const text = "Cut it after 80 % of testers skipped it.";
+    const problems = validateCaseStudy({ ...base, challenges: [{ ...design, did: text }, engineering] });
+    expect(problems).toContain(`pulse: percentage of a small sample: "${text}"`);
+  });
+
+  test("rejects a small-sample percentage in a challenge title", () => {
+    const title = "70% of testers were confused";
+    const problems = validateCaseStudy({ ...base, challenges: [{ ...design, title }, engineering] });
+    expect(problems).toContain(`pulse: percentage of a small sample: "${title}"`);
   });
 
   test("allows percentages that aren't about a sample of people", () => {
