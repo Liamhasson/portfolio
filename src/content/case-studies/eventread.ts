@@ -34,7 +34,7 @@ export const eventread: CaseStudy = {
       title: "A feature I cut the same day",
       happened: "Showing the distance to each competing show meant asking for the venue first.",
       did: "I removed it. People come to Eventread to find the venue; asking for it first asks them for the answer.",
-      changed: "The search stays one form: place, date, genre, capacity.",
+      changed: "People get their answer first; no venue needed to start.",
     },
   ],
   outcome: {
