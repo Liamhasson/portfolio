@@ -10,6 +10,7 @@ import { HeroOverlay } from "./hero-overlay";
 import { BallShadow } from "@/three/sand/ball-shadow";
 import { FrostSkin } from "@/three/sand/frost-skin";
 import { attemptAt } from "@/three/sand/attempts";
+import { BakedDesk } from "@/three/sand/baked-desk";
 import { SAND_ENCODE, SAND_LAYER, SandComposite } from "@/three/sand/sand-composite";
 import { Pullback } from "@/three/sand/pullback";
 import * as THREE from "three";
@@ -125,6 +126,11 @@ export function SandLab() {
       const rise = hero && !compare ? await Pullback.load("/lab/rise").catch(() => null) : null;
       if (disposed) return;
       if (rise) stage.scene.add(rise.plate);
+      // ?desk3d: the desk as a real 3D object (baked lighting) instead of the rendered plates
+      const desk3d = hero && !compare && new URLSearchParams(window.location.search).has("desk3d") ? await BakedDesk.load(stage.renderer) : null;
+      if (disposed) return;
+      if (desk3d) stage.scene.add(desk3d.group);
+      (window as unknown as { __desk3d?: unknown }).__desk3d = desk3d;
       // 2.2: the frost skin that grows out of the sand inside each attempt
       const frost = hero && !compare ? new FrostSkin(field.material) : null;
       if (frost) {
@@ -330,6 +336,11 @@ export function SandLab() {
           pullback.plate.visible = move === pullback;
           field!.setGround(groundCol, stage!.camera);
           if (settle) settle.plate.visible = move === settle;
+          if (desk3d) {
+            pullback.plate.visible = false;
+            if (settle) settle.plate.visible = false;
+            if (rise) rise.plate.visible = false;
+          }
           if (shadow && deskNow) {
             // the lamp's real size (0.2 m soft radius, 2 hero units) sets the softness; ~85% of the desk's light is the lamp
             const ballC = field!.material.uniforms.uBallC.value as THREE.Vector3;

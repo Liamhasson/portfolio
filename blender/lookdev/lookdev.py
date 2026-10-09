@@ -23,7 +23,7 @@ from mathutils import Vector
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 ap = argparse.ArgumentParser()
-ap.add_argument("--scene", choices=["ball", "chaos", "glass", "studio", "desk", "bench", "canvas", "hero", "pullback", "deskmove", "attempts", "export", "settle", "raygrid"], required=True)
+ap.add_argument("--scene", choices=["ball", "chaos", "glass", "studio", "desk", "bench", "canvas", "hero", "pullback", "deskmove", "attempts", "export", "settle", "raygrid", "bakedesk"], required=True)
 ap.add_argument("--move", choices=["rise", "descend", "push"], default="rise", help="deskmove: which camera move")
 ap.add_argument("--move-name", dest="move_name", default="pullback", help="raygrid: which move's camera path (pullback, settle)")
 ap.add_argument("--grid", choices=["etched", "glow", "mat"], default="etched", help="bench scene only")
@@ -1666,6 +1666,168 @@ def build_settle():
     if one:
         scene.frame_start = scene.frame_end = scene.frame_current
 
+def build_bakedesk():
+    """The desk as a real 3D object for the browser: every visible surface gets its own texture with the Cycles lighting
+    baked in (lamp, rim, bounce, shadows, the reflection-only environment), then the lot is exported as one GLB. The site
+    draws it unlit (texture x encode, then AgX), so any camera move is free; the plates stay the ground truth to compare.
+    Laptop shut (2.1-2.2); keycaps, trackpad, display and bezel are hidden under the lid and left out.
+    BAKE_SAMPLES (default 384), BAKE_SCALE (texture size multiplier, default 1). Writes renders/bake/desk.glb."""
+    import json
+    ENCODE = 4.0   # textures store radiance / ENCODE in sRGB, so values up to ENCODE don't clip (the site multiplies back)
+    args.view, args.dstate = "tq", "chaos"
+    os.environ["LOOKDEV_NO_SAND"] = "1"
+    build_desk()
+    c_ = Vector(CHAOS_C)
+    area_light("rim", tuple(c_ + Vector((0.18, 0.78, 0.3))), 0.24, 26.0, ROSE_SOFT, target=tuple(c_))   # as in the plates
+    out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "renders", "bake")
+    os.makedirs(out, exist_ok=True)
+    scale = float(os.environ.get("BAKE_SCALE", "1"))
+    deps = bpy.context.evaluated_depsgraph_get()
+    hidden = ("trackpad", "display", "bezel")
+    sizes = {"desk": 4096, "base": 1024, "lid": 2048, "mark": 1024, "pick": 256, "Cylinder": 512}
+    keep = []
+    for o in list(bpy.data.objects):
+        if o.type != "MESH":
+            continue
+        name = o.name.split(".")[0]
+        if name in hidden or (name == "Cube" and o.parent and o.parent.name.startswith("laptop")):
+            bpy.data.objects.remove(o, do_unlink=True)
+            continue
+        keep.append(o)
+    bpy.context.view_layer.update()
+    deps = bpy.context.evaluated_depsgraph_get()
+    baked = []
+    for o in keep:
+        # final geometry in world space, single user, own materials
+        ev = o.evaluated_get(deps)
+        me = bpy.data.meshes.new_from_object(ev, preserve_all_data_layers=True, depsgraph=deps)
+        me.transform(o.matrix_world)
+        mats = [m.copy() if m else None for m in (s.material for s in o.material_slots)]
+        n = bpy.data.objects.new("bake_" + o.name, me)
+        scene.collection.objects.link(n)
+        me.materials.clear()
+        for m in mats:
+            me.materials.append(m)
+        o.hide_render = True; o.hide_viewport = True
+        if not me.uv_layers:
+            me.uv_layers.new(name="UVMap")
+        orig_uv = me.uv_layers[0].name
+        bake_uv = me.uv_layers.new(name="bake")
+        me.uv_layers.active = bake_uv
+        for uv in me.uv_layers:
+            uv.active_render = uv.name == orig_uv     # materials keep reading their own UVs
+        bpy.ops.object.select_all(action="DESELECT")
+        bpy.context.view_layer.objects.active = n; n.select_set(True)
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.004)
+        bpy.ops.object.mode_set(mode="OBJECT")
+        base = o.name.split(".")[0]
+        size = int(next((v for k, v in sizes.items() if base.startswith(k)), 1024) * scale)
+        img = bpy.data.images.new("bake_" + o.name, size, size, float_buffer=True)
+        for m in me.materials:
+            if not m:
+                continue
+            nt = m.node_tree
+            tex = nt.nodes.new("ShaderNodeTexImage"); tex.image = img
+            uvn = nt.nodes.new("ShaderNodeUVMap"); uvn.uv_map = "bake"
+            nt.links.new(uvn.outputs["UV"], tex.inputs["Vector"])
+            for nd in nt.nodes:
+                nd.select = False
+            tex.select = True; nt.nodes.active = tex
+        baked.append((n, img, base))
+    scene.render.engine = "CYCLES"
+    render_settings(int(os.environ.get("BAKE_SAMPLES", "384")))
+    scene.cycles.use_denoising = False
+    scene.render.bake.margin = 16
+    # glossy objects (metal, the coated pen): view-dependent, so only their diffuse light is baked (linear, / ENCODE);
+    # their reflections are drawn live from a 360 probe of the room (below)
+    GLOSSY = {"lid": "alu", "base": "alu", "Cylinder": None, "mark": "mark"}
+    glossy_meta = {}
+    def principled_of(obj):
+        for m in obj.data.materials:
+            if m and m.node_tree:
+                b = next((nd for nd in m.node_tree.nodes if nd.type == "BSDF_PRINCIPLED"), None)
+                if b:
+                    rough = b.inputs["Roughness"]
+                    r = rough.default_value if not rough.is_linked else 0.35
+                    return dict(color=list(b.inputs["Base Color"].default_value)[:3], metallic=b.inputs["Metallic"].default_value,
+                                roughness=r, coat=b.inputs["Coat Weight"].default_value, coat_roughness=b.inputs["Coat Roughness"].default_value)
+        return None
+    for n, img, base in baked:
+        bpy.ops.object.select_all(action="DESELECT")
+        bpy.context.view_layer.objects.active = n; n.select_set(True)
+        glossy = base in GLOSSY
+        if glossy:
+            glossy_meta[n.name] = principled_of(n)
+            bpy.ops.object.bake(type="DIFFUSE", pass_filter={"DIRECT", "INDIRECT", "COLOR"}, margin=16, use_clear=True)
+            px = np.array(img.pixels[:], dtype=np.float32).reshape(img.size[1], img.size[0], 4)[..., :3]
+            enc = np.clip(px / ENCODE, 0, 1)
+            srgb_ = np.where(enc > 0.0031308, 1.055 * np.power(enc, 1 / 2.4) - 0.055, enc * 12.92)
+            rgba = np.concatenate([srgb_, np.ones(srgb_.shape[:2] + (1,), np.float32)], axis=2)
+            out_img = bpy.data.images.new("tex_" + n.name, img.size[0], img.size[1])
+            out_img.colorspace_settings.name = "sRGB"
+            out_img.pixels.foreach_set(rgba.ravel())
+            out_img.filepath_raw = os.path.join(out, n.name + ".png"); out_img.file_format = "PNG"; out_img.save()
+        else:
+            bpy.ops.object.bake(type="COMBINED", margin=16, use_clear=True)
+        # display-referred: the baked radiance through the scene's own view transform (AgX, Punchy), exactly as the
+        # plates were, so the site draws the texture as-is (no tone mapping) and matte surfaces match by construction
+        if not glossy:
+            path_png = os.path.join(out, n.name + ".png")
+            scene.render.image_settings.file_format = "PNG"
+            scene.render.image_settings.color_mode = "RGB"
+            scene.render.image_settings.color_depth = "8"
+            img.save_render(path_png, scene=scene)
+            out_img = bpy.data.images.load(path_png)
+            out_img.colorspace_settings.name = "sRGB"
+        # export material: just the baked texture on the bake UVs
+        m = bpy.data.materials.new("m_" + n.name); m.use_nodes = True
+        bsdf = m.node_tree.nodes["Principled BSDF"]
+        t = m.node_tree.nodes.new("ShaderNodeTexImage"); t.image = out_img
+        m.node_tree.links.new(t.outputs["Color"], bsdf.inputs["Base Color"])
+        n.data.materials.clear(); n.data.materials.append(m)
+        for uv in list(n.data.uv_layers):
+            if uv.name != "bake":
+                n.data.uv_layers.remove(uv)
+        print("BAKED", n.name, img.size[0], flush=True)
+    bpy.ops.object.select_all(action="DESELECT")
+    for n, _, _ in baked:
+        n.select_set(True)
+    bpy.ops.export_scene.gltf(filepath=os.path.join(out, "desk.glb"), export_format="GLB", use_selection=True,
+                              export_image_format="JPEG", export_jpeg_quality=90, export_yup=True, export_apply=True)
+    # the 360 probe the glossy objects reflect: the room as seen from just above the laptop (everything visible to it,
+    # including the reflection-only panels and the lamp)
+    for o in bpy.data.objects:
+        if o.type == "LIGHT":
+            o.visible_camera = True
+    scene.world.cycles_visibility.camera = True
+    for n, _, _ in baked:
+        n.hide_render = True                         # the probe sees the room, not the baked copies
+    for o in keep:
+        o.hide_render = False                        # the originals, with their own materials
+    for nm in ("lid", "mark", "base", "Cylinder"):
+        for o in keep:
+            if o.name.split(".")[0] == nm and o.parent and "laptop" in (o.parent.name + (o.parent.parent.name if o.parent.parent else "")):
+                o.hide_render = True                 # the laptop doesn't reflect itself
+    cam_d = bpy.data.cameras.new("probe"); cam_d.type = "PANO"
+    try:
+        cam_d.panorama_type = "EQUIRECTANGULAR"
+    except Exception:
+        cam_d.cycles.panorama_type = "EQUIRECTANGULAR"
+    probe = bpy.data.objects.new("probe", cam_d); scene.collection.objects.link(probe)
+    probe.location = (0.27, 0.04, 0.03); probe.rotation_euler = (math.pi / 2, 0, -math.pi / 2)
+    scene.camera = probe
+    render_settings(128, 1024, 512)
+    scene.render.image_settings.file_format = "OPEN_EXR"; scene.render.image_settings.color_depth = "16"
+    scene.render.filepath = os.path.join(out, "probe.exr")
+    bpy.ops.render.render(write_still=True)
+    json.dump({"encode": 1.0, "display_referred": True, "glossy_encode": ENCODE, "glossy": glossy_meta, "probe": "probe.exr",
+               "chaos_center": list(c_), "chaos_scale": CHAOS_SCALE, "laptop": "shut"},
+              open(os.path.join(out, "desk.json"), "w"))
+    print("WROTE", os.path.join(out, "desk.glb"))
+    sys.exit(0)
+
 def build_raygrid():
     """Depth for a camera move's backplate (no rendering: rays are traced against the desk): for every frame of the move
     (renders/<move>-camera.json) and every point of a GWxGH grid over the plate's view, the distance to the first
@@ -2035,7 +2197,7 @@ def build_export():
 {"ball": build_ball, "chaos": build_chaos, "glass": build_glass, "studio": build_studio,
  "desk": build_desk, "bench": build_bench, "canvas": build_canvas, "hero": build_hero, "pullback": build_pullback,
  "deskmove": build_deskmove, "attempts": build_attempts, "export": build_export,
- "settle": build_settle, "raygrid": build_raygrid}[args.scene]()
+ "settle": build_settle, "raygrid": build_raygrid, "bakedesk": build_bakedesk}[args.scene]()
 if args.preview:
     render_settings(24, *( (960, 600) if os.environ.get("LOOKDEV_BIGPREVIEW") else (480, 300) ))
 elif os.environ.get("LOOKDEV_REVIEW"):
@@ -2043,6 +2205,9 @@ elif os.environ.get("LOOKDEV_REVIEW"):
 else:
     render_settings(512 if args.scene in ("glass", "studio") else 256)
 
+if os.environ.get("LOOKDEV_LIST"):
+    exec(open(os.environ["LOOKDEV_LIST"]).read())
+    sys.exit(0)
 if os.environ.get("LOOKDEV_DEBUG"):
     bpy.context.view_layer.update()
     for o in bpy.data.objects:
