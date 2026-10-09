@@ -1481,7 +1481,8 @@ def build_hero():
     if args.word == "none":
         font = None
     else:
-        font = bpy.data.fonts.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts", "HankenGrotesk-ExtraBold.ttf"))
+        # WORDMARK_FONT: compare treatments (2026-10-09: Geist 400 vs the approved heavy weight vs none)
+        font = bpy.data.fonts.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts", os.environ.get("WORDMARK_FONT", "HankenGrotesk-ExtraBold.ttf")))
     cu = bpy.data.curves.new("wordmark", "FONT") if font else None
     if cu is None:
         _hero_lights(); return
