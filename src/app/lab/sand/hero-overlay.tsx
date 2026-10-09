@@ -5,7 +5,7 @@
  * line-height 1.15, the scroll cue ~1.75vw bottom right on desktop and centred ~4vw on phones, 4.9% side margins).
  * Ours in Geist. Lines rise in from a mask, staggered (approved). Copy from the production plan §5.1.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
 const RISE = "hero-rise";
 
@@ -38,7 +38,6 @@ export function HeroOverlay({
   exit, scrolled, enter, leave, enter2,
 }: { exit: () => number; scrolled: () => number; enter?: () => number; leave?: () => number; enter2?: () => number }) {
   const root = useRef<HTMLDivElement>(null);
-  const [linesBottom] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("lines") === "bottom");
   useEffect(() => {
     let raf = 0;
     const tick = () => {
@@ -109,11 +108,12 @@ export function HeroOverlay({
         </p>
       </div>
       {/* 2.1: the next chapter's line, entering from the right over the dark room above the desk */}
-      {linesBottom && enter && (
+      {/* chapter lines sit lower left over the desk: a soft fade from the bottom edge keeps them legible */}
+      {enter && (
         <div
           aria-hidden
           data-scrim
-          className="absolute inset-x-0 bottom-0 h-[42vh] opacity-0"
+          className="absolute inset-x-0 bottom-0 h-[34vh] opacity-0"
           style={{ background: "linear-gradient(to top, rgba(0,0,0,0.62), rgba(0,0,0,0.3) 45%, transparent)" }}
         />
       )}
@@ -122,7 +122,7 @@ export function HeroOverlay({
         // two below the menu on phones. A soft text shadow for legibility, never a shape over the desk.
         <h2
           data-enter
-          className={`absolute left-[4.9vw] right-[4.9vw] text-[clamp(28px,3.5vw,54px)] font-normal leading-[1.08] tracking-[-0.015em] opacity-0 md:right-auto ${linesBottom ? "bottom-[96px] max-w-[15ch] md:bottom-[clamp(96px,11vw,150px)] md:max-w-[15ch]" : "top-[clamp(76px,11vh,120px)] md:top-[clamp(28px,6vh,64px)]"}`}
+          className={`absolute left-[4.9vw] right-[4.9vw] text-[clamp(28px,3.5vw,54px)] font-normal leading-[1.08] tracking-[-0.015em] opacity-0 md:right-auto bottom-[clamp(40px,6vh,64px)] max-w-[15ch] md:bottom-[clamp(36px,4.4vw,64px)]`}
           style={{ textShadow: "0 1px 24px rgba(0,0,0,0.55)" }}
         >
           I look for problems nobody pointed at.
@@ -131,7 +131,7 @@ export function HeroOverlay({
       {enter2 && (
         <h2
           data-enter2
-          className={`absolute left-[4.9vw] right-[4.9vw] text-[clamp(28px,3.5vw,54px)] font-normal leading-[1.08] tracking-[-0.015em] opacity-0 md:right-auto ${linesBottom ? "bottom-[96px] max-w-[15ch] md:bottom-[clamp(96px,11vw,150px)] md:max-w-[15ch]" : "top-[clamp(76px,11vh,120px)] md:top-[clamp(28px,6vh,64px)]"}`}
+          className={`absolute left-[4.9vw] right-[4.9vw] text-[clamp(28px,3.5vw,54px)] font-normal leading-[1.08] tracking-[-0.015em] opacity-0 md:right-auto bottom-[clamp(40px,6vh,64px)] max-w-[15ch] md:bottom-[clamp(36px,4.4vw,64px)]`}
           style={{ textShadow: "0 1px 24px rgba(0,0,0,0.55)" }}
         >
           Then I test solutions.
