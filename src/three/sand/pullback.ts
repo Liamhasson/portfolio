@@ -142,21 +142,25 @@ export class Pullback {
    * just in front of and below it (what keeps the sand evenly warm in the Cycles render; the set's own bounce spot
    * aims elsewhere).
    */
-  deskLights(wattsToIrradiance: number, gains: [number, number, number]) {
+  deskLights(
+    wattsToIrradiance: number,
+    gains: [number, number, number],
+    o: { bouncePos?: number[]; bounceColor?: number[]; radii?: number[]; spotDeg?: number; blend?: number } = {},
+  ) {
     const L = this.data.lights;
     const k2 = 1 / (this.k * this.k);
-    const deskBounce = { pos: [0.0, -0.12, 0.0], watts: 20, color: [1.0, 0.6, 0.34] };
+    const deskBounce = { pos: o.bouncePos ?? [0.0, -0.12, 0.0], watts: 20, color: o.bounceColor ?? [1.0, 0.6, 0.34] };
     // light radii in the hero's units: the lamp's soft size 0.2 m, the rim panel 0.24 m, the lit desk ~0.3 m
-    const radii = [2.0, 1.2, 3.0];
+    const radii = o.radii ?? [2.0, 1.2, 3.0];
     const set = [L.lamp, L.rim, deskBounce].map((l, i) => ({
       pos: this.toHero(l.pos),
       col: new THREE.Vector3(...(l.color as [number, number, number])).multiplyScalar(l.watts * k2 * wattsToIrradiance * gains[i]),
       r: radii[i],
     }));
     const dir = this.toHero(L.lamp.target).sub(set[0].pos).normalize();
-    const half = THREE.MathUtils.degToRad(L.lamp.spot_deg / 2);
+    const half = THREE.MathUtils.degToRad((o.spotDeg ?? L.lamp.spot_deg) / 2);
     const outer = Math.cos(half);
-    const inner = outer + L.lamp.blend * (1 - outer);
+    const inner = outer + (o.blend ?? L.lamp.blend) * (1 - outer);
     return { lights: set, spot: { dir, cos: new THREE.Vector2(outer, inner) } };
   }
 

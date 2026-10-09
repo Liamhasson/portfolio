@@ -252,6 +252,7 @@ in float vPx;
 in float vEdgePx;
 
 uniform float uExposure;
+uniform float uOutScale;   // 1 on screen; 1/4 into the filtered sand layer (see sand-composite.ts)
 uniform float uSpec;
 uniform float uWrap;     // light reaching past the terminator: grains are lit by the bounce off their neighbours
 uniform float uBounce;   // light that has hit two grains (Cycles' multiple scattering): saturates toward the sand's colour
@@ -280,7 +281,7 @@ void main() {
     vec3 alb = i == 0 ? mix(vAlbedo, vAlbedo * vAlbedo * 2.2, uLampSat) : vAlbedo;
     col += E[i] * (alb * ndl / 3.14159265 + spec * ndl + vAlbedo * vAlbedo * uBounce * vBounceW);
   }
-  col *= uExposure;
+  col *= uExposure * uOutScale;
   gl_FragColor = vec4(col, vAlpha * edge);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>

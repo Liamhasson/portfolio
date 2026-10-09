@@ -1295,7 +1295,8 @@ def build_desk():
     pen.data.materials.append(principled("pen", (0.02, 0.02, 0.025, 1), 0.25, **{"Coat Weight": 0.6}))
     world((0.0, 0.0, 0.0, 1), 1.0)   # the desk floats in a pitch black void
     # Reflection-only light (never seen, lights nothing): polished metal and glass read as polished, not black.
-    reflection_env(0.35, rot_z=math.radians(-40), dome=0.6)
+    if not os.environ.get("LOOKDEV_NO_ENV"):   # light diagnosis: the reflection-only environment off
+        reflection_env(0.35, rot_z=math.radians(-40), dome=0.6)
     # The lamp: off-frame, upper left, warm. Its light defines the scene; the ball does not emit.
     sp = bpy.data.lights.new("lamp", "SPOT")
     sp.energy = 230
@@ -1604,6 +1605,11 @@ def build_pullback():
                    "lights": {"lamp": dict(pos=[-0.42, 0.3, 0.55], target=[0, 0, 0], watts=230, color=[1.0, 0.74, 0.48], spot_deg=85, blend=0.85),
                               "rim": dict(pos=list(c + Vector((0.18, 0.78, 0.3))), watts=26, color=list(ROSE_SOFT[:3])),
                               "bounce": dict(pos=[0.45, -0.25, 0.25], watts=3.5, color=[1.0, 0.85, 0.7])}}, fh)
+    # light diagnosis: LOOKDEV_ONLY=lamp,rim,... keeps only those lights
+    keep = os.environ.get("LOOKDEV_ONLY")
+    if keep:
+        for o in [o for o in bpy.data.objects if o.type == "LIGHT" and o.name.split(".")[0] not in keep.split(",")]:
+            bpy.data.objects.remove(o, do_unlink=True)
     scene.frame_set(int(os.environ.get("PULLBACK_FRAME", "1")))
     if os.environ.get("PULLBACK_FRAME"):
         scene.frame_start = scene.frame_end = scene.frame_current

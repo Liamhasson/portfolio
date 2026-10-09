@@ -131,6 +131,7 @@ export class SandField {
         uRamp: { value: ramp.map(([, c]) => new THREE.Vector3(...c)) },
         uRampAt: { value: new THREE.Vector4(ramp[0][0], ramp[1][0], ramp[2][0], ramp[3][0]) },
         uExposure: { value: SAND_LOOK.exposure },
+        uOutScale: { value: 1 },
         uSpec: { value: SAND_LOOK.spec },
         uSpotDir: { value: new THREE.Vector3(0, 0, -1) },
         uSpotCos: { value: new THREE.Vector2(-3, -2) },   // no cone: a plain point light

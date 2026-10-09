@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Stage } from "@/three/stage";
 import { loadSand, SAND_BASE } from "@/three/sand/data";
-import { SandField, type SandState } from "@/three/sand/sand-field";
+import { SAND_LOOK, SandField, type SandState } from "@/three/sand/sand-field";
 import { PaintField } from "@/three/sand/paint";
 import { Wordmark } from "@/three/sand/wordmark";
 import { HeroOverlay } from "./hero-overlay";
+import { SAND_ENCODE, SAND_LAYER, SandComposite } from "@/three/sand/sand-composite";
 import { Pullback } from "@/three/sand/pullback";
 import * as THREE from "three";
 import { parseTierOverride, pickTier, readSignals, settingsFor } from "@/three/tier";
@@ -91,19 +92,41 @@ export function SandLab() {
       );
       field = new SandField(data);
       stage.scene.add(field.points);
+      // the sand through a pixel filter like Cycles' (?filter=0 draws it plain, for comparison)
+      const filterParam = new URLSearchParams(window.location.search).get("filter");
+      // the filter's width follows the grains' size on screen (fitted against the renders): chaos 0.5, ball 0.28,
+      // the far desk view 0.525
+      let composite: SandComposite | null = null;
+      const FILTER = { chaos: 0.5, ball: 0.28, desk: 0.525 };
+      if (filterParam !== "0") {
+        const comp = new SandComposite();
+        composite = comp;
+        if (filterParam) comp.sigma = Number(filterParam);
+        field.points.layers.set(SAND_LAYER);
+        field.material.uniforms.uOutScale.value = 1 / SAND_ENCODE;
+        stage.camera.layers.enable(SAND_LAYER);
+        stage.renderFrame = (r, sc, cam) => comp.render(r, sc, cam);
+        (window as unknown as { __sandFilter?: (s: number) => void }).__sandFilter = (s) => { comp.sigma = s; };
+      }
       const pullback = hero && !compare ? await Pullback.load() : null;
       if (disposed) return;
       if (pullback) stage.scene.add(pullback.plate);
       const heroLights = field.heroLights();
       const g = field.lookGains;
       // the desk set, calibrated 2026-10-09 against the pull-back render with sand at frame 60 (scripts/lab/pb-calib.mjs)
-      let desk = pullback?.deskLights(g.wattsToIrradiance, [0.55, 0.03, 0.4]);
+      // the desk set, fitted 2026-10-09 against the Cycles pull-back render at frame 60 (lamp alone, then with the rim;
+      // scripts/lab/fit_desk_light.py). The lamp's cone is wider and softer than its Blender settings suggest (116°,
+      // blend 1): Cycles lit the whole cloud. The desk bounce adds nothing in Cycles, so it is off.
+      let desk = pullback?.deskLights(g.wattsToIrradiance, [0.244, 1.0, 0], { radii: [0.573, 1.2, 3.0], spotDeg: 116, blend: 1.0 });
+      const DESK_LOOK = { shadowKChaos: 0.602, wrap: 0.375, bounce: 0.12, localOcclusion: 0.016, spec: 0.016, radScaleChaos: 1.44 };
       // lab calibration: ?pbframe=N holds the camera on a path frame; __pbGains sets the desk lights' gains
-      let lampSat = 0.6;
+      let lampSat = 0.2;
       (window as unknown as { __pbSat?: (v: number) => void }).__pbSat = (v) => { lampSat = v; };
       const pbFrame = Number(new URLSearchParams(window.location.search).get("pbframe") || NaN);
-      (window as unknown as { __pbGains?: (a: number, b: number, c: number) => void }).__pbGains = (a, b, c) => {
-        desk = pullback?.deskLights(g.wattsToIrradiance, [a, b, c]);
+      let pbOpts: Parameters<Pullback["deskLights"]>[2] = {};
+      (window as unknown as { __pbGains?: (a: number, b: number, c: number, o?: typeof pbOpts) => void }).__pbGains = (a, b, c, o) => {
+        if (o) pbOpts = o;
+        desk = pullback?.deskLights(g.wattsToIrradiance, [a, b, c], pbOpts);
       };
       // ?weight=bold|black|ultrablack: compare the wordmark's weight (default black); ?wordmark=0 hides it
       const params = new URLSearchParams(window.location.search);
@@ -156,11 +179,14 @@ export function SandLab() {
       if (compare) {
         // frozen, at the exact Blender camera: comparable pixel for pixel with the render
         state.compact = COMPACT_FOR[compare];
+        if (composite && !filterParam) composite.sigma = FILTER.chaos + (FILTER.ball - FILTER.chaos) * state.compact;
         field.update(state);
         stage.renderOnce();
         const w = window as unknown as { __sandReady?: boolean; __sandLook?: (l: Record<string, number>) => void };
         w.__sandLook = (look) => {
-          field!.setLook(look);
+          const { filter, ...rest } = look;
+          if (filter !== undefined) (window as unknown as { __sandFilter?: (s: number) => void }).__sandFilter?.(filter);
+          field!.setLook(rest);
           stage!.renderOnce();
         };
         w.__sandReady = true;
@@ -224,7 +250,14 @@ export function SandLab() {
           const deskNow = desk;
           const hl = THREE.MathUtils.smoothstep(span(progressRef.current, TL.pullback), 0.15, 0.85);
           // the desk lamp is close and soft: the sand's own shading softens with it (shadow strength, wrap)
-          if (!Number.isFinite(pbFrame) || pbFrame < 0) field!.setLook({ ...baseLook, shadowKChaos: 2.2 + (0.45 - 2.2) * hl, wrap: 0.1 + (0.9 - 0.1) * hl });
+          if (!Number.isFinite(pbFrame) || pbFrame < 0) {
+            const mixLook: Record<string, number> = {};
+            for (const [key, v] of Object.entries(DESK_LOOK)) {
+              const from = SAND_LOOK[key as keyof typeof SAND_LOOK] as number;
+              mixLook[key] = from + (v - from) * hl;
+            }
+            field!.setLook({ ...baseLook, ...mixLook });
+          }
           // the camera on the exported path; the plate cropped to its view; the lights handed to the desk lamp
           const t = Number.isFinite(pbFrame) ? (pbFrame - 1) / (pullback.data.frames - 1) : span(progressRef.current, TL.pullback);
           const f = t * (pullback.data.frames - 1);
@@ -275,6 +308,11 @@ export function SandLab() {
         }
         wordmark?.setPaint(reduced ? null : paint!.texture, canvas.width, canvas.height);
         wordmark?.update(dt, reduced || still);
+        if (composite && !filterParam) {
+          const onBall = FILTER.chaos + (FILTER.ball - FILTER.chaos) * state.compact;
+          const toDesk = pullback ? THREE.MathUtils.smoothstep(span(progressRef.current, TL.pullback), 0.15, 0.85) : 0;
+          composite.sigma = onBall + (FILTER.desk - onBall) * toDesk;
+        }
         field!.update(state);
       });
       stage.start();

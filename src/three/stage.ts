@@ -23,6 +23,8 @@ export class Stage {
   readonly camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
   settings: TierSettings;
   private readonly frames = new Set<FrameCallback>();
+  /** Replaces the plain render (layered compositing, e.g. the sand's pixel filter). */
+  renderFrame: ((renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) => void) | null = null;
   private readonly tierChanges = new Set<(s: TierSettings) => void>();
   private readonly governor: QualityGovernor;
   private raf = 0;
@@ -121,7 +123,7 @@ export class Stage {
       const frameMs = now - this.last;
       this.last = now;
       this.frames.forEach((cb) => cb(dt, now / 1000));
-      this.renderer.render(this.scene, this.camera);
+      this.draw();
       const next = this.governor.sample(frameMs);
       if (next) {
         this.settings = settingsFor(next, window.devicePixelRatio || 1);
@@ -141,7 +143,12 @@ export class Stage {
   /** Render once now (compare captures). */
   renderOnce(): void {
     this.frames.forEach((cb) => cb(0, performance.now() / 1000));
-    this.renderer.render(this.scene, this.camera);
+    this.draw();
+  }
+
+  private draw(): void {
+    if (this.renderFrame) this.renderFrame(this.renderer, this.scene, this.camera);
+    else this.renderer.render(this.scene, this.camera);
   }
 
   private onVisibility = () => {
