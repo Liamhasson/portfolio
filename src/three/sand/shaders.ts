@@ -103,6 +103,7 @@ uniform vec3 uCursorCol;     // colour * intensity (fades with the pointer)
 uniform float uCursorReach;  // world units: how far its light carries
 uniform sampler2D uPaint;    // the cursor's drift field: CSS px / s
 uniform float uPaintScale;   // seconds: velocity -> offset
+uniform vec2 uFront;         // the drift only moves the front layer: optical depth to the camera (strength, falloff)
 uniform vec2 uViewport;      // CSS px
 
 out vec3 vAlbedo;
@@ -176,6 +177,10 @@ void main() {
     float T = transmittance(pv, lp, min(d, mix(8.5, 3.0, t)), j, mix(uShadowK.x, uShadowK.y, t));
     E[i] = uLightCol[i] * T / (d * d);
   }
+  // how much sand stands between this grain and the viewer: the cursor can only reach the front layer
+  vec3 cv = mix(uChaosC + chaosInv * (cameraPosition - uChaosC), uBallC + ballInv * (cameraPosition - uBallC), t);
+  float toCam = transmittance(pv, cv, mix(8.5, 3.0, t), j, uFront.x);
+  float frontness = uFront.x > 0.0 ? smoothstep(uFront.y, 1.0, toCam) : 1.0;
   // grain-scale occlusion on the ball: the deeper below the surface, the darker (too fine for the volume)
   float depth = clamp((uBallR - distance(B, uBallC)) / (uBallR * uCavity.x), 0.0, 1.0);
   float cavity = mix(1.0, 1.0 - uCavity.y * depth, t);
@@ -199,7 +204,7 @@ void main() {
   gl_Position = projectionMatrix * mv;
   // the cursor's drift: a push in screen space from the paint field, which decays on its own
   vec2 suv = gl_Position.xy / gl_Position.w * 0.5 + 0.5;
-  vec2 push = texture(uPaint, suv).xy * uPaintScale;
+  vec2 push = texture(uPaint, suv).xy * uPaintScale * frontness;
   gl_Position.xy += push / (uViewport * 0.5) * gl_Position.w;
   float packed = floor(aAttr.z * 255.0 + 0.5);
   float rad = mix(floor(packed / 16.0), mod(packed, 16.0), t) / 15.0;

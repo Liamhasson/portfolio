@@ -44,6 +44,8 @@ export const SAND_LOOK = {
   cursor: 5.0,          // the cursor light's strength (fades with the pointer): ~2x the key on the grains it touches
   cursorReach: 0.9,     // world units
   paintScale: 0.1,      // seconds: drift velocity -> grain offset
+  frontK: 1.0,          // the drift reaches only grains with little sand between them and the viewer (0 = all grains)
+  frontFalloff: 0.25,   // transmittance below which a grain counts as behind
 };
 
 const Y = new THREE.Vector3(0, 1, 0);
@@ -130,6 +132,7 @@ export class SandField {
         uCursorReach: { value: SAND_LOOK.cursorReach },
         uPaint: { value: null },
         uPaintScale: { value: SAND_LOOK.paintScale },
+        uFront: { value: new THREE.Vector2(SAND_LOOK.frontK, SAND_LOOK.frontFalloff) },
         uViewport: { value: new THREE.Vector2(1, 1) },
       },
     });
@@ -206,6 +209,7 @@ export class SandField {
     u.uSpec.value = l.spec;
     u.uCursorReach.value = l.cursorReach;
     u.uPaintScale.value = l.paintScale;
+    (u.uFront.value as THREE.Vector2).set(l.frontK, l.frontFalloff);
     (u.uRadScale.value as THREE.Vector2).set(l.radScaleChaos, l.radScale);
     (u.uEdge.value as THREE.Vector2).set(l.edgeChaos, l.edgePx);
     u.uChaosShare.value = l.chaosShare;
