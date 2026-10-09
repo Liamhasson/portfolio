@@ -52,6 +52,8 @@ There is no "What I'd do next" section: on a portfolio it reads as a to-do list 
 - Each project brings its own colour world: **Eventread** light with navy, **Cyvore** deep violet, **Pulse** deep blue.
 - Project fonts (Cyvore's Michroma and Iceland, Pulse's Plus Jakarta Sans) appear **only inside the product**: screens, logo, brand strip. Never in headings or body.
 
+**3.6 Visuals show the final result only.** No before/after images or earlier versions; how the work got there is told in text (Liam, 2026-10-09). Pulse shows the Training Log screen, not the old Injury Log; Cyvore has no old-site slider.
+
 **3.5 Voice.** Light and personal, first person, one idea per line. The page shows; it doesn't claim.
 
 ## 4. Shared blocks
@@ -89,7 +91,7 @@ There is no "What I'd do next" section: on a portfolio it reads as a to-do list 
 | At a glance | Research, information architecture, prototype and investor presentations · About 1 month, part of a 2025–26 project-based contract · Solo, reviewed with the CTO, a developer and DevOps · Figma, Figma MCP, Claude Code |
 | Problem: a linear site vs an investor meeting | Why a scroll-through website fails when a founder presents live. Liam pitched the fix unasked. |
 | Signature: one screen, everything | A working replica of the four-tab hero (Security · Exposure · Coverage · Enables). |
-| Supporting: before / after | A drag slider, old site vs new: navigation and micro-animation. The design system (a third of the live page) shrinks to one strip: type, tokens, states. The live page's "Main CFA" typo becomes "Main CTA". |
+| Supporting: "Motion with a job" | The final site only (rule §3.6): the micro-animations and the 7-second mission animation (the shipped Zoom-call phishing sequence, `zoom animation.mov`, trimmed to ~8s with the BLOCK frame as poster). The design system (a third of the live page) shrinks to one strip: type, tokens, states. The live page's "Main CFA" typo becomes "Main CTA". The old linear site appears only in the problem block's text. |
 | What got in the way | 1. **The CEO wanted the full product video on the site** → Liam argued for a ~7-second animation of the product's mission with the video one click away: in a meeting you present with visual support rather than narrate over a video, and investors had likely seen the only public product video already. Result, a compromise: the animation shipped on the site, with an on-screen button that opens the full video on YouTube. 2. **No investors to test with** → tested with the three people who'd present it (CTO, developer, DevOps), four navigation tasks, task order counterbalanced. |
 | Outcome | Used as the live product presentation in investor meetings (not a public site). 3 of 3 stakeholders completed all four tasks; time to find a section ~35s → ~8s. The CTO's words, exactly as on the home page: "We weren't looking for a designer. Liam reached us and thanks to his work, we closed our first funding round." Yoav Rotem, CTO, Cyvore. |
 | Next project | → Pulse |
@@ -136,7 +138,6 @@ Case studies are MDX content files sharing one shell (back button, pill nav with
 | `DangerScore` | Eventread's live calculator |
 | `CyvoreTabs` | Working replica of the four-tab hero |
 | `FlowSequence` | Pulse's pinned 12-screen step-through |
-| `BeforeAfter` | Drag-to-compare slider |
 | `ChallengeList` | "What got in the way" items (happened → did → changed) |
 | `Outcome` | Outcome block, with optional `Quote` |
 | `NextProject` | The looping next-case-study preview and transition |
