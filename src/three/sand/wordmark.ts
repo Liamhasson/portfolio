@@ -5,7 +5,9 @@ import type { SandMeta } from "./data";
  * LIAM HASSON behind the sand: heavy Geist letters as dark outlines in the void, light travelling through their strokes
  * (reference: the outlined titles on lusion.co/about). Approved by Liam 2026-10-09: heavy weight, dark fill, light on the
  * stroke paths, the sand's own colours (not Lusion's RGB), and both kinds of light:
- *   - an ambient wave through the strokes every few seconds (alive on every device, phones included),
+ *   - an ambient light that spreads through the strokes like water from a different spot each time, fills the letters
+ *     it reaches and slowly ebbs, its edge bent by flowing noise (Liam 2026-10-09: "spreading and taking over the
+ *     characters slowly and gradually, like a wave, not a scan"); alive on every device, phones included,
  *   - the cursor's drift field lighting the strokes along its trail (Lusion's model), fading in about half a second.
  * One deliberate exception to the type rules (no weights above 500): this is a lit object in the scene, not text.
  *
@@ -21,9 +23,11 @@ export const WORDMARK = {
   position: [0, 0.85, -4.5] as [number, number, number],
   strokePx: 0.6, // half-width of the outline, in screen pixels
   base: 0.14, // how visible the dark outline is at rest (Lusion: faint, never gone)
-  waveEvery: 6.5, // seconds between ambient waves
-  waveTime: 2.6, // seconds for a wave to cross the name
-  waveGain: 1.4,
+  waveCycle: 15, // seconds from one wave's start to the next
+  waveSpread: 10, // seconds for a wave to spread across the name (fast at first, slowing as it reaches further)
+  waveHold: 1.5, // seconds fully spread before it ebbs
+  waveEbb: 5, // seconds to fade back to the dark outline
+  waveGain: 1.1,
   cursorGain: 1.6,
 };
 
@@ -128,13 +132,27 @@ uniform float uRange;        // texels encoded either side of the edge
 uniform vec2 uTexSize;
 uniform float uStrokePx;
 uniform float uBase;
-uniform float uWave;         // the ambient wave's front, in name widths (-0.3 .. 1.3)
+uniform vec2 uWaveO;         // where this wave starts (uv)
+uniform float uWaveR;        // how far it has spread (name heights)
+uniform float uWaveFade;     // 1 while spreading, ebbing to 0
 uniform float uWaveGain;
+uniform float uTime;
+uniform float uAspect;       // plane width / height
 uniform sampler2D uPaint;    // the cursor's drift field (CSS px / s)
 uniform vec2 uViewport;      // device px of the canvas
 uniform float uCursorGain;
 uniform vec3 uRamp[4];
 uniform float uDpr;
+
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float vnoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y);
+}
+float fbm(vec2 p) {
+  return vnoise(p) * 0.55 + vnoise(p * 2.03 + 7.1) * 0.3 + vnoise(p * 4.1 + 3.7) * 0.15;
+}
 
 // the sand's colours as a glow: plum tail, dusty rose, rose-gold, a gold core
 vec3 glow(float i) {
@@ -151,11 +169,16 @@ void main() {
   float stroke = 1.0 - smoothstep(uStrokePx, uStrokePx + 1.0, dist);
   if (stroke <= 0.0) discard;
 
-  // the ambient wave: a sharp leading edge, a long tail
-  float x = vUv.x + (vUv.y - 0.5) * 0.18;                     // a slight lean
-  float behind = uWave - x;
-  float wave = behind > 0.0 ? exp(-behind * 5.5) : exp(-behind * behind * 900.0);
-  wave *= uWaveGain;
+  // the ambient wave: light spreading from a point like water, its edge bent by slowly flowing noise
+  vec2 p = vec2(vUv.x * uAspect, vUv.y);
+  vec2 o = vec2(uWaveO.x * uAspect, uWaveO.y);
+  float warp = (fbm(p * 0.9 + vec2(uTime * 0.05, -uTime * 0.03)) - 0.5) * 1.6;
+  float d = length(p - o) + warp;                              // name heights, uneven
+  float inside = 1.0 - smoothstep(uWaveR - 0.9, uWaveR + 0.15, d);   // a wide, soft edge
+  float front = exp(-pow((d - uWaveR + 0.25) / 0.45, 2.0)) * 0.5;    // a little brighter where it is arriving
+  // the light inside flows and breathes along the strokes
+  float flow = 0.12 + 0.88 * smoothstep(0.3, 0.72, fbm(p * 2.8 + vec2(-uTime * 0.16, uTime * 0.1)));
+  float wave = (inside * flow + front) * uWaveFade * uWaveGain;
 
   // the cursor: where its drift field moves, the strokes catch light
   vec2 suv = gl_FragCoord.xy / uViewport;
@@ -173,7 +196,8 @@ void main() {
 export class Wordmark {
   readonly mesh: THREE.Mesh;
   private readonly material: THREE.ShaderMaterial;
-  private wavePhase = 2.0;
+  private time = 0;
+  private waveStart = 0.6;   // the first wave starts just after the hero appears
 
   private constructor(mesh: THREE.Mesh, material: THREE.ShaderMaterial) {
     this.mesh = mesh;
@@ -198,7 +222,11 @@ export class Wordmark {
         uTexSize: { value: new THREE.Vector2(sdf.W, sdf.H) },
         uStrokePx: { value: WORDMARK.strokePx },
         uBase: { value: WORDMARK.base },
-        uWave: { value: -1 },
+        uWaveO: { value: new THREE.Vector2(0.52, 0.45) },   // the first wave spreads from the middle, both ways
+        uWaveR: { value: 0 },
+        uWaveFade: { value: 0 },
+        uTime: { value: 0 },
+        uAspect: { value: w / h },
         uWaveGain: { value: WORDMARK.waveGain },
         uPaint: { value: null },
         uViewport: { value: new THREE.Vector2(1, 1) },
@@ -222,11 +250,26 @@ export class Wordmark {
   /** Advance the ambient wave. `still` freezes it (compare captures). */
   update(dt: number, still = false): void {
     if (still) return;
-    this.wavePhase += dt;
-    const cycle = WORDMARK.waveEvery;
-    const t = this.wavePhase % cycle;
-    // the front crosses from just before the name to just past it, then rests until the next wave
-    this.material.uniforms.uWave.value = t < WORDMARK.waveTime ? -0.3 + (t / WORDMARK.waveTime) * 1.6 : -1;
+    const u = this.material.uniforms;
+    this.time += dt;
+    u.uTime.value = this.time;
+    let t = this.time - this.waveStart;
+    if (t >= WORDMARK.waveCycle) {
+      // a new wave from a new spot: somewhere along the name, never the same end twice in a row
+      const prev = (u.uWaveO.value as THREE.Vector2).x;
+      const x = prev < 0.5 ? 0.45 + Math.random() * 0.5 : 0.05 + Math.random() * 0.5;
+      (u.uWaveO.value as THREE.Vector2).set(x, 0.35 + Math.random() * 0.3);
+      this.waveStart = this.time;
+      t = 0;
+    }
+    const aspect = u.uAspect.value as number;
+    const reach = aspect * 0.95 + 1.0;   // far enough to cover the whole name from any start, plus the warp
+    const x = Math.min(t / WORDMARK.waveSpread, 1);
+    u.uWaveR.value = t < 0 ? -1 : reach * (1 - Math.pow(1 - x, 1.6));   // fast at first, slowing as it reaches further
+    const ebbAt = WORDMARK.waveSpread + WORDMARK.waveHold;
+    const e = Math.min(Math.max((t - ebbAt) / WORDMARK.waveEbb, 0), 1);
+    const rise = Math.min(Math.max(t, 0) / 1.2, 1);
+    u.uWaveFade.value = rise * rise * (3 - 2 * rise) * (1 - e * e * (3 - 2 * e));
   }
 
   dispose(): void {
