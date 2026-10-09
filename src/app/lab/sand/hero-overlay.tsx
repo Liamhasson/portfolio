@@ -5,7 +5,7 @@
  * line-height 1.15, the scroll cue ~1.75vw bottom right on desktop and centred ~4vw on phones, 4.9% side margins).
  * Ours in Geist. Lines rise in from a mask, staggered (approved). Copy from the production plan §5.1.
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const RISE = "hero-rise";
 
@@ -38,6 +38,7 @@ export function HeroOverlay({
   exit, scrolled, enter, leave, enter2,
 }: { exit: () => number; scrolled: () => number; enter?: () => number; leave?: () => number; enter2?: () => number }) {
   const root = useRef<HTMLDivElement>(null);
+  const [linesBottom] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("lines") === "bottom");
   useEffect(() => {
     let raf = 0;
     const tick = () => {
@@ -61,6 +62,8 @@ export function HeroOverlay({
         };
         if (enter) travel(el.querySelector<HTMLElement>("[data-enter]"), enter(), leave ? leave() : 0);
         if (enter2) travel(el.querySelector<HTMLElement>("[data-enter2]"), enter2(), 0);
+        const scrim = el.querySelector<HTMLElement>("[data-scrim]");
+        if (scrim && enter) scrim.style.opacity = String(Math.min(Math.max(enter(), 0), 1));
       }
       raf = requestAnimationFrame(tick);
     };
@@ -97,7 +100,7 @@ export function HeroOverlay({
         <p className="mt-[0.9em] text-[clamp(17px,1.75vw,25px)] font-normal leading-[1.3] text-white/80">
           <span data-exit="1" className="block">
             <Line delay={520}>
-              I build <em className="italic text-white">ambiguous ideas</em> into products
+              I build ambiguous ideas into products
             </Line>
           </span>
           <span data-exit="2" className="block">
@@ -106,24 +109,32 @@ export function HeroOverlay({
         </p>
       </div>
       {/* 2.1: the next chapter's line, entering from the right over the dark room above the desk */}
+      {linesBottom && enter && (
+        <div
+          aria-hidden
+          data-scrim
+          className="absolute inset-x-0 bottom-0 h-[42vh] opacity-0"
+          style={{ background: "linear-gradient(to top, rgba(0,0,0,0.62), rgba(0,0,0,0.3) 45%, transparent)" }}
+        />
+      )}
       {enter && (
         // over the void strip at the top (the three-quarter view leaves only that much empty): one line on desktop,
         // two below the menu on phones. A soft text shadow for legibility, never a shape over the desk.
         <h2
           data-enter
-          className="absolute left-[4.9vw] right-[4.9vw] top-[clamp(76px,11vh,120px)] text-[clamp(28px,3.5vw,54px)] font-normal leading-[1.08] tracking-[-0.015em] opacity-0 md:right-auto md:top-[clamp(28px,6vh,64px)]"
+          className={`absolute left-[4.9vw] right-[4.9vw] text-[clamp(28px,3.5vw,54px)] font-normal leading-[1.08] tracking-[-0.015em] opacity-0 md:right-auto ${linesBottom ? "bottom-[96px] max-w-[15ch] md:bottom-[clamp(96px,11vw,150px)] md:max-w-[15ch]" : "top-[clamp(76px,11vh,120px)] md:top-[clamp(28px,6vh,64px)]"}`}
           style={{ textShadow: "0 1px 24px rgba(0,0,0,0.55)" }}
         >
-          I look for problems <em className="italic">nobody</em> pointed at.
+          I look for problems nobody pointed at.
         </h2>
       )}
       {enter2 && (
         <h2
           data-enter2
-          className="absolute left-[4.9vw] right-[4.9vw] top-[clamp(76px,11vh,120px)] text-[clamp(28px,3.5vw,54px)] font-normal leading-[1.08] tracking-[-0.015em] opacity-0 md:right-auto md:top-[clamp(28px,6vh,64px)]"
+          className={`absolute left-[4.9vw] right-[4.9vw] text-[clamp(28px,3.5vw,54px)] font-normal leading-[1.08] tracking-[-0.015em] opacity-0 md:right-auto ${linesBottom ? "bottom-[96px] max-w-[15ch] md:bottom-[clamp(96px,11vw,150px)] md:max-w-[15ch]" : "top-[clamp(76px,11vh,120px)] md:top-[clamp(28px,6vh,64px)]"}`}
           style={{ textShadow: "0 1px 24px rgba(0,0,0,0.55)" }}
         >
-          Then I <em className="italic">test</em> solutions.
+          Then I test solutions.
         </h2>
       )}
       {/* the scroll cue: bottom right on desktop, centred on phones */}

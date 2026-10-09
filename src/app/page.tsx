@@ -13,7 +13,7 @@ export default function Home() {
       </section>
       <section id="contact" className="min-h-dvh px-16 pb-32 pt-24 text-center">
         <p>If you made it here,</p>
-        <h2 className="text-5xl italic text-rose">let&rsquo;s just talk?</h2>
+        <h2 className="text-5xl text-rose">let&rsquo;s just talk?</h2>
       </section>
     </>
   );

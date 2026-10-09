@@ -78,7 +78,7 @@ Step 2 is the risk: a ball flickering between states reads as a glitch. It must 
 ## 4. Type and copy system
 
 - **Sans only.** **Geist** for everything, **Geist Mono** for labels and footnotes (locked 2026-10-09 from the side-by-side sheet; free, SIL OFL, self-hosted via next/font; in the code since d150557+).
-- **Weights:** display 400, buttons/labels 500, **no 700/800**. Emphasis by **italic**, by size, and by opacity (secondary lines at ~60%).
+- **Weights:** display 400, buttons/labels 500, **no 700/800**. **No italic anywhere** (Liam, 2026-10-09: not needed). Hierarchy by size and opacity (secondary lines at ~60%).
 - **Scale:** display lines large (clamp 3–7vw), uppercase for manifesto-style lines, sentence case for personal lines. One idea per line.
 - **The one exception: the hero wordmark** (decided 2026-10-09). LIAM HASSON in heavy Geist (Black) as dark outlines in the void behind the sand, light travelling through the strokes in the sand's colours: an ambient wave every few seconds (alive on phones) plus the cursor lighting the strokes along its trail (reference: the outlined titles on lusion.co/about, which are cursor-lit). It is a lit object in the scene, not text, so it may break the weight rule. Live layer, never baked: the pull-back frames must be re-rendered without the old glowing wordmark. Built in `src/three/sand/wordmark.ts`.
 - **Horizontal text travel** (About, and the hero→desk copy): sentences exit left and enter right with scroll.
@@ -103,9 +103,9 @@ Step 2 is the risk: a ball flickering between states reads as a glitch. It must 
 
 Eventread's device shows the **month calendar laid out by risk** (the results view). Proposed capture: Berlin, November 2026, Rock, 500–1,500 cap (the live app's own example), captured from eventread.vercel.app, no login.
 
-**4 Toolkit.** The 3D bead canvas returns under the logos. Copy on one line: "My toolkit *never stops* expanding." "My toolkit" slides in from the left, "expanding" from the right, then "never stops" fades in. Logos scale up from near the centre and travel to their resting spots, staggered, scrubbed (as on the live site). Chip: "My current challenge: 3D modeling with Blender".
+**4 Toolkit.** The 3D bead canvas returns under the logos. Copy on one line: "My toolkit never stops expanding." "My toolkit" slides in from the left, "expanding" from the right, then "never stops" fades in. Logos scale up from near the centre and travel to their resting spots, staggered, scrubbed (as on the live site). Chip: "My current challenge: 3D modeling with Blender".
 
-**5 About.** Text: `docs/copy/about.md` (approved). Presentation: Lusion manifesto model, sentence by sentence, horizontal travel with scroll, italic emphasis on one phrase per sentence. Portrait and View resume stay.
+**5 About.** Text: `docs/copy/about.md` (approved). Presentation: Lusion manifesto model, sentence by sentence, horizontal travel with scroll, no italic (2026-10-09). Portrait and View resume stay.
 
 **6 Testimonials.** The two quotes.
 
