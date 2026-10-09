@@ -55,6 +55,27 @@ float snoise(vec3 v) {
 }
 `;
 
+/**
+ * 2.2, the attempts (the approved Blender logic, lookdev.py _attempt_on_dense): a patch facing uAttUp, its edge bent by
+ * noise, plus break-up noise when an attempt fails. Fixed in world space, so the grains flow through it as the ball
+ * turns. rank ~ the share of the surface below this point (d.up is uniform on a sphere).
+ */
+export const ATTEMPT_FIELD = /* glsl */ `
+uniform vec3 uAttUp;
+uniform float uAttLo;        // 1 = no attempt; lower = a bigger patch
+uniform float uAttBreak;     // 0..1: the patch fractures into islands
+uniform float uAttDepth;     // 0..1: how clear its centre gets
+float attField(vec3 d) {
+  float f = dot(d, uAttUp) + 0.22 * (0.5 * snoise(d * 1.7 + vec3(3.0, 0.0, 5.0)));
+  f += uAttBreak * 0.55 * (0.5 * snoise(d * 4.2 + vec3(11.0, 2.0, 7.0)));
+  return f;
+}
+float attBand(vec3 d) {
+  float rank = clamp(attField(d) * 0.5 + 0.5, 0.0, 1.0);
+  return clamp((rank - uAttLo) / max(1.01 - uAttLo, 1e-3), 0.0, 1.0);
+}
+`;
+
 export const SAND_VERTEX = /* glsl */ `
 precision highp float;
 precision highp sampler3D;
@@ -122,6 +143,7 @@ out float vAmbient;
 out float vBounceW;
 out float vPx;
 out float vEdgePx;
+out float vClear;    // 2.2: how far this grain has turned toward glass
 out float vGround;   // how much of the desk below this grain sees (surface grains of the formed ball)
 out vec4 vEll;      // grain shape: squash x, squash y, cos, sin of its turn (Blender: random squash +-22%, random rotation)
 
@@ -159,6 +181,7 @@ float transmittance(vec3 p, vec3 lightPos, float dist, float jitter, float k) {
 }
 
 float hash(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
+${ATTEMPT_FIELD}
 
 void main() {
   vec3 A = uChaosLo + vec3(float(aPos.x & 2047u) / 2047.0, float((aPos.x >> 11) & 1023u) / 1023.0,
@@ -180,6 +203,21 @@ void main() {
   float amp = uDrift * mix(1.0, 0.35, t);
   vec3 q = p * uDriftFreq + vec3(0.0, 0.0, uTime * uDriftSpeed);
   p += amp * vec3(snoise(q), snoise(q + vec3(31.4, 0.0, 0.0)), snoise(q + vec3(0.0, 47.2, 0.0)));
+  // 2.2: inside an attempt the grains pack onto the surface (closing the gaps), then drain toward glass
+  vClear = 0.0;
+  float attGrow = 1.0;
+  if (uAttLo < 0.999 && t > 0.5) {
+    vec3 rel = p - uBallC;
+    float rn = length(rel) / uBallR;
+    vec3 dir = rel / max(length(rel), 1e-5);
+    float band = attBand(dir);
+    float clear = pow(band, 1.4) * uAttDepth;
+    float pull = clamp(band * 2.5, 0.0, 1.0); pull = pull * pull * (3.0 - 2.0 * pull);
+    float rr = rn + (0.997 + 0.03 * hash(aPosB + 7.7) - 0.03 * clear - rn) * pull;
+    p = uBallC + dir * rr * uBallR;
+    vClear = clear;
+    attGrow = 1.0 + 0.7 * clear;
+  }
 
   // shadows: march in the volumes' own (unturned) frame, so shadows turn with the chaos and with the ball
   mat3 chaosInv = transpose(uChaosRot);
@@ -232,7 +270,7 @@ void main() {
   vec2 squash = 1.0 + 0.22 * (vec2(h1, h2) * 2.0 - 1.0);
   float ang = h3 * 6.2831853;
   vEll = vec4(squash, cos(ang), sin(ang));
-  float px = 2.0 * rad * uRadMax * mix(uRadScale.x, uRadScale.y * uBallGrain, t) * uCountScale * uPointScale / -mv.z * max(squash.x, squash.y);   // device pixels
+  float px = 2.0 * rad * uRadMax * mix(uRadScale.x, uRadScale.y * uBallGrain, t) * uCountScale * attGrow * uPointScale / -mv.z * max(squash.x, squash.y);   // device pixels
   // below a minimum the grain keeps its area through coverage, so it never shimmers
   vAlpha = clamp((px * px) / (uMinPx * uMinPx), 0.0, 1.0);
   gl_PointSize = max(px, uMinPx);
@@ -253,6 +291,7 @@ in float vAlpha;
 in float vAmbient;
 in vec4 vEll;
 in float vGround;
+in float vClear;
 in float vBounceW;
 in float vPx;
 in float vEdgePx;
@@ -264,7 +303,8 @@ uniform float uWrap;     // light reaching past the terminator: grains are lit b
 uniform float uBounce;   // light that has hit two grains (Cycles' multiple scattering): saturates toward the sand's colour
 uniform vec3 uGroundCol;   // the lamp-lit desk below, as a broad light from beneath (colour x strength)
 uniform vec3 uUpView;      // world up, in view space
-uniform float uLampSat;  // the desk lamp: light that reaches a grain through the sand is filtered by it (warmer, deeper)
+uniform float uLampSat;
+uniform vec3 uClearAlb;    // 2.2: the colour clearing grains drain to (pale frost)  // the desk lamp: light that reaches a grain through the sand is filtered by it (warmer, deeper)
 
 void main() {
   vec2 c = gl_PointCoord * 2.0 - 1.0;
@@ -279,6 +319,9 @@ void main() {
   vec3 n = normalize(vec3(mat2(vEll.z, vEll.w, -vEll.w, vEll.z) * ng, sqrt(1.0 - r2)));
   // matte: lambert, plus a faint broad sheen (roughness 0.62, specular 0.3 in the Cycles material)
   vec3 v = vec3(0.0, 0.0, 1.0);
+  // 2.2: clearing grains drain toward the frost's pale colour (no heat, no glow); they stay solid and the pixel
+  // filter blends them into the skin, as in the render
+  vec3 albedo = mix(vAlbedo, uClearAlb, vClear);
   vec3 L[4] = vec3[4](vL0, vL1, vL2, vL3);
   vec3 E[4] = vec3[4](vE0, vE1, vE2, vE3);
   vec3 col = vec3(0.0);
@@ -286,12 +329,13 @@ void main() {
     float ndl = max((dot(n, L[i]) + uWrap) / (1.0 + uWrap), 0.0);
     vec3 h = normalize(L[i] + v);
     float spec = pow(max(dot(n, h), 0.0), 12.0) * uSpec;
-    vec3 alb = i == 0 ? mix(vAlbedo, vAlbedo * vAlbedo * 2.2, uLampSat) : vAlbedo;
-    col += E[i] * (alb * ndl / 3.14159265 + spec * ndl + vAlbedo * vAlbedo * uBounce * vBounceW);
+    vec3 alb = i == 0 ? mix(albedo, albedo * albedo * 2.2, uLampSat) : albedo;
+    col += E[i] * (alb * ndl / 3.14159265 + spec * ndl + albedo * albedo * uBounce * vBounceW);
   }
   // the desk below: grains facing down see a broad warm surface (no single ray, so the ball doesn't block it)
   float down = clamp(0.5 - 0.5 * dot(n, uUpView), 0.0, 1.0);
-  col += vAlbedo * uGroundCol * down * down * vGround;
+  col += albedo * uGroundCol * down * down * vGround;
+  // 2.2: clearing grains drain toward pale glass (no heat, no glow) and turn see-through, showing the frost skin
   col *= uExposure * uOutScale;
   gl_FragColor = vec4(col, vAlpha * edge);
   #include <tonemapping_fragment>

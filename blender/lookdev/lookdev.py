@@ -1255,7 +1255,7 @@ def build_desk():
     view, state = args.view, args.dstate
     ball_c = {"tq": (0.0, 0.03, R + 0.028), "top": (0.0, 0.03, 0.2), "side": (0.47, -0.14, R + 0.0005)}[view]
     before = set(bpy.data.objects)
-    if os.environ.get("LOOKDEV_NO_SAND") or os.environ.get("PULLBACK_PLATE") or os.environ.get("SETTLE_PLATE"):
+    if os.environ.get("LOOKDEV_NO_SAND") or os.environ.get("PULLBACK_PLATE") or os.environ.get("SETTLE_PLATE") or os.environ.get("DESKMOVE_PLATE"):
         pass   # backplates and ray grids: the sand is live on the site; don't build it just to delete it
     elif state == "chaos":
         pts, hue, radius, _ = chaos_points(80_000 if args.preview else 520_000)
@@ -1730,9 +1730,18 @@ def build_deskmove():
     if move == "descend":
         MOVE_CTX["open"] = 108; MOVE_CTX["side_fill"] = True
         os.environ["ATTEMPT"] = "0.68,0,1"     # the third attempt, held (the last frame of the 2.2 clip)
+    # DESKMOVE_PLATE=1: the backplate for the site: desk only (the ball is live), lens 1.5x wider, and the same rim light
+    # as the settle plate (the plates meet edge to edge)
+    plate = bool(os.environ.get("DESKMOVE_PLATE"))
+    OVERSCAN = 1.5 if plate else 1.0
+    if plate:
+        os.environ["LOOKDEV_NO_SAND"] = "1"
     build_desk()
     for o in [o for o in bpy.data.objects if o.type == "CAMERA"]:
         bpy.data.objects.remove(o)
+    if plate:
+        c_ = Vector(CHAOS_C)
+        area_light("rim", tuple(c_ + Vector((0.18, 0.78, 0.3))), 0.24, 26.0, ROSE_SOFT, target=tuple(c_))
     R = 0.07
     F = {"rise": 60, "descend": 100, "push": 72}[move]
     scene.frame_start, scene.frame_end = 1, F
@@ -1804,7 +1813,7 @@ def build_deskmove():
         c = c0.lerp(c1, tc); r = lerp(r0, r1, tr); el = lerp(el0, el1, te); az = lerp(az0, az1, ta)
         pos = c + r * Vector((math.cos(el) * math.cos(az), math.cos(el) * math.sin(az), math.sin(el)))
         cam.location = pos; cam.rotation_quaternion = (c - pos).to_track_quat("-Z", "Y")
-        cam_d.lens = lerp(a_[2], b_[2], ease(t, 0.0, 0.66) if move == "descend" else tc)
+        cam_d.lens = lerp(a_[2], b_[2], ease(t, 0.0, 0.66) if move == "descend" else tc) / OVERSCAN
         cam_d.dof.aperture_fstop = lerp(a_[3], b_[3], tc)
         tb = ease(t, 0.0, 0.66) if move == "descend" else ease(t)
         rig.location = ball0.lerp(ball1, tb)
@@ -1831,10 +1840,18 @@ def build_deskmove():
         mw = cam.matrix_world; q = mw.to_quaternion()
         _, _, corners = screen_frame()
         path.append({"frame": f, "position": list(mw.translation), "quaternion": [q.w, q.x, q.y, q.z],
-                     "lens_mm": cam_d.lens, "sensor_mm": 36, "focus_m": cam_d.dof.focus_distance,
-                     "ball": list(rig.matrix_world.translation), "ball_radius": R,
+                     "lens_mm": cam_d.lens * OVERSCAN, "sensor_mm": 36, "focus_m": cam_d.dof.focus_distance,
+                     "ball": list(rig.matrix_world.translation), "ball_radius": R, "ball_roll": rig.rotation_euler.x,
                      "screen_corners": [list(v) for v in corners]})
     os.makedirs(args.out, exist_ok=True)
+    if plate:
+        c_ = Vector(CHAOS_C)
+        with open(os.path.join(args.out, f"{move}-camera.json"), "w") as fh:
+            json.dump({"fps": 24, "frames": F, "units": "metres", "up": "z", "path": path, "plate_overscan": OVERSCAN,
+                       "chaos_center": list(c_), "chaos_scale": CHAOS_SCALE, "ball": {"center": path[0]["ball"], "radius": R},
+                       "lights": {"lamp": dict(pos=[-0.42, 0.3, 0.55], target=[0, 0, 0], watts=230, color=[1.0, 0.74, 0.48], spot_deg=85, blend=0.85),
+                                  "rim": dict(pos=list(c_ + Vector((0.18, 0.78, 0.3))), watts=26, color=list(ROSE_SOFT[:3])),
+                                  "bounce": dict(pos=[0.45, -0.25, 0.25], watts=3.5, color=[1.0, 0.85, 0.7])}}, fh)
     with open(os.path.join(args.out, f"deskmove-{move}-camera.json"), "w") as fh:
         json.dump({"move": move, "fps": 24, "frames": F, "units": "metres", "up": "z",
                    "screen_corners_order": "top-left, top-right, bottom-right, bottom-left (as seen on the screen)", "path": path}, fh)
@@ -2053,8 +2070,9 @@ if args.scene == "attempts":
     sys.exit(0)
 if args.scene in ("pullback", "deskmove", "settle"):
     name = (("pullback-plate" if os.environ.get("PULLBACK_PLATE") else "pullback") if args.scene == "pullback"
-            else ("settle-plate" if os.environ.get("SETTLE_PLATE") else "settle") if args.scene == "settle" else f"deskmove-{args.move}")
-    if (os.environ.get("PULLBACK_PLATE") or os.environ.get("SETTLE_PLATE")) and not args.preview:
+            else ("settle-plate" if os.environ.get("SETTLE_PLATE") else "settle") if args.scene == "settle"
+            else (f"{args.move}-plate" if os.environ.get("DESKMOVE_PLATE") else f"deskmove-{args.move}"))
+    if (os.environ.get("PULLBACK_PLATE") or os.environ.get("SETTLE_PLATE") or os.environ.get("DESKMOVE_PLATE")) and not args.preview:
         render_settings(64, 1920, 1200)
         # speed: keep the static desk between frames (no rebuild per frame) and stop sampling pixels that have converged
         scene.render.use_persistent_data = True

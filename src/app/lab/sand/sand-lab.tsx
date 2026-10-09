@@ -8,6 +8,8 @@ import { PaintField } from "@/three/sand/paint";
 import { Wordmark } from "@/three/sand/wordmark";
 import { HeroOverlay } from "./hero-overlay";
 import { BallShadow } from "@/three/sand/ball-shadow";
+import { FrostSkin } from "@/three/sand/frost-skin";
+import { attemptAt } from "@/three/sand/attempts";
 import { SAND_ENCODE, SAND_LAYER, SandComposite } from "@/three/sand/sand-composite";
 import { Pullback } from "@/three/sand/pullback";
 import * as THREE from "three";
@@ -27,7 +29,12 @@ function compactFor(progress: number): number {
  * back and down to the desk, the 2.1 line enters as the desk arrives. The ball forms on the desk in 2.1 (next step),
  * so here the sand stays chaos (Liam, 2026-10-09: "on the desk, as planned").
  */
-const TL = { exit: [0.06, 0.17], pullback: [0.1, 0.52], enter: [0.38, 0.52], settle: [0.56, 0.92], compact: [0.6, 0.9] } as const;
+const TL = {
+  exit: [0.035, 0.1], pullback: [0.06, 0.31], enter: [0.22, 0.31],              // hero -> 2.1
+  settle: [0.33, 0.52], compact: [0.35, 0.5],                                  // 2.1: the ball forms on the desk
+  leave21: [0.54, 0.6], rise: [0.56, 0.68], enter22: [0.64, 0.7],               // 2.1 -> 2.2
+  attempts: [0.71, 0.97],                                                      // 2.2: three attempts
+} as const;
 const span = (p: number, [a, b]: readonly [number, number]) => Math.min(Math.max((p - a) / (b - a), 0), 1);
 
 /** Frame-rate-independent damping toward a target. */
@@ -53,6 +60,8 @@ export function SandLab() {
   );
   const readScrolled = useCallback(() => progressRef.current, []);
   const readEnter = useCallback(() => span(progressRef.current, TL.enter), []);
+  const readLeave21 = useCallback(() => span(progressRef.current, TL.leave21), []);
+  const readEnter22 = useCallback(() => span(progressRef.current, TL.enter22), []);
   const [status, setStatus] = useState("loading sand");
   // no WebGL2 (or the sand failed to load): the approved renders as stills, chaos then ball with scroll
   const [fallback, setFallback] = useState(false);
@@ -112,7 +121,17 @@ export function SandLab() {
       const pullback = hero && !compare ? await Pullback.load() : null;
       // 2.1: the settle into the three-quarter view, the chaos packing into the ball on the desk
       const settle = hero && !compare ? await Pullback.load("/lab/settle") : null;
+      // 2.1 -> 2.2: the rise to the top-down view (the ball rises and rolls with it)
+      const rise = hero && !compare ? await Pullback.load("/lab/rise").catch(() => null) : null;
       if (disposed) return;
+      if (rise) stage.scene.add(rise.plate);
+      // 2.2: the frost skin that grows out of the sand inside each attempt
+      const frost = hero && !compare ? new FrostSkin(field.material) : null;
+      if (frost) {
+        frost.mesh.layers.set(SAND_LAYER);
+        stage.scene.add(frost.mesh);
+        (window as unknown as { __frost?: (l: Parameters<FrostSkin["setLook"]>[0]) => void }).__frost = (l) => frost.setLook(l);
+      }
       if (pullback) stage.scene.add(pullback.plate);
       let shadow: BallShadow | null = null;
       // the shadow: lamp radius (hero units), strength, and the ball's effective solid size (its edge is sparse sand)
@@ -290,8 +309,20 @@ export function SandLab() {
           // ?stframe=N holds the camera on a settle frame (calibration)
           const stFrame = Number(new URLSearchParams(window.location.search).get("stframe") || NaN);
           const st = settle ? (Number.isFinite(stFrame) ? (stFrame - 1) / (settle.data.frames - 1) : span(progressRef.current, TL.settle)) : 0;
-          const move = settle && st > 0 ? settle : pullback;
-          const f = move === settle ? st * (settle.data.frames - 1) : t * (pullback.data.frames - 1);
+          const rt = rise ? span(progressRef.current, TL.rise) : 0;
+          const move = rise && rt > 0 ? rise : settle && st > 0 ? settle : pullback;
+          const f = move === rise ? rt * (rise.data.frames - 1) : move === settle ? st * (settle!.data.frames - 1) : t * (pullback.data.frames - 1);
+          if (rise) {
+            rise.plate.visible = move === rise;
+            // the ball rides the rise: up off the desk, rolling forward 45 degrees (scroll turns the ball)
+            const fi = Math.min(Math.max(Math.round(f), 0), rise.data.frames - 1);
+            const fr = rise.data.path[move === rise ? fi : 0] as unknown as { ball: number[]; ball_roll: number };
+            field!.setBallTarget(rise.toHero(fr.ball), 0.07 / rise.data.chaos_scale);
+            state.ballRoll = move === rise ? fr.ball_roll : 0;
+          }
+          // 2.2: the attempts, scrubbed by scroll, facing the camera above (world up)
+          const [lo, brk, dep] = attemptAt(span(progressRef.current, TL.attempts));
+          field!.setAttempt(span(progressRef.current, TL.attempts) > 0 ? lo : 1, brk, dep);
           const v = move.view(f);
           stage!.setView(v.position, v.quaternion, v.lens);
           const tanV = Math.tan(THREE.MathUtils.degToRad(stage!.camera.fov) / 2);
@@ -302,7 +333,7 @@ export function SandLab() {
           if (shadow && deskNow) {
             // the lamp's real size (0.2 m soft radius, 2 hero units) sets the softness; ~85% of the desk's light is the lamp
             const ballC = field!.material.uniforms.uBallC.value as THREE.Vector3;
-            shadow.update(ballC, field!.material.uniforms.uBallR.value * shadowK[2], deskNow.lights[0].pos, shadowK[0], move === settle ? shadowK[1] * state.compact : 0);
+            shadow.update(ballC, field!.material.uniforms.uBallR.value * shadowK[2], deskNow.lights[0].pos, shadowK[0], move !== pullback ? shadowK[1] * state.compact : 0);
           }
           field!.setPointScale(stage!.bufferHeight, THREE.MathUtils.degToRad(stage!.camera.fov));
           const h = THREE.MathUtils.smoothstep(t, 0.15, 0.85);
@@ -436,10 +467,10 @@ export function SandLab() {
   }
 
   return (
-    <div className="bg-black" style={{ height: hero ? "950vh" : "400vh" }}>
+    <div className="bg-black" style={{ height: hero ? "1700vh" : "400vh" }}>
       <canvas ref={canvasRef} className="fixed inset-0 h-screen w-screen" data-testid="sand-canvas" />
       {hero ? (
-        <HeroOverlay exit={readExit} scrolled={readScrolled} enter={readEnter} />
+        <HeroOverlay exit={readExit} scrolled={readScrolled} enter={readEnter} leave={readLeave21} enter2={readEnter22} />
       ) : (
         <div className="pointer-events-none fixed left-3 top-3 font-mono text-[11px] uppercase tracking-wider text-white/60">
           sand lab · {status}

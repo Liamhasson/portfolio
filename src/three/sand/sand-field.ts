@@ -12,6 +12,8 @@ export interface SandState {
   ballSpin: number;
   /** The chaos turning around itself, radians. */
   chaosSpin: number;
+  /** The ball rolling forward about the horizontal (the rise to the top view), radians. */
+  ballRoll?: number;
 }
 
 /** Calibrated against the Cycles renders (see the compare mode); light power is Blender's watts times this. */
@@ -101,6 +103,11 @@ export class SandField {
         uBallVolC: { value: new THREE.Vector3(...meta.ball.center) },
         uBallVolS: { value: 1 },
         uBallGrain: { value: 1 },
+        uAttUp: { value: new THREE.Vector3(0, 1, 0) },
+        uAttLo: { value: 1 },
+        uAttBreak: { value: 0 },
+        uAttDepth: { value: 0 },
+        uClearAlb: { value: new THREE.Vector3(0.58, 0.44, 0.36) },   // calibrated with the frost skin (frost-skin.ts)
         uBallRot: { value: this.ballRot },
         uChaosC: { value: this.chaosCentre() },
         uChaosRot: { value: this.chaosRot },
@@ -214,6 +221,15 @@ export class SandField {
     (u.uUpView.value as THREE.Vector3).set(0, 1, 0).transformDirection(camera.matrixWorldInverse);
   }
 
+  /** 2.2: the current attempt (lo 1 = none; lower = a bigger patch), how broken, how clear; `up` faces the patch. */
+  setAttempt(lo: number, breakup: number, depth: number, up?: THREE.Vector3): void {
+    const u = this.material.uniforms;
+    u.uAttLo.value = lo;
+    u.uAttBreak.value = breakup;
+    u.uAttDepth.value = depth;
+    if (up) (u.uAttUp.value as THREE.Vector3).copy(up);
+  }
+
   /** The cursor as a light: world position and intensity 0..1 (fades with the pointer). */
   setCursor(pos: THREE.Vector3, intensity: number): void {
     const u = this.material.uniforms;
@@ -267,7 +283,9 @@ export class SandField {
     } else {
       u.uVolA.value = mid; u.uVolB.value = ball; u.uVolMix.value = (s.compact - 0.5) / 0.5;
     }
-    this.ballRot.setFromMatrix4(this.m4.makeRotationAxis(Y, s.ballSpin));
+    this.m4.makeRotationAxis(Y, s.ballSpin);
+    if (s.ballRoll) this.m4.premultiply(new THREE.Matrix4().makeRotationX(s.ballRoll));
+    this.ballRot.setFromMatrix4(this.m4);
     this.chaosRot.setFromMatrix4(this.m4.makeRotationAxis(Y, s.chaosSpin));
   }
 

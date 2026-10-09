@@ -15,7 +15,7 @@ await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
 await page.waitForTimeout(4000);
 // a slow, even scroll over ~10s to the end
 const max = await page.evaluate(() => document.documentElement.scrollHeight - innerHeight);
-const steps = 420;
+const steps = 640;
 for (let i = 1; i <= steps; i++) {
   await page.evaluate((y) => window.scrollTo(0, y), (i / steps) * max);
   await page.waitForTimeout(33);

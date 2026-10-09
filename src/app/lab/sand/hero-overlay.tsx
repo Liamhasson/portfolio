@@ -34,7 +34,9 @@ function exitT(e: number, i: number): number {
  * `exit`: 0 holding .. 1 gone (staggered per line). `scrolled`: 0 at the top .. (the scroll cue fades once it moves).
  * `enter`: the next chapter's line, 0 off to the right .. 1 in place.
  */
-export function HeroOverlay({ exit, scrolled, enter }: { exit: () => number; scrolled: () => number; enter?: () => number }) {
+export function HeroOverlay({
+  exit, scrolled, enter, leave, enter2,
+}: { exit: () => number; scrolled: () => number; enter?: () => number; leave?: () => number; enter2?: () => number }) {
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
     let raf = 0;
@@ -49,19 +51,22 @@ export function HeroOverlay({ exit, scrolled, enter }: { exit: () => number; scr
         });
         const cue = el.querySelector<HTMLElement>("[data-cue]");
         if (cue) cue.style.opacity = String(1 - Math.min(scrolled() / 0.03, 1));   // its job is done once scrolling starts
-        const next = el.querySelector<HTMLElement>("[data-enter]");
-        if (next && enter) {
-          const t0 = Math.min(Math.max(enter(), 0), 1);
-          const t = 1 - Math.pow(1 - t0, 3);
-          next.style.transform = `translate3d(${(1 - t) * 55}vw,0,0)`;
-          next.style.opacity = String(t0);
-        }
+        // chapter lines: each enters from the right, holds, and travels out left as the next arrives
+        const travel = (node: HTMLElement | null, inT: number, outT: number) => {
+          if (!node) return;
+          const a = Math.min(Math.max(inT, 0), 1), b = Math.min(Math.max(outT, 0), 1);
+          const ti = 1 - Math.pow(1 - a, 3), to = b * b * (3 - 2 * b);
+          node.style.transform = `translate3d(${(1 - ti) * 55 - to * 55}vw,0,0)`;
+          node.style.opacity = String(a * (1 - to));
+        };
+        if (enter) travel(el.querySelector<HTMLElement>("[data-enter]"), enter(), leave ? leave() : 0);
+        if (enter2) travel(el.querySelector<HTMLElement>("[data-enter2]"), enter2(), 0);
       }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [exit, scrolled, enter]);
+  }, [exit, scrolled, enter, leave, enter2]);
 
   return (
     <div ref={root} className="pointer-events-none fixed inset-0 z-10 text-[#f4efe9]" data-testid="hero-overlay">
@@ -110,6 +115,15 @@ export function HeroOverlay({ exit, scrolled, enter }: { exit: () => number; scr
           style={{ textShadow: "0 1px 24px rgba(0,0,0,0.55)" }}
         >
           I look for problems <em className="italic">nobody</em> pointed at.
+        </h2>
+      )}
+      {enter2 && (
+        <h2
+          data-enter2
+          className="absolute left-[4.9vw] right-[4.9vw] top-[clamp(76px,11vh,120px)] text-[clamp(28px,3.5vw,54px)] font-normal leading-[1.08] tracking-[-0.015em] opacity-0 md:right-auto md:top-[clamp(28px,6vh,64px)]"
+          style={{ textShadow: "0 1px 24px rgba(0,0,0,0.55)" }}
+        >
+          Then I <em className="italic">test</em> solutions.
         </h2>
       )}
       {/* the scroll cue: bottom right on desktop, centred on phones */}
