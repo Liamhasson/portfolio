@@ -63,3 +63,6 @@ blender/lookdev/renders/deskmove-push/
 
 # isolated worktrees for parallel chats
 .claude/worktrees/
+blender/lookdev/renders/bake/
+blender/lookdev/renders/targets/
+blender/lookdev/renders/*-plate/
