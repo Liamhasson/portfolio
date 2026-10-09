@@ -1324,6 +1324,14 @@ git commit -m "chore: Eventread calendar capture for the case-study hero" -- scr
 ### Task 11: Copy review with Liam (gate)
 
 - [ ] **Step 1:** Start the dev server (`preview_start` with `portfolio-dev`) and open `/eventread`, `/cyvore`, `/pulse`. The pages are unstyled; this review is about words only.
+- [ ] **Step 1b: Open questions from the Task 4 fact check** (raise these first):
+  - Eventread: "The formula produced only 27 distinct values, and none fell between 35–45 or 64–80" comes from the August build sessions, not the spec. Keep?
+  - Eventread: is the UI string really "No coverage here"? Check the live app.
+  - Eventread: "The search stays one form: place, date, genre, capacity" is inferred from the app's search form. Keep or reword?
+  - Eventread: the approved impact line says "every competing event", while the same page shows "Not checked" states. Keep "every"?
+  - Cyvore: challenge 2's "what it changed" restates the method rather than a result; challenge 1's "happened" repeats its title.
+  - Cyvore: the outcome's timing sentence should name who was measured ("3 stakeholders: about 35s → about 8s").
+  - Pulse: "The goal-based onboarding shown above" depends on layout; confirm once Part B places the blocks.
 - [ ] **Step 2:** Walk Liam through every line of the content files and MDX, one study at a time. Apply his edits in `src/content/case-studies/*.ts` and `*.mdx`; re-run `npx vitest run src/content` after each study (the validator catches a broken frame).
 - [ ] **Step 3: Commit** after each approved study: `git commit -m "content: <study> copy approved by Liam" -- src/content/case-studies/`
 
