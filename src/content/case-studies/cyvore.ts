@@ -26,13 +26,13 @@ export const cyvore: CaseStudy = {
       title: "No investors to test with",
       happened: "The people the site was for, investors in a live meeting, weren't available to test with.",
       did: "I tested with the three people who'd present it, the CTO, a developer and DevOps: four navigation tasks, with the task order counterbalanced.",
-      changed: "Every task was measured on the people who'd actually be presenting it.",
+      changed: "With them, finding a section fell from about 35s to about 8s.",
     },
   ],
   outcome: {
     lines: [
       "Used as the live product presentation in investor meetings.",
-      "3 of 3 stakeholders completed all four tasks. Time to find a section: about 35s → about 8s.",
+      "3 of 3 stakeholders completed all four tasks.",
     ],
     quote: {
       text: "We weren't looking for a designer. Liam reached us and thanks to his work, we closed our first funding round.",
