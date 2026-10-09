@@ -12,6 +12,7 @@ const params = new URLSearchParams({
   lat: "52.52",
   lon: "13.405",
   date: "2026-11-01", // the app wants a full date; "2026-11" crashes its results page
+  day: "2026-11-18", // the night the detail panel opens on (the Muse example)
   range: "month",
   genre: "Rock",
   capacity: "1000",
@@ -19,7 +20,7 @@ const params = new URLSearchParams({
 
 await mkdir(OUT, { recursive: true });
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1512, height: 982 }, deviceScaleFactor: 2 });
+const page = await browser.newPage({ viewport: { width: 1728, height: 1080 }, deviceScaleFactor: 2 });
 await page.goto(`https://eventread.vercel.app/results?${params}`, { waitUntil: "networkidle" });
 // Loaded = both source pills have left "Checking …" (see LiveDataStatus in the app).
 await page.getByText("live data").first().waitFor({ timeout: 30000 });
@@ -29,6 +30,11 @@ if (/couldn't be reached|sample data|Something broke/.test(body)) {
   throw new Error("Eventread did not load cleanly; not saving a broken capture.");
 }
 if (!body.includes("Powered by JamBase")) throw new Error("JamBase source missing; not saving.");
+// The panel must be on the 18th, not the app's default earliest-event day.
+await page.getByText("Nov 18, 2026").first().waitFor({ timeout: 30000 });
+if (!(await page.locator("body").innerText()).includes("Muse")) {
+  throw new Error("Muse not found on 18 Nov; not saving.");
+}
 await page.waitForTimeout(1500); // let the calendar cells settle
 await page.screenshot({ path: `${OUT}/calendar-berlin-2026-11.png` });
 await browser.close();
