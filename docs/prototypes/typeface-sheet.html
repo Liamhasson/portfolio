@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Geist Type Check</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:ital,wght@0,400;0,500;1,400&family=Geist+Mono:wght@400;500&family=DM+Mono:wght@400&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  /* Values measured on lusion.co/about (2026-10-09): Aeonik 400, display 57.6px at a
+     1440px viewport (4vw), line-height 1.15, normal tracking, italic for emphasis.
+     Every frame below is a 1440-wide container, sized in cqw so the Geist set and the
+     Aeonik screenshot stay at the same scale at any window width. */
+  :root {
+    --void: #000;
+    --ink: #f3f1ee;
+    --ink-dim: rgba(243, 241, 238, .6);
+    --rule: rgba(243, 241, 238, .14);
+    --tag: #b9725c;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--void);
+    color: var(--ink);
+    font-family: "Geist", sans-serif;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    padding: 0 16px 120px;
+  }
+  .wrap { max-width: 1440px; margin: 0 auto; }
+
+  header { padding: 64px 0 40px; border-bottom: 1px solid var(--rule); }
+  .mono { font-family: "Geist Mono", monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+  header h1 { font-size: clamp(32px, 4vw, 57.6px); line-height: 1.15; font-weight: 400; margin: 16px 0 24px; }
+  header h1 em { font-style: italic; }
+  header p { max-width: 640px; font-size: 18px; line-height: 1.5; color: var(--ink-dim); }
+  header ul { margin-top: 20px; padding-left: 18px; color: var(--ink-dim); font-size: 16px; line-height: 1.7; max-width: 680px; }
+
+  section { padding: 72px 0 0; }
+  .sec-head { display: flex; gap: 24px; align-items: baseline; margin-bottom: 24px; }
+  .sec-head .mono { color: var(--tag); }
+  .sec-head h2 { font-size: 24px; font-weight: 400; }
+  .sec-head h2 em { color: var(--ink-dim); }
+
+  .pair-label { margin: 28px 0 10px; display: flex; justify-content: space-between; color: var(--ink-dim); }
+  .ref img { display: block; width: 100%; height: auto; border: 1px solid var(--rule); }
+
+  /* A frame is a stand-in for the 1440px viewport. */
+  .frame {
+    container-type: inline-size;
+    position: relative;
+    width: 100%;
+    background: var(--void);
+    border: 1px solid var(--rule);
+    overflow: hidden;
+  }
+  .frame em { font-style: italic; }
+  .display { font-size: 4cqw; line-height: 1.15; }
+
+  /* 01 caps */
+  .f-caps { aspect-ratio: 1440 / 320; }
+  .f-caps .l { position: absolute; left: 5cqw; bottom: 2.4cqw; text-transform: uppercase; }
+  .f-caps .r { position: absolute; right: 5cqw; bottom: 2.4cqw; text-transform: uppercase; text-align: right; font-style: italic; }
+
+  /* 02 italic sentence case (Lusion spaces each word as its own span) */
+  .f-sent { aspect-ratio: 1440 / 900; }
+  .f-sent .display { word-spacing: .2em; }
+  .f-sent .tl { position: absolute; left: 5cqw; top: 8.6cqw; }
+  .f-sent .br { position: absolute; right: 5cqw; top: 44.3cqw; text-align: right; }
+
+  /* 03 small sentence */
+  .f-small { aspect-ratio: 1400 / 155; }
+  .f-small p { position: absolute; left: 25.93cqw; top: 1.1cqw; font-size: 2.6cqw; line-height: 1.1; }
+
+  /* 04 hero composition */
+  .f-hero { aspect-ratio: 16 / 9; }
+  .f-hero .label { position: absolute; left: 5cqw; top: 4.4cqw; font-family: "Geist Mono", monospace; font-size: .95cqw; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); }
+  .f-hero .name { position: absolute; left: 5cqw; bottom: 13cqw; font-size: 7cqw; line-height: 1; letter-spacing: -.01em; }
+  .f-hero .line { position: absolute; left: 5cqw; bottom: 5cqw; font-size: 2.6cqw; line-height: 1.15; max-width: 56cqw; }
+  .f-hero .line span { color: var(--ink-dim); }
+  .f-hero .cue { position: absolute; right: 5cqw; bottom: 5cqw; font-size: 1.25cqw; text-transform: uppercase; }
+
+  /* 05 step lines */
+  .f-steps { padding: 6cqw 5cqw; }
+  .f-steps p + p { margin-top: 4cqw; }
+  .f-steps .tool { text-align: center; }
+
+  /* 06 small type */
+  .f-ui { padding: 5cqw; display: grid; gap: 4cqw; }
+  .index-row { display: grid; grid-template-columns: 5cqw 1fr auto; align-items: baseline; gap: 2cqw; padding: 1.4cqw 0; border-top: 1px solid var(--rule); font-size: 1.9cqw; line-height: 1.2; }
+  .index-row:last-child { border-bottom: 1px solid var(--rule); }
+  .index-row .n, .index-row .s { font-family: "Geist Mono", monospace; font-size: .95cqw; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-dim); }
+  .index-row .t span { color: var(--ink-dim); }
+  .body-row { display: grid; grid-template-columns: 1fr 1fr; gap: 4cqw; align-items: start; }
+  .body-row p { font-size: max(16px, 1.25cqw); line-height: 1.55; color: var(--ink-dim); }
+  .body-row p:first-child { color: var(--ink); }
+  .btns { display: flex; gap: 1cqw; align-items: center; }
+  .btn { font-family: "Geist", sans-serif; font-weight: 500; font-size: max(13px, .95cqw); text-transform: uppercase; letter-spacing: .02em; padding: .95cqw 1.6cqw; border-radius: 999px; border: 0; }
+  .btn.dark { background: #1c1b22; color: var(--ink); }
+  .btn.light { background: var(--ink); color: #000; }
+
+  .monos { display: grid; grid-template-columns: 12cqw 1fr; row-gap: 1.2cqw; align-items: baseline; }
+  .monos .k { color: var(--ink-dim); font-size: max(12px, .9cqw); }
+  .monos .v { font-size: max(12px, .95cqw); letter-spacing: .06em; text-transform: uppercase; }
+
+  footer { margin-top: 72px; padding-top: 32px; border-top: 1px solid var(--rule); }
+  footer p { font-size: 18px; line-height: 1.5; color: var(--ink-dim); max-width: 680px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="mono">Type check · 2026-10-09 · Geist vs the Lusion reference</div>
+    <h1>Geist, set at Lusion's <em>exact</em> values.</h1>
+    <p>Each section shows Lusion's real Aeonik first (a screenshot of lusion.co), then the same words in Geist at the same size, line height and position, then our copy in Geist. Weight 400 throughout; 500 only on buttons.</p>
+    <ul>
+      <li>Does the italic hold up as the only emphasis tool?</li>
+      <li>Do the large lines feel crafted, or like a default template?</li>
+      <li>Geist Mono vs DM Mono for labels (section 06).</li>
+    </ul>
+  </header>
+
+  <!-- 01 -->
+  <section>
+    <div class="sec-head"><span class="mono">01</span><h2>Uppercase manifesto <em>· 4vw, line height 1.15</em></h2></div>
+
+    <div class="pair-label mono"><span>Aeonik · lusion.co/about</span><span>reference</span></div>
+    <div class="ref"><img src="img/lusion-caps.jpg" alt="Lusion about page: WE ARE LUSION, A CREATIVE PRODUCTION STUDIO, CRAFTING UNIQUE DIGITAL EXPERIENCES in Aeonik"></div>
+
+    <div class="pair-label mono"><span>Geist · same words</span><span>1:1</span></div>
+    <div class="frame f-caps">
+      <p class="display l">We are<br>Lusion<br>A creative<br><em>Production studio</em></p>
+      <p class="display r">Crafting unique<br>digital experiences</p>
+    </div>
+
+    <div class="pair-label mono"><span>Geist · our hero line in this style</span><span>illustration</span></div>
+    <div class="frame f-caps">
+      <p class="display l">I build<br>ambiguous ideas<br>into products</p>
+      <p class="display r">where design and<br>user needs meet</p>
+    </div>
+  </section>
+
+  <!-- 02 -->
+  <section>
+    <div class="sec-head"><span class="mono">02</span><h2>Sentence case, italic emphasis <em>· the About slide model</em></h2></div>
+
+    <div class="pair-label mono"><span>Aeonik · lusion.co/about</span><span>reference</span></div>
+    <div class="ref"><img src="img/lusion-italic.jpg" alt="Lusion about page: A worldwide team of specialists in design, motion, 3D, and technology, working together to turn ambitious ideas into immersive digital experiences"></div>
+
+    <div class="pair-label mono"><span>Geist · same words</span><span>1:1</span></div>
+    <div class="frame f-sent">
+      <p class="display tl"><em>A worldwide team</em> of<br>specialists in design,<br>motion, 3D, and technology</p>
+      <p class="display br">working together to<br>turn ambitious ideas into<br>immersive digital experiences.</p>
+    </div>
+
+    <div class="pair-label mono"><span>Geist · our About copy</span><span>approved text</span></div>
+    <div class="frame f-sent">
+      <p class="display tl">I’m Liam. I love crafting<br>products where design<br>and <em>user needs meet.</em></p>
+      <p class="display br">That’s still how I work. I go<br>looking for problems<br><em>nobody pointed at.</em></p>
+    </div>
+  </section>
+
+  <!-- 03 -->
+  <section>
+    <div class="sec-head"><span class="mono">03</span><h2>Mid-size sentence <em>· Lusion home intro</em></h2></div>
+
+    <div class="pair-label mono"><span>Aeonik · lusion.co</span><span>reference (on light)</span></div>
+    <div class="ref"><img src="img/lusion-sentence.jpg" alt="Lusion home: We create 3D visual storytelling and interactive web experiences that help brands stand out"></div>
+
+    <div class="pair-label mono"><span>Geist · same words, on our black</span><span>1:1 size</span></div>
+    <div class="frame f-small">
+      <p>We create 3D visual storytelling<br>and interactive web experiences<br>that help brands stand out</p>
+    </div>
+  </section>
+
+  <!-- 04 -->
+  <section>
+    <div class="sec-head"><span class="mono">04</span><h2>Our hero <em>· name, title, one line</em></h2></div>
+    <div class="pair-label mono"><span>Geist + Geist Mono</span><span>16:9 viewport</span></div>
+    <div class="frame f-hero">
+      <span class="label">Product Designer</span>
+      <p class="name">Hi, I’m Liam.</p>
+      <p class="line">I build ambiguous ideas into products <span>where design and user needs meet.</span></p>
+      <span class="cue">Scroll to explore</span>
+    </div>
+  </section>
+
+  <!-- 05 -->
+  <section>
+    <div class="sec-head"><span class="mono">05</span><h2>How I work + toolkit <em>· display lines</em></h2></div>
+    <div class="pair-label mono"><span>Geist · 4vw</span><span>approved copy</span></div>
+    <div class="frame f-steps">
+      <p class="display">I look for problems <em>nobody pointed at.</em></p>
+      <p class="display">Then I <em>test</em> solutions.</p>
+      <p class="display">And I <em>build</em> it.</p>
+      <p class="display tool">My toolkit <em>never stops</em> expanding.</p>
+    </div>
+  </section>
+
+  <!-- 06 -->
+  <section>
+    <div class="sec-head"><span class="mono">06</span><h2>Small type <em>· index, body, buttons, labels</em></h2></div>
+    <div class="pair-label mono"><span>Geist + Geist Mono</span><span>working sizes</span></div>
+    <div class="frame f-ui">
+      <div>
+        <div class="index-row"><span class="n">01</span><span class="t">Eventread · SaaS web app <span>— The check every booker skips.</span></span><span class="s">Live</span></div>
+        <div class="index-row"><span class="n">02</span><span class="t">Cyvore · B2B website <span>— A cybersecurity startup needed a site investors would believe in.</span></span><span class="s">Live</span></div>
+        <div class="index-row"><span class="n">03</span><span class="t">Pulse · Fitness app <span>— A goal-focused fitness app designed around four retention milestones.</span></span><span class="s">Live</span></div>
+        <div class="index-row"><span class="n">04</span><span class="t">Nordic Logic · B2B website</span><span class="s">In progress</span></div>
+        <div class="index-row"><span class="n">05</span><span class="t">Stub</span><span class="s">Coming soon</span></div>
+      </div>
+
+      <div class="body-row">
+        <p>Before design, I spent ten years managing two rock bands and creative projects across a few industries: small teams of specialists making something out of nothing.</p>
+        <p>If you’re working on something that really matters to people, I’d like to hear about it.</p>
+      </div>
+
+      <div class="btns">
+        <button class="btn dark" type="button">Let’s talk</button>
+        <button class="btn light" type="button">Menu</button>
+        <button class="btn dark" type="button">View resume</button>
+      </div>
+
+      <div class="monos">
+        <span class="k">Geist Mono</span><span class="v" style="font-family:'Geist Mono',monospace">Product Designer · Berlin, Germany · 01 / 05</span>
+        <span class="k">DM Mono</span><span class="v" style="font-family:'DM Mono',monospace">Product Designer · Berlin, Germany · 01 / 05</span>
+        <span class="k">IBM Plex Mono (Lusion)</span><span class="v" style="font-family:'IBM Plex Mono',monospace">Product Designer · Berlin, Germany · 01 / 05</span>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="mono" style="color:var(--tag);margin-bottom:12px">Verdict</div>
+    <p>Locked by Liam, 2026-10-09: <em>Geist + Geist Mono.</em> Aeonik stays a reference only (paid, and Lusion's own face).</p>
+  </footer>
+
+</div>
+</body>
+</html>
