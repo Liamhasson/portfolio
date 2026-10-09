@@ -1,34 +1,7 @@
-import { DM_Mono, Host_Grotesk, Playfair_Display, Plus_Jakarta_Sans } from "next/font/google";
+import { GeistMono } from "geist/font/mono";
+import { GeistSans } from "geist/font/sans";
 
-export const hostGrotesk = Host_Grotesk({
-  subsets: ["latin"],
-  weight: ["400", "700"],
-  variable: "--font-host-grotesk",
-  display: "swap",
-});
-
-export const plusJakarta = Plus_Jakarta_Sans({
-  subsets: ["latin"],
-  weight: ["400"],
-  variable: "--font-plus-jakarta",
-  display: "swap",
-});
-
-export const playfair = Playfair_Display({
-  subsets: ["latin"],
-  weight: ["400"],
-  style: ["italic"],
-  variable: "--font-playfair",
-  display: "swap",
-});
-
-export const dmMono = DM_Mono({
-  subsets: ["latin"],
-  weight: ["400"],
-  variable: "--font-dm-mono",
-  display: "swap",
-});
-
-export const fontVariables = [hostGrotesk, plusJakarta, playfair, dmMono]
-  .map((f) => f.variable)
-  .join(" ");
+// Type locked 2026-10-09: Geist for everything, Geist Mono for labels and footnotes (free, SIL OFL; self-hosted by
+// next/font). Sans only, no serif anywhere. Weights: 400 display and text, 500 buttons and labels, nothing heavier
+// (the hero wordmark's heavy outlines are a lit object in the 3D scene, not text).
+export const fontVariables = [GeistSans.variable, GeistMono.variable].join(" ");

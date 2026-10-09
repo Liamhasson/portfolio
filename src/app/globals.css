@@ -26,10 +26,8 @@
 
 @theme inline {
   /* Type */
-  --font-sans: var(--font-host-grotesk), ui-sans-serif, system-ui, sans-serif;
-  --font-tag: var(--font-plus-jakarta), ui-sans-serif, system-ui, sans-serif;
-  --font-accent: var(--font-playfair), ui-serif, Georgia, serif;
-  --font-mono: var(--font-dm-mono), ui-monospace, monospace;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
 @layer base {
