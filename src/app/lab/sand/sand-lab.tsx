@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Stage } from "@/three/stage";
 import { loadSand, SAND_BASE } from "@/three/sand/data";
 import { SandField, type SandState } from "@/three/sand/sand-field";
@@ -33,6 +33,8 @@ export function SandLab() {
   const [split, setSplit] = useState(50);
   // ?hero: the hero's front layer over the sand (the lab's status line hidden)
   const [hero] = useState(() => new URLSearchParams(window.location.search).has("hero"));
+  const compactRef = useRef(0);
+  const readCompact = useCallback(() => compactRef.current, []);
   const [status, setStatus] = useState("loading sand");
   // no WebGL2 (or the sand failed to load): the approved renders as stills, chaos then ball with scroll
   const [fallback, setFallback] = useState(false);
@@ -185,6 +187,7 @@ export function SandLab() {
         const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
         const progress = window.scrollY / max;
         state.compact = damp(state.compact, compactFor(progress), 6, dt);
+        compactRef.current = state.compact;
         // scroll turns the ball; when scrolling stops it keeps a slow idle spin
         const scrolled = window.scrollY - lastScroll;
         lastScroll = window.scrollY;
@@ -295,7 +298,7 @@ export function SandLab() {
     <div className="bg-black" style={{ height: "400vh" }}>
       <canvas ref={canvasRef} className="fixed inset-0 h-screen w-screen" data-testid="sand-canvas" />
       {hero ? (
-        <HeroOverlay />
+        <HeroOverlay compact={readCompact} />
       ) : (
         <div className="pointer-events-none fixed left-3 top-3 font-mono text-[11px] uppercase tracking-wider text-white/60">
           sand lab · {status}

@@ -23,7 +23,7 @@ function ReadingProgress() {
     <motion.span
       data-testid="reading-progress"
       aria-hidden
-      className="absolute inset-x-4 -top-2 h-0.5 origin-left rounded-full bg-rose"
+      className="absolute inset-x-4 -bottom-2 h-0.5 origin-left rounded-full bg-rose"
       style={{ scaleX: scrollYProgress }}
     />
   );
@@ -38,10 +38,11 @@ export function PillNav() {
   return (
     <motion.nav
       aria-label="Primary"
-      initial={{ opacity: 0, y: 16 }}
+      initial={{ opacity: 0, y: -16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: dur.ui, ease: ease.settle }}
-      className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2"
+      // top right, as on lusion.co (Liam, 2026-10-09); aligned with the hero's top-left label
+      className="fixed right-[4.9vw] top-[clamp(12px,3.6vw,48px)] z-50"
     >
       <div className="relative flex gap-2 rounded-full p-1">
         {!isHome && <ReadingProgress />}
