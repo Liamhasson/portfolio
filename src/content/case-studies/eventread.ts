@@ -40,7 +40,7 @@ export const eventread: CaseStudy = {
   outcome: {
     lines: [
       "Live at eventread.vercel.app, built solo.",
-      "Finds every competing event, ticketed or not, before the date is booked.",
+      "Finds the competing events, ticketed or not, before the date is booked.",
     ],
     link: { href: "https://eventread.vercel.app", label: "Try it" },
   },
