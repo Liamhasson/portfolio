@@ -98,6 +98,9 @@ export class SandField {
         uDelaySpan: { value: meta.compaction.delay_span },
         uRampLen: { value: meta.compaction.ramp },
         uBallC: { value: new THREE.Vector3(...meta.ball.center) },
+        uBallVolC: { value: new THREE.Vector3(...meta.ball.center) },
+        uBallVolS: { value: 1 },
+        uBallGrain: { value: 1 },
         uBallRot: { value: this.ballRot },
         uChaosC: { value: this.chaosCentre() },
         uChaosRot: { value: this.chaosRot },
@@ -132,6 +135,8 @@ export class SandField {
         uRampAt: { value: new THREE.Vector4(ramp[0][0], ramp[1][0], ramp[2][0], ramp[3][0]) },
         uExposure: { value: SAND_LOOK.exposure },
         uOutScale: { value: 1 },
+        uGroundCol: { value: new THREE.Vector3() },
+        uUpView: { value: new THREE.Vector3(0, 1, 0) },
         uSpec: { value: SAND_LOOK.spec },
         uSpotDir: { value: new THREE.Vector3(0, 0, -1) },
         uSpotCos: { value: new THREE.Vector2(-3, -2) },   // no cone: a plain point light
@@ -185,6 +190,28 @@ export class SandField {
 
   get lookGains(): { key: number; rim: number; fill: number; wattsToIrradiance: number } {
     return this.look;
+  }
+
+  /**
+   * Where the ball forms (2.1: on the desk, smaller than the hero's). The grains, their size and the self-shadowing all
+   * follow; the density volume baked for the hero's ball is reused through a mapping.
+   */
+  setBallTarget(center: THREE.Vector3, radius: number): void {
+    const u = this.material.uniforms;
+    const meta = this.data.meta;
+    const s = radius / meta.ball.radius;
+    (u.uBallC.value as THREE.Vector3).copy(center);
+    u.uBallPosMax.value = meta.ball_pos_max * s;
+    u.uBallR.value = radius;
+    u.uBallVolS.value = 1 / s;
+    u.uBallGrain.value = s;
+  }
+
+  /** The desk below as a broad light (colour x strength, 0 = none), and the camera (for world up in view space). */
+  setGround(col: THREE.Vector3, camera: THREE.Camera): void {
+    const u = this.material.uniforms;
+    (u.uGroundCol.value as THREE.Vector3).copy(col);
+    (u.uUpView.value as THREE.Vector3).set(0, 1, 0).transformDirection(camera.matrixWorldInverse);
   }
 
   /** The cursor as a light: world position and intensity 0..1 (fades with the pointer). */

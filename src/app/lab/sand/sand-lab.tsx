@@ -7,6 +7,7 @@ import { SAND_LOOK, SandField, type SandState } from "@/three/sand/sand-field";
 import { PaintField } from "@/three/sand/paint";
 import { Wordmark } from "@/three/sand/wordmark";
 import { HeroOverlay } from "./hero-overlay";
+import { BallShadow } from "@/three/sand/ball-shadow";
 import { SAND_ENCODE, SAND_LAYER, SandComposite } from "@/three/sand/sand-composite";
 import { Pullback } from "@/three/sand/pullback";
 import * as THREE from "three";
@@ -26,7 +27,7 @@ function compactFor(progress: number): number {
  * back and down to the desk, the 2.1 line enters as the desk arrives. The ball forms on the desk in 2.1 (next step),
  * so here the sand stays chaos (Liam, 2026-10-09: "on the desk, as planned").
  */
-const TL = { exit: [0.1, 0.26], pullback: [0.16, 0.8], enter: [0.58, 0.78] } as const;
+const TL = { exit: [0.06, 0.17], pullback: [0.1, 0.52], enter: [0.38, 0.52], settle: [0.56, 0.92], compact: [0.6, 0.9] } as const;
 const span = (p: number, [a, b]: readonly [number, number]) => Math.min(Math.max((p - a) / (b - a), 0), 1);
 
 /** Frame-rate-independent damping toward a target. */
@@ -109,8 +110,21 @@ export function SandLab() {
         (window as unknown as { __sandFilter?: (s: number) => void }).__sandFilter = (s) => { comp.sigma = s; };
       }
       const pullback = hero && !compare ? await Pullback.load() : null;
+      // 2.1: the settle into the three-quarter view, the chaos packing into the ball on the desk
+      const settle = hero && !compare ? await Pullback.load("/lab/settle") : null;
       if (disposed) return;
       if (pullback) stage.scene.add(pullback.plate);
+      let shadow: BallShadow | null = null;
+      // the shadow: lamp radius (hero units), strength, and the ball's effective solid size (its edge is sparse sand)
+      const shadowK = [1.2, 0.9, 0.7];   // chosen by eye against the settle target (2026-10-09)
+      (window as unknown as { __pbShadow?: (a: number, b: number, c: number) => void }).__pbShadow = (a, b, c) => { shadowK.splice(0, 3, a, b, c); };
+      if (settle) {
+        stage.scene.add(settle.plate);
+        shadow = new BallShadow(settle.toHero([0, 0, 0]).y);
+        stage.scene.add(shadow.mesh);
+        const sb = (settle.data as unknown as { ball: { center: number[]; radius: number } }).ball;
+        field.setBallTarget(settle.toHero(sb.center), sb.radius / settle.data.chaos_scale);
+      }
       const heroLights = field.heroLights();
       const g = field.lookGains;
       // the desk set, calibrated 2026-10-09 against the pull-back render with sand at frame 60 (scripts/lab/pb-calib.mjs)
@@ -119,9 +133,16 @@ export function SandLab() {
       // blend 1): Cycles lit the whole cloud. The desk bounce adds nothing in Cycles, so it is off.
       let desk = pullback?.deskLights(g.wattsToIrradiance, [0.244, 1.0, 0], { radii: [0.573, 1.2, 3.0], spotDeg: 116, blend: 1.0 });
       const DESK_LOOK = { shadowKChaos: 0.602, wrap: 0.375, bounce: 0.12, localOcclusion: 0.016, spec: 0.016, radScaleChaos: 1.44 };
+      // the formed ball on the desk, fitted against the Cycles target at the settle's end (scripts/lab/fit_ball.py):
+      // a slightly stronger lamp, and the lamp-lit desk below as a broad light (setGround)
+      const BALL_LOOK = { shadowK: 0.571, cavity: 0.3, cavityDepth: 0.071, wrap: 0.375, bounce: 0.12, spec: 0.064, radScale: 1.0 };
+      const deskBall = pullback?.deskLights(g.wattsToIrradiance, [0.305, 1.0, 0], { radii: [0.573, 1.2, 3.0], spotDeg: 116, blend: 1.0 });
       // lab calibration: ?pbframe=N holds the camera on a path frame; __pbGains sets the desk lights' gains
       let lampSat = 0.2;
+      const groundCol = new THREE.Vector3(1.0, 0.7, 0.406).multiplyScalar(0.444);
+      (window as unknown as { __pbGround?: (g: number, c: number) => void }).__pbGround = (g, c) => { groundCol.set(1.0, c, c * 0.58).multiplyScalar(g); };
       (window as unknown as { __pbSat?: (v: number) => void }).__pbSat = (v) => { lampSat = v; };
+      const calibrating = new URLSearchParams(window.location.search).has("pbframe") || new URLSearchParams(window.location.search).has("stframe");
       const pbFrame = Number(new URLSearchParams(window.location.search).get("pbframe") || NaN);
       let pbOpts: Parameters<Pullback["deskLights"]>[2] = {};
       (window as unknown as { __pbGains?: (a: number, b: number, c: number, o?: typeof pbOpts) => void }).__pbGains = (a, b, c, o) => {
@@ -244,41 +265,61 @@ export function SandLab() {
         const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
         const progress = window.scrollY / max;
         progressRef.current = damp(progressRef.current, progress, 6, dt);
-        state.compact = pullback ? 0 : damp(state.compact, compactFor(progress), 6, dt);
+        state.compact = pullback
+          ? (() => { const x = span(progressRef.current, TL.compact); return x * x * (3 - 2 * x); })()
+          : damp(state.compact, compactFor(progress), 6, dt);
         compactRef.current = state.compact;
         if (pullback && desk) {
           const deskNow = desk;
           const hl = THREE.MathUtils.smoothstep(span(progressRef.current, TL.pullback), 0.15, 0.85);
           // the desk lamp is close and soft: the sand's own shading softens with it (shadow strength, wrap)
-          if (!Number.isFinite(pbFrame) || pbFrame < 0) {
+          if (!calibrating) {
             const mixLook: Record<string, number> = {};
             for (const [key, v] of Object.entries(DESK_LOOK)) {
               const from = SAND_LOOK[key as keyof typeof SAND_LOOK] as number;
               mixLook[key] = from + (v - from) * hl;
             }
+            for (const [key, v] of Object.entries(BALL_LOOK)) {
+              const from = mixLook[key] ?? (SAND_LOOK[key as keyof typeof SAND_LOOK] as number);
+              mixLook[key] = from + (v - from) * state.compact;
+            }
             field!.setLook({ ...baseLook, ...mixLook });
           }
           // the camera on the exported path; the plate cropped to its view; the lights handed to the desk lamp
           const t = Number.isFinite(pbFrame) ? (pbFrame - 1) / (pullback.data.frames - 1) : span(progressRef.current, TL.pullback);
-          const f = t * (pullback.data.frames - 1);
-          const v = pullback.view(f);
+          // ?stframe=N holds the camera on a settle frame (calibration)
+          const stFrame = Number(new URLSearchParams(window.location.search).get("stframe") || NaN);
+          const st = settle ? (Number.isFinite(stFrame) ? (stFrame - 1) / (settle.data.frames - 1) : span(progressRef.current, TL.settle)) : 0;
+          const move = settle && st > 0 ? settle : pullback;
+          const f = move === settle ? st * (settle.data.frames - 1) : t * (pullback.data.frames - 1);
+          const v = move.view(f);
           stage!.setView(v.position, v.quaternion, v.lens);
           const tanV = Math.tan(THREE.MathUtils.degToRad(stage!.camera.fov) / 2);
-          pullback.show(f, tanV * stage!.camera.aspect, tanV, v.lens);
+          move.show(f, tanV * stage!.camera.aspect, tanV, v.lens);
+          pullback.plate.visible = move === pullback;
+          field!.setGround(groundCol, stage!.camera);
+          if (settle) settle.plate.visible = move === settle;
+          if (shadow && deskNow) {
+            // the lamp's real size (0.2 m soft radius, 2 hero units) sets the softness; ~85% of the desk's light is the lamp
+            const ballC = field!.material.uniforms.uBallC.value as THREE.Vector3;
+            shadow.update(ballC, field!.material.uniforms.uBallR.value * shadowK[2], deskNow.lights[0].pos, shadowK[0], move === settle ? shadowK[1] * state.compact : 0);
+          }
           field!.setPointScale(stage!.bufferHeight, THREE.MathUtils.degToRad(stage!.camera.fov));
           const h = THREE.MathUtils.smoothstep(t, 0.15, 0.85);
           field!.setLights(
             heroLights.map((l, i) => {
               // blend what reaches the sand (irradiance at its centre), not the raw power: a light swinging past the
               // sand mid-move would otherwise flare
-              const d = deskNow.lights[i];
+              const d0 = deskNow.lights[i];
+              const db = deskBall && !calibrating ? deskBall.lights[i] : d0;
+              const d = { pos: d0.pos, col: d0.col.clone().lerp(db.col, state.compact), r: d0.r };
               const pos = l.pos.clone().lerp(d.pos, h);
               const r2 = (v: THREE.Vector3) => Math.max(v.distanceToSquared(chaosC), 1e-3);
               const col = l.col.clone().divideScalar(r2(l.pos)).lerp(d.col.clone().divideScalar(r2(d.pos)), h).multiplyScalar(r2(pos));
               return { pos, col, r: (d.r ?? 0) * h };
             }),
             { dir: deskNow.spot.dir, cos: new THREE.Vector2(-3, -2).lerp(deskNow.spot.cos, h) },
-            lampSat * h,
+            (calibrating ? lampSat : lampSat + (0.05 - lampSat) * state.compact) * h,
           );
           // the name dims as the camera pulls away (the approved clip's glow keys: 0.55 -> 0.25 at 40% -> 0)
           wordmark?.setFade(t < 0.4 ? 1 - (0.3 / 0.55) * (t / 0.4) : (0.25 / 0.55) * (1 - (t - 0.4) / 0.6));
@@ -308,10 +349,10 @@ export function SandLab() {
         }
         wordmark?.setPaint(reduced ? null : paint!.texture, canvas.width, canvas.height);
         wordmark?.update(dt, reduced || still);
-        if (composite && !filterParam) {
-          const onBall = FILTER.chaos + (FILTER.ball - FILTER.chaos) * state.compact;
+        if (composite && !filterParam && !calibrating) {
           const toDesk = pullback ? THREE.MathUtils.smoothstep(span(progressRef.current, TL.pullback), 0.15, 0.85) : 0;
-          composite.sigma = onBall + (FILTER.desk - onBall) * toDesk;
+          const chaos = FILTER.chaos + (FILTER.desk - FILTER.chaos) * toDesk;
+          composite.sigma = chaos + (FILTER.ball - chaos) * state.compact;
         }
         field!.update(state);
       });
@@ -395,7 +436,7 @@ export function SandLab() {
   }
 
   return (
-    <div className="bg-black" style={{ height: hero ? "700vh" : "400vh" }}>
+    <div className="bg-black" style={{ height: hero ? "950vh" : "400vh" }}>
       <canvas ref={canvasRef} className="fixed inset-0 h-screen w-screen" data-testid="sand-canvas" />
       {hero ? (
         <HeroOverlay exit={readExit} scrolled={readScrolled} enter={readEnter} />

@@ -79,6 +79,7 @@ export function HeroOverlay({ exit, scrolled, enter }: { exit: () => number; scr
         {/* legibility: the sand thins out behind the copy, a soft falloff, never a box */}
         <div
           aria-hidden
+          data-exit="0"
           className="absolute -bottom-[30%] -left-[12vw] -right-[18%] -top-[45%] -z-10"
           style={{ background: "radial-gradient(ellipse 60% 55% at 35% 55%, rgba(0,0,0,0.72), rgba(0,0,0,0.45) 45%, transparent 75%)" }}
         />
@@ -101,15 +102,13 @@ export function HeroOverlay({ exit, scrolled, enter }: { exit: () => number; scr
       </div>
       {/* 2.1: the next chapter's line, entering from the right over the dark room above the desk */}
       {enter && (
+        // over the void strip at the top (the three-quarter view leaves only that much empty): one line on desktop,
+        // two below the menu on phones. A soft text shadow for legibility, never a shape over the desk.
         <h2
           data-enter
-          className="absolute isolate left-[4.9vw] top-[clamp(88px,15vh,170px)] max-w-[min(90vw,18ch)] text-[clamp(34px,4.6vw,72px)] font-normal leading-[1.08] tracking-[-0.015em] opacity-0"
+          className="absolute left-[4.9vw] right-[4.9vw] top-[clamp(76px,11vh,120px)] text-[clamp(28px,3.5vw,54px)] font-normal leading-[1.08] tracking-[-0.015em] opacity-0 md:right-auto md:top-[clamp(28px,6vh,64px)]"
+          style={{ textShadow: "0 1px 24px rgba(0,0,0,0.55)" }}
         >
-          <span
-            aria-hidden
-            className="absolute -bottom-[40%] -left-[12vw] -right-[30%] -top-[40%] -z-10"
-            style={{ background: "radial-gradient(ellipse 60% 55% at 35% 50%, rgba(0,0,0,0.7), rgba(0,0,0,0.4) 45%, transparent 75%)" }}
-          />
           I look for problems <em className="italic">nobody</em> pointed at.
         </h2>
       )}

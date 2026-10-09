@@ -72,6 +72,9 @@ uniform float uCompact;      // 0 chaos .. 1 ball
 uniform float uDelaySpan;
 uniform float uRampLen;
 uniform vec3 uBallC;
+uniform vec3 uBallVolC;      // the ball the density volume was baked for (the hero's): retargeted balls map into it
+uniform float uBallVolS;     // volume units per world unit (hero radius / this ball's radius)
+uniform float uBallGrain;    // grain size scale for a retargeted ball (its radius / the hero's)
 uniform mat3 uBallRot;       // the ball's spin (object -> world)
 uniform vec3 uChaosC;
 uniform mat3 uChaosRot;      // the chaos moving around itself
@@ -119,6 +122,7 @@ out float vAmbient;
 out float vBounceW;
 out float vPx;
 out float vEdgePx;
+out float vGround;   // how much of the desk below this grain sees (surface grains of the formed ball)
 out vec4 vEll;      // grain shape: squash x, squash y, cos, sin of its turn (Blender: random squash +-22%, random rotation)
 
 ${SIMPLEX}
@@ -180,23 +184,24 @@ void main() {
   // shadows: march in the volumes' own (unturned) frame, so shadows turn with the chaos and with the ball
   mat3 chaosInv = transpose(uChaosRot);
   mat3 ballInv = transpose(uBallRot);
-  vec3 pv = mix(uChaosC + chaosInv * (p - uChaosC), uBallC + ballInv * (p - uBallC), t);
+  vec3 pv = mix(uChaosC + chaosInv * (p - uChaosC), uBallVolC + ballInv * (p - uBallC) * uBallVolS, t);
   float j = hash(aPosA);
   vec3 E[3];
   for (int i = 0; i < 3; i++) {
-    vec3 lp = mix(uChaosC + chaosInv * (uLightPos[i] - uChaosC), uBallC + ballInv * (uLightPos[i] - uBallC), t);
+    vec3 lp = mix(uChaosC + chaosInv * (uLightPos[i] - uChaosC), uBallVolC + ballInv * (uLightPos[i] - uBallC) * uBallVolS, t);
     float d = distance(p, uLightPos[i]);
-    float T = transmittance(pv, lp, min(d, mix(8.5, 3.0, t)), j, mix(uShadowK.x, uShadowK.y, t));
+    float T = transmittance(pv, lp, min(d * mix(1.0, uBallVolS, t), mix(8.5, 3.0, t)), j, mix(uShadowK.x, uShadowK.y, t));
     E[i] = uLightCol[i] * T / (d * d + uLightR2[i]);
   }
   E[0] *= smoothstep(uSpotCos.x, uSpotCos.y, dot(normalize(p - uLightPos[0]), uSpotDir));
   // how much sand stands between this grain and the viewer: the cursor can only reach the front layer
-  vec3 cv = mix(uChaosC + chaosInv * (cameraPosition - uChaosC), uBallC + ballInv * (cameraPosition - uBallC), t);
+  vec3 cv = mix(uChaosC + chaosInv * (cameraPosition - uChaosC), uBallVolC + ballInv * (cameraPosition - uBallC) * uBallVolS, t);
   float toCam = transmittance(pv, cv, mix(8.5, 3.0, t), j, uFront.x);
   float frontness = uFront.x > 0.0 ? smoothstep(uFront.y, 1.0, toCam) : 1.0;
   // grain-scale occlusion on the ball: the deeper below the surface, the darker (too fine for the volume)
   float depth = clamp((uBallR - distance(B, uBallC)) / (uBallR * uCavity.x), 0.0, 1.0);
   float cavity = mix(1.0, 1.0 - uCavity.y * depth, t);
+  vGround = t * (1.0 - depth);
   // local density: grains inside dense filaments are shaded by their neighbours, and catch more bounce light
   float rho = density(pv);
   float occl = mix(exp(-rho * uLocal.x), 1.0, t);
@@ -227,7 +232,7 @@ void main() {
   vec2 squash = 1.0 + 0.22 * (vec2(h1, h2) * 2.0 - 1.0);
   float ang = h3 * 6.2831853;
   vEll = vec4(squash, cos(ang), sin(ang));
-  float px = 2.0 * rad * uRadMax * mix(uRadScale.x, uRadScale.y, t) * uCountScale * uPointScale / -mv.z * max(squash.x, squash.y);   // device pixels
+  float px = 2.0 * rad * uRadMax * mix(uRadScale.x, uRadScale.y * uBallGrain, t) * uCountScale * uPointScale / -mv.z * max(squash.x, squash.y);   // device pixels
   // below a minimum the grain keeps its area through coverage, so it never shimmers
   vAlpha = clamp((px * px) / (uMinPx * uMinPx), 0.0, 1.0);
   gl_PointSize = max(px, uMinPx);
@@ -247,6 +252,7 @@ in vec3 vE0; in vec3 vE1; in vec3 vE2; in vec3 vE3;
 in float vAlpha;
 in float vAmbient;
 in vec4 vEll;
+in float vGround;
 in float vBounceW;
 in float vPx;
 in float vEdgePx;
@@ -256,6 +262,8 @@ uniform float uOutScale;   // 1 on screen; 1/4 into the filtered sand layer (see
 uniform float uSpec;
 uniform float uWrap;     // light reaching past the terminator: grains are lit by the bounce off their neighbours
 uniform float uBounce;   // light that has hit two grains (Cycles' multiple scattering): saturates toward the sand's colour
+uniform vec3 uGroundCol;   // the lamp-lit desk below, as a broad light from beneath (colour x strength)
+uniform vec3 uUpView;      // world up, in view space
 uniform float uLampSat;  // the desk lamp: light that reaches a grain through the sand is filtered by it (warmer, deeper)
 
 void main() {
@@ -281,6 +289,9 @@ void main() {
     vec3 alb = i == 0 ? mix(vAlbedo, vAlbedo * vAlbedo * 2.2, uLampSat) : vAlbedo;
     col += E[i] * (alb * ndl / 3.14159265 + spec * ndl + vAlbedo * vAlbedo * uBounce * vBounceW);
   }
+  // the desk below: grains facing down see a broad warm surface (no single ray, so the ball doesn't block it)
+  float down = clamp(0.5 - 0.5 * dot(n, uUpView), 0.0, 1.0);
+  col += vAlbedo * uGroundCol * down * down * vGround;
   col *= uExposure * uOutScale;
   gl_FragColor = vec4(col, vAlpha * edge);
   #include <tonemapping_fragment>

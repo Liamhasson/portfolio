@@ -23,7 +23,7 @@ from mathutils import Vector
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 ap = argparse.ArgumentParser()
-ap.add_argument("--scene", choices=["ball", "chaos", "glass", "studio", "desk", "bench", "canvas", "hero", "pullback", "deskmove", "attempts", "export"], required=True)
+ap.add_argument("--scene", choices=["ball", "chaos", "glass", "studio", "desk", "bench", "canvas", "hero", "pullback", "deskmove", "attempts", "export", "settle"], required=True)
 ap.add_argument("--move", choices=["rise", "descend", "push"], default="rise", help="deskmove: which camera move")
 ap.add_argument("--grid", choices=["etched", "glow", "mat"], default="etched", help="bench scene only")
 ap.add_argument("--word", choices=["solid", "light", "cutout", "none"], default="light", help="hero scene only")
@@ -1614,6 +1614,55 @@ def build_pullback():
     if os.environ.get("PULLBACK_FRAME"):
         scene.frame_start = scene.frame_end = scene.frame_current
 
+def build_settle():
+    """2.1, the settle: from the pull-back's last frame down into the approved three-quarter view, while (live) the chaos
+    packs into the dense ball on the desk. SETTLE_PLATE=1: the desk only (sand live), lens 1.5x wider. Otherwise the
+    dense ball in place (the calibration target at the end). Writes settle-camera.json in the pull-back's format."""
+    import json
+    plate = bool(os.environ.get("SETTLE_PLATE"))
+    OVERSCAN = 1.5 if plate else 1.0
+    args.view, args.dstate = "tq", "chaos" if plate else "dense"
+    build_desk()
+    for o in [o for o in bpy.data.objects if o.type == "CAMERA"]:
+        bpy.data.objects.remove(o)
+    if plate:
+        for o in [o for o in bpy.data.objects if o.name.split(".")[0] == "chaos"]:
+            bpy.data.objects.remove(o, do_unlink=True)
+    k = CHAOS_SCALE
+    c = Vector(CHAOS_C)
+    area_light("rim", tuple(c + Vector((0.18, 0.78, 0.3))), 0.24, 26.0, ROSE_SOFT, target=tuple(c))   # as in the pull-back
+    cam_d = bpy.data.cameras.new("cam"); cam_d.sensor_width = 36
+    cam = bpy.data.objects.new("cam", cam_d); scene.collection.objects.link(cam); scene.camera = cam
+    cam.rotation_mode = "QUATERNION"
+    F = 48
+    scene.frame_start, scene.frame_end = 1, F
+    scene.render.fps = 24
+    a_pos, a_look = Vector((0.05, -1.55, 1.08)), Vector((0.0, 0.03, 0.2))     # the pull-back's last frame
+    b_pos, b_look = Vector((0.03, -0.62, 0.46)), Vector((0.0, 0.02, 0.03))    # the approved three-quarter view
+    def ease(t):
+        return t * t * t * (t * (t * 6 - 15) + 10)
+    path = []
+    for f in range(1, F + 1):
+        t = ease((f - 1) / (F - 1))
+        pos = a_pos.lerp(b_pos, t); look = a_look.lerp(b_look, t)
+        cam.location = pos; cam.rotation_quaternion = (look - pos).to_track_quat("-Z", "Y")
+        cam_d.lens = 50 / OVERSCAN
+        cam.keyframe_insert("location", frame=f); cam.keyframe_insert("rotation_quaternion", frame=f)
+        q = cam.rotation_quaternion
+        path.append({"frame": f, "position": list(pos), "quaternion": [q.w, q.x, q.y, q.z], "lens_mm": 50.0, "sensor_mm": 36})
+    os.makedirs(args.out, exist_ok=True)
+    R = 0.07
+    with open(os.path.join(args.out, "settle-camera.json"), "w") as fh:
+        json.dump({"fps": 24, "frames": F, "units": "metres", "up": "z", "path": path, "plate_overscan": OVERSCAN,
+                   "chaos_center": list(c), "chaos_scale": k, "ball": {"center": [0.0, 0.03, R + 0.028], "radius": R},
+                   "lights": {"lamp": dict(pos=[-0.42, 0.3, 0.55], target=[0, 0, 0], watts=230, color=[1.0, 0.74, 0.48], spot_deg=85, blend=0.85),
+                              "rim": dict(pos=list(c + Vector((0.18, 0.78, 0.3))), watts=26, color=list(ROSE_SOFT[:3])),
+                              "bounce": dict(pos=[0.45, -0.25, 0.25], watts=3.5, color=[1.0, 0.85, 0.7])}}, fh)
+    one = os.environ.get("SETTLE_FRAME")
+    scene.frame_set(int(one or 1))
+    if one:
+        scene.frame_start = scene.frame_end = scene.frame_current
+
 def build_deskmove():
     """The camera moves between the three desk views, one continuous space, no cuts:
       rise     2.1 → 2.2  three-quarter → top-down; the dense ball rises with it
@@ -1916,7 +1965,8 @@ def build_export():
 
 {"ball": build_ball, "chaos": build_chaos, "glass": build_glass, "studio": build_studio,
  "desk": build_desk, "bench": build_bench, "canvas": build_canvas, "hero": build_hero, "pullback": build_pullback,
- "deskmove": build_deskmove, "attempts": build_attempts, "export": build_export}[args.scene]()
+ "deskmove": build_deskmove, "attempts": build_attempts, "export": build_export,
+ "settle": build_settle}[args.scene]()
 if args.preview:
     render_settings(24, *( (960, 600) if os.environ.get("LOOKDEV_BIGPREVIEW") else (480, 300) ))
 elif os.environ.get("LOOKDEV_REVIEW"):
@@ -1949,9 +1999,10 @@ if args.scene == "attempts":
         bpy.ops.render.render(write_still=True)
         print("FRAME", f, lo, brk, dep, flush=True)
     sys.exit(0)
-if args.scene in ("pullback", "deskmove"):
-    name = ("pullback-plate" if os.environ.get("PULLBACK_PLATE") else "pullback") if args.scene == "pullback" else f"deskmove-{args.move}"
-    if os.environ.get("PULLBACK_PLATE") and not args.preview:
+if args.scene in ("pullback", "deskmove", "settle"):
+    name = (("pullback-plate" if os.environ.get("PULLBACK_PLATE") else "pullback") if args.scene == "pullback"
+            else ("settle-plate" if os.environ.get("SETTLE_PLATE") else "settle") if args.scene == "settle" else f"deskmove-{args.move}")
+    if (os.environ.get("PULLBACK_PLATE") or os.environ.get("SETTLE_PLATE")) and not args.preview:
         render_settings(64, 1920, 1200)
     scene.render.use_overwrite = False   # a crashed run resumes where it stopped
     seq = os.path.abspath(os.path.join(args.out, name + ("-preview" if args.preview else ""), "f_"))
