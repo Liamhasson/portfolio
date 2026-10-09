@@ -5,6 +5,7 @@ import { Stage } from "@/three/stage";
 import { loadSand, SAND_BASE } from "@/three/sand/data";
 import { SandField, type SandState } from "@/three/sand/sand-field";
 import { PaintField } from "@/three/sand/paint";
+import { Wordmark } from "@/three/sand/wordmark";
 import * as THREE from "three";
 import { parseTierOverride, pickTier, readSignals } from "@/three/tier";
 
@@ -38,6 +39,7 @@ export function SandLab() {
     let stage: Stage | null = null;
     let field: SandField | null = null;
     let paint: PaintField | null = null;
+    let wordmark: Wordmark | null = null;
     const listeners: [string, EventListener][] = [];
 
     (async () => {
@@ -60,6 +62,14 @@ export function SandLab() {
       );
       field = new SandField(data);
       stage.scene.add(field.points);
+      // ?weight=bold|black|ultrablack: compare the wordmark's weight (default black); ?wordmark=0 hides it
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("wordmark") !== "0" && !compare) {
+        const weight = { bold: "Bold", black: "Black", ultrablack: "UltraBlack" }[params.get("weight") ?? "black"] ?? "Black";
+        wordmark = await Wordmark.create(data.meta, `/lab/fonts/Geist-${weight}.ttf`);
+        if (disposed) return;
+        stage.scene.add(wordmark.mesh);
+      }
       stage.onSettings((s) => {
         field!.setGrains(s.grains);
         field!.setShadowSteps(s.shadowSteps);
@@ -155,6 +165,8 @@ export function SandLab() {
           paint!.update(stage!.renderer, dt);
           field!.setPaint(paint!.texture, canvas.clientWidth, canvas.clientHeight);
         }
+        wordmark?.setPaint(reduced ? null : paint!.texture, canvas.width, canvas.height);
+        wordmark?.update(dt, reduced || still);
         field!.update(state);
       });
       stage.start();
@@ -168,6 +180,7 @@ export function SandLab() {
         else window.removeEventListener(type, fn);
       }
       paint?.dispose();
+      wordmark?.dispose();
       field?.dispose();
       stage?.dispose();
     };
