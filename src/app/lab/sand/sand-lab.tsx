@@ -11,6 +11,7 @@ import { BallShadow } from "@/three/sand/ball-shadow";
 import { FrostSkin } from "@/three/sand/frost-skin";
 import { attemptAt } from "@/three/sand/attempts";
 import { BakedDesk } from "@/three/sand/baked-desk";
+import { revealAt } from "@/three/sand/screen-reveal";
 import { SAND_ENCODE, SAND_LAYER, SandComposite } from "@/three/sand/sand-composite";
 import { Pullback } from "@/three/sand/pullback";
 import * as THREE from "three";
@@ -35,7 +36,27 @@ const TL = {
   settle: [0.33, 0.52], compact: [0.35, 0.5],                                  // 2.1: the ball forms on the desk
   leave21: [0.54, 0.6], rise: [0.56, 0.68], enter22: [0.64, 0.7],               // 2.1 -> 2.2
   attempts: [0.71, 0.97],                                                      // 2.2: three attempts
+  leave22: [0.975, 1.03], descend: [0.99, 1.122], enter23: [1.09, 1.135],      // 2.2 -> 2.3: down to the side view
 } as const;
+/**
+ * The page's length. Progress is measured in units of the first 1600vh of scroll (the timeline above was laid out on
+ * a 1700vh page), so each chapter added after it keeps the earlier ones' pace.
+ */
+const PAGE_VH = 2000;
+const PROGRESS_SCALE = (PAGE_VH - 100) / 1600;
+/**
+ * The descend (lookdev.py deskmove --move descend, 100 frames): the scroll carries the camera to its arrival (frame 66,
+ * where the view settles); the lid opens on the way (frames 27-60), the low view's fill rises (31-66), and the screen
+ * wakes at frame 50 and plays the index's reveal in time, as a real screen would (scroll back up and it sleeps).
+ */
+const DESCEND = { arrive: 65, wake: 49, lid: [0.26, 0.6], open: [0.3, 0.66], openDeg: 108 } as const;
+/** The low view's fill (lookdev.py: area light, 0.9 m, 38 W), lighting the sand from the camera's side. */
+const SIDE_FILL = { pos: [1.35, -0.95, 0.45], watts: 38, color: [1.0, 0.86, 0.72], radius: 4.5 };
+/** smootherstep of t over [a, b] (Blender's ease in lookdev.py). */
+function ease(t: number, [a, b]: readonly [number, number]): number {
+  const x = Math.min(Math.max((t - a) / (b - a), 0), 1);
+  return x * x * x * (x * (x * 6 - 15) + 10);
+}
 const span = (p: number, [a, b]: readonly [number, number]) => Math.min(Math.max((p - a) / (b - a), 0), 1);
 
 /** Frame-rate-independent damping toward a target. */
@@ -63,6 +84,8 @@ export function SandLab() {
   const readEnter = useCallback(() => span(progressRef.current, TL.enter), []);
   const readLeave21 = useCallback(() => span(progressRef.current, TL.leave21), []);
   const readEnter22 = useCallback(() => span(progressRef.current, TL.enter22), []);
+  const readLeave22 = useCallback(() => span(progressRef.current, TL.leave22), []);
+  const readEnter23 = useCallback(() => span(progressRef.current, TL.enter23), []);
   const [status, setStatus] = useState("loading sand");
   // no WebGL2 (or the sand failed to load): the approved renders as stills, chaos then ball with scroll
   const [fallback, setFallback] = useState(false);
@@ -131,6 +154,18 @@ export function SandLab() {
       const desk3d = hero && !compare && !usePlates ? await BakedDesk.load(stage.renderer) : null;
       if (disposed) return;
       if (desk3d) stage.scene.add(desk3d.group);
+      // 2.2 -> 2.3: the descend to the low side view (the 3D desk only: no plates were rendered for it)
+      const descend = desk3d ? await Pullback.load("/lab/descend", false).catch(() => null) : null;
+      if (disposed) return;
+      // the screen's reveal: seconds since it woke; and how far it has gone back to sleep (scrolling back up)
+      let revealT = 0, sleep = 1;
+      // ?dsframe=N holds the camera on a descend frame; ?reveal=S holds the screen's reveal at S seconds (calibration)
+      const dsFrame = Number(new URLSearchParams(window.location.search).get("dsframe") || NaN);
+      const holdDescend = Number.isFinite(dsFrame);
+      const lidHold = Number(new URLSearchParams(window.location.search).get("lid") || NaN);   // ?lid=deg (calibration)
+      const revealHold = Number(new URLSearchParams(window.location.search).get("reveal") || NaN);
+      let fillGain = 1;
+      (window as unknown as { __fill?: (g: number) => void }).__fill = (g) => { fillGain = g; };
       (window as unknown as { __desk3d?: unknown }).__desk3d = desk3d;
       // 2.2: the frost skin that grows out of the sand inside each attempt
       const frost = hero && !compare ? new FrostSkin(field.material) : null;
@@ -290,7 +325,9 @@ export function SandLab() {
       stage.onFrame((dt) => {
         const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
         const progress = window.scrollY / max;
-        progressRef.current = damp(progressRef.current, progress, 6, dt);
+        progressRef.current = damp(progressRef.current, hero ? progress * PROGRESS_SCALE : progress, 6, dt);
+        // ?dsframe holds a descend frame: everything before it (the ball, the third attempt) as the page has it there
+        if (holdDescend) progressRef.current = TL.descend[0] + 0.01;
         state.compact = pullback
           ? (() => { const x = span(progressRef.current, TL.compact); return x * x * (3 - 2 * x); })()
           : damp(state.compact, compactFor(progress), 6, dt);
@@ -319,15 +356,42 @@ export function SandLab() {
           // ?rtframe=N holds the camera on a rise frame (calibration)
           const rtFrame = Number(new URLSearchParams(window.location.search).get("rtframe") || NaN);
           const rt = rise ? (Number.isFinite(rtFrame) ? Math.max((rtFrame - 1) / (rise.data.frames - 1), 1e-4) : span(progressRef.current, TL.rise)) : 0;
-          const move = rise && rt > 0 ? rise : settle && st > 0 ? settle : pullback;
-          const f = move === rise ? rt * (rise.data.frames - 1) : move === settle ? st * (settle!.data.frames - 1) : t * (pullback.data.frames - 1);
+          const ds = descend ? (Number.isFinite(dsFrame) ? Math.max((dsFrame - 1) / DESCEND.arrive, 1e-4) : span(progressRef.current, TL.descend)) : 0;
+          const move = descend && ds > 0 ? descend : rise && rt > 0 ? rise : settle && st > 0 ? settle : pullback;
+          const f = move === descend ? (Number.isFinite(dsFrame) ? dsFrame - 1 : ds * DESCEND.arrive)
+            : move === rise ? rt * (rise.data.frames - 1) : move === settle ? st * (settle!.data.frames - 1) : t * (pullback.data.frames - 1);
           if (rise) {
             rise.plate.visible = move === rise;
-            // the ball rides the rise: up off the desk, rolling forward 45 degrees (scroll turns the ball)
+            // the ball rides the rise: up off the desk, rolling forward 45 degrees (scroll turns the ball); then the
+            // descend carries it beside the laptop, still turned
             const fi = Math.min(Math.max(Math.round(f), 0), rise.data.frames - 1);
             const fr = rise.data.path[move === rise ? fi : 0] as unknown as { ball: number[]; ball_roll: number };
-            field!.setBallTarget(rise.toHero(fr.ball), 0.07 / rise.data.chaos_scale);
-            state.ballRoll = move === rise ? fr.ball_roll : 0;
+            const end = rise.data.path[rise.data.frames - 1] as unknown as { ball_roll: number };
+            if (move === descend && descend) {
+              const a = descend.data.path[Math.min(Math.floor(f), descend.data.frames - 2)] as unknown as { ball: number[] };
+              const b = descend.data.path[Math.min(Math.floor(f) + 1, descend.data.frames - 1)] as unknown as { ball: number[] };
+              field!.setBallTarget(descend.toHero(a.ball).lerp(descend.toHero(b.ball), f - Math.floor(f)), 0.07 / descend.data.chaos_scale);
+              state.ballRoll = end.ball_roll;
+            } else {
+              field!.setBallTarget(rise.toHero(fr.ball), 0.07 / rise.data.chaos_scale);
+              state.ballRoll = move === rise ? fr.ball_roll : 0;
+            }
+          }
+          // 2.3's arrival: the lid opens, the low view's fill rises, the screen wakes and plays the index's reveal
+          let openF = 0;
+          if (desk3d) {
+            const tb = move === descend ? f / (descend!.data.frames - 1) : 0;
+            openF = ease(tb, DESCEND.open);
+            desk3d.setLid(Number.isFinite(lidHold) ? lidHold : DESCEND.openDeg * ease(tb, DESCEND.lid));
+            const awake = move === descend && f >= DESCEND.wake;
+            if (Number.isFinite(revealHold)) { revealT = revealHold; sleep = 0; }
+            else if (awake) { sleep = Math.max(sleep - dt / 0.35, 0); if (sleep === 0 || revealT > 0) revealT += dt; }
+            else { sleep = Math.min(sleep + dt / 0.35, 1); if (sleep === 1) revealT = 0; }
+            const rf = revealAt(revealT);
+            rf.wake = Math.max(rf.wake, sleep);
+            rf.light *= 1 - sleep;
+            desk3d.setScreen(rf);
+            desk3d.setState(openF, rf.light);
           }
           // 2.2: the attempts, scrubbed by scroll, facing the camera above (world up)
           const [lo, brk, dep] = attemptAt(span(progressRef.current, TL.attempts));
@@ -347,7 +411,11 @@ export function SandLab() {
           if (shadow && deskNow) {
             // the lamp's real size (0.2 m soft radius, 2 hero units) sets the softness; ~85% of the desk's light is the lamp
             const ballC = field!.material.uniforms.uBallC.value as THREE.Vector3;
-            shadow.update(ballC, field!.material.uniforms.uBallR.value * shadowK[2], deskNow.lights[0].pos, shadowK[0], move !== pullback ? shadowK[1] * state.compact : 0);
+            const k = move !== pullback ? shadowK[1] * state.compact : 0;
+            const ballR = field!.material.uniforms.uBallR.value * shadowK[2];
+            // on the 3D desk the shadow falls on whatever the lamp lights (the laptop too); on the plates, a plane
+            if (desk3d) { desk3d.setBallShadow(ballC, ballR, deskNow.lights[0].pos, shadowK[0], k); shadow.update(ballC, ballR, deskNow.lights[0].pos, shadowK[0], 0); }
+            else shadow.update(ballC, ballR, deskNow.lights[0].pos, shadowK[0], k);
           }
           field!.setPointScale(stage!.bufferHeight, THREE.MathUtils.degToRad(stage!.camera.fov));
           const h = THREE.MathUtils.smoothstep(t, 0.15, 0.85);
@@ -358,6 +426,13 @@ export function SandLab() {
               const d0 = deskNow.lights[i];
               const db = deskBall && !calibrating ? deskBall.lights[i] : d0;
               const d = { pos: d0.pos, col: d0.col.clone().lerp(db.col, state.compact), r: d0.r };
+              // the third light (the desk bounce, off on the desk) becomes the low view's fill as it rises
+              if (i === 2 && descend && openF > 0) {
+                d.pos = descend.toHero(SIDE_FILL.pos);
+                d.col = new THREE.Vector3(...(SIDE_FILL.color as [number, number, number]))
+                  .multiplyScalar((SIDE_FILL.watts / (descend.data.chaos_scale ** 2)) * g.wattsToIrradiance * fillGain * openF);
+                d.r = SIDE_FILL.radius;
+              }
               const pos = l.pos.clone().lerp(d.pos, h);
               const r2 = (v: THREE.Vector3) => Math.max(v.distanceToSquared(chaosC), 1e-3);
               const col = l.col.clone().divideScalar(r2(l.pos)).lerp(d.col.clone().divideScalar(r2(d.pos)), h).multiplyScalar(r2(pos));
@@ -481,10 +556,13 @@ export function SandLab() {
   }
 
   return (
-    <div className="bg-black" style={{ height: hero ? "1700vh" : "400vh" }}>
+    <div className="bg-black" style={{ height: hero ? `${PAGE_VH}vh` : "400vh" }}>
       <canvas ref={canvasRef} className="fixed inset-0 h-screen w-screen" data-testid="sand-canvas" />
       {hero ? (
-        <HeroOverlay exit={readExit} scrolled={readScrolled} enter={readEnter} leave={readLeave21} enter2={readEnter22} />
+        <HeroOverlay
+          exit={readExit} scrolled={readScrolled}
+          enter={readEnter} leave={readLeave21} enter2={readEnter22} leave2={readLeave22} enter3={readEnter23}
+        />
       ) : (
         <div className="pointer-events-none fixed left-3 top-3 font-mono text-[11px] uppercase tracking-wider text-white/60">
           sand lab · {status}

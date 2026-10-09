@@ -17,7 +17,7 @@ import sys
 
 import bpy
 import numpy as np
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 # ---------------------------------------------------------------- args
 
@@ -1674,12 +1674,24 @@ def build_bakedesk():
     BAKE_SAMPLES (default 384), BAKE_SCALE (texture size multiplier, default 1). Writes renders/bake/desk.glb."""
     import json
     ENCODE = 4.0   # textures store radiance / ENCODE in sRGB, so values up to ENCODE don't clip (the site multiplies back)
+    # BAKE_STATE: shut (2.1-2.2), open (lid open, screen dark, the side fill of the low view), lit (the screen glowing).
+    # The site blends the three as the lid opens and the screen wakes; the geometry comes from the open state.
+    state = os.environ.get("BAKE_STATE", "shut")
+    if state != "shut":
+        MOVE_CTX["open"] = 108; MOVE_CTX["side_fill"] = True
     args.view, args.dstate = "tq", "chaos"
     os.environ["LOOKDEV_NO_SAND"] = "1"
     build_desk()
+    if state == "open":
+        for o in bpy.data.objects:
+            if o.name.split(".")[0] == "screen_glow":
+                o.data.energy = 0.0
+        if "display" in bpy.data.materials:
+            bsdf = bpy.data.materials["display"].node_tree.nodes["Principled BSDF"]
+            bsdf.inputs["Emission Strength"].default_value = 0.0
     c_ = Vector(CHAOS_C)
     area_light("rim", tuple(c_ + Vector((0.18, 0.78, 0.3))), 0.24, 26.0, ROSE_SOFT, target=tuple(c_))   # as in the plates
-    out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "renders", "bake")
+    out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "renders", "bake", state)
     os.makedirs(out, exist_ok=True)
     scale = float(os.environ.get("BAKE_SCALE", "1"))
     deps = bpy.context.evaluated_depsgraph_get()
@@ -1690,10 +1702,36 @@ def build_bakedesk():
         if o.type != "MESH":
             continue
         name = o.name.split(".")[0]
-        if name in hidden or (name == "Cube" and o.parent and o.parent.name.startswith("laptop")):
+        if state == "shut" and (name in hidden or (name == "Cube" and o.parent and o.parent.name.startswith("laptop"))):
             bpy.data.objects.remove(o, do_unlink=True)
             continue
         keep.append(o)
+    # open: the keyboard (78 keys and the deck) as one mesh, one texture
+    caps = [o for o in keep if o.name.split(".")[0] == "Cube" and o.parent and o.parent.name.startswith("laptop")]
+    if caps:
+        bpy.ops.object.select_all(action="DESELECT")
+        for o in caps:
+            o.select_set(True)
+        bpy.context.view_layer.objects.active = caps[0]
+        bpy.ops.object.convert(target="MESH")
+        bpy.ops.object.join()
+        joined = bpy.context.view_layer.objects.active
+        joined.name = "keys"
+        keep = [o for o in keep if o not in caps] + [joined]
+    # the lid's parts turn on the hinge: they hang under a pivot at the hinge, so the site can swing the lid
+    hinge = bpy.data.objects.get("hinge")
+    pivot = None
+    if hinge:
+        bpy.context.view_layer.update()
+        pivot = bpy.data.objects.new("lid_pivot", None); scene.collection.objects.link(pivot)
+        pivot.matrix_world = hinge.matrix_world.copy()
+    def on_hinge(o):
+        p_ = o.parent
+        while p_:
+            if p_.name.split(".")[0] == "hinge":
+                return True
+            p_ = p_.parent
+        return False
     bpy.context.view_layer.update()
     deps = bpy.context.evaluated_depsgraph_get()
     # the desk's top is what the camera sees: give it its own texture (the sides and underside share the other)
@@ -1717,11 +1755,22 @@ def build_bakedesk():
     bpy.context.view_layer.update()
     deps = bpy.context.evaluated_depsgraph_get()
     baked = []
+    screens = []
     for o in keep:
         # final geometry in world space, single user, own materials
         ev = o.evaluated_get(deps)
         me = bpy.data.meshes.new_from_object(ev, preserve_all_data_layers=True, depsgraph=deps)
-        me.transform(o.matrix_world)
+        # the lid's parts are unwrapped in the hinge's own frame (the same numbers whatever the lid's angle), so the
+        # shut, open and lit bakes share their UVs and the site can blend them as the lid turns; then carried to the world
+        hinge_obj = None
+        if pivot and on_hinge(o):
+            rel, p_ = Matrix.Identity(4), o
+            while p_.name.split(".")[0] != "hinge":
+                rel = p_.matrix_local @ rel; p_ = p_.parent
+            hinge_obj = p_
+            me.transform(rel)
+        else:
+            me.transform(o.matrix_world)
         mats = [m.copy() if m else None for m in (s.material for s in o.material_slots)]
         n = bpy.data.objects.new("bake_" + o.name, me)
         scene.collection.objects.link(n)
@@ -1729,6 +1778,15 @@ def build_bakedesk():
         for m in mats:
             me.materials.append(m)
         o.hide_render = True; o.hide_viewport = True
+        if pivot and on_hinge(o):
+            n.parent = pivot; n.matrix_parent_inverse = pivot.matrix_world.inverted()
+        if o.name.split(".")[0] == "display":
+            # the screen isn't baked: it shows the index (live), on its own UVs
+            uv0 = me.uv_layers[0]; uv0.name = "bake"
+            if hinge_obj:
+                me.transform(hinge_obj.matrix_world)
+            screens.append(n)
+            continue
         if not me.uv_layers:
             me.uv_layers.new(name="UVMap")
         orig_uv = me.uv_layers[0].name
@@ -1755,6 +1813,8 @@ def build_bakedesk():
             bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.004)
             bpy.ops.object.mode_set(mode="OBJECT")
             w_ = h_ = int(next((v for k, v in sizes.items() if base.startswith(k)), 1024) * scale)
+        if hinge_obj:
+            n.data.transform(hinge_obj.matrix_world)
         img = bpy.data.images.new("bake_" + o.name, w_, h_, float_buffer=True)
         for m in me.materials:
             if not m:
@@ -1820,10 +1880,19 @@ def build_bakedesk():
         for uv in list(n.data.uv_layers):
             if uv.name != "bake":
                 n.data.uv_layers.remove(uv)
+        uvs = np.empty(len(n.data.loops) * 2, np.float32); n.data.uv_layers["bake"].data.foreach_get("uv", uvs)
+        meta["uv_sum"] = float(np.round(np.abs(uvs).sum(), 3))
         print("BAKED", n.name, img.size[0], img.size[1], flush=True)
+    for n in screens:
+        mats_meta[n.name] = {"screen": True, "emission": 1.1, "color": [0, 0, 0], "metallic": 0.0, "roughness": 0.5,
+                             "coat": 0.0, "coat_roughness": 0.03, "ior": 1.5, "specular": 0.04, "diff": ""}
     bpy.ops.object.select_all(action="DESELECT")
     for n, _, _ in baked:
         n.select_set(True)
+    for n in screens:
+        n.select_set(True)
+    if pivot:
+        pivot.select_set(True)
     bpy.ops.export_scene.gltf(filepath=os.path.join(out, "desk.glb"), export_format="GLB", use_selection=True,
                               export_materials="NONE", export_tangents=True, export_yup=True, export_apply=True)
     # the 360 probe the glossy objects reflect: the room as seen from just above the laptop (everything visible to it,
@@ -1852,6 +1921,13 @@ def build_bakedesk():
         for o in keep:
             if o.name.split(".")[0] == nm and o.parent and "laptop" in (o.parent.name + (o.parent.parent.name if o.parent.parent else "")):
                 o.hide_render = True                 # the laptop doesn't reflect itself
+    if state != "shut":
+        # the probes come from the shut state; here only the metadata (with this state's lights and the lid pose)
+        hinge_deg = math.degrees(hinge.rotation_euler.x) if hinge else 0.0
+        json.dump({"state": state, "materials": mats_meta, "lights": lights_meta, "lid_open_deg": MOVE_CTX.get("open", 0),
+                   "hinge_x_deg": hinge_deg}, open(os.path.join(out, "desk.json"), "w"))
+        print("WROTE", os.path.join(out, "desk.glb"))
+        sys.exit(0)
     cam_d = bpy.data.cameras.new("probe"); cam_d.type = "PANO"
     try:
         cam_d.panorama_type = "EQUIRECTANGULAR"

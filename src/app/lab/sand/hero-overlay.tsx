@@ -32,11 +32,15 @@ function exitT(e: number, i: number): number {
 
 /**
  * `exit`: 0 holding .. 1 gone (staggered per line). `scrolled`: 0 at the top .. (the scroll cue fades once it moves).
- * `enter`: the next chapter's line, 0 off to the right .. 1 in place.
+ * `enter`: the next chapter's line, 0 off to the right .. 1 in place. `leave`: it travels out left as the next arrives.
+ * Chapter lines: 2.1 (enter, leave), 2.2 (enter2, leave2), 2.3 (enter3), one at a time.
  */
 export function HeroOverlay({
-  exit, scrolled, enter, leave, enter2,
-}: { exit: () => number; scrolled: () => number; enter?: () => number; leave?: () => number; enter2?: () => number }) {
+  exit, scrolled, enter, leave, enter2, leave2, enter3,
+}: {
+  exit: () => number; scrolled: () => number;
+  enter?: () => number; leave?: () => number; enter2?: () => number; leave2?: () => number; enter3?: () => number;
+}) {
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
     let raf = 0;
@@ -60,7 +64,8 @@ export function HeroOverlay({
           node.style.opacity = String(a * (1 - to));
         };
         if (enter) travel(el.querySelector<HTMLElement>("[data-enter]"), enter(), leave ? leave() : 0);
-        if (enter2) travel(el.querySelector<HTMLElement>("[data-enter2]"), enter2(), 0);
+        if (enter2) travel(el.querySelector<HTMLElement>("[data-enter2]"), enter2(), leave2 ? leave2() : 0);
+        if (enter3) travel(el.querySelector<HTMLElement>("[data-enter3]"), enter3(), 0);
         const scrim = el.querySelector<HTMLElement>("[data-scrim]");
         if (scrim && enter) scrim.style.opacity = String(Math.min(Math.max(enter(), 0), 1));
       }
@@ -68,7 +73,7 @@ export function HeroOverlay({
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [exit, scrolled, enter, leave, enter2]);
+  }, [exit, scrolled, enter, leave, enter2, leave2, enter3]);
 
   return (
     <div ref={root} className="pointer-events-none fixed inset-0 z-10 text-[#f4efe9]" data-testid="hero-overlay">
@@ -135,6 +140,15 @@ export function HeroOverlay({
           style={{ textShadow: "0 1px 24px rgba(0,0,0,0.55)" }}
         >
           Then I test solutions.
+        </h2>
+      )}
+      {enter3 && (
+        <h2
+          data-enter3
+          className={`absolute left-[4.9vw] right-[4.9vw] text-[clamp(28px,3.5vw,54px)] font-normal leading-[1.08] tracking-[-0.015em] opacity-0 md:right-auto bottom-[clamp(40px,6vh,64px)] max-w-[15ch] md:bottom-[clamp(36px,4.4vw,64px)]`}
+          style={{ textShadow: "0 1px 24px rgba(0,0,0,0.55)" }}
+        >
+          And I build it.
         </h2>
       )}
       {/* the scroll cue: bottom right on desktop, centred on phones */}
