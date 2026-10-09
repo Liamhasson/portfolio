@@ -9,13 +9,15 @@
  *   - portrait (phones): the screen's black panel grows to fill the phone, the 16:10 layout gives way, and the phone
  *     list surfaces row by row (the same rise as the screen's wake reveal), so the screen becomes the section.
  */
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { matrix3d, type Pt } from "@/three/sand/homography";
 
-const ROWS = [
-  { n: "01", name: "Eventread", kind: "SaaS web app", line: "The check every booker skips." },
-  { n: "02", name: "Cyvore", kind: "B2B website", line: "A cybersecurity startup needed a site investors would believe in." },
-  { n: "03", name: "Pulse", kind: "Fitness app", line: "A goal-focused fitness app designed around four retention milestones." },
+/** The three finished projects open their case studies; Nordic Logic and the stub have none yet (in progress). */
+const ROWS: { n: string; name: string; kind: string; line: string; href?: string; soon?: boolean }[] = [
+  { n: "01", name: "Eventread", kind: "SaaS web app", line: "The check every booker skips.", href: "/eventread" },
+  { n: "02", name: "Cyvore", kind: "B2B website", line: "A cybersecurity startup needed a site investors would believe in.", href: "/cyvore" },
+  { n: "03", name: "Pulse", kind: "Fitness app", line: "A goal-focused fitness app designed around four retention milestones.", href: "/pulse" },
   { n: "04", name: "Nordic Logic", kind: "B2B website", line: "A carrier invoice audit startup that needed to build trust without any social proof or clients." },
   { n: "05", name: "Stub", kind: "", line: "Coming soon", soon: true },
 ];
@@ -42,13 +44,16 @@ const CSS = `
 .wi .top { position:absolute; left:3.6cqw; right:3.6cqw; top:3.4cqw; display:flex; justify-content:space-between; align-items:flex-end; }
 .wi .title { font-size:4.8cqw; font-weight:400; line-height:.98; letter-spacing:-.02em; margin:0; }
 .wi .rows { position:absolute; left:3.6cqw; right:3.6cqw; top:15.5cqw; border-top:1px solid var(--rule); margin:0; padding:0; list-style:none; }
-.wi .row { display:grid; grid-template-columns:7cqw 1fr 38cqw; align-items:baseline; padding:1.75cqw 0 1.95cqw; border-bottom:1px solid var(--rule); color:var(--dim); transition:color .35s cubic-bezier(.22,1,.36,1); }
+.wi .row { display:grid; grid-template-columns:7cqw 1fr 38cqw; align-items:baseline; padding:1.75cqw 0 1.95cqw; border-bottom:1px solid var(--rule); color:inherit; }
 .wi .row .n { font:400 1.15cqw/1 var(--font-mono); letter-spacing:.04em; }
 .wi .row .name { font-size:2.15cqw; font-weight:400; }
 .wi .row .name small { font-size:1.2cqw; margin-left:1.2cqw; letter-spacing:.02em; opacity:.8; }
 .wi .row .line { font-size:1.55cqw; line-height:1.35; }
-.wi .row.on, .wl .row.on { color:var(--ink); }
 .wi .row.soon .line { font:400 1.15cqw/1.4 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; }
+.wi a.row, .wl a.row { text-decoration:none; color:inherit; }
+.wi li, .wl li { color:var(--dim); transition:color .35s cubic-bezier(.22,1,.36,1); }
+.wi li.on, .wl li.on { color:var(--ink); }
+.wi a.row:focus-visible, .wl a.row:focus-visible { outline:1px solid var(--ink); outline-offset:4px; }
 .wi-panel { position:fixed; left:0; top:0; background:#0a0a0b; pointer-events:none; transform-origin:0 0; }
 .wl { --ink:#f4f1ee; --dim:rgba(244,241,238,.38); --rule:rgba(244,241,238,.14);
   position:fixed; inset:0; color:var(--ink); font-family:var(--font-sans); line-height:normal;
@@ -56,7 +61,7 @@ const CSS = `
 .wl .title { font-size:clamp(34px,10vw,44px); font-weight:400; line-height:1; letter-spacing:-.02em; margin:0 0 28px; }
 .wl .rows { margin:0; padding:0; list-style:none; border-top:1px solid var(--rule); }
 .wl .row { display:grid; grid-template-columns:44px 1fr; row-gap:6px; padding:16px 0 18px; border-bottom:1px solid var(--rule);
-  color:var(--dim); transition:color .35s cubic-bezier(.22,1,.36,1); }
+  color:inherit; }
 .wl .row .n { font:400 11px/1 var(--font-mono); letter-spacing:.04em; padding-top:6px; }
 .wl .row .name { font-size:20px; font-weight:400; }
 .wl .row .name small { font-size:12px; margin-left:10px; letter-spacing:.02em; opacity:.8; }
@@ -67,19 +72,32 @@ const CSS = `
 function Rows({ active, onActive, rowRef }: { active: number; onActive: (i: number) => void; rowRef?: (el: HTMLElement | null, i: number) => void }) {
   return (
     <ol className="rows">
-      {ROWS.map((r, i) => (
-        <li
-          key={r.n}
-          ref={rowRef ? (el) => rowRef(el, i) : undefined}
-          className={`row${i === active ? " on" : ""}${r.soon ? " soon" : ""}`}
-          onPointerEnter={() => onActive(i)}
-          onPointerDown={() => onActive(i)}
-        >
-          <span className="n">{r.n}</span>
-          <span className="name">{r.name}{r.kind && <small>{r.kind}</small>}</span>
-          <span className="line">{r.line}</span>
-        </li>
-      ))}
+      {ROWS.map((r, i) => {
+        const cells = (
+          <>
+            <span className="n">{r.n}</span>
+            <span className="name">{r.name}{r.kind && <small>{r.kind}</small>}</span>
+            <span className="line">{r.line}</span>
+          </>
+        );
+        const cls = `row${r.soon ? " soon" : ""}`;
+        return (
+          // the row lights where the pointer is (or the finger lands); a project with a case study opens it
+          <li
+            key={r.n}
+            ref={rowRef ? (el) => rowRef(el, i) : undefined}
+            className={i === active ? "on" : undefined}
+            onPointerEnter={() => onActive(i)}
+            onPointerDown={() => onActive(i)}
+          >
+            {r.href ? (
+              <Link href={r.href} className={cls} onFocus={() => onActive(i)}>{cells}</Link>
+            ) : (
+              <div className={cls}>{cells}</div>
+            )}
+          </li>
+        );
+      })}
     </ol>
   );
 }
