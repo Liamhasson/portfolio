@@ -15,7 +15,7 @@ export function Outcome({ outcome }: { outcome: Data }) {
       ))}
       {outcome.quote && (
         <figure className="mt-10 max-w-[56ch]">
-          <blockquote className="text-xl italic">“{outcome.quote.text}”</blockquote>
+          <blockquote className="text-xl italic">{outcome.quote.text}</blockquote>
           <figcaption className="mt-3 font-mono text-xs uppercase tracking-[0.08em] text-ink-3">
             <span>{outcome.quote.name}</span> · {outcome.quote.title}
           </figcaption>
@@ -24,6 +24,7 @@ export function Outcome({ outcome }: { outcome: Data }) {
       {outcome.link && (
         <a href={outcome.link.href} target="_blank" rel="noreferrer" className="mt-8 inline-block underline">
           {outcome.link.label}
+          <span className="sr-only"> (opens in a new tab)</span>
         </a>
       )}
     </section>

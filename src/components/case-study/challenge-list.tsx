@@ -9,7 +9,7 @@ export function ChallengeList({ challenges }: { challenges: readonly Challenge[]
       <h2 id={headingId} className="mt-2 text-[clamp(2rem,4vw,3.6rem)] font-normal leading-[1.15]">
         What got in the way
       </h2>
-      <ol className="mt-10 grid gap-10 md:grid-cols-3">
+      <ol role="list" className="mt-10 grid gap-10 md:grid-cols-3">
         {challenges.map((c) => (
           <li key={c.title}>
             <h3 className="text-xl">{c.title}</h3>
