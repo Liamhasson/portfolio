@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion, useScroll } from "motion/react";
+import { motion } from "motion/react";
 import { useActiveSection } from "@/hooks/use-active-section";
 import { dur, ease } from "@/lib/motion";
 
@@ -16,18 +16,6 @@ const SECTION_IDS = ITEMS.map((i) => i.id);
 
 const PILL =
   "relative flex min-h-11 items-center rounded-full border border-rose bg-surface-2/80 px-5 text-xs text-ink backdrop-blur-sm transition-colors duration-(--duration-micro) hover:bg-rose/30";
-
-function ReadingProgress() {
-  const { scrollYProgress } = useScroll();
-  return (
-    <motion.span
-      data-testid="reading-progress"
-      aria-hidden
-      className="absolute inset-x-4 -bottom-2 h-0.5 origin-left rounded-full bg-rose"
-      style={{ scaleX: scrollYProgress }}
-    />
-  );
-}
 
 export function PillNav() {
   const pathname = usePathname();
@@ -45,7 +33,6 @@ export function PillNav() {
       className="fixed right-[4.9vw] top-[clamp(12px,3.6vw,48px)] z-50"
     >
       <div className="relative flex gap-2 rounded-full p-1">
-        {!isHome && <ReadingProgress />}
         {ITEMS.map((item) => {
           const isActive = active === item.id;
           const href = `/#${item.id}`;

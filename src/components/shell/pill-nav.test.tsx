@@ -46,16 +46,18 @@ describe("PillNav", () => {
     expect(screen.getByRole("link", { name: "Projects" })).not.toHaveAttribute("aria-current");
   });
 
-  test("no reading progress on home", () => {
+  test("no reading progress bar anywhere (removed by Liam, 2026-10-09)", () => {
+    render(<PillNav />);
+    expect(screen.queryByTestId("reading-progress")).toBeNull();
+    pathname.mockReturnValue("/cyvore");
     render(<PillNav />);
     expect(screen.queryByTestId("reading-progress")).toBeNull();
   });
 
-  test("reading progress on case studies, without active section", () => {
+  test("case studies show no active section", () => {
     pathname.mockReturnValue("/cyvore");
     useActiveSection.mockReturnValue("about");
     render(<PillNav />);
-    expect(screen.getByTestId("reading-progress")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "About" })).not.toHaveAttribute("aria-current");
   });
 
