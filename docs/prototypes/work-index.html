@@ -12,7 +12,6 @@ html,body { margin:0; height:100%; background:#000; }
 .screen { position:relative; width:min(100vw, 160vh); aspect-ratio:16/10; margin:0 auto; background:var(--bg); color:var(--ink); font-family:var(--sans); overflow:hidden; container-type:inline-size; }
 .top { position:absolute; left:3.6cqw; right:3.6cqw; top:3.4cqw; display:flex; justify-content:space-between; align-items:flex-end; }
 .title { font-size:4.8cqw; font-weight:400; line-height:.98; letter-spacing:-.02em; margin:0; }
-.count { font:400 1.15cqw/1 var(--mono); letter-spacing:.06em; color:var(--dim); }
 .rows { position:absolute; left:3.6cqw; right:3.6cqw; top:15.5cqw; border-top:1px solid var(--rule); }
 .row { display:grid; grid-template-columns:7cqw 1fr 38cqw; align-items:baseline; padding:1.75cqw 0 1.95cqw; border-bottom:1px solid var(--rule); color:var(--dim); transition:color .35s cubic-bezier(.22,1,.36,1); }
 .row .n { font:400 1.15cqw/1 var(--mono); letter-spacing:.04em; }
@@ -22,8 +21,8 @@ html,body { margin:0; height:100%; background:#000; }
 .row.on { color:var(--ink); }
 .row.soon .line { font:400 1.15cqw/1.4 var(--mono); letter-spacing:.08em; text-transform:uppercase; }
 /* first reveal: the screen wakes from black and each row surfaces in turn */
-.play .title, .play .count, .play .row { animation:surface .9s cubic-bezier(.22,1,.36,1) both; }
-.play .title { animation-delay:.2s } .play .count { animation-delay:.3s }
+.play .title, .play .row { animation:surface .9s cubic-bezier(.22,1,.36,1) both; }
+.play .title { animation-delay:.2s }
 .play .row:nth-child(1){animation-delay:.55s} .play .row:nth-child(2){animation-delay:.68s} .play .row:nth-child(3){animation-delay:.81s} .play .row:nth-child(4){animation-delay:.94s} .play .row:nth-child(5){animation-delay:1.07s}
 @keyframes surface { from { opacity:0; transform:translateY(1.2cqw); filter:blur(6px); } }
 .wake { position:absolute; inset:0; background:#000; pointer-events:none; }
@@ -33,7 +32,7 @@ html,body { margin:0; height:100%; background:#000; }
 @media (prefers-reduced-motion: reduce) { .play * { animation:none !important; } .wake { display:none; } }
 </style></head><body>
 <div class="screen" id="screen">
-  <div class="top"><h1 class="title">Selected work</h1><span class="count">05 PROJECTS</span></div>
+  <div class="top"><h1 class="title">Selected work</h1></div>
   <div class="rows" id="rows">
     <div class="row on"><span class="n">01</span><span class="name">Eventread<small>SaaS web app</small></span><span class="line">The check every booker skips.</span></div>
     <div class="row"><span class="n">02</span><span class="name">Cyvore<small>B2B website</small></span><span class="line">A cybersecurity startup needed a site investors would believe in.</span></div>

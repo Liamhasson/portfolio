@@ -27,10 +27,8 @@ const layout = await page.evaluate(async (src) => {
     const r = el.getBoundingClientRect();
     return [(r.left - s.left) / s.width, (r.top - s.top) / s.height, (r.right - s.left) / s.width, (r.bottom - s.top) / s.height];
   };
-  const delays = { title: 0.2, count: 0.3 };
   const els = [
-    { name: "title", el: document.querySelector(".title"), delay: delays.title },
-    { name: "count", el: document.querySelector(".count"), delay: delays.count },
+    { name: "title", el: document.querySelector(".title"), delay: 0.2 },
     ...[...document.querySelectorAll(".row")].map((el, i) => ({ name: `row${i + 1}`, el, delay: 0.55 + 0.13 * i })),
   ];
   const img = new Image();

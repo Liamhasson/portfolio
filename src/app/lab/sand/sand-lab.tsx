@@ -451,25 +451,55 @@ export function SandLab() {
           if (ix && desk3d && push) {
             const take = ease(span(progressRef.current, TL.takeover), [0, 1]);
             const sett = ease(span(progressRef.current, TL.indexIn), [0, 1]);
-            if (pt > 0) {
-              const cam = stage!.camera;
-              cam.updateMatrixWorld();
-              const W = canvas.clientWidth, H = canvas.clientHeight;
-              const proj = (desk3d.screenCorners() ?? []).map((p) => {
-                const q = p.clone().project(cam);
-                return [(q.x + 1) / 2 * W, (1 - q.y) / 2 * H] as [number, number];
-              });
-              if (proj.length === 4) {
-                // where it settles: the 16:10 index contained in the view, centred
-                const { w, h } = ix.size();
+            const W = canvas.clientWidth, H = canvas.clientHeight;
+            const portrait = W / H < 1;
+            const cam = stage!.camera;
+            const project = () => (desk3d.screenCorners() ?? []).map((p) => {
+              const q = p.clone().project(cam);
+              return [(q.x + 1) / 2 * W, (1 - q.y) / 2 * H] as [number, number];
+            });
+            if (move === push && portrait) {
+              // phones: the 16:10 screen is far wider than the view; toward the push's end the lens widens just enough
+              // to keep the whole screen in (with the site's side margins), so the takeover happens on the whole screen
+              const xs = project().map((p) => p[0]);
+              if (xs.length === 4) {
+                const need = (Math.max(...xs) - Math.min(...xs)) / (W * 0.902);
+                const wgt = ease(pt, [0.3, 1]);
+                if (need > 1 && wgt > 0) {
+                  const k = 1 + (need - 1) * wgt;
+                  cam.fov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2) * k));
+                  cam.updateProjectionMatrix();
+                }
+              }
+            }
+            const proj = pt > 0 ? project() : [];
+            if (proj.length === 4) {
+              const { w, h } = ix.size();
+              if (portrait) {
+                ix.place(proj as [[number, number], [number, number], [number, number], [number, number]]);
+                // the screen's black panel grows from the screen to the whole phone; the 16:10 layout gives way and
+                // the phone list surfaces
+                const xs = proj.map((p) => p[0]), ys = proj.map((p) => p[1]);
+                const r0 = { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+                const g = ease(sett, [0, 0.55]);
+                ix.panel(take > 0.999 ? { x: r0.x * (1 - g), y: r0.y * (1 - g), w: r0.w + (W - r0.w) * g, h: r0.h + (H - r0.h) * g } : null);
+                ix.show((Number.isFinite(indexMix) ? indexMix : take) * (1 - ease(sett, [0.05, 0.35])));
+                ix.list(ease(sett, [0.4, 1]));
+                ix.interactive(sett > 0.999 ? "list" : "none");
+              } else {
+                // where it settles: the 16:10 index contained in the view, centred, the bars in its black
                 const s = Math.min(W / w, H / h), cw = w * s, ch = h * s, x0 = (W - cw) / 2, y0 = (H - ch) / 2;
                 const rest: [number, number][] = [[x0, y0], [x0 + cw, y0], [x0 + cw, y0 + ch], [x0, y0 + ch]];
                 const quad = proj.map((p, i) => [p[0] + (rest[i][0] - p[0]) * sett, p[1] + (rest[i][1] - p[1]) * sett]) as [[number, number], [number, number], [number, number], [number, number]];
                 ix.place(quad);
+                ix.panel(sett > 0 ? { x: 0, y: 0, w: W, h: H } : null);
+                ix.show(Number.isFinite(indexMix) ? indexMix : take);
+                ix.list(0);
+                ix.interactive(sett > 0.999 ? "wide" : "none");
               }
+            } else {
+              ix.show(0); ix.panel(null); ix.list(0); ix.interactive("none");
             }
-            ix.show(pt > 0 ? (Number.isFinite(indexMix) ? indexMix : take) : 0, pt > 0 ? sett : 0);
-            ix.interactive(sett > 0.999);
           }
           const tanV = Math.tan(THREE.MathUtils.degToRad(stage!.camera.fov) / 2);
           move.show(f, tanV * stage!.camera.aspect, tanV, v.lens);
