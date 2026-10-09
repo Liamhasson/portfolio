@@ -121,7 +121,8 @@ export class Pullback {
   private readonly c: THREE.Vector3;
   private readonly k: number;
 
-  constructor(readonly data: PullbackPath, frameUrl: (i: number) => string) {
+  /** `frameUrl` null: the camera path only (the desk is drawn in 3D), no plate frames are downloaded. */
+  constructor(readonly data: PullbackPath, frameUrl: ((i: number) => string) | null) {
     this.c = new THREE.Vector3(...data.chaos_center);
     this.k = data.chaos_scale;
     for (const t of [this.texA, this.texB]) {
@@ -150,7 +151,7 @@ export class Pullback {
     }
     // the frames load in the background, the start of the move first
     this.images = new Array(data.frames).fill(null);
-    for (let i = 0; i < data.frames; i++) {
+    for (let i = 0; frameUrl && i < data.frames; i++) {
       const img = new Image();
       img.decoding = "async";
       img.onload = () => { this.images[i] = img; };
@@ -158,10 +159,10 @@ export class Pullback {
     }
   }
 
-  static async load(base = PULLBACK_BASE): Promise<Pullback> {
+  static async load(base = PULLBACK_BASE, frames = true): Promise<Pullback> {
     const data = (await (await fetch(`${base}/camera.json`)).json()) as PullbackPath;
-    const pb = new Pullback(data, (i) => `${base}/f_${String(i).padStart(4, "0")}.jpg`);
-    if (data.depth) {
+    const pb = new Pullback(data, frames ? (i) => `${base}/f_${String(i).padStart(4, "0")}.jpg` : null);
+    if (frames && data.depth) {
       fetch(`${base}/${data.depth.file}`)
         .then((r) => (r.ok ? r.arrayBuffer() : null))
         .then((buf) => { if (buf) pb.depth = new Uint16Array(buf); })

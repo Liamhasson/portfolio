@@ -119,15 +119,16 @@ export function SandLab() {
         stage.renderFrame = (r, sc, cam) => comp.render(r, sc, cam);
         (window as unknown as { __sandFilter?: (s: number) => void }).__sandFilter = (s) => { comp.sigma = s; };
       }
-      const pullback = hero && !compare ? await Pullback.load() : null;
+      // the desk: a real 3D object by default; ?plates draws the rendered frames instead (for comparison)
+      const usePlates = new URLSearchParams(window.location.search).has("plates");
+      const pullback = hero && !compare ? await Pullback.load(undefined, usePlates) : null;
       // 2.1: the settle into the three-quarter view, the chaos packing into the ball on the desk
-      const settle = hero && !compare ? await Pullback.load("/lab/settle") : null;
+      const settle = hero && !compare ? await Pullback.load("/lab/settle", usePlates) : null;
       // 2.1 -> 2.2: the rise to the top-down view (the ball rises and rolls with it)
-      const rise = hero && !compare ? await Pullback.load("/lab/rise").catch(() => null) : null;
+      const rise = hero && !compare ? await Pullback.load("/lab/rise", usePlates).catch(() => null) : null;
       if (disposed) return;
       if (rise) stage.scene.add(rise.plate);
-      // ?desk3d: the desk as a real 3D object (baked lighting) instead of the rendered plates
-      const desk3d = hero && !compare && new URLSearchParams(window.location.search).has("desk3d") ? await BakedDesk.load(stage.renderer) : null;
+      const desk3d = hero && !compare && !usePlates ? await BakedDesk.load(stage.renderer) : null;
       if (disposed) return;
       if (desk3d) stage.scene.add(desk3d.group);
       (window as unknown as { __desk3d?: unknown }).__desk3d = desk3d;
@@ -315,7 +316,9 @@ export function SandLab() {
           // ?stframe=N holds the camera on a settle frame (calibration)
           const stFrame = Number(new URLSearchParams(window.location.search).get("stframe") || NaN);
           const st = settle ? (Number.isFinite(stFrame) ? (stFrame - 1) / (settle.data.frames - 1) : span(progressRef.current, TL.settle)) : 0;
-          const rt = rise ? span(progressRef.current, TL.rise) : 0;
+          // ?rtframe=N holds the camera on a rise frame (calibration)
+          const rtFrame = Number(new URLSearchParams(window.location.search).get("rtframe") || NaN);
+          const rt = rise ? (Number.isFinite(rtFrame) ? Math.max((rtFrame - 1) / (rise.data.frames - 1), 1e-4) : span(progressRef.current, TL.rise)) : 0;
           const move = rise && rt > 0 ? rise : settle && st > 0 ? settle : pullback;
           const f = move === rise ? rt * (rise.data.frames - 1) : move === settle ? st * (settle!.data.frames - 1) : t * (pullback.data.frames - 1);
           if (rise) {

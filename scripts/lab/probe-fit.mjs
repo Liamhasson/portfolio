@@ -9,7 +9,7 @@ await page.addStyleTag({ content: "nextjs-portal,nav,[data-testid=hero-overlay]{
 await page.mouse.move(1599, 999);
 await page.waitForTimeout(4000);
 for (const [i, [rot, k]] of sets.entries()) {
-  await page.evaluate(([rot, k]) => { for (const m of window.__desk3d.glossyMaterials) { m.envMapRotation.set(0, rot, 0); m.envMapIntensity = k; m.needsUpdate = true; } }, [rot, k]);
+  await page.evaluate(([rot, k]) => { for (const m of window.__desk3d.materials) { m.envMapRotation.set(0, rot, 0); m.envMapIntensity = k; m.needsUpdate = true; } }, [rot, k]);
   await page.waitForTimeout(500);
   await page.screenshot({ path: `test-results/sand/probe-${i}.png` });
 }

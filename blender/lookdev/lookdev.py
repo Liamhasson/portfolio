@@ -1684,7 +1684,7 @@ def build_bakedesk():
     scale = float(os.environ.get("BAKE_SCALE", "1"))
     deps = bpy.context.evaluated_depsgraph_get()
     hidden = ("trackpad", "display", "bezel")
-    sizes = {"desk": 4096, "base": 1024, "lid": 2048, "mark": 1024, "pick": 256, "Cylinder": 512}
+    sizes = {"desk": 1024, "base": 1024, "lid": 2048, "mark": 1024, "pick": 256, "Cylinder": 512}
     keep = []
     for o in list(bpy.data.objects):
         if o.type != "MESH":
@@ -1694,6 +1694,26 @@ def build_bakedesk():
             bpy.data.objects.remove(o, do_unlink=True)
             continue
         keep.append(o)
+    bpy.context.view_layer.update()
+    deps = bpy.context.evaluated_depsgraph_get()
+    # the desk's top is what the camera sees: give it its own texture (the sides and underside share the other)
+    import bmesh
+    for o in list(keep):
+        if o.name.split(".")[0] != "desk":
+            continue
+        bm = bmesh.new(); bm.from_mesh(o.data)
+        ztop = max(v.co.z for v in bm.verts)
+        top_faces = [f for f in bm.faces if f.normal.z > 0.9 and all(abs(v.co.z - ztop) < 1e-4 for v in f.verts)]
+        bm_top = bm.copy()
+        bmesh.ops.delete(bm_top, geom=[f for f in bm_top.faces if not (f.normal.z > 0.9 and all(abs(v.co.z - ztop) < 1e-4 for v in f.verts))], context="FACES")
+        bmesh.ops.delete(bm, geom=top_faces, context="FACES")
+        me_top = bpy.data.meshes.new("desk_top_mesh"); bm_top.to_mesh(me_top); bm_top.free()
+        bm.to_mesh(o.data); bm.free()
+        top = bpy.data.objects.new("desk_top", me_top); scene.collection.objects.link(top)
+        top.matrix_world = o.matrix_world
+        for m in o.data.materials:
+            me_top.materials.append(m)
+        keep.append(top)
     bpy.context.view_layer.update()
     deps = bpy.context.evaluated_depsgraph_get()
     baked = []
@@ -1720,11 +1740,22 @@ def build_bakedesk():
         bpy.context.view_layer.objects.active = n; n.select_set(True)
         bpy.ops.object.mode_set(mode="EDIT")
         bpy.ops.mesh.select_all(action="SELECT")
-        bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.004)
-        bpy.ops.object.mode_set(mode="OBJECT")
         base = o.name.split(".")[0]
-        size = int(next((v for k, v in sizes.items() if base.startswith(k)), 1024) * scale)
-        img = bpy.data.images.new("bake_" + o.name, size, size, float_buffer=True)
+        if base == "desk_top":
+            bpy.ops.object.mode_set(mode="OBJECT")
+            # a flat top: planar UVs at its true proportions (2:1), filling the texture
+            bake_uv = me.uv_layers["bake"]   # re-fetch: the edit-mode round trip invalidates the old reference
+            xs = [v.co.x for v in me.vertices]; ys = [v.co.y for v in me.vertices]
+            x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
+            for loop in me.loops:
+                co = me.vertices[loop.vertex_index].co
+                bake_uv.data[loop.index].uv = ((co.x - x0) / (x1 - x0), (co.y - y0) / (y1 - y0))
+            w_, h_ = int(4096 * scale), int(4096 * scale * (y1 - y0) / (x1 - x0))
+        else:
+            bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.004)
+            bpy.ops.object.mode_set(mode="OBJECT")
+            w_ = h_ = int(next((v for k, v in sizes.items() if base.startswith(k)), 1024) * scale)
+        img = bpy.data.images.new("bake_" + o.name, w_, h_, float_buffer=True)
         for m in me.materials:
             if not m:
                 continue
@@ -1740,10 +1771,11 @@ def build_bakedesk():
     render_settings(int(os.environ.get("BAKE_SAMPLES", "384")))
     scene.cycles.use_denoising = False
     scene.render.bake.margin = 16
-    # glossy objects (metal, the coated pen): view-dependent, so only their diffuse light is baked (linear, / ENCODE);
-    # their reflections are drawn live from a 360 probe of the room (below)
-    GLOSSY = {"lid": "alu", "base": "alu", "Cylinder": None, "mark": "mark"}
-    glossy_meta = {}
+    # Every surface: its diffuse light baked (linear, / ENCODE, sRGB-encoded PNG); its sheen and reflections are drawn
+    # live from a 360 probe of the room, and the site applies Blender's exact view transform (a LUT, make_lut.py).
+    # The wood also gets its roughness and normal (grain, scratches) baked, since its sheen carries the scratches.
+    DETAIL = ("desk_top", "desk")
+    mats_meta = {}
     def principled_of(obj):
         for m in obj.data.materials:
             if m and m.node_tree:
@@ -1752,55 +1784,65 @@ def build_bakedesk():
                     rough = b.inputs["Roughness"]
                     r = rough.default_value if not rough.is_linked else 0.35
                     return dict(color=list(b.inputs["Base Color"].default_value)[:3], metallic=b.inputs["Metallic"].default_value,
-                                roughness=r, coat=b.inputs["Coat Weight"].default_value, coat_roughness=b.inputs["Coat Roughness"].default_value)
+                                roughness=r, coat=b.inputs["Coat Weight"].default_value, coat_roughness=b.inputs["Coat Roughness"].default_value,
+                                ior=b.inputs["IOR"].default_value, specular=b.inputs["Specular IOR Level"].default_value)
         return None
+    def save_png(img, path, encode_linear):
+        px = np.array(img.pixels[:], dtype=np.float32).reshape(img.size[1], img.size[0], 4)[..., :3]
+        if encode_linear:
+            enc = np.clip(px / ENCODE, 0, 1)
+            px = np.where(enc > 0.0031308, 1.055 * np.power(enc, 1 / 2.4) - 0.055, enc * 12.92)
+        rgba = np.concatenate([np.clip(px, 0, 1), np.ones(px.shape[:2] + (1,), np.float32)], axis=2)
+        o = bpy.data.images.new("o_" + os.path.basename(path), img.size[0], img.size[1])
+        o.colorspace_settings.name = "Non-Color"
+        o.pixels.foreach_set(rgba.ravel())
+        o.filepath_raw = path; o.file_format = "PNG"; o.save()
     for n, img, base in baked:
         bpy.ops.object.select_all(action="DESELECT")
         bpy.context.view_layer.objects.active = n; n.select_set(True)
-        glossy = base in GLOSSY
-        if glossy:
-            glossy_meta[n.name] = principled_of(n)
-            bpy.ops.object.bake(type="DIFFUSE", pass_filter={"DIRECT", "INDIRECT", "COLOR"}, margin=16, use_clear=True)
-            px = np.array(img.pixels[:], dtype=np.float32).reshape(img.size[1], img.size[0], 4)[..., :3]
-            enc = np.clip(px / ENCODE, 0, 1)
-            srgb_ = np.where(enc > 0.0031308, 1.055 * np.power(enc, 1 / 2.4) - 0.055, enc * 12.92)
-            rgba = np.concatenate([srgb_, np.ones(srgb_.shape[:2] + (1,), np.float32)], axis=2)
-            out_img = bpy.data.images.new("tex_" + n.name, img.size[0], img.size[1])
-            out_img.colorspace_settings.name = "sRGB"
-            out_img.pixels.foreach_set(rgba.ravel())
-            out_img.filepath_raw = os.path.join(out, n.name + ".png"); out_img.file_format = "PNG"; out_img.save()
-        else:
+        meta = principled_of(n) or {}
+        # paper lets light through (translucency), which the diffuse pass leaves out: bake its full light, no live sheen
+        paper = base.startswith(("card", "sticky"))
+        if paper:
             bpy.ops.object.bake(type="COMBINED", margin=16, use_clear=True)
-        # display-referred: the baked radiance through the scene's own view transform (AgX, Punchy), exactly as the
-        # plates were, so the site draws the texture as-is (no tone mapping) and matte surfaces match by construction
-        if not glossy:
-            path_png = os.path.join(out, n.name + ".png")
-            scene.render.image_settings.file_format = "PNG"
-            scene.render.image_settings.color_mode = "RGB"
-            scene.render.image_settings.color_depth = "8"
-            img.save_render(path_png, scene=scene)
-            out_img = bpy.data.images.load(path_png)
-            out_img.colorspace_settings.name = "sRGB"
-        # export material: just the baked texture on the bake UVs
-        m = bpy.data.materials.new("m_" + n.name); m.use_nodes = True
-        bsdf = m.node_tree.nodes["Principled BSDF"]
-        t = m.node_tree.nodes.new("ShaderNodeTexImage"); t.image = out_img
-        m.node_tree.links.new(t.outputs["Color"], bsdf.inputs["Base Color"])
-        n.data.materials.clear(); n.data.materials.append(m)
+            meta["combined"] = True
+        else:
+            bpy.ops.object.bake(type="DIFFUSE", pass_filter={"DIRECT", "INDIRECT", "COLOR"}, margin=16, use_clear=True)
+        save_png(img, os.path.join(out, n.name + ".diff.png"), True)
+        meta["diff"] = n.name + ".diff.png"
+        if base in DETAIL:
+            bpy.ops.object.bake(type="ROUGHNESS", margin=16, use_clear=True)
+            save_png(img, os.path.join(out, n.name + ".rough.png"), False); meta["rough"] = n.name + ".rough.png"
+            bpy.ops.object.bake(type="NORMAL", normal_space="TANGENT", margin=16, use_clear=True)
+            save_png(img, os.path.join(out, n.name + ".normal.png"), False); meta["normal"] = n.name + ".normal.png"
+        mats_meta[n.name] = meta
+        n.data.materials.clear()
         for uv in list(n.data.uv_layers):
             if uv.name != "bake":
                 n.data.uv_layers.remove(uv)
-        print("BAKED", n.name, img.size[0], flush=True)
+        print("BAKED", n.name, img.size[0], img.size[1], flush=True)
     bpy.ops.object.select_all(action="DESELECT")
     for n, _, _ in baked:
         n.select_set(True)
     bpy.ops.export_scene.gltf(filepath=os.path.join(out, "desk.glb"), export_format="GLB", use_selection=True,
-                              export_image_format="JPEG", export_jpeg_quality=90, export_yup=True, export_apply=True)
+                              export_materials="NONE", export_tangents=True, export_yup=True, export_apply=True)
     # the 360 probe the glossy objects reflect: the room as seen from just above the laptop (everything visible to it,
     # including the reflection-only panels and the lamp)
+    # the lights are NOT in the probe: they are close to the desk (their reflections depend on where you look), so the
+    # site adds them as real lights (exported below); the probe holds the room: the soft panels, the dome, the lit desk
+    lights_meta = {}
     for o in bpy.data.objects:
-        if o.type == "LIGHT":
-            o.visible_camera = True
+        if o.type != "LIGHT" or o.hide_render:
+            continue
+        L = o.data
+        fwd = o.matrix_world.to_quaternion() @ Vector((0, 0, -1))
+        e = dict(type=L.type, pos=list(o.matrix_world.translation), dir=list(fwd), watts=L.energy, color=list(L.color),
+                 radius=getattr(L, "shadow_soft_size", 0.0))
+        if L.type == "SPOT":
+            e.update(spot_size=L.spot_size, blend=L.spot_blend)
+        if L.type == "AREA":
+            e.update(shape=L.shape, size=L.size, size_y=getattr(L, "size_y", L.size), up=list(o.matrix_world.to_quaternion() @ Vector((0, 1, 0))))
+        lights_meta[o.name] = e
     scene.world.cycles_visibility.camera = True
     for n, _, _ in baked:
         n.hide_render = True                         # the probe sees the room, not the baked copies
@@ -1822,7 +1864,15 @@ def build_bakedesk():
     scene.render.image_settings.file_format = "OPEN_EXR"; scene.render.image_settings.color_depth = "16"
     scene.render.filepath = os.path.join(out, "probe.exr")
     bpy.ops.render.render(write_still=True)
-    json.dump({"encode": 1.0, "display_referred": True, "glossy_encode": ENCODE, "glossy": glossy_meta, "probe": "probe.exr",
+    # a second probe with the lights in it (their true soft discs), for the metal and the coated pen: their look is
+    # the lamp's broad reflection, which a point-like live light can't draw; seen from the laptop, where they sit
+    for o in bpy.data.objects:
+        if o.type == "LIGHT":
+            o.visible_camera = True
+    scene.render.filepath = os.path.join(out, "probe_lit.exr")
+    bpy.ops.render.render(write_still=True)
+    json.dump({"version": 2, "encode": ENCODE, "materials": mats_meta, "probe": "probe.exr", "probe_lit": "probe_lit.exr",
+               "lut": "agx-punchy-64.bin", "lights": lights_meta,
                "chaos_center": list(c_), "chaos_scale": CHAOS_SCALE, "laptop": "shut"},
               open(os.path.join(out, "desk.json"), "w"))
     print("WROTE", os.path.join(out, "desk.glb"))
