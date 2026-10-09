@@ -1332,6 +1332,9 @@ git commit -m "chore: Eventread calendar capture for the case-study hero" -- scr
   - Cyvore: challenge 2's "what it changed" restates the method rather than a result; challenge 1's "happened" repeats its title.
   - Cyvore: the outcome's timing sentence should name who was measured ("3 stakeholders: about 35s → about 8s").
   - Pulse: "The goal-based onboarding shown above" depends on layout; confirm once Part B places the blocks.
+  - Eventread MDX: "mostly sold through one company" paraphrases the live page's "54,000 events. 151 million fans. One company." (Live Nation's own figures). Confirm the source and wording.
+  - Pulse MDX: "BEAT81 and Urban Sports Club sell the classes, but neither is built around keeping you coming back" is a claim about competitors the live page doesn't make. Keep, soften, or cut.
+  - Pulse MDX: the "80% more likely to still be active six months later (Lucid)" stat: confirm the source link for a footnote.
 - [ ] **Step 2:** Walk Liam through every line of the content files and MDX, one study at a time. Apply his edits in `src/content/case-studies/*.ts` and `*.mdx`; re-run `npx vitest run src/content` after each study (the validator catches a broken frame).
 - [ ] **Step 3: Commit** after each approved study: `git commit -m "content: <study> copy approved by Liam" -- src/content/case-studies/`
 
