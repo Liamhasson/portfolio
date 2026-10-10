@@ -149,7 +149,7 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
 .tools span:not(:last-child)::after { content: ""; position: absolute; right: calc(var(--u) * -12); top: .74em; width: calc(var(--u) * 3); height: calc(var(--u) * 3); border-radius: 50%; background: var(--ink-3); }
 
 /* ------------------------------ 3 problem ------------------------------ */
-.problem { padding: calc(var(--u) * 112) 0 calc(var(--u) * 104); }
+.problem { padding: calc(var(--u) * 96) 0 calc(var(--u) * 72); }
 .fig-num { font: 400 calc(var(--u) * 196)/.74 var(--sans); letter-spacing: -.05em; font-variant-numeric: tabular-nums; margin-left: calc(var(--u) * -6); margin-top: calc(var(--u) * 4); }
 .fig-sub { font-size: calc(var(--u) * 24); line-height: 1.2; font-style: italic; color: var(--ink-2); margin-top: calc(var(--u) * 20); }
 .fig-src { margin-top: calc(var(--u) * 16); }
@@ -258,6 +258,33 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
 .follow-piece .btn { width: 100%; justify-content: center; height: calc(var(--u) * 46); }
 .follow-piece p { font-size: calc(var(--u) * 12); color: var(--ink-3); text-align: center; }
 
+/* ------------------------------ 5 how it works: the walkthrough ------------------------------ */
+.walk { padding: calc(var(--u) * 112) 0 calc(var(--u) * 88); }
+.w-step { margin-top: calc(var(--u) * 72); }
+.w-head { align-items: start; }
+.w-num { grid-column: 1 / 2; font: 400 calc(var(--u) * 12)/1 var(--mono); letter-spacing: .08em; color: var(--ink-3); padding-top: calc(var(--u) * 10); }
+.w-head .w-title { grid-column: 2 / 7; }
+.w-head .w-body { grid-column: 8 / 13; }
+.w-title { font-size: calc(var(--u) * 32); line-height: 1.15; letter-spacing: -.015em; }
+.w-tray { background: var(--subtle); border-radius: calc(var(--u) * 24); padding: calc(var(--u) * 32); }
+.w-step .w-tray { margin: calc(var(--u) * 32) calc(var(--u) * 72) 0; padding: calc(var(--u) * 24); }
+.w-pair { display: flex; gap: calc(var(--u) * 24); align-items: flex-start; }
+.w-shot { margin: 0; }
+.w-shot:first-child { flex: 2.54 1 0; } .w-shot:last-child { flex: 1.07 1 0; }
+.w-shot figcaption { margin-top: calc(var(--u) * 14); }
+.crop { position: relative; overflow: hidden; aspect-ratio: var(--w) / var(--h); border-radius: calc(var(--u) * 12); background: var(--canvas); box-shadow: 0 0 0 calc(var(--u) * 1) var(--hair); }
+.crop video { position: absolute; width: calc(1728 / var(--w) * 100%); left: calc(var(--x) / var(--w) * -100%); top: calc(var(--y) / var(--h) * -100%); }
+.w-duo { margin-top: calc(var(--u) * 80); align-items: start; }
+.w-col { grid-column: span 6; display: grid; grid-template-columns: calc(var(--u) * 110) 1fr; align-content: start; }
+.w-col .w-num { grid-column: 1; }
+.w-col .w-title, .w-col .w-body, .w-col .w-tray { grid-column: 2; }
+.w-col .w-body { margin-top: calc(var(--u) * 18); max-width: 40ch; }
+.w-col .w-tray { margin-top: calc(var(--u) * 28); padding: calc(var(--u) * 24); }
+.w-col .w-tray img { display: block; width: 100%; height: auto; border-radius: calc(var(--u) * 12); box-shadow: 0 0 0 calc(var(--u) * 1) var(--hair); }
+.walk .hood { margin-top: calc(var(--u) * 64); }
+.walk .hood p { max-width: none; font-size: calc(var(--u) * 16); }
+.draft-tag { color: #f0a020; }
+
 /* ------------------------------ 6 challenges ------------------------------ */
 .chal { padding: calc(var(--u) * 112) 0 calc(var(--u) * 104); }
 .chs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(5, auto); column-gap: calc(var(--u) * 48); margin: calc(var(--u) * 64) calc(var(--u) * 72) 0; }
@@ -277,7 +304,7 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
 .mini-btn .ic { width: calc(var(--u) * 12); height: calc(var(--u) * 12); }
 
 /* ------------------------------ 7 impact ------------------------------ */
-.outcome { padding: calc(var(--u) * 112) 0 calc(var(--u) * 104); }
+.outcome { padding: calc(var(--u) * 96) 0 calc(var(--u) * 72); }
 .outcome .display { margin-top: calc(var(--u) * 32); font-size: calc(var(--u) * 52); }
 .outcome .display a { background-image: linear-gradient(currentColor, currentColor); background-size: 100% calc(var(--u) * 1.5); background-repeat: no-repeat; background-position: 0 92%; }
 .outcome .row-cta { margin-top: calc(var(--u) * 44); }
@@ -374,8 +401,8 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
 
 <header class="board-head">
   <div>
-    <h1>Eventread case study <em>— mockup board, v2</em></h1>
-    <p>Revised to Eventread's design system of 10 Oct 2026: risk is the only colour, no teal, Geist Sans for words and Geist Mono for numbers, 6px pressables, 12px panels, hairlines. One plain title per section. All copy verbatim from eventread.ts and eventread.mdx.</p>
+    <h1>Eventread case study <em>— mockup board, v3</em></h1>
+    <p>Revised to Eventread's design system of 10 Oct 2026: risk is the only colour, no teal, Geist Sans for words and Geist Mono for numbers, 6px pressables, 12px panels, hairlines. One plain title per section. All copy verbatim from eventread.ts and eventread.mdx, except How it works (v3, marked draft).</p>
   </div>
   <div class="legend"><span><i></i>End of a 900px screen (board only)</span><span>1440 frames, scaled</span></div>
 </header>
@@ -441,7 +468,7 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
 
 <!-- ============================== 3 PROBLEM ============================== -->
 <section class="block">
-  <div class="cap"><span><b>03 · Problem</b></span><span>1 screen · 1440 × ~990</span></div>
+  <div class="cap"><span><b>03 · Problem</b></span><span>1 screen · 1440 × ~870</span></div>
   <div class="frame"><div class="f problem">
     <div class="fold" style="top:calc(var(--u) * 900)"><span>900</span></div>
     <div class="g12">
@@ -550,52 +577,52 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
 
 <!-- ============================== 5 HOW IT WORKS ============================== -->
 <section class="block">
-  <div class="cap"><span><b>05 · How it works</b></span><span>1 screen · 1440 × ~960</span></div>
-  <div class="frame"><div class="f support">
+  <div class="cap"><span><b>05 · How it works</b> — the product, walked through · <span class="draft-tag">new copy: draft, not in eventread.mdx yet</span></span><span>~1.9 screens · 1440 × ~1740</span></div>
+  <div class="frame"><div class="f walk">
     <div class="fold" style="top:calc(var(--u) * 900)"><span>900</span></div>
-    <div class="g12">
-      <div class="sup-left">
-        <h2 class="title" style="margin-left:calc(var(--u) * -3)">How it works</h2>
-        <p class="body"><span class="lead">One search, two APIs.</span> Ticketmaster covers the big ticketed shows. JamBase catches the smaller, local ones Ticketmaster doesn't list. For Berlin in November 2026 that's 487 shows against Ticketmaster's 93, and 436 of them aren't on Ticketmaster at all. One search checks both, and followed dates send an update when something new lands on your night.</p>
-        <div class="hood">
-          <p>Two fixes behind the search: "Cambridge" returned 124 events across the UK and the US until places carried their country (21 after the fix), and tour shows wanting the same night are assigned in two passes.</p>
-        </div>
-      </div>
+    <div class="g12" style="align-items:end">
+      <h2 class="title" style="grid-column:1/7;margin-left:calc(var(--u) * -3)">How it works</h2>
+      <p class="body" style="grid-column:8/13"><span class="lead">One search, then it remembers.</span> Pick a city, a month, your genre and your room size, and the month comes back laid out by risk. Around that search sit three things bookers do every week: book for several acts, watch a date after it's booked, and route a tour.</p>
+    </div>
 
-      <div class="sup-right app">
-        <div class="searchbar">
-          <div class="sb-seg"><span class="app-label">City</span><span class="sb-sel">Berlin, Germany<svg class="ic"><use href="#i-chevron-down"/></svg></span></div>
-          <div class="sb-seg"><span class="app-label">Month</span><span class="sb-sel">November 2026<svg class="ic"><use href="#i-calendar"/></svg></span></div>
-          <div class="sb-seg"><span class="app-label">Your show</span><span class="sb-sel">Rock · 500–1,500 · 20:00<svg class="ic"><use href="#i-chevron-down"/></svg></span></div>
-        </div>
-        <svg class="wires" viewBox="0 0 636 56" preserveAspectRatio="none" aria-hidden="true">
-          <path d="M318 0 V18 Q318 28 308 28 H169 Q159 28 159 38 V56 M318 18 Q318 28 328 28 H467 Q477 28 477 38 V56" fill="none" stroke="#1a1a2e" stroke-opacity=".3" stroke-width="1" vector-effect="non-scaling-stroke"/>
-        </svg>
-        <div class="sources">
-          <div class="src"><span class="live"></span>Ticketmaster — live data</div>
-          <div class="src"><span class="live"></span>Live events search — live data<u>Powered by JamBase</u></div>
-        </div>
-        <svg class="wires" viewBox="0 0 636 56" preserveAspectRatio="none" aria-hidden="true">
-          <path d="M159 0 V18 Q159 28 169 28 H308 Q318 28 318 38 V56 M477 0 V18 Q477 28 467 28 H328 Q318 28 318 38" fill="none" stroke="#1a1a2e" stroke-opacity=".3" stroke-width="1" vector-effect="non-scaling-stroke"/>
-        </svg>
-        <div class="counts">
-          <div class="app-label">Berlin · November 2026</div>
-          <div class="c-row">
-            <div><div class="c-num">487</div><div class="app-label c-name">JamBase</div></div>
-            <div class="c-bar"><i style="width:89.5%;background:var(--ink)"></i><i style="width:10.5%;background:var(--hair-2)"></i></div>
-          </div>
-          <div class="c-row">
-            <div><div class="c-num">93</div><div class="app-label c-name">Ticketmaster</div></div>
-            <div class="c-bar"><i style="width:19.1%;background:var(--hair-2)"></i></div>
-          </div>
-          <div class="c-key">
-            <span><i style="background:var(--ink)"></i><span><span class="mono">436</span> of them <em>aren't on Ticketmaster at all.</em></span></span>
-          </div>
-        </div>
-        <div class="follow-piece">
-          <a class="btn btn-ink"><svg class="ic"><use href="#i-plus"/></svg>Follow this date</a>
-          <p>We re-check this date every day and email you if a competing show is announced.</p>
-        </div>
+    <!-- 01 search + acts -->
+    <div class="w-step">
+      <div class="g12 w-head">
+        <div class="w-num">01</div>
+        <h3 class="w-title">Search, then save it as an act</h3>
+        <p class="body w-body">A manager or an agent books for several acts, and every search asked for the same genre and room size again. Signed in, a search offers to save itself as an act. After that the act is one click on the search page, and its genre and room size fill in.</p>
+      </div>
+      <div class="w-tray w-pair">
+        <figure class="w-shot">
+          <div class="crop" style="--w:940;--h:370;--x:620;--y:150"><video src="eventread-mockups/flow-save-act.mp4" poster="eventread-mockups/flow-save-act-poster.jpg" autoplay muted loop playsinline aria-label="Results for Berlin, November 2026: the Save Rock · 500–1,500 as an act offer is named The Quiet Hours and becomes a chip"></video></div>
+          <figcaption class="app-label">After a search · the offer</figcaption>
+        </figure>
+        <figure class="w-shot">
+          <div class="crop" style="--w:470;--h:440;--x:1040;--y:390"><video src="eventread-mockups/flow-pick-act.mp4" poster="eventread-mockups/flow-pick-act-poster.jpg" autoplay muted loop playsinline aria-label="The search form: picking Mira Solenne fills Electronic and 1,500–5,000"></video></div>
+          <figcaption class="app-label">Next search · one click</figcaption>
+        </figure>
+      </div>
+    </div>
+
+    <!-- 02 followed dates + 03 tours -->
+    <div class="g12 w-duo">
+      <div class="w-col">
+        <div class="w-num">02</div>
+        <h3 class="w-title">Follow the date you booked</h3>
+        <p class="body w-body">Shows keep getting announced after a date is booked. A followed date is re-checked every day, and an email goes out when a competing show lands on that night.</p>
+        <div class="w-tray"><img src="eventread-mockups/followed-dates.jpg" alt="Followed dates: two dates followed, both at risk, three new conflicts since the last visit"></div>
+      </div>
+      <div class="w-col">
+        <div class="w-num">03</div>
+        <h3 class="w-title">Plan a tour as one run</h3>
+        <p class="body w-body">Name the cities and the window. The tour planner keeps the dates far enough apart to drive, picks the nights with the least competition, and plans around any date that's already booked.</p>
+        <div class="w-tray"><img src="eventread-mockups/tour-planner.jpg" alt="Tour planner: dates, genre, room size and the cities in running order"></div>
+      </div>
+    </div>
+
+    <div class="g12">
+      <div class="hood" style="grid-column:1/13">
+        <p><span class="label" style="margin-right:calc(var(--u) * 16)">Under the hood</span>Ticketmaster covers the big ticketed shows and JamBase the local ones it doesn't list: for Berlin in November 2026, 487 shows against 93, 436 of them not on Ticketmaster at all. "Cambridge" returned 124 events across the UK and the US until places carried their country (21 after the fix), and tour shows wanting the same night are assigned in two passes.</p>
       </div>
     </div>
   </div></div>
@@ -635,7 +662,7 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
 
 <!-- ============================== 7 IMPACT ============================== -->
 <section class="block">
-  <div class="cap"><span><b>07 · Impact</b> — shared</span><span>0.5 screen · 1440 × ~520</span></div>
+  <div class="cap"><span><b>07 · Impact</b> — shared</span><span>0.7 screen · 1440 × ~600</span></div>
   <div class="frame"><div class="f outcome">
     <div class="g12">
       <div style="grid-column:1/12">
