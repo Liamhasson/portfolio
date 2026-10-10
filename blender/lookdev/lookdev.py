@@ -24,7 +24,7 @@ from mathutils import Matrix, Vector
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 ap = argparse.ArgumentParser()
 ap.add_argument("--scene", choices=["ball", "chaos", "glass", "studio", "desk", "bench", "canvas", "hero", "pullback", "deskmove", "attempts", "export", "settle", "raygrid", "bakedesk", "concept"], required=True)
-ap.add_argument("--move", choices=["rise", "descend", "push", "through"], default="rise", help="deskmove: which camera move")
+ap.add_argument("--move", choices=["rise", "descend", "push", "through", "cloud"], default="rise", help="deskmove: which camera move")
 ap.add_argument("--move-name", dest="move_name", default="pullback", help="raygrid: which move's camera path (pullback, settle)")
 ap.add_argument("--grid", choices=["etched", "glow", "mat"], default="etched", help="bench scene only")
 ap.add_argument("--word", choices=["solid", "light", "cutout", "none"], default="light", help="hero scene only")
@@ -1081,28 +1081,71 @@ def laptop(loc, rot_z, open_deg=108):
     bpy.ops.mesh.primitive_cylinder_add(radius=0.0018, depth=0.01, vertices=32, location=(-W / 2, -0.06, 0.0045), rotation=(0, math.pi / 2, 0))
     cut(base, bpy.context.active_object)
     base.data.materials.clear(); base.data.materials.append(alu); base.parent = root   # the cuts leave an empty slot: clear it, or the base renders default grey
-    # keyboard: a slightly recessed black field with a real key grid
-    keys_mat = principled("keys", (0.018, 0.018, 0.02, 1), 0.55)
-    deck = principled("deck", (0.012, 0.012, 0.013, 1), 0.6)
-    kb_w, kb_d, kb_y = 0.276, 0.112, D / 2 - 0.074
+    # keyboard: a MacBook layout (key widths in units), black caps with translucent legends lit from below, and the
+    # backlight leaking round every key (Liam, 2026-10-10: the keys read as missing, black on black with no light)
+    on = open_deg >= 30
+    BACK = (1.0, 0.9, 0.78, 1)
+    keys_mat = principled("keys", (0.016, 0.016, 0.018, 1), 0.42, **{"Specular IOR Level": 0.35})
+    deck = principled("deck", (0.01, 0.01, 0.011, 1), 0.6, **{"Emission Color": BACK, "Emission Strength": 0.26 if on else 0.0})
+    legend = principled("legend", (0.32, 0.32, 0.33, 1), 0.5, **{"Emission Color": BACK, "Emission Strength": 3.2 if on else 0.0})
+    MOVE_CTX["backlight"] = [(deck.node_tree.nodes["Principled BSDF"].inputs["Emission Strength"], 0.26),
+                             (legend.node_tree.nodes["Principled BSDF"].inputs["Emission Strength"], 3.2)]
+    # between the hinge (11 mm margin) and the trackpad (9 mm above it), as on the real 14-inch
+    tp_top = -D / 2 + 0.012 + 0.094
+    kb_top, kb_bot = D / 2 - 0.011, tp_top + 0.009
+    kb_w, kb_d, kb_y = 0.276, kb_top - kb_bot, (kb_top + kb_bot) / 2
     bpy.ops.mesh.primitive_cube_add(size=1, location=(0, kb_y, Hb - 0.0002)); kw = bpy.context.active_object
-    kw.scale = (kb_w + 0.004, kb_d + 0.004, 0.0004); kw.data.materials.append(deck); kw.parent = root
-    pitch = kb_w / 14
-    rows = [(14, 0.55), (14, 1), (14, 1), (13, 1), (12, 1), (11, 1)]
-    yk = kb_y + kb_d / 2 - 0.004
-    for n, hfac in rows:
-        kh = pitch * 0.88 * hfac; kwid = (kb_w - 0.0015 * (n - 1)) / n
-        for i in range(n):
-            x = -kb_w / 2 + kwid / 2 + i * (kwid + 0.0015)
-            bpy.ops.mesh.primitive_cube_add(size=1, location=(x, yk - kh / 2, Hb + 0.0002))
-            k = bpy.context.active_object; k.scale = (kwid, kh, 0.0006)
-            bv = k.modifiers.new("b", "BEVEL"); bv.width = 0.0012; bv.segments = 3
-            k.data.materials.append(keys_mat); k.parent = root
-        yk -= kh + 0.0015
-    # trackpad: dark glass, matching the Space Black body
+    kw.scale = (kb_w + 0.0012, kb_d + 0.0012, 0.0004); kw.data.materials.append(deck); kw.parent = root
+    U, gap = kb_w / 14.5, 0.0015
+    kh_full = (kb_d - 5 * gap) / 5.55
+    F = [f"F{i}" for i in range(1, 13)]
+    rows = [
+        (0.55, [("esc", 1.5)] + [(f, 1) for f in F] + [("", 1)]),
+        (1, [(c, 1) for c in "`1234567890-="] + [("delete", 1.5)]),
+        (1, [("tab", 1.5)] + [(c, 1) for c in "QWERTYUIOP[]"] + [("\\", 1)]),
+        (1, [("caps lock", 1.75)] + [(c, 1) for c in "ASDFGHJKL;'"] + [("return", 1.75)]),
+        (1, [("shift", 2.25)] + [(c, 1) for c in "ZXCVBNM,./"] + [("shift ", 2.25)]),
+        (1, [("fn", 1), ("control", 1), ("option", 1), ("command", 1.25), (" ", 5), ("command ", 1.25), ("option ", 1),
+             ("<", 1), ("^v", 1), (">", 1)]),
+    ]
+    font = bpy.data.fonts.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts", "Geist-Regular.ttf"))
+    def key(x, y, w, h):
+        bpy.ops.mesh.primitive_cube_add(size=1, location=(x, y, Hb + 0.0004))
+        k = bpy.context.active_object; k.scale = (w, h, 0.0009)
+        bv = k.modifiers.new("b", "BEVEL"); bv.width = 0.0011; bv.segments = 3
+        k.data.materials.append(keys_mat); k.parent = root
+    def label(body, x, y, size, align="CENTER"):
+        cu = bpy.data.curves.new("legend", "FONT"); cu.body = body; cu.font = font; cu.size = size
+        cu.align_x, cu.align_y = align, "CENTER"
+        t = bpy.data.objects.new("legend", cu); scene.collection.objects.link(t)
+        cu.materials.append(legend); t.parent = root; t.location = (x, y, Hb + 0.00086)
+    yk = kb_top
+    for hfac, row in rows:
+        kh = kh_full * hfac
+        cum = 0.0
+        for body, units in row:
+            w = units * U - gap
+            x = -kb_w / 2 + (cum + units / 2) * U
+            cum += units
+            if body == "^v":                                     # up and down share one key's space, stacked
+                for dy in (kh / 4 + gap / 4, -kh / 4 - gap / 4):
+                    key(x, yk - kh / 2 + dy, w, kh / 2 - gap / 2)
+                continue
+            key(x, yk - kh / 2, w, kh)
+            name = body.strip()
+            if not name or name in "<>":
+                continue
+            if len(name) == 1:                                   # characters: centred, as on the caps
+                label(name, x, yk - kh / 2, 0.0042 if name.isalpha() else 0.0038)
+            else:                                                # words: small, at the cap's lower corner
+                right = body.endswith(" ")
+                label(name, x + (w / 2 - 0.0016) * (1 if right else -1), yk - kh + 0.003, 0.0021 if hfac == 1 else 0.0018,
+                      align="RIGHT" if right else "LEFT")
+        yk -= kh + gap
+    # trackpad: matte etched glass, dark, a soft sheen only (it shone like a mirror)
     tp = slab("trackpad", 0.15, 0.094, 0.004, 0.0002, z0=Hb - 0.00005, bevel=0)
     tp.location = (0, -D / 2 + 0.012 + 0.047, 0)
-    tp.data.materials.append(principled("trackpad", (0.04, 0.04, 0.045, 1), 0.12, **{"Metallic": 0.0, "Coat Weight": 0.6, "Coat Roughness": 0.08}))
+    tp.data.materials.append(principled("trackpad", (0.022, 0.022, 0.025, 1), 0.42, **{"Specular IOR Level": 0.25}))
     tp.parent = root
     # hinge barrel
     bpy.ops.mesh.primitive_cylinder_add(radius=0.0035, depth=W * 0.86, vertices=48, location=(0, D / 2 - 0.004, Hb), rotation=(0, math.pi / 2, 0))
@@ -2014,10 +2057,13 @@ def build_through():
     The glass stays above, out of frame.
     Writes the frames and a JSON path (camera, ball, lid angle, screen corners per frame) like the other moves."""
     import json
+    # --move cloud (Liam, 2026-10-10, sand only): the same path with no glass: the ball spreads into a thinning cloud in
+    # the camera's way, the camera flies through it, and the grains are gone as the screen wakes
+    cloud = args.move == "cloud"
     args.view, args.dstate = "top", "glass"
     MOVE_CTX["open"] = 108; MOVE_CTX["side_fill"] = True
     plate = bool(os.environ.get("DESKMOVE_PLATE"))
-    if plate:
+    if plate or cloud:
         os.environ["LOOKDEV_NO_SAND"] = "1"
     build_desk()
     for o in [o for o in bpy.data.objects if o.type == "CAMERA"]:
@@ -2110,6 +2156,7 @@ def build_through():
     cam = bpy.data.objects.new("cam", cam_d); scene.collection.objects.link(cam); scene.camera = cam
     cam.rotation_mode = "QUATERNION"
     path = []
+    centres, cams = [], []
     for f in range(1, F + 1):
         s = at_len(travel(f) * Ltot)
         pos = bez(s)
@@ -2133,15 +2180,67 @@ def build_through():
         else:
             ball = M.copy()
         rig.location = ball
+        centres.append(ball.copy()); cams.append(pos.copy())
         cam_d.lens = 45 + 5 * ease(s, s_meet, 0.95)
+        if cloud:
+            # depth of field on the desk ahead: the sand near the lens goes soft, a passage, never specks on the lens
+            # (on the ball until it opens, then on the desk ahead)
+            cam_d.dof.use_dof = True; cam_d.dof.aperture_fstop = 4.0
+            desk_d = max(pos.z / max(-(cam.rotation_quaternion @ Vector((0, 0, -1))).z, 0.35), 0.2)
+            ball_d = max((ball - pos).length, 0.05)
+            cam_d.dof.focus_distance = ball_d + (desk_d - ball_d) * ease(f, 68, 92)
+            cam_d.dof.keyframe_insert("focus_distance", frame=f)
         fill.energy = fill_e * ease(s, sl0 - 0.05, sl1)
         glow.energy = glow_e * ease(s, sl1, sl1 + 0.06)
         emit.default_value = emit_s if s >= sl1 else 0.0
+        for sock, base_v in MOVE_CTX.get("backlight", []):
+            sock.default_value = base_v * ease(s, sl0, sl1)
+            sock.keyframe_insert("default_value", frame=f)
         for ob, prop in ((cam, "location"), (cam, "rotation_quaternion"), (rig, "location")):
             ob.keyframe_insert(prop, frame=f)
         cam_d.keyframe_insert("lens", frame=f); hinge.keyframe_insert("rotation_euler", frame=f)
         fill.keyframe_insert("energy", frame=f); glow.keyframe_insert("energy", frame=f); emit.keyframe_insert("default_value", frame=f)
     WAKE_F = next(f for f in range(1, F + 1) if at_len(travel(f) * Ltot) >= min(S_AIM + 0.2, 0.9))
+    # the cloud: the ball's own grains, spreading out from its centre (each at its own pace, turning slowly about the
+    # vertical), thinning as each grain shrinks away at its own moment; none left as the screen wakes. Grains that would
+    # pass within a few cm of the lens shrink first (the live site draws those as pebbles)
+    # (first take, Liam's review pending: an even spray filled the whole view like pepper on the desk) so the cloud
+    # parts around the camera's line of travel like a tunnel opening: grains are pushed out from that line (the view ahead
+    # stays clear), stretched a little along it, and thin out by the time the camera is through
+    CLOUD = {"spread": [55, 120], "radial": 6.5, "axial": 1.5, "clear": 0.15, "dissolve": [84, 126], "life": 10}
+    if cloud:
+        scene.render.use_motion_blur = False
+        pts0, hue0, rad0 = dense_points(R)
+        pts0 = roll_x(pts0, BALL_ROLL)
+        rngc = np.random.default_rng(11)
+        u1, u2 = rngc.uniform(0, 1, len(pts0)), rngc.uniform(0, 1, len(pts0))
+        off = pts0.astype(np.float64)
+        cobj = grains("cloud", (off + np.array(MOVE_CTX["ball_c"])).astype(np.float32), hue0, rad0)
+        cme = cobj.data
+        axis = np.array(cams[F_MEET] - cams[F_MEET - 2]); axis /= np.linalg.norm(axis)
+        along = off @ axis
+        radial = off - along[:, None] * axis[None, :]
+        rlen = np.linalg.norm(radial, axis=1)
+        rdir = radial / np.maximum(rlen, 1e-6)[:, None]
+        def cloud_at(f):
+            f = min(max(int(round(f)), 1), F)
+            c = np.array(centres[f - 1]); k = ease(f, *CLOUD["spread"])
+            pace = 0.6 + 0.8 * u1
+            rr = rlen * (1 + CLOUD["radial"] * k * pace) + CLOUD["clear"] * k * pace
+            aa = along * (1 + CLOUD["axial"] * k * pace)
+            p_ = c + rdir * rr[:, None] + axis[None, :] * aa[:, None]
+            td = CLOUD["dissolve"][0] + (CLOUD["dissolve"][1] - CLOUD["dissolve"][0]) * u2
+            life = 1 - np.clip((f - td) / CLOUD["life"], 0, 1)
+            life = life * life * (3 - 2 * life)
+            near = np.linalg.norm(p_ - np.array(cams[f - 1]), axis=1)
+            life *= np.clip((near - 0.02) / 0.06, 0, 1)
+            return p_.astype(np.float32), (rad0 * life).astype(np.float32)
+        def on_frame(scn, *_):
+            p_, r_ = cloud_at(scn.frame_current)
+            cme.vertices.foreach_set("co", p_.ravel())
+            cme.attributes["gscale"].data.foreach_set("value", r_)
+            cme.update()
+        bpy.app.handlers.frame_change_pre.append(on_frame)
     for f in range(1, F + 1):
         scene.frame_set(f)
         mw = cam.matrix_world; q = mw.to_quaternion(); dm = disp.matrix_world
@@ -2150,8 +2249,9 @@ def build_through():
                      "lens_mm": cam_d.lens, "sensor_mm": 36, "ball": list(rig.matrix_world.translation), "ball_radius": R,
                      "lid_open_deg": math.degrees(shut - hinge.rotation_euler.x), "screen_corners": cs})
     os.makedirs(args.out, exist_ok=True)
-    with open(os.path.join(args.out, "deskmove-through-camera.json"), "w") as fh:
-        json.dump({"move": "through", "fps": 24, "frames": F, "units": "metres", "up": "z", "meet_frame": F_MEET, "wake_frame": WAKE_F,
+    with open(os.path.join(args.out, f"deskmove-{args.move}-camera.json"), "w") as fh:
+        json.dump({"move": args.move, "fps": 24, "frames": F, "units": "metres", "up": "z", "meet_frame": F_MEET, "wake_frame": WAKE_F,
+                   **({"cloud": CLOUD} if cloud else {}),
                    "plate_overscan": 1.0, "chaos_center": list(c_), "chaos_scale": CHAOS_SCALE,
                    "screen_corners_order": "top-left, top-right, bottom-right, bottom-left (as seen on the screen)", "path": path}, fh)
     if os.environ.get("PATH_ONLY"):
@@ -2195,7 +2295,7 @@ def build_deskmove():
     frame, so the live sphere follows the move and the live index can sit exactly on the screen and take over."""
     import json
     move = args.move
-    if move == "through":
+    if move in ("through", "cloud"):
         return build_through()
     args.view, args.dstate = {"rise": ("tq", "dense"), "descend": ("top", "attempt"), "push": ("side", "glass")}[move]
     if move == "descend":
