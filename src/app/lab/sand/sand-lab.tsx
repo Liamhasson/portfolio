@@ -718,10 +718,12 @@ export function SandLab() {
               const m = 1 / cd!.chaos_scale;   // metres -> hero units
               // (thinning sooner than Blender's [84, 126]: the live grains are bigger on screen than the render's, which
               // its depth of field also melts away; this matches the reference's clear view by frame ~88)
-              field!.setCloud(k, fr, cloudAxis, cl.radial, cl.axial, cl.clear * m, 68, 90, cl.life, 0.03 * m, 0.1 * m);
-              // in the cloud the sand goes out of focus (Blender racks focus from the ball to the desk: the grains near
-              // the lens a soft haze, never specks)
-              if (composite) composite.defocus = 11 * (stage!.bufferHeight / 900) * ease(fr, [64, 76]) * (1 - ease(fr, [88, 100]));
+              // (denser than the render: it parts to 3.5x, not 6.5x, so the camera passes through grains, not a haze; it
+              // thins between frames 74 and 100; the grains at the lens slip past, gone only within ~1.5 cm of it)
+              field!.setCloud(k, fr, cloudAxis, 3.5, cl.axial, cl.clear * m, 74, 100, cl.life, 0.006 * m, 0.012 * m);
+              // in the cloud the focus is on the grains: they stay sharp and solid, the desk behind goes softly out of
+              // focus (Liam, 2026-10-10)
+              if (composite) composite.defocus = 9 * (stage!.bufferHeight / 900) * ease(fr, [58, 72]) * (1 - ease(fr, [100, 118]));
             } else {
               field!.setCloud(0, 0, cloudAxis, 0, 0, 0, 1e9, 1e9, 1, 0, 1);
               if (composite) composite.defocus = 0;

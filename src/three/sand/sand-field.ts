@@ -171,6 +171,8 @@ export class SandField {
         uGroundCol: { value: new THREE.Vector3() },
         uGround: { value: new THREE.Vector2(-1e3, 1) },
         uHover: { value: 0 },
+        uRough: { value: 0.6 },
+        uGapFill: { value: 0.12 },
         uCloud: { value: new THREE.Vector4(0, 0, 0, 0) },
         uCloudAxis: { value: new THREE.Vector3(0, 0, 1) },
         uCloudLife: { value: new THREE.Vector4(1e9, 1e9, 1, 0) },
