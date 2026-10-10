@@ -34,6 +34,7 @@ function countUp(el, instant) {
 export function openPanel(list, i, { instant = false } = {}) {
   // Whatever opens a column (a beat, a click, a key) cancels a hover still waiting to fire.
   clearTimeout(list.hoverTimer);
+  list.hoverTab = null;
   const tabs = [...list.querySelectorAll('[role="tab"]')];
   tabs.forEach((t, k) => {
     t.setAttribute("aria-selected", String(k === i));
@@ -57,16 +58,20 @@ export function bindPanels(root, { instant = false } = {}) {
     const tabs = [...list.querySelectorAll('[role="tab"]')];
     const vertical = !!list.closest(".is-phone");
     tabs.forEach((t, i) => {
-      t.addEventListener("click", () => openPanel(list, i, { instant }));
+      t.addEventListener("click", () => {
+        if (t.getAttribute("aria-selected") === "true") return; // already open: nothing to redo
+        openPanel(list, i, { instant });
+      });
       // Hover means the mouse moved onto a column. A column sliding under a resting mouse
       // (the story scrolling) sends events at the same position; those don't count.
       t.addEventListener("pointermove", (e) => {
         if (e.pointerType !== "mouse" || !pointerMoved(e)) return;
-        if (t.getAttribute("aria-selected") === "true") return;
+        if (t.getAttribute("aria-selected") === "true" || list.hoverTab === t) return;
         clearTimeout(list.hoverTimer);
-        list.hoverTimer = setTimeout(() => openPanel(list, i, { instant }), reduce ? 0 : 90);
+        list.hoverTab = t; // armed once on entry: a mouse still moving across the column opens it too
+        list.hoverTimer = setTimeout(() => { list.hoverTab = null; openPanel(list, i, { instant }); }, reduce ? 0 : 90);
       });
-      t.addEventListener("pointerleave", () => clearTimeout(list.hoverTimer));
+      t.addEventListener("pointerleave", () => { clearTimeout(list.hoverTimer); list.hoverTab = null; });
       t.addEventListener("keydown", (e) => {
         const step = vertical ? { ArrowDown: 1, ArrowUp: -1 } : { ArrowRight: 1, ArrowLeft: -1 };
         let j = null;
@@ -100,7 +105,6 @@ function setBar(site, beat, within) {
   site.querySelectorAll(".chap[data-go]").forEach((c) => {
     const ch = c.dataset.go;
     c.setAttribute("aria-selected", String(ch === current));
-    c.tabIndex = ch === current ? 0 : -1;
     c.style.setProperty("--fill", fill[ch].toFixed(3));
     c.toggleAttribute("data-done", fill[ch] >= 1 && ch !== current);
   });
@@ -146,10 +150,14 @@ export function mountStory(story, name) {
   };
   layout();
 
-  const applyBeat = (b, instant) => {
+  const applyBeat = (b, instant, keepBuilt = false) => {
     const B = BEATS[b];
     if (B.chapter === "why" || B.chapter === "risk") openPanel(listIn(site, B.chapter), B.panel, { instant });
-    if (B.kind === "build") instant ? powers.progress(1) : powers.restart();
+    // Built once per visit: scrolling back from the release into the build keeps it drawn.
+    if (B.kind === "build") {
+      if (instant || keepBuilt) powers.progress(1);
+      else powers.restart();
+    }
     if (B.kind === "release") powers.progress(1);
   };
 
@@ -162,33 +170,40 @@ export function mountStory(story, name) {
       if (from === "attack") setCaption(-1);
       chapter = next;
       where.textContent = `Chapter ${CHAPTERS.indexOf(next) + 1} of ${CHAPTERS.length}`;
-      // A new handover finishes the running one first, so chapters never stack up.
-      if (tl) { tl.progress(1).kill(); tl = null; }
+      // A new handover takes over from whatever is on screen: the running one is dropped,
+      // not completed, so a chapter the visitor is scrolling past never flashes to full.
+      if (tl) { tl.kill(); tl = null; }
       if (!from || instant || reduce) {
         showOnly(site, next);
         applyBeat(b, true);
         settled = true;
       } else {
         settled = false;
-        const out = chapterEl(site, from);
         const inn = chapterEl(site, next);
         const y = dir > 0 ? -16 : 16;
-        CHAPTERS.forEach((c) => {
-          if (c === from || c === next) return;
-          const el = chapterEl(site, c);
-          el.classList.remove("is-on");
-          el.inert = true;
-          gsap.set(el, { autoAlpha: 0, y: 0 });
+        const opacity = (el) => parseFloat(gsap.getProperty(el, "opacity"));
+        const outs = CHAPTERS.filter((c) => c !== next).map((c) => chapterEl(site, c)).filter((el) => opacity(el) > 0.001);
+        CHAPTERS.forEach((c) => { chapterEl(site, c).inert = c !== next; });
+        const already = opacity(inn);
+        tl = gsap.timeline({
+          onComplete: () => {
+            CHAPTERS.forEach((c) => {
+              if (c === next) return;
+              const el = chapterEl(site, c);
+              el.classList.remove("is-on");
+              gsap.set(el, { autoAlpha: 0, y: 0 });
+            });
+            settled = true;
+            tl = null;
+          },
         });
-        out.inert = true;
-        inn.inert = false;
-        tl = gsap.timeline({ onComplete: () => { settled = true; tl = null; } })
-          .to(out, { autoAlpha: 0, y, duration: 0.36, ease: "power2.in" })
-          .call(() => { out.classList.remove("is-on"); gsap.set(out, { y: 0 }); inn.classList.add("is-on"); applyBeat(b, false); })
-          .fromTo(inn, { autoAlpha: 0, y: -y }, { autoAlpha: 1, y: 0, duration: 0.52, ease: SETTLE });
+        if (outs.length) tl.to(outs, { autoAlpha: 0, y, duration: 0.36, ease: "power2.in" });
+        tl.call(() => { inn.classList.add("is-on"); applyBeat(b, false); });
+        if (already > 0.001) tl.to(inn, { autoAlpha: 1, y: 0, duration: 0.52, ease: SETTLE });
+        else tl.fromTo(inn, { autoAlpha: 0, y: -y }, { autoAlpha: 1, y: 0, duration: 0.52, ease: SETTLE });
       }
     } else {
-      applyBeat(b, instant);
+      applyBeat(b, instant, dir < 0);
     }
     beat = b;
   };
