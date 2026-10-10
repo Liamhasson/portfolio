@@ -158,8 +158,8 @@ uniform vec4 uRampAt;
 uniform vec3 uCursorPos;     // the cursor as a light (Lusion model), on a plane through the sand
 uniform vec3 uCursorCol;     // colour * intensity (fades with the pointer)
 uniform float uCursorReach;  // world units: how far its light carries
-uniform sampler2D uPaint;    // the cursor's drift field: CSS px / s
-uniform float uPaintScale;   // seconds: velocity -> offset
+uniform sampler2D uPaint;    // the cursor's ripples (paint.ts): BA the push, CSS px
+uniform float uPaintScale;   // how much of it the sand takes (0 = none)
 uniform vec2 uFront;         // the drift only moves the front layer: optical depth to the camera (strength, falloff)
 uniform vec2 uViewport;      // CSS px
 uniform float uBufH;         // device px of the drawing buffer's height
@@ -347,10 +347,9 @@ void main() {
   vAlbedo = ramp(mix(aAttr.x, aAttr.y, t));
 
   gl_Position = projectionMatrix * mv;
-  // the cursor's drift: a push in screen space from the paint field, which decays on its own
+  // the cursor's ripples: a push in screen space from the wave surface's slope (paint.ts), out as a ring's front passes
   vec2 suv = gl_Position.xy / gl_Position.w * 0.5 + 0.5;
-  vec2 pvel = texture(uPaint, suv).xy * frontness;           // CSS px / s
-  vec2 push = pvel * uPaintScale;
+  vec2 push = texture(uPaint, suv).zw * frontness * uPaintScale;   // CSS px
   gl_Position.xy += push / (uViewport * 0.5) * gl_Position.w;
   // the cursor only moves the grains, never stretches them (Liam, 2026-10-10: its streak smudged the sand)
   vec2 blur = vec2(0.0);

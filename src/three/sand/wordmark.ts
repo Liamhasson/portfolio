@@ -139,7 +139,7 @@ uniform float uWaveFade;     // 1 while spreading, ebbing to 0
 uniform float uWaveGain;
 uniform float uTime;
 uniform float uAspect;       // plane width / height
-uniform sampler2D uPaint;    // the cursor's drift field (CSS px / s)
+uniform sampler2D uPaint;    // the cursor's ripples (paint.ts): BA the push, CSS px
 uniform vec2 uViewport;      // device px of the canvas
 uniform float uCursorGain;
 uniform vec3 uRamp[4];
@@ -184,10 +184,10 @@ void main() {
   float flow = 0.12 + 0.88 * smoothstep(0.3, 0.72, fbm(p * 2.8 + vec2(-uTime * 0.16, uTime * 0.1)));
   float wave = (inside * flow + front) * uWaveFade * uWaveGain;
 
-  // the cursor: where its drift field moves, the strokes catch light
+  // the cursor: where its ripples pass, the strokes catch light
   vec2 suv = gl_FragCoord.xy / uViewport;
-  float stir = length(texture(uPaint, suv).xy);
-  float cursor = clamp(stir / 900.0, 0.0, 1.0) * uCursorGain;
+  float stir = length(texture(uPaint, suv).zw);
+  float cursor = clamp(stir / 8.0, 0.0, 1.0) * uCursorGain;
 
   float light = clamp(wave + cursor, 0.0, 1.6);
   vec3 col = glow(min(light, 1.0)) * light * 2.2 + vec3(0.18, 0.1, 0.12) * uBase;

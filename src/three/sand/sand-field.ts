@@ -50,7 +50,7 @@ export const SAND_LOOK = {
   // drifting off the sand (drift-grains.ts) keep the full strength, as Lusion's do
   cursor: 0.5,          // the cursor light's strength (fades with the pointer)
   cursorReach: 0.9,     // world units
-  paintScale: 0.01,     // seconds: drift velocity -> grain offset
+  paintScale: 1,        // how much of the cursor's ripples the sand takes (paint.ts sets their size)
   frontK: 1.0,          // the drift reaches only grains with little sand between them and the viewer (0 = all grains)
   frontFalloff: 0.25,   // transmittance below which a grain counts as behind
   // the flow between chaos and ball (shaders.ts flowOffset; Ducky 3D's particle flow, 2026-10-10): its reach at the

@@ -807,7 +807,7 @@ export function SandLab() {
         field!.update(state);
       });
       stage.start();
-      (window as unknown as { __sand?: unknown }).__sand = { stage, field, state, glass, drift };   // lab debugging
+      (window as unknown as { __sand?: unknown }).__sand = { stage, field, state, glass, drift, paint };   // lab debugging
     })().catch((err) => {
       setStatus(String(err));
       setFallback(true);
