@@ -11,7 +11,7 @@ export const eventread: CaseStudy = {
     role: "Research, design and build, end to end",
     timeline: "Mar 2026 – ongoing",
     team: "Solo",
-    tools: ["Figma", "Figma MCP", "Claude Code", "Next.js", "Vercel", "Ticketmaster API", "JamBase API"],
+    tools: ["Figma", "Figma MCP", "Claude Code", "Next.js", "Vercel", "Ticketmaster", "JamBase", "football-data.org", "Wikidata"],
   },
   challenges: [
     {
