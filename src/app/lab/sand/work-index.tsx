@@ -29,7 +29,7 @@ export interface WorkIndexHandle {
   /** How present the 16:10 index is (0..1). */
   show(opacity: number): void;
   /** The black panel behind it, as a rect (CSS px), or null for none. */
-  panel(rect: { x: number; y: number; w: number; h: number } | null): void;
+  panel(rect: { x: number; y: number; w: number; h: number } | null, opacity?: number): void;
   /** Phones: how far the list has surfaced (0..1, rows in turn). */
   list(progress: number): void;
   /** Which layer takes the pointer: none, the 16:10 index, or the phone list. */
@@ -176,10 +176,11 @@ export function WorkIndex({ bind }: { bind: (h: WorkIndexHandle) => void }) {
         const on = opacity > 0.001;
         setPlaying((p) => (p.wide === on ? p : { ...p, wide: on }));
       },
-      panel(rect) {
+      panel(rect, opacity = 1) {
         const el = panelEl.current;
         if (!el) return;
-        el.style.visibility = rect ? "visible" : "hidden";
+        el.style.visibility = rect && opacity > 0.001 ? "visible" : "hidden";
+        el.style.opacity = String(opacity);
         if (rect) el.style.transform = `translate(${rect.x}px,${rect.y}px) scale(${rect.w / window.innerWidth},${rect.h / window.innerHeight})`;
       },
       list(progress) {

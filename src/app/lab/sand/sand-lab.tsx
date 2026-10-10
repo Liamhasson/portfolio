@@ -207,7 +207,8 @@ export function SandLab() {
         ? new GlassBall(desk3d.env, desk3d.lut, desk3d.invLut, desk3d.glassLights(), desk3d.heroPerMetre, field.material) : null;
       // where the current attempt was born, in the ball's frame (the side that faced the viewer then); it rides the ball
       const attUp = new THREE.Vector3(0, 1, 0);
-      let attIndex = -1, meltBorn = false;   // (which 2.2 burst is on; the 2.3 clearing born)
+      let attIndex = -1;
+      const cloudAxis = new THREE.Vector3();   // 2.3: the line the cloud parts around   // (which 2.2 burst is on; the 2.3 clearing born)
       let probes: { top: THREE.Texture; meet: THREE.Texture } | null = null;
       if (glass && composite) {
         stage.scene.add(glass.mesh);
@@ -664,8 +665,17 @@ export function SandLab() {
                 const rest: [number, number][] = [[x0, y0], [x0 + cw, y0], [x0 + cw, y0 + ch], [x0, y0 + ch]];
                 const quad = proj.map((p, i) => [p[0] + (rest[i][0] - p[0]) * sett, p[1] + (rest[i][1] - p[1]) * sett]) as [[number, number], [number, number], [number, number], [number, number]];
                 ix.place(quad);
-                ix.panel(sett > 0 ? { x: 0, y: 0, w: W, h: H } : null);
-                ix.show(Number.isFinite(indexMix) ? indexMix : take);
+                // the index takes over only once the screen fills the view (Liam, 2026-10-10: it crossed over while the
+                // laptop's edges still showed): the screen's share of the view, against the most a 16:10 screen can fill
+                let area = 0;
+                for (let i = 0; i < 4; i++) { const a = proj[i], b2 = proj[(i + 1) % 4]; area += a[0] * b2[1] - b2[0] * a[1]; }
+                const fill = Math.abs(area) / 2 / (W * H) / (Math.min(W / H, 1.6) / Math.max(W / H, 1.6));
+                const byFill = THREE.MathUtils.smoothstep(fill, 0.86, 0.98);
+                const shown = Number.isFinite(indexMix) ? indexMix : Math.max(Math.min(take, byFill), sett);
+                ix.show(shown);
+                // and what the screen can't fill (a window wider or taller than 16:10: the laptop's edges) goes to the
+                // index's black with it, so the laptop is gone as the index arrives
+                ix.panel({ x: 0, y: 0, w: W, h: H }, Math.max(shown, sett));
                 ix.list(0);
                 ix.interactive(sett > 0.999 ? "wide" : "none");
               }
@@ -688,31 +698,34 @@ export function SandLab() {
             if (settle) settle.plate.visible = false;
             if (rise) rise.plate.visible = false;
           }
-          // 2.3: the build, while the ball drifts up
-          const b = Number.isFinite(buildHold) ? buildHold : span(progressRef.current, TL.build);
-          const glassF = Math.min(Math.max((b - BUILD.melt[0]) / (BUILD.melt[1] - BUILD.melt[0]), 0), 1);   // how much is glass (its shadow)
-          if (glassF > 0 && !meltBorn) {
-            // the clearing starts on the side facing the viewer the moment it starts (the scroll turns the ball before
-            // then), then rides the ball
-            const toCam = stage!.camera.position.clone().sub(ballC).normalize();
-            (field!.material.uniforms.uMeltUp.value as THREE.Vector3).copy(toCam.applyMatrix3(field!.ballRotation.clone().transpose())).normalize();
-            meltBorn = true;
-          }
-          if (glassF <= 0) meltBorn = false;
-          // the clearing advances evenly with the scroll (an eased curve rushed its middle)
-          const meltT = Math.min(Math.max((b - BUILD.melt[0]) / (BUILD.melt[1] - BUILD.melt[0]), 0), 1);
-          field!.setBuild(ease(b, BUILD.sweep), ease(b, BUILD.drain), meltT);
-          if (glass) {
-            // the frost exists from the first attempt on; the glass surface is the frost, clearing
-            const on = b > 0;   // (2.2 is sand only now: no frost before the build)
-            glass.update(ballC, field!.material.uniforms.uBallR.value, on ? 1 : 0);
-            glass.blurred = meltT < 1;   // fully clear: sharp reads only
-            // the room it sees: from over the shut laptop, then from where it meets the camera (by its height)
-            if (probes && through) {
-              const zTop = through.toHero([0, 0.03, 0.2]).y, zMeet = through.toHero([0, 0, 0.76]).y;
-              glass.probeMix = Math.min(Math.max((ballC.y - zTop) / (zMeet - zTop), 0), 1);
+          // 2.3 in sand only (Liam, 2026-10-10; the work plan, step 4): no frost, no glass. The ball rides the path up
+          // into the camera's way and parts around its line of travel like a tunnel opening; the camera flies through
+          // and the grains are gone as the screen wakes (Blender: lookdev.py --move cloud, the same path and numbers)
+          const glassF = 0;
+          field!.setBuild(0, 0, 0);
+          if (glass) glass.update(ballC, field!.material.uniforms.uBallR.value, 0);
+          {
+            const cd = through?.data as unknown as { cloud?: { spread: number[]; radial: number; axial: number; clear: number; dissolve: number[]; life: number }; chaos_scale: number; meet_frame: number } | undefined;
+            const cl = cd?.cloud;
+            if (cl && through && move === through) {
+              const P = through.data.path as unknown as { position: number[] }[];
+              if (!cloudAxis.lengthSq()) {
+                // the line of travel at the meeting (Blender: the camera's step into it)
+                cloudAxis.copy(through.toHero(P[cd!.meet_frame].position)).sub(through.toHero(P[cd!.meet_frame - 2].position)).normalize();
+              }
+              const fr = f + 1;   // Blender's frames count from 1
+              const k = ease(fr, cl.spread as [number, number]);
+              const m = 1 / cd!.chaos_scale;   // metres -> hero units
+              // (thinning sooner than Blender's [84, 126]: the live grains are bigger on screen than the render's, which
+              // its depth of field also melts away; this matches the reference's clear view by frame ~88)
+              field!.setCloud(k, fr, cloudAxis, cl.radial, cl.axial, cl.clear * m, 68, 90, cl.life, 0.03 * m, 0.1 * m);
+              // in the cloud the sand goes out of focus (Blender racks focus from the ball to the desk: the grains near
+              // the lens a soft haze, never specks)
+              if (composite) composite.defocus = 11 * (stage!.bufferHeight / 900) * ease(fr, [64, 76]) * (1 - ease(fr, [88, 100]));
+            } else {
+              field!.setCloud(0, 0, cloudAxis, 0, 0, 0, 1e9, 1e9, 1, 0, 1);
+              if (composite) composite.defocus = 0;
             }
-            if (on) desk3d!.glassLights().rects.forEach((r, i) => glass.setRectRadiance(i, r.radiance));
           }
           if (shadow && deskNow) {
             // the lamp's real size (0.2 m soft radius, 2 hero units) sets the softness; ~85% of the desk's light is the lamp

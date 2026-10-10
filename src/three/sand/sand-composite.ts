@@ -28,6 +28,8 @@ in vec2 vUv;
 uniform sampler2D uSand;
 uniform vec2 uTexel;
 uniform float uSigma;   // device px
+uniform float uDefocus; // device px: 2.3's passage through the cloud, the sand out of focus (Blender: depth of field)
+uniform sampler2D uSandBlur;   // the sand at a quarter of the size (while defocused)
 void main() {
   // a small Gaussian of width uSigma in five reads: the centre, and four bilinear reads at (+-d, +-d) (each averaging
   // 2x2 texels). Per axis the four reads spread with variance ~d^2 + 1/4; mixing in the centre scales that down.
@@ -37,6 +39,15 @@ void main() {
   vec4 ring = 0.25 * (texture(uSand, vUv + vec2(-d, -d) * uTexel) + texture(uSand, vUv + vec2(d, -d) * uTexel)
                     + texture(uSand, vUv + vec2(-d, d) * uTexel) + texture(uSand, vUv + vec2(d, d) * uTexel));
   vec4 acc = mix(texture(uSand, vUv), ring, w);
+  if (uDefocus > 0.5) {
+    // a disc of 16 reads from a blurred level (golden-angle spiral): the sand as a soft haze, the desk sharp behind
+    vec4 dsum = vec4(0.0);
+    for (int i = 0; i < 16; i++) {
+      float r = sqrt((float(i) + 0.5) / 16.0) * uDefocus, an = float(i) * 2.39996;
+      dsum += texture(uSandBlur, vUv + vec2(cos(an), sin(an)) * r * uTexel);
+    }
+    acc = mix(acc, dsum / 16.0, smoothstep(0.5, 3.0, uDefocus));
+  }
   // alpha-to-coverage writes the fragment's alpha into the samples it covers, so the resolved alpha is ~alpha x coverage
   // (~coverage^2) while the colour is ~colour x coverage (premultiplied): the coverage is the root of the alpha
   float a = clamp(sqrt(acc.a), 0.0, 1.0);
@@ -67,6 +78,7 @@ void main() { gl_FragColor = texture(uTex, vUv); }
 
 export class SandComposite {
   private readonly rt: THREE.WebGLRenderTarget;
+  private readonly blurRt: THREE.WebGLRenderTarget;
   /** 2.3: the glass, drawn between the desk and the sand; it looks through the desk as drawn into `bg`. */
   glass: GlassBall | null = null;
   private bg: THREE.WebGLRenderTarget | null = null;
@@ -74,6 +86,12 @@ export class SandComposite {
   private readonly copy = new THREE.ShaderMaterial({
     glslVersion: THREE.GLSL3, vertexShader: VERTEX, fragmentShader: COPY_FRAGMENT,
     depthTest: false, depthWrite: false, toneMapped: false, uniforms: { uTex: { value: null } },
+  });
+  /** A straight copy (rgba as it is), for the defocus's reduced sand. */
+  private readonly rawScene = new THREE.Scene();
+  private readonly raw = new THREE.ShaderMaterial({
+    glslVersion: THREE.GLSL3, vertexShader: VERTEX, fragmentShader: OVER_FRAGMENT,
+    depthTest: false, depthWrite: false, toneMapped: false, blending: THREE.NoBlending, uniforms: { uTex: { value: null } },
   });
   /** The glass drawn smaller (where it fills the view), laid over the screen: premultiplied (its target clears to none). */
   private glassRt: THREE.WebGLRenderTarget | null = null;
@@ -87,6 +105,8 @@ export class SandComposite {
   private readonly material: THREE.ShaderMaterial;
   private readonly scene = new THREE.Scene();
   private readonly ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  /** 2.3: the sand out of focus as the camera passes through the cloud (device px; 0 = sharp). */
+  defocus = 0;
   /** The filter's width at the render's resolution (1600 px wide), in its pixels. Fitted against the renders. */
   sigma = 0.55;
 
@@ -94,6 +114,8 @@ export class SandComposite {
     // 8-bit sRGB-encoded (half the bandwidth of half float; the hardware encodes and blends in linear), with the sand
     // written at 1/ENCODE so its highlights (scene values up to ~4) don't clip
     this.rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.UnsignedByteType, samples: 4, depthBuffer: true, colorSpace: THREE.SRGBColorSpace });
+    // the passage's defocus reads a quarter-size copy (made only while it's on)
+    this.blurRt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.UnsignedByteType, depthBuffer: false });
     this.material = new THREE.ShaderMaterial({
       glslVersion: THREE.GLSL3,
       vertexShader: VERTEX,
@@ -105,7 +127,7 @@ export class SandComposite {
       depthTest: false,
       depthWrite: false,
       toneMapped: true,
-      uniforms: { uSand: { value: this.rt.texture }, uTexel: { value: new THREE.Vector2() }, uSigma: { value: 1 } },
+      uniforms: { uSand: { value: this.rt.texture }, uTexel: { value: new THREE.Vector2() }, uSigma: { value: 1 }, uDefocus: { value: 0 }, uSandBlur: { value: null } },
     });
     this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.material);
     this.quad.frustumCulled = false;
@@ -113,6 +135,9 @@ export class SandComposite {
     const copyQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.copy);
     copyQuad.frustumCulled = false;
     this.copyScene.add(copyQuad);
+    const rawQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.raw);
+    rawQuad.frustumCulled = false;
+    this.rawScene.add(rawQuad);
     const overQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.over);
     overQuad.frustumCulled = false;
     this.overScene.add(overQuad);
@@ -146,7 +171,7 @@ export class SandComposite {
   /** Compiles its own passes' shaders and makes its targets now, not on the frame each is first needed (stalls of up
    *  to 200 ms mid-scroll). */
   async warm(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): Promise<void> {
-    await Promise.all([this.scene, this.copyScene, this.overScene].map((sc) => renderer.compileAsync(sc, this.ortho)));
+    await Promise.all([this.scene, this.copyScene, this.overScene, this.rawScene].map((sc) => renderer.compileAsync(sc, this.ortho)));
     // and drawn once each way (the GPU builds its pipelines on a shader's first draw into each kind of target)
     for (const mode of ["full", "small"] as const) {
       this.force = mode;
@@ -162,6 +187,7 @@ export class SandComposite {
     if (this.rt.width !== size.x || this.rt.height !== size.y) this.rt.setSize(size.x, size.y);
     (this.material.uniforms.uTexel.value as THREE.Vector2).set(1 / size.x, 1 / size.y);
     this.material.uniforms.uSigma.value = this.sigma * (size.x / 1600);
+    this.material.uniforms.uDefocus.value = this.defocus;
     const mask = camera.layers.mask;
     const clear = renderer.getClearColor(new THREE.Color());
     const clearA = renderer.getClearAlpha();
@@ -170,6 +196,15 @@ export class SandComposite {
     renderer.clear();
     camera.layers.set(SAND_LAYER);
     renderer.render(scene, camera);
+    if (this.defocus > 0.5) {
+      // the sand at a quarter of the size, for the defocus (a straight copy: the reduction averages it)
+      const bw = Math.max(1, Math.round(size.x / 4)), bh = Math.max(1, Math.round(size.y / 4));
+      if (this.blurRt.width !== bw || this.blurRt.height !== bh) this.blurRt.setSize(bw, bh);
+      this.raw.uniforms.uTex.value = this.rt.texture;
+      renderer.setRenderTarget(this.blurRt);
+      renderer.render(this.rawScene, this.ortho);
+      this.material.uniforms.uSandBlur.value = this.blurRt.texture;
+    }
     renderer.setRenderTarget(null);
     renderer.setClearColor(clear, clearA);
     camera.layers.mask = mask;
@@ -225,6 +260,8 @@ export class SandComposite {
     this.rt.dispose();
     this.bg?.dispose();
     this.glassRt?.dispose();
+    this.blurRt.dispose();
+    this.raw.dispose();
     this.copy.dispose();
     this.over.dispose();
     this.material.dispose();

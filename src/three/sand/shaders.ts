@@ -132,6 +132,10 @@ uniform float uHover;        // the cursor over the formed ball: how much (0..1)
 uniform vec4 uBurst;         // 2.2's attempts: how far it breaks (0..1), the ball's volume (+-), its shape (0 patch,
                              // 1 seam, 2 ring), its seed
 uniform vec3 uBurstDir;      // where on the ball (its own frame)
+uniform vec4 uCloud;         // 2.3's cloud: how far parted (0..1), the move's frame, radial and axial spread
+uniform vec3 uCloudAxis;     // the line it parts around (world)
+uniform vec4 uCloudLife;     // each grain gone between these frames (x..y), over z frames; w: the clear way's width
+uniform vec3 uCloudNear;     // grains this near the lens (x .. x + y) are gone first
 uniform vec3 uHoverDir;      // and where: the direction from the ball's centre to the point under it (world)
 uniform vec2 uHoverShape;    // the patch's edge (cosine of its angle) and how far a grain lifts (ball radii)
 uniform float uDrift;        // ambient flow amplitude (world units)
@@ -309,6 +313,25 @@ void main() {
     vec3 vol = rel * uBurst.y * smoothstep(0.5, 0.9, t);
     p += brk + vol; pMoved += brk + vol; pPrev += brk + vol;
   }
+  // 2.3 in sand only: the ball parts around the camera's line of travel like a tunnel opening (out from that line, a
+  // little along it, each grain at its own pace) and thins away, grain by grain, as the camera flies through
+  float cloudLife = 1.0;
+  if (t > 0.5 && uCloud.y > 0.0) {
+    vec3 rel = p - uBallC;
+    float pace = 0.6 + 0.8 * hash(aPosA + 31.3);
+    float al = dot(rel, uCloudAxis);
+    vec3 rad3 = rel - uCloudAxis * al;
+    float rlen = length(rad3);
+    vec3 rdir = rlen > 1e-6 ? rad3 / rlen : vec3(0.0);
+    float k = uCloud.x * pace;
+    vec3 np = uBallC + rdir * (rlen * (1.0 + uCloud.z * k) + uCloudLife.w * k) + uCloudAxis * al * (1.0 + uCloud.w * k);
+    vec3 dc = np - p;
+    p += dc; pMoved += dc; pPrev += dc;
+    float td = uCloudLife.x + (uCloudLife.y - uCloudLife.x) * hash(aPosB + 41.9);
+    float lf = 1.0 - clamp((uCloud.y - td) / uCloudLife.z, 0.0, 1.0);
+    cloudLife = lf * lf * (3.0 - 2.0 * lf);
+    cloudLife *= clamp((distance(p, cameraPosition) - uCloudNear.x) / uCloudNear.y, 0.0, 1.0);
+  }
   // the cursor over the formed ball (Liam, 2026-10-10): the ball's own grains lift out of it there and settle back,
   // each at its own moment and height, so the patch thins while they're out; never streaked (the lift is in the
   // previous frame's place too)
@@ -413,6 +436,7 @@ void main() {
   float h1 = hash(aPosB + 1.7), h2 = hash(aPosB + 3.1), h3 = hash(aPosB + 5.3);
   vec2 squash = 1.0 + 0.22 * (vec2(h1, h2) * 2.0 - 1.0);
   float ang = h3 * 6.2831853;
+  rad *= cloudLife;
   float px = 2.0 * rad * uRadMax * mix(uRadScale.x, uRadScale.y * uBallGrain, t) * uCountScale * attGrow * uPointScale / -mv.z * max(squash.x, squash.y);   // device pixels
   // and its own motion (the flow, the ball forming, the spin): its travel on screen since the frame before, over the
   // shutter, never longer than a few grains (a jump in the page is not a motion)

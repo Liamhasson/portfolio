@@ -171,6 +171,10 @@ export class SandField {
         uGroundCol: { value: new THREE.Vector3() },
         uGround: { value: new THREE.Vector2(-1e3, 1) },
         uHover: { value: 0 },
+        uCloud: { value: new THREE.Vector4(0, 0, 0, 0) },
+        uCloudAxis: { value: new THREE.Vector3(0, 0, 1) },
+        uCloudLife: { value: new THREE.Vector4(1e9, 1e9, 1, 0) },
+        uCloudNear: { value: new THREE.Vector3(0, 1, 0) },
         uBurst: { value: new THREE.Vector4(0, 0, 0, 0) },
         uBurstDir: { value: new THREE.Vector3(0, 0, 1) },
         uHoverDir: { value: new THREE.Vector3(0, 0, 1) },
@@ -254,6 +258,19 @@ export class SandField {
     u.uBallR.value = radius;
     u.uBallVolS.value = 1 / s;
     u.uBallGrain.value = s;
+  }
+
+  /** 2.3's cloud: how far the ball has parted (0..1) at the move's frame `frame`, around the line `axis` (world); out
+   *  `radial` times and along it `axial` times (each grain at its own pace), opening a clear way `clear` wide; each grain
+   *  gone at its own frame between `d0` and `d1` (over `life` frames), and those within `near`..`near + nearSpan` of
+   *  the lens gone first. */
+  setCloud(k: number, frame: number, axis: THREE.Vector3, radial: number, axial: number, clear: number, d0: number, d1: number,
+    life: number, near: number, nearSpan: number): void {
+    const u = this.material.uniforms;
+    (u.uCloud.value as THREE.Vector4).set(k, frame, radial, axial);
+    (u.uCloudAxis.value as THREE.Vector3).copy(axis);
+    (u.uCloudLife.value as THREE.Vector4).set(d0, d1, life, clear);
+    (u.uCloudNear.value as THREE.Vector3).set(near, nearSpan, 0);
   }
 
   /** 2.2's attempts: how far the ball breaks (0..1), its volume (+-, a share of its size), the burst's shape (0 patch,
