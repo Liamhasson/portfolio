@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cyvore refinement</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500&family=Geist+Mono:wght@400;500&family=Michroma&family=Iceland&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* A comparison page for the board: one working copy of the Cyvore replica, three looks.
+   A = as shipped (the board's own CSS), B = Evervault only, C = Evervault + Twingate + Doppler's rules.
+   Sources: styles.refero.design (Evervault, Twingate, Doppler), read 10 Oct 2026. */
+:root {
+  /* page (from Cyvore's darks #0c0e12 / #161122 / #160b23) */
+  --void: #0b0814; --panel: #120d1f; --raise: #191229;
+  --hair: rgba(236,230,250,.09); --hair-2: rgba(236,230,250,.16);
+  --ink: #f1edf9; --ink-2: rgba(241,237,249,.74); --ink-3: rgba(241,237,249,.56);
+  /* Cyvore violet ramp, sampled from its token board */
+  --v1: #8a38f5; --v2: #9c83fb; --v3: #51218f; --v4: #411f6e; --v5: #43246c; --v6: #2c1747; --v7: #160b23;
+  --site: #0c0e12; --tab: #1a1230; --cta-grey: #d1d5dc;
+  --pulse: #06122a;
+  --sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --mono: "Geist Mono", ui-monospace, monospace;
+  --mich: "Michroma", var(--sans);
+  --ice: "Iceland", var(--mono);
+  --ui: "Inter", var(--sans);
+  --settle: cubic-bezier(0.22, 1, 0.36, 1);
+}
+* { box-sizing: border-box; }
+html, body { background: #050407; }
+body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
+.board { max-width: 1536px; margin: 0 auto; padding: 48px 48px 120px; }
+.board-head h1 { margin: 0; font: 400 32px/1.1 var(--sans); color: #f2f2f4; letter-spacing: -.01em; }
+.board-head h1 em { font-style: italic; color: #8c8c96; }
+.board-head p { margin: 10px 0 0; max-width: 78ch; color: #8c8c96; }
+.ctrl { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; gap: 12px 28px; align-items: center; padding: 16px 0; margin-top: 24px; background: #050407; border-bottom: 1px solid #1e1c24; }
+.seg { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: #121117; }
+.seg button { border: 0; border-radius: 999px; padding: 0 14px; height: 32px; background: transparent; color: #a6a6ae; font: 500 12px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: #e6e6ea; color: #111113; }
+.seg button:focus-visible { outline: 2px solid #e6e6ea; outline-offset: 2px; }
+.ctrl .lab { font: 400 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #6c6c74; margin-right: 8px; }
+.cmp { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 32px; margin-top: 28px; align-items: start; }
+.frame { container-type: inline-size; border-radius: 3px; overflow: clip; box-shadow: 0 0 0 1px rgba(255,255,255,.08); }
+.f { --u: calc(100cqw / 1440); position: relative; background: var(--void); padding: calc(var(--u) * 56) calc(var(--u) * 72); }
+.f p { margin: 0; }
+.f h1, .f h2, .f h3, .f h4, .f h5 { font-weight: 400; }
+.ic { width: calc(var(--u) * 16); height: calc(var(--u) * 16); fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.changes { position: sticky; top: 92px; font-size: 14px; line-height: 1.6; color: #a6a6ae; }
+.changes h3 { margin: 0 0 6px; font: 400 12px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #e6e6ea; }
+.changes .src { font: 400 11px/1.5 var(--mono); color: #6c6c74; margin: 0 0 14px; }
+.changes ul { margin: 0; padding-left: 18px; }
+.changes li { margin: 0 0 8px; }
+.changes [data-for] { display: none; }
+.changes [data-for].on { display: block; }
+@media (max-width: 1100px) { .cmp { grid-template-columns: minmax(0, 1fr); } .changes { position: static; } }
+@media (max-width: 700px) { .board { padding: 24px 16px 80px; } }
+
+/* ------------------------------ 4 solution: the story replica ------------------------------ */
+.solution { padding: calc(var(--u) * 112) 0 calc(var(--u) * 104); }
+.sol-glow { position: absolute; left: 50%; top: calc(var(--u) * 760); width: calc(var(--u) * 1500); height: calc(var(--u) * 700); transform: translate(-50%, -50%); background: radial-gradient(closest-side, rgba(138,56,245,.22), rgba(138,56,245,0)); pointer-events: none; }
+.story { position: relative; margin: calc(var(--u) * 72) calc(var(--u) * 72) 0; }
+.story-track { position: relative; } /* height set by story-board.js: pin + the pinned scroll */
+.story-pin { position: sticky; top: var(--pin-top, 24px); }
+.rep-anno { display: flex; justify-content: space-between; margin-bottom: calc(var(--u) * 16); }
+.rep-anno span { font: 400 calc(var(--u) * 12)/1 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); display: flex; align-items: center; gap: calc(var(--u) * 10); }
+.rep-anno span::before { content: ""; width: calc(var(--u) * 14); height: calc(var(--u) * 1); background: var(--ink-3); }
+.sol-foot { margin-top: calc(var(--u) * 72); align-items: end; }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* The site itself (Cyvore's own UI: Michroma, Iceland, Inter in the cards) */
+.site { --s: var(--u); position: relative; height: calc(var(--s) * 776); border-radius: calc(var(--s) * 20); background: var(--site); overflow: hidden; box-shadow: 0 0 0 calc(var(--s) * 1) rgba(156,131,251,.18), 0 calc(var(--s) * 40) calc(var(--s) * 120) calc(var(--s) * -40) rgba(138,56,245,.45); font-family: var(--mich); color: #fff; }
+.site::before { content: ""; position: absolute; left: 50%; top: calc(var(--s) * 300); width: calc(var(--s) * 1200); height: calc(var(--s) * 560); transform: translate(-50%, -50%); background: radial-gradient(closest-side, rgba(138,56,245,.42), rgba(138,56,245,0)); pointer-events: none; }
+.s-nav { position: absolute; left: calc(var(--s) * 36); right: calc(var(--s) * 36); top: calc(var(--s) * 24); height: calc(var(--s) * 40); display: flex; align-items: center; justify-content: space-between; z-index: 4; }
+.s-logo { display: flex; align-items: center; gap: calc(var(--s) * 8); font: 700 calc(var(--s) * 20)/1 var(--ui); letter-spacing: -.02em; }
+.s-logo img { width: calc(var(--s) * 15); height: auto; }
+.s-logo sup { font-size: .4em; font-weight: 500; margin-left: calc(var(--s) * 1); opacity: .7; }
+.s-links { display: flex; gap: calc(var(--s) * 34); font-size: calc(var(--s) * 9); letter-spacing: .02em; color: rgba(255,255,255,.82); }
+.s-cta { height: calc(var(--s) * 32); padding: 0 calc(var(--s) * 16); border-radius: calc(var(--s) * 999); display: inline-flex; align-items: center; font: 400 calc(var(--s) * 8.5)/1 var(--mich); letter-spacing: .04em; color: #111011; background: #fff; box-shadow: 0 0 calc(var(--s) * 18) rgba(156,131,251,.65); white-space: nowrap; }
+.s-cta.ghost { background: transparent; color: #fff; box-shadow: inset 0 0 0 calc(var(--s) * 1) rgba(255,255,255,.55); }
+/* the stage is only a frame: it never moves; chapters draw into it */
+.s-stage { position: absolute; left: calc(var(--s) * 96); right: calc(var(--s) * 96); top: calc(var(--s) * 208); height: calc(var(--s) * 544); border-radius: calc(var(--s) * 18); background: #07060b; box-shadow: 0 0 0 calc(var(--s) * 1) rgba(156,131,251,.14), 0 0 calc(var(--s) * 60) rgba(138,56,245,.35); z-index: 1; }
+.s-chapter { position: absolute; inset: 0; z-index: 2; opacity: 0; visibility: hidden; }
+.s-chapter.is-on { opacity: 1; visibility: visible; }
+.s-head { position: absolute; left: 0; right: 0; top: calc(var(--s) * 92); text-align: center; }
+.s-head h4 { margin: 0; font: 400 calc(var(--s) * 24)/1.1 var(--mich); letter-spacing: .01em; }
+.site .s-head p { margin: calc(var(--s) * 8) 0 0; font: 400 calc(var(--s) * 9)/1.4 var(--mich); color: rgba(255,255,255,.7); }
+.s-btns { display: flex; justify-content: center; gap: calc(var(--s) * 10); margin-top: calc(var(--s) * 16); }
+.s-body { position: absolute; left: calc(var(--s) * 112); right: calc(var(--s) * 112); top: calc(var(--s) * 224); bottom: calc(var(--s) * 112); }
+
+/* columns: one opens, the rest stay as labelled columns */
+.panels { display: flex; gap: calc(var(--s) * 14); height: 100%; }
+.pan { position: relative; flex: 1 1 0; min-width: 0; min-height: 0; border: 0; padding: 0; margin: 0; border-radius: calc(var(--s) * 14); background: var(--tab); color: #fff; font: inherit; cursor: pointer; overflow: hidden; text-align: left;
+  transition: flex-grow 560ms var(--settle), background-color 420ms var(--settle); -webkit-tap-highlight-color: transparent; }
+.pan::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: radial-gradient(70% 70% at 50% 48%, #5a1fb8 0%, #6f29df 55%, #7f31f0 100%); opacity: 0; transition: opacity 420ms var(--settle); }
+.pan[aria-selected="true"] { flex-grow: 3.3; cursor: default; }
+.pan[aria-selected="true"]::before { opacity: 1; }
+.pan:focus-visible { outline: calc(var(--s) * 2) solid #fff; outline-offset: calc(var(--s) * 3); }
+.pan-name { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); text-align: center; font: 400 calc(var(--s) * 13)/1 var(--mich); letter-spacing: .03em; white-space: nowrap; transition: opacity 260ms var(--settle); }
+.pan[aria-selected="true"] .pan-name { opacity: 0; }
+.pan-body { position: absolute; inset: 0; padding: calc(var(--s) * 28) calc(var(--s) * 30); display: flex; flex-direction: column; justify-content: flex-end; opacity: 0; transition: opacity 240ms var(--settle); pointer-events: none; }
+.pan[aria-selected="true"] .pan-body { opacity: 1; transition: opacity 380ms var(--settle) 400ms; } /* after the column has mostly widened */
+.pan-title { text-align: center; font: 400 calc(var(--s) * 24)/1 var(--mich); letter-spacing: .03em; text-shadow: 0 calc(var(--s) * 2) calc(var(--s) * 10) rgba(20,0,60,.45); white-space: nowrap; }
+.pan-desc { margin-top: calc(var(--s) * 20); font: 400 calc(var(--s) * 13)/1.7 var(--mich); color: rgba(255,255,255,.96); max-width: 44ch; }
+.pan-art { position: absolute; left: 0; right: 0; top: calc(var(--s) * 30); height: calc(var(--s) * 220); }
+.pan .bit { opacity: 0; transform: translateY(calc(var(--s) * 14)) scale(.96); transition: opacity 420ms var(--settle), transform 520ms var(--settle); }
+.pan[aria-selected="true"] .bit { opacity: 1; transform: none; transition-delay: calc(520ms + var(--d, 0) * 110ms); }
+.card { position: absolute; width: calc(var(--s) * 214); padding: calc(var(--s) * 14) calc(var(--s) * 16); border-radius: calc(var(--s) * 12); background: linear-gradient(180deg, #fff, #f1ecfb); color: #2a2440; font: 400 calc(var(--s) * 13)/1.35 var(--ui); box-shadow: 0 calc(var(--s) * 10) calc(var(--s) * 24) rgba(30,0,80,.35); }
+.card .ic { color: var(--v1); width: calc(var(--s) * 15); height: calc(var(--s) * 15); display: block; margin-bottom: calc(var(--s) * 10); }
+.pan[aria-selected="true"] .card.bit { transform: rotate(var(--r, 0deg)); }
+.chain { position: absolute; left: 50%; top: calc(var(--s) * 6); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; }
+.link { width: calc(var(--s) * 46); height: calc(var(--s) * 46); border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.28); color: #fff; margin-top: calc(var(--s) * -6); }
+.link:first-child { border-radius: calc(var(--s) * 12) calc(var(--s) * 12) calc(var(--s) * 30) calc(var(--s) * 30); width: calc(var(--s) * 52); height: calc(var(--s) * 52); margin-top: 0; }
+.link.last { background: #fff; color: var(--v1); box-shadow: 0 0 calc(var(--s) * 24) rgba(255,255,255,.35); }
+.link .ic { width: calc(var(--s) * 18); height: calc(var(--s) * 18); }
+.tiles { position: absolute; left: 50%; top: calc(var(--s) * 10); transform: translateX(-50%); display: grid; grid-template-columns: repeat(4, calc(var(--s) * 54)); gap: calc(var(--s) * 12); justify-items: center; }
+.tile { width: calc(var(--s) * 54); height: calc(var(--s) * 54); border-radius: calc(var(--s) * 12); background: linear-gradient(180deg, #fff, #efe9fb); color: var(--v1); display: grid; place-items: center; font: 600 calc(var(--s) * 15)/1 var(--ui); box-shadow: 0 calc(var(--s) * 8) calc(var(--s) * 18) rgba(30,0,80,.28); }
+.tile.word { font-size: calc(var(--s) * 10); letter-spacing: -.02em; }
+.tile .ic { width: calc(var(--s) * 20); height: calc(var(--s) * 20); }
+.plus { grid-column: 1 / -1; width: calc(var(--s) * 26); height: calc(var(--s) * 26); border-radius: 50%; background: rgba(255,255,255,.3); display: grid; place-items: center; margin-top: calc(var(--s) * 2); }
+.plus .ic { width: calc(var(--s) * 14); height: calc(var(--s) * 14); }
+.iocs { position: absolute; left: 50%; top: 0; transform: translateX(-50%); display: flex; flex-direction: column; gap: calc(var(--s) * 12); }
+.ioc { display: flex; align-items: center; gap: calc(var(--s) * 14); width: calc(var(--s) * 270); padding: calc(var(--s) * 11) calc(var(--s) * 14); border-radius: calc(var(--s) * 14); background: rgba(255,255,255,.92); color: #2a2440; font: 400 calc(var(--s) * 13)/1.35 var(--ui); }
+.ioc b { flex: none; width: calc(var(--s) * 32); height: calc(var(--s) * 32); border-radius: calc(var(--s) * 8); display: grid; place-items: center; background: #fff; color: var(--v1); font: 600 calc(var(--s) * 8.5)/1 var(--ui); box-shadow: 0 0 0 calc(var(--s) * 1) rgba(42,36,64,.08); }
+.ioc b .ic { width: calc(var(--s) * 15); height: calc(var(--s) * 15); }
+/* The risk is real: the same columns, numbers instead of pictures */
+.pan.stat .pan-name { top: calc(var(--s) * 30); transform: none; left: calc(var(--s) * 20); text-align: left; font-size: calc(var(--s) * 15); }
+.pan.stat .pan-body { justify-content: center; }
+.stat-num { font: 400 calc(var(--s) * 34)/1 var(--mich); font-variant-numeric: tabular-nums; }
+.stat-desc { margin-top: calc(var(--s) * 18); font: 400 calc(var(--s) * 13)/1.7 var(--mich); color: rgba(255,255,255,.96); max-width: 30ch; }
+/* Real-world attack: the mission animation fills the stage; the captions sit under the heading */
+.attack { position: absolute; inset: 0; }
+.attack video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; mix-blend-mode: lighten; }
+.s-caps { position: relative; height: calc(var(--s) * 18); margin: calc(var(--s) * 10) 0 0; padding: 0; list-style: none; font: 400 calc(var(--s) * 11)/1.6 var(--mich); color: rgba(255,255,255,.9); }
+.s-caps li { position: absolute; left: 0; right: 0; opacity: 0; transform: translateY(calc(var(--s) * 6)); transition: opacity 300ms var(--settle), transform 300ms var(--settle); }
+.s-caps li.is-on { opacity: 1; transform: none; }
+/* What powers us: three engines on a dashed diagram */
+.wires { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; clip-path: inset(0% 0% 100% 0%); }
+.wires path { fill: none; stroke: rgba(156,131,251,.6); stroke-width: 1.2; stroke-dasharray: 6 6; vector-effect: non-scaling-stroke; }
+.wires .node { fill: #9c83fb; }
+.engines { position: absolute; left: 0; right: 0; top: 27.3%; height: 45.5%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(var(--s) * 24); padding: 0 calc(var(--s) * 24); }
+.eng { --lit: 0; border-radius: calc(var(--s) * 16); background: rgba(26,18,48,.92); padding: calc(var(--s) * 24) calc(var(--s) * 22); opacity: calc(.25 + .75 * var(--lit));
+  box-shadow: inset 0 0 0 calc(var(--s) * 1) rgba(156,131,251, calc(.14 + .32 * var(--lit))), 0 0 calc(var(--s) * 28) rgba(138,56,245, calc(.35 * var(--lit))); }
+.eng h5 { margin: 0; font: 400 calc(var(--s) * 18)/1 var(--mich); letter-spacing: .02em; }
+.site .eng-x { margin-top: calc(var(--s) * 10); font: 400 calc(var(--s) * 11.5)/1.6 var(--mich); color: rgba(255,255,255,.86); }
+.site .eng-d { margin-top: calc(var(--s) * 16); font: 400 calc(var(--s) * 13)/1.7 var(--mich); color: rgba(255,255,255,.96); }
+/* the second nav: chapters, always on screen; a line fills as the story moves */
+.s-chapters { position: absolute; left: calc(var(--s) * 112); right: calc(var(--s) * 112); bottom: calc(var(--s) * 40); height: calc(var(--s) * 58); border-radius: calc(var(--s) * 14); background: #040306; display: grid; grid-template-columns: repeat(4, 1fr); gap: calc(var(--s) * 8); padding: calc(var(--s) * 7); z-index: 3; }
+.chap { position: relative; border: 0; margin: 0; border-radius: calc(var(--s) * 10); background: transparent; color: rgba(255,255,255,.82); font: 400 calc(var(--s) * 13)/1 var(--ice); letter-spacing: .14em; text-transform: uppercase; cursor: pointer; box-shadow: inset 0 0 0 calc(var(--s) * 1) transparent; transition: background-color 320ms var(--settle), box-shadow 320ms var(--settle), color 320ms var(--settle); }
+.chap:hover { color: #fff; background: rgba(255,255,255,.04); }
+.chap[aria-selected="true"] { color: #fff; background: #170d2a; box-shadow: inset 0 0 0 calc(var(--s) * 1) var(--v1), 0 0 calc(var(--s) * 18) rgba(138,56,245,.35); }
+.chap:focus-visible { outline: calc(var(--s) * 2) solid #fff; outline-offset: calc(var(--s) * 2); }
+.chap-fill { position: absolute; left: calc(var(--s) * 14); right: calc(var(--s) * 14); bottom: calc(var(--s) * 7); height: calc(var(--s) * 2); border-radius: calc(var(--s) * 2); background: var(--v1); transform-origin: 0 50%; transform: scaleX(var(--fill, 0)); }
+.chap[data-done] .chap-fill { opacity: .45; }
+@media (prefers-reduced-motion: reduce) {
+  .pan, .pan::before, .pan-name, .pan-body, .pan .bit, .chap, .s-caps li { transition: none !important; }
+  .pan .bit { transform: none !important; }
+}
+/* reduced motion: four still screens, one under another */
+.story.is-static .story-track { height: auto !important; }
+.story.is-static .story-pin { position: static; display: flex; flex-direction: column; gap: calc(var(--u) * 32); }
+.story.is-static .s-caps { height: auto; }
+.story.is-static .s-caps li { position: static; opacity: 1; transform: none; }
+
+
+/* =====================================================================
+   B · Evervault only: colour and text tokens, type roles.
+   Michroma keeps headings, nav, buttons and column names; anything read
+   moves to Inter. Text is a cool off-white, shadows carry violet, not black.
+   ===================================================================== */
+.site.t-b, .site.t-c { --txt: #dfe1f4; --txt-hi: #ececfb; --txt-2: #babcd2; --txt-3: #9fa2b9; color: var(--txt); }
+.t-b .s-head h4, .t-c .s-head h4, .t-b .pan-title, .t-c .pan-title { color: var(--txt-hi); }
+.site.t-b .s-head p, .site.t-c .s-head p, .t-b .s-caps, .t-c .s-caps { font: 400 calc(var(--s) * 13)/1.5 var(--ui); letter-spacing: 0; color: var(--txt-2); }
+.t-b .pan-desc, .t-c .pan-desc, .t-b .stat-desc, .t-c .stat-desc { font: 400 calc(var(--s) * 15)/1.6 var(--ui); letter-spacing: -.005em; color: var(--txt); }
+.t-b .s-links, .t-c .s-links { color: var(--txt-2); }
+.t-b .chap, .t-c .chap { color: var(--txt-2); }
+.t-b .card, .t-c .card, .t-b .tile, .t-c .tile { box-shadow: 0 calc(var(--s) * 10) calc(var(--s) * 24) rgba(46,42,76,.55); }
+.site.t-b .eng-x, .site.t-c .eng-x { font: 400 calc(var(--s) * 12)/1.5 var(--ui); color: var(--txt-3); }
+.site.t-b .eng-d, .site.t-c .eng-d { font: 400 calc(var(--s) * 14)/1.6 var(--ui); color: var(--txt); }
+
+/* =====================================================================
+   C · + Twingate's instrument-panel components, Doppler's rules.
+   Hairline insets instead of glows; one light source behind the stage;
+   engineered radii (16 frame / 12 surfaces / 10 cards / 8 tabs, pills stay
+   pills); surfaces step up from the canvas; one glowing CTA per screen.
+   ===================================================================== */
+.site.t-c { border-radius: calc(var(--s) * 16); box-shadow: 0 0 0 calc(var(--s) * 1) rgba(184,140,255,.14), 0 calc(var(--s) * 40) calc(var(--s) * 120) calc(var(--s) * -60) rgba(138,56,245,.35); }
+.t-c .s-stage { border-radius: calc(var(--s) * 16); background: #0d0a16; box-shadow: inset 0 0 0 calc(var(--s) * 1) rgba(184,140,255,.16), inset 0 calc(var(--s) * 1) 0 rgba(255,255,255,.04); }
+.t-c .pan { border-radius: calc(var(--s) * 12); background: #161025; box-shadow: inset 0 0 0 calc(var(--s) * 1) rgba(236,230,250,.06); }
+.t-c .pan::before { background: linear-gradient(160deg, #8a38f5 0%, #6a24d6 55%, #4e1aa8 100%); box-shadow: inset 0 calc(var(--s) * 1) 0 rgba(255,255,255,.18); }
+.t-c .pan-name { font-size: calc(var(--s) * 12); letter-spacing: .06em; color: var(--txt-2); }
+.t-c .card { border-radius: calc(var(--s) * 10); box-shadow: inset 0 calc(var(--s) * 1) 0 #fff, 0 calc(var(--s) * 12) calc(var(--s) * 28) rgba(46,42,76,.6); }
+.t-c .tile, .t-c .ioc { border-radius: calc(var(--s) * 10); }
+.t-c .s-nav .s-cta { background: transparent; color: var(--txt-hi); box-shadow: inset 0 0 0 calc(var(--s) * 1) rgba(236,230,250,.35); }
+.t-c .s-chapters { border-radius: calc(var(--s) * 12); background: #0d0a16; box-shadow: inset 0 0 0 calc(var(--s) * 1) rgba(236,230,250,.07); }
+.t-c .chap { border-radius: calc(var(--s) * 8); font-size: calc(var(--s) * 12); letter-spacing: .22em; }
+.t-c .chap[aria-selected="true"] { background: rgba(138,56,245,.14); box-shadow: inset 0 0 0 calc(var(--s) * 1) rgba(184,140,255,.55); }
+.t-c .eng { border-radius: calc(var(--s) * 12); background: #120d1f; }
+
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></symbol>
+  <symbol id="i-at" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/></symbol>
+  <symbol id="i-headphones" viewBox="0 0 24 24"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></symbol>
+  <symbol id="i-link-out" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></symbol>
+</svg>
+<main class="board">
+  <header class="board-head">
+    <h1>Cyvore refinement <em>— compare before choosing</em></h1>
+    <p>One working copy of the replica (hover or click columns; the lower bar switches chapters). Flip between A, B and C with the switch or the keys 1, 2, 3. All three keep Cyvore's violet-black, Michroma and the purple open column; B and C only refine around them. Sources: Evervault, Twingate and Doppler on styles.refero.design.</p>
+  </header>
+
+  <div class="ctrl" role="group" aria-label="Compare controls">
+    <div><span class="lab">Version</span><span class="seg" data-theme-switch>
+      <button type="button" data-theme="a" aria-pressed="false">A · As shipped</button>
+      <button type="button" data-theme="b" aria-pressed="false">B · Evervault</button>
+      <button type="button" data-theme="c" aria-pressed="true">C · Evervault + Twingate</button>
+    </span></div>
+    <div><span class="lab">Chapter</span><span class="seg" data-chapter-switch>
+      <button type="button" data-go="why" aria-pressed="true">Why it matters</button>
+      <button type="button" data-go="risk" aria-pressed="false">The risk is real</button>
+      <button type="button" data-go="attack" aria-pressed="false">Real-world attack</button>
+      <button type="button" data-go="powers" aria-pressed="false">What powers us</button>
+    </span></div>
+  </div>
+
+  <div class="cmp">
+    <div class="frame"><div class="f"><div data-host></div></div></div>
+    <aside class="changes" aria-live="polite">
+      <div data-for="a"><h3>A · As shipped</h3><p class="src">Cyvore's site, as on the case-study board</p>
+        <ul><li>Michroma for everything, including 13px descriptions.</li><li>Pure white text.</li><li>Depth from purple glows: around the site, the stage, the active tab, both CTAs.</li><li>Radii 20 / 18 / 14 / 12 as built.</li></ul></div>
+      <div data-for="b"><h3>B · Evervault only</h3><p class="src">Colour and text tokens, type roles</p>
+        <ul><li>Michroma stays for headings, nav, buttons and column names; descriptions, sub-heads and captions move to Inter 15px.</li><li>Cool off-white text (#dfe1f4, brightest #ececfb), quieter secondary text (#babcd2).</li><li>Shadows tinted violet (#2e2a4c), not black.</li><li>Components, radii and glows unchanged.</li></ul></div>
+      <div data-for="c" class="on"><h3>C · Evervault + Twingate</h3><p class="src">B, plus Twingate's components and Doppler's rules</p>
+        <ul><li>Everything in B.</li><li>One light source (behind the site); the stage, tabs and cards get hairline insets instead of glows.</li><li>Engineered radii: 16 frame, 12 surfaces, 10 cards, 8 tabs; pills stay pills.</li><li>Closed columns step up from the canvas (#161025) with quieter names.</li><li>One glowing CTA per screen: the hero's; the nav's goes outline.</li><li>Open column: a directional violet gradient with a top highlight, instead of a radial glow.</li></ul></div>
+    </aside>
+  </div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script type="module">
+import { bindPanels, openPanel } from "./cyvore-mockups/story-board.js";
+
+// The replica's own markup, from the board: one source, so the comparison never drifts.
+const html = await (await fetch("cyvore-mockups.html")).text();
+const doc = new DOMParser().parseFromString(html, "text/html");
+const site = document.importNode(doc.querySelector('.story[data-story="desktop"] .site'), true);
+document.querySelector("[data-host]").append(site);
+
+const chapters = ["why", "risk", "attack", "powers"];
+const show = (ch) => {
+  chapters.forEach((c) => {
+    const el = site.querySelector(`[data-chapter="${c}"]`);
+    el.classList.toggle("is-on", c === ch);
+    el.inert = c !== ch;
+  });
+  site.querySelectorAll(".chap[data-go]").forEach((b) => {
+    b.setAttribute("aria-selected", String(b.dataset.go === ch));
+    b.style.setProperty("--fill", b.dataset.go === ch ? "1" : "0");
+  });
+  document.querySelectorAll("[data-chapter-switch] button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.go === ch)));
+};
+const theme = (t) => {
+  site.classList.remove("t-b", "t-c");
+  if (t !== "a") site.classList.add(`t-${t}`);
+  document.querySelectorAll("[data-theme-switch] button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.theme === t)));
+  document.querySelectorAll(".changes [data-for]").forEach((d) => d.classList.toggle("on", d.dataset.for === t));
+};
+
+// Still states for the chapters that animate in the story.
+site.querySelector(".wires").style.clipPath = "none";
+site.querySelectorAll(".eng").forEach((e) => e.style.setProperty("--lit", "1"));
+site.querySelectorAll('[data-chapter="attack"] .s-caps li')[2].classList.add("is-on");
+
+bindPanels(site);
+openPanel(site.querySelector('[data-chapter="why"] .panels'), 0, { instant: true });
+openPanel(site.querySelector('[data-chapter="risk"] .panels'), 0, { instant: true });
+site.querySelectorAll(".chap[data-go]").forEach((b) => b.addEventListener("click", () => show(b.dataset.go)));
+document.querySelectorAll("[data-chapter-switch] button").forEach((b) => b.addEventListener("click", () => show(b.dataset.go)));
+document.querySelectorAll("[data-theme-switch] button").forEach((b) => b.addEventListener("click", () => theme(b.dataset.theme)));
+addEventListener("keydown", (e) => { if (["1", "2", "3"].includes(e.key) && !e.target.closest?.("input,textarea")) theme("abc"[Number(e.key) - 1]); });
+show("why");
+theme("c");
+</script>
+</body>
+</html>
