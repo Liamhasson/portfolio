@@ -2007,14 +2007,11 @@ def build_raygrid():
 def build_through():
     """2.3 → 3, revised 2026-10-10 (Liam): from the top view, the glass comes to the viewer and the camera goes through it.
       1-40    the ball (glass here; the frost clearing is live only) drifts slowly up; the camera holds the top view
-      40-110  once glass, it rushes up the camera's path and the camera descends to meet it, both slowing into the
-              contact (a held breath: the desk magnified and upside down in the glass fills the frame), passing through
-              its centre at 110 (inside, the world rights itself)
-      110-165 out the other side, low between the ball and the desk, the camera tips down and turns to face the shut
-              laptop from a little way off (all of it in view)
-      160-188 it holds there, drifting in, while the lid opens in front of it (Liam: the lid opens in view)
-      182-210 the screen wakes; the camera pushes in until the 16:10 screen fills the frame, square to it
-    The glass stays above, out of frame (the dark screen may catch it)
+      40-210  one continuous shot (Liam, 2026-10-10): the camera sets off down its line of sight and the glass closes on
+              it at the centre of the frame; it passes through the glass (inside, the world rights itself) and, never
+              stopping, sweeps round and in toward the laptop, whose lid opens in view on the approach; the screen wakes
+              as it finishes and the camera eases in until the 16:10 screen fills the frame, square to it
+    The glass stays above, out of frame.
     Writes the frames and a JSON path (camera, ball, lid angle, screen corners per frame) like the other moves."""
     import json
     args.view, args.dstate = "top", "glass"
@@ -2056,58 +2053,89 @@ def build_through():
         sn = -sn                                         # the side the index shows on (toward the front of the desk)
     fit = disp.scale.x / (36.0 / 50.0)
     END = sc + sn * fit
-    q_end = (sc - END).to_track_quat("-Z", "Y")
     TOP = Vector((0.0, 0.02, 1.35))
-    q_top = (Vector((0.0, 0.0201, 0.0)) - TOP).to_track_quat("-Z", "Y")
-    # the camera's path: straight down from the top view, then a curve that arrives facing the laptop from W (all of it in
-    # view), then straight in to the screen
-    W = sc + sn * fit * 2.3 + Vector((0, 0, 0.04))
-    q_w = (sc - W).to_track_quat("-Z", "Y")
-    P0, P1 = TOP, Vector((0.0, 0.03, 0.42))
-    P2, P3 = W + sn * 0.3, W
+    # one continuous shot (Liam, 2026-10-10: no stops): a single curve from the top view, straight down through the
+    # glass, sweeping round and in to the screen; the camera looks where it is going, its aim easing from straight down
+    # to the screen's centre; speed rises from rest, never drops, and eases only into the screen
+    P0, P1 = TOP, TOP + Vector((0, 0, -0.75))
+    P3 = END; P2 = END + sn * 0.75 + Vector((0, 0, 0.06))
     def bez(s):
         u = 1 - s
         return P0 * u ** 3 + P1 * 3 * u * u * s + P2 * 3 * u * s * s + P3 * s ** 3
-    S_MEET = 0.3
-    M = bez(S_MEET)                                     # where camera and glass meet
+    # arc length table, so speed is set by the profile, not by the curve's parameter
+    N = 2000; pts = [bez(k / N) for k in range(N + 1)]
+    acc = [0.0]
+    for k in range(N):
+        acc.append(acc[-1] + (pts[k + 1] - pts[k]).length)
+    Ltot = acc[-1]
+    def at_len(L):
+        L = min(max(L, 0.0), Ltot); lo, hi = 0, N
+        while hi - lo > 1:
+            m = (lo + hi) // 2
+            if acc[m] < L: lo = m
+            else: hi = m
+        t = (L - acc[lo]) / max(acc[hi] - acc[lo], 1e-9)
+        return (lo + t) / N
+    F0 = 40
+    def travel(f):
+        # 0..1 of the way along the curve: an ease-in from rest, cruise, an ease-out into the screen (C1 throughout)
+        if f <= F0: return 0.0
+        x = (f - F0) / (F - F0)
+        a_, b_ = 0.18, 0.22                               # share of the time spent speeding up, slowing down
+        vmax = 1.0 / (1.0 - a_ / 2 - b_ / 2)
+        if x < a_: return vmax * x * x / (2 * a_)
+        if x > 1 - b_:
+            y = 1 - x; return 1 - vmax * y * y / (2 * b_)
+        return vmax * (x - a_ / 2)
+    # where the camera passes through the glass: the curve point at the meeting frame
+    F_MEET = 110
+    s_meet = at_len(travel(F_MEET) * Ltot)
+    M = bez(s_meet)
     B0 = Vector(MOVE_CTX["ball_c"]); B1 = B0 + Vector((0, 0, 0.1))
+    S_AIM = min(s_meet + 0.2, 0.8)                     # the laptop is centred in the frame from here on
+    print("S_MEET", round(s_meet, 3), "S_AIM", round(S_AIM, 3))
+    def aim(f, pos, s):
+        # straight down until past the glass, then easing onto the screen's centre
+        down = pos + Vector((0, 0.0001, -1.0))
+        k = ease(s, s_meet, S_AIM)                     # onto the laptop soon after the glass: never a bare desk
+        tgt = down.lerp(sc, k) if k < 1 else sc
+        return (tgt - pos).to_track_quat("-Z", "Y")
     cam_d = bpy.data.cameras.new("cam"); cam_d.sensor_width = 36; cam_d.dof.use_dof = False
+    cam_d.clip_start = 0.001                           # it passes within millimetres of the glass (the default clips it)
     cam = bpy.data.objects.new("cam", cam_d); scene.collection.objects.link(cam); scene.camera = cam
     cam.rotation_mode = "QUATERNION"
     path = []
     for f in range(1, F + 1):
-        # the approach: fast in its middle, slowing into the contact (smootherstep), out to W, a slow drift in while the
-        # lid opens, then into the screen
-        if f <= 40:
-            s = 0.0
-        elif f <= 110:
-            s = S_MEET * ease((f - 40) / 70)
-        else:
-            s = S_MEET + (1 - S_MEET) * ease((f - 110) / 55)
-        pos = bez(min(s, 1.0))
-        if f > 165:
-            k = 0.12 * ease(f, 165, 190) + 0.88 * ease(f, 186, 210)    # a little in while the lid opens, then all the way
-            pos = W.lerp(END, k)
-        # the glass: drifting slowly up, then rushing to the meeting point (it arrives with the camera), then held
-        if f <= 40:
-            ball = B0.lerp(B1, ease(f, 1, 40))
-        elif f <= 110:
-            ball = B1.lerp(M, ease((f - 40) / 70))
+        s = at_len(travel(f) * Ltot)
+        pos = bez(s)
+        cam.location = pos
+        cam.rotation_quaternion = aim(f, pos, s)
+        # the glass rides the camera's line of sight: drifting up while it turns to glass, then closing on the lens at
+        # the centre of the frame, and the camera passes through its centre at F_MEET; then it stays there, above
+        fwd = cam.rotation_quaternion @ Vector((0, 0, -1))
+        if f <= F0:
+            ball = B0.lerp(B1, ease(f, 1, F0))
+        elif f <= F_MEET:
+            d0 = (B1 - TOP).length
+            k = ease(f, F0, F_MEET)
+            dist = d0 * (1 - k)                            # its distance ahead of the lens, closing to zero
+            off = (B1 - (TOP + Vector((0, 0, -1)) * d0)) * (1 - ease(f, F0, F0 + 30))   # its 1 cm off-axis, gone
+            ball = pos + fwd * dist + off
         else:
             ball = M.copy()
         rig.location = ball
-        # looking straight down until through the glass, then turning to the screen
-        cam.location = pos
-        cam.rotation_quaternion = q_top.slerp(q_w, ease(f, 112, 165)) if f <= 165 else q_w.slerp(q_end, ease(f, 165, 200))
-        cam_d.lens = 45 + 5 * ease(f, 110, 165)
-        hinge.rotation_euler.x = shut + (opened - shut) * ease(f, 160, 188)
-        fill.energy = fill_e * ease(f, 150, 188)
-        glow.energy = glow_e * ease(f, 188, 202)
-        emit.default_value = emit_s if f >= 188 else 0.0
+        cam_d.lens = 45 + 5 * ease(s, s_meet, 0.95)
+        # the lid opens in view during the approach; the screen wakes as it finishes
+        sl0, sl1 = S_AIM - 0.04, min(S_AIM + 0.2, 0.9)   # the lid opens once the laptop is framed
+        hinge.rotation_euler.x = shut + (opened - shut) * ease(s, sl0, sl1)
+        fill.energy = fill_e * ease(s, sl0 - 0.05, sl1)
+        glow.energy = glow_e * ease(s, sl1, sl1 + 0.06)
+        emit.default_value = emit_s if s >= sl1 else 0.0
         for ob, prop in ((cam, "location"), (cam, "rotation_quaternion"), (rig, "location")):
             ob.keyframe_insert(prop, frame=f)
         cam_d.keyframe_insert("lens", frame=f); hinge.keyframe_insert("rotation_euler", frame=f)
         fill.keyframe_insert("energy", frame=f); glow.keyframe_insert("energy", frame=f); emit.keyframe_insert("default_value", frame=f)
+    WAKE_F = next(f for f in range(1, F + 1) if at_len(travel(f) * Ltot) >= min(S_AIM + 0.2, 0.9))
     for f in range(1, F + 1):
         scene.frame_set(f)
         mw = cam.matrix_world; q = mw.to_quaternion(); dm = disp.matrix_world
@@ -2117,7 +2145,7 @@ def build_through():
                      "lid_open_deg": math.degrees(shut - hinge.rotation_euler.x), "screen_corners": cs})
     os.makedirs(args.out, exist_ok=True)
     with open(os.path.join(args.out, "deskmove-through-camera.json"), "w") as fh:
-        json.dump({"move": "through", "fps": 24, "frames": F, "units": "metres", "up": "z", "meet_frame": 110,
+        json.dump({"move": "through", "fps": 24, "frames": F, "units": "metres", "up": "z", "meet_frame": F_MEET, "wake_frame": WAKE_F,
                    "plate_overscan": 1.0, "chaos_center": list(c_), "chaos_scale": CHAOS_SCALE,
                    "screen_corners_order": "top-left, top-right, bottom-right, bottom-left (as seen on the screen)", "path": path}, fh)
     one = os.environ.get("MOVE_FRAME")

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Stage } from "@/three/stage";
 import { loadSand, SAND_BASE } from "@/three/sand/data";
-import { SAND_LOOK, SandField, type SandState } from "@/three/sand/sand-field";
+import { CURSOR_WARM, SAND_LOOK, SandField, type SandState } from "@/three/sand/sand-field";
 import { PaintField } from "@/three/sand/paint";
 import { Wordmark } from "@/three/sand/wordmark";
 import { HeroOverlay } from "./hero-overlay";
@@ -40,22 +40,22 @@ const TL = {
   settle: [0.33, 0.52], compact: [0.35, 0.5],                                  // 2.1: the ball forms on the desk
   leave21: [0.54, 0.6], rise: [0.56, 0.68], enter22: [0.64, 0.7],               // 2.1 -> 2.2
   attempts: [0.71, 0.97],                                                      // 2.2: three attempts
-  // 2.3, in the same top view (Liam, 2026-10-10): the frost spreads and clears into glass as the ball drifts up, then
-  // the glass rushes to the lens and the camera passes through it, comes out low, faces the laptop while its lid opens,
-  // and pushes into the screen (lookdev.py deskmove --move through; its frames: drift 1-40, rush 40-110, out 110-165,
-  // lid 165-188, push 188-210)
+  // 2.3, in the same top view (Liam, 2026-10-10): the frost spreads and clears into glass as the ball drifts up (the
+  // move's frames 1-40), then one continuous shot (frames 40-210, scrolled evenly): the camera passes through the glass
+  // at the centre of the frame, sweeps round onto the laptop as its lid opens, and eases into the screen.
+  // rush/out/lid/push name stretches of that one shot (the frames they span: 40-110, 110-130, 130-160, 160-210)
   leave22: [0.975, 1.0], enter23: [1.0, 1.04], build: [0.99, 1.24], leave23: [1.23, 1.27],
-  rush: [1.24, 1.38], out: [1.38, 1.48], lid: [1.48, 1.56], push: [1.56, 1.66],
-  takeover: [1.63, 1.66], indexIn: [1.66, 1.7],                                 // the live index takes over, settles
+  rush: [1.24, 1.388], out: [1.388, 1.431], lid: [1.431, 1.494], push: [1.494, 1.6],
+  takeover: [1.57, 1.6], indexIn: [1.6, 1.64],                                 // the live index takes over, settles
 } as const;
 /**
  * The page's length. Progress is measured in units of the first 1600vh of scroll (the timeline above was laid out on
  * a 1700vh page), so each chapter added after it keeps the earlier ones' pace.
  */
-const PAGE_VH = 2900;
+const PAGE_VH = 2800;
 const PROGRESS_SCALE = (PAGE_VH - 100) / 1600;
 /** Progress -> the through move's frame (0-based): each beat gets its own share of the scroll. */
-const THROUGH_KEYS: [keyof typeof TL, number][] = [["build", 39], ["rush", 109], ["out", 164], ["lid", 187], ["push", 209]];
+const THROUGH_KEYS: [keyof typeof TL, number][] = [["build", 39], ["push", 209]];
 function throughFrame(p: number): number {
   let prevP: number = TL.build[0], prevF = 0;
   for (const [k, f] of THROUGH_KEYS) {
@@ -65,8 +65,8 @@ function throughFrame(p: number): number {
   }
   return 209;
 }
-/** The frame the screen wakes on (Blender: 188), and the lid's open angle in the bake. */
-const WAKE_FRAME = 187;
+/** The frame the screen wakes on (from the move's camera.json; Blender: 155). */
+let WAKE_FRAME = 154;
 /** The open laptop's fill (lookdev.py: area light, 0.9 m, 38 W, rising with the lid), lighting the sand too. */
 const SIDE_FILL = { pos: [1.35, -0.95, 0.45], watts: 38, color: [1.0, 0.86, 0.72], radius: 4.5 };
 /** 2.3's build, over the drift: the frost covers the ball, then a wave of clarity runs over it; the grains sink just
@@ -189,6 +189,7 @@ export function SandLab() {
       if (desk3d) stage.scene.add(desk3d.group);
       // 2.3 -> 3: through the glass and into the screen (lookdev.py deskmove --move through; the 3D desk only)
       const through = desk3d ? await Pullback.load("/lab/through", false).catch(() => null) : null;
+      if (through) WAKE_FRAME = ((through.data as unknown as { wake_frame?: number }).wake_frame ?? 155) - 1;
       if (disposed) return;
       // the screen's reveal: seconds since it woke; and how far it has gone back to sleep (scrolling back up)
       let revealT = 0, sleep = 1;
@@ -230,8 +231,8 @@ export function SandLab() {
       if (glass) (window as unknown as { __frost?: (l: Parameters<GlassBall["setLook"]>[0]) => void }).__frost = (l) => glass.setLook(l);
       // grains leaving the sand: the scene's atmosphere (drift-grains.ts)
       const drift = new DriftGrains(field.material, tier === "low" ? 600 : 1600);
-      drift.points.layers.set(SAND_LAYER);
-      stage.scene.add(drift.points);
+      drift.mesh.layers.set(SAND_LAYER);
+      stage.scene.add(drift.mesh);
       const lean = new THREE.Vector2();     // the eased lean, -1..1 each way
       // the desk's top as a rectangle in the hero's units (x, z) and its height, for keeping the top view inside it
       let deskTop: { min: THREE.Vector2; max: THREE.Vector2; y: number } | null = null;
@@ -506,7 +507,9 @@ export function SandLab() {
             // the void. The lens tightens once, for the pose (never with the cursor); the lean then goes only as far as
             // the desk allows
             const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
-            const down = deskTop ? THREE.MathUtils.smoothstep(-fwd.y, 0.9, 0.97) : 0;
+            // (only the held top view: once the camera dives for the glass it frames as Blender does)
+            const dive = move === through ? ease(f, [39, 55]) : 0;
+            const down = deskTop ? THREE.MathUtils.smoothstep(-fwd.y, 0.9, 0.97) * (1 - dive) : 0;
             const q0 = cam.quaternion.clone();
             const inside = (scale: number, q: THREE.Quaternion) => {
               const th = Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2) * scale, tw = th * cam.aspect;
@@ -545,7 +548,7 @@ export function SandLab() {
           const ix = indexRef.current;
           if (ix && desk3d && through) {
             // the screen is in play once the camera faces the laptop (the takeover itself at the push's end)
-            const pt = move === through ? Math.min(Math.max((f - 164) / (209 - 164), 0), 1) : 0;
+            const pt = move === through ? Math.min(Math.max((f - 129) / (209 - 129), 0), 1) : 0;
             const take = ease(span(progressRef.current, TL.takeover), [0, 1]);
             const sett = ease(span(progressRef.current, TL.indexIn), [0, 1]);
             const W = canvas.clientWidth, H = canvas.clientHeight;
@@ -708,14 +711,16 @@ export function SandLab() {
           const ballR = field!.material.uniforms.uBallR.value as number;
           const pg = progressRef.current;
           const density = !hero ? DRIFT.hero
-            : THREE.MathUtils.lerp(DRIFT.hero, DRIFT.desk, ease(pg, TL.pullback)) * (1 - ease(pg, [TL.lid[0], TL.lid[0] + 0.05]));
+            : THREE.MathUtils.lerp(DRIFT.hero, DRIFT.desk, ease(pg, TL.pullback)) * (1 - ease(pg, [TL.build[1] - 0.02, TL.build[1]]));   // none once the dive begins
           const r = THREE.MathUtils.lerp(chaosR, ballR * 1.05, state.compact);
           const um = field!.material.uniforms;
           // the sand's own grain size (its largest grain x its look's scale x the tier's count scale), typical grain
           const grainR = (um.uRadMax.value as number) * (um.uCountScale.value as number) * 0.7
             * THREE.MathUtils.lerp((um.uRadScale.value as THREE.Vector2).x, (um.uRadScale.value as THREE.Vector2).y, state.compact);
-          drift.update(state.time, focus, r, reduced ? density * 0.5 : density, r * 3.5, grainR,
-            new THREE.Vector3(1.0, 0.9, 0.82).multiplyScalar(5.0 * cursorI));
+          // the cursor at full strength on these (Lusion's and Oryzo's loose particles): a warm light, and a push
+          drift.update(state.time, reduced || still ? 0 : dt, focus, r, reduced ? density * 0.5 : density, r * 3.5, grainR,
+            pointer.active && !reduced ? cursorWorld : null, dir, 0.45,
+            new THREE.Vector3(...CURSOR_WARM).multiplyScalar(5.0 * cursorI), cam);
         }
         if (!reduced) {
           paint!.update(stage!.renderer, dt);

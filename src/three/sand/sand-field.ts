@@ -17,6 +17,9 @@ export interface SandState {
 }
 
 /** Calibrated against the Cycles renders (see the compare mode); light power is Blender's watts times this. */
+/** The cursor light's colour: rose-gold (the palette's #b9725c, lifted toward light). */
+export const CURSOR_WARM: [number, number, number] = [1.0, 0.64, 0.46];
+
 export const SAND_LOOK = {
   // calibrated 2026-10-09 against the hero renders (chaos, mid, ball) with scripts/lab/sweep.sh: total light per channel
   // within 3-7%, colour balance within 0.02, grain and structure contrast matched on the ball
@@ -114,6 +117,8 @@ export class SandField {
         uMeltUp: { value: new THREE.Vector3(0, 0, 1) },
         uDrain: { value: 0 },
         uSinkClear: { value: 0.9 },
+        uBufH: { value: 1 },
+        uShutter: { value: 1 / 60 },   // motion blur: the grain's travel over this long, on screen
         uClearAlb: { value: new THREE.Vector3(0.58, 0.44, 0.36) },   // calibrated with the frost skin (frost-skin.ts)
         uBallRot: { value: this.ballRot },
         uChaosC: { value: this.chaosCentre() },
@@ -256,7 +261,8 @@ export class SandField {
     const u = this.material.uniforms;
     (u.uCursorPos.value as THREE.Vector3).copy(pos);
     // warm white, a little cooler than the key so it reads as the visitor's own light
-    (u.uCursorCol.value as THREE.Vector3).set(1.0, 0.9, 0.82).multiplyScalar(this.look.cursor * intensity);
+    // warm, rose-gold (Liam: as Oryzo's amber cursor light, in our palette)
+    (u.uCursorCol.value as THREE.Vector3).set(...CURSOR_WARM).multiplyScalar(this.look.cursor * intensity);
   }
 
   /** The cursor's drift field, and the viewport in CSS px it is measured in. */
@@ -291,6 +297,7 @@ export class SandField {
   /** Pixels per world unit at distance 1, for the grains' point size. */
   setPointScale(viewportHeightPx: number, vfovRad: number): void {
     this.material.uniforms.uPointScale.value = viewportHeightPx / (2 * Math.tan(vfovRad / 2));
+    this.material.uniforms.uBufH.value = viewportHeightPx;
   }
 
   update(s: SandState): void {

@@ -161,6 +161,8 @@ uniform sampler2D uPaint;    // the cursor's drift field: CSS px / s
 uniform float uPaintScale;   // seconds: velocity -> offset
 uniform vec2 uFront;         // the drift only moves the front layer: optical depth to the camera (strength, falloff)
 uniform vec2 uViewport;      // CSS px
+uniform float uBufH;         // device px of the drawing buffer's height
+uniform float uShutter;      // motion blur: seconds
 
 out vec3 vAlbedo;
 out vec3 vL0; out vec3 vL1; out vec3 vL2; out vec3 vL3;   // light directions, view space (3 = cursor)
@@ -296,8 +298,11 @@ void main() {
   gl_Position = projectionMatrix * mv;
   // the cursor's drift: a push in screen space from the paint field, which decays on its own
   vec2 suv = gl_Position.xy / gl_Position.w * 0.5 + 0.5;
-  vec2 push = texture(uPaint, suv).xy * uPaintScale * frontness;
+  vec2 pvel = texture(uPaint, suv).xy * frontness;           // CSS px / s
+  vec2 push = pvel * uPaintScale;
   gl_Position.xy += push / (uViewport * 0.5) * gl_Position.w;
+  // motion blur: how far the grain moves on screen in the shutter (device px), from the cursor's push
+  vec2 blur = pvel * uPaintScale * 6.0 * uShutter * 60.0 * (uBufH / uViewport.y);
   float packed = floor(aAttr.z * 255.0 + 0.5);
   float rad = mix(floor(packed / 16.0), mod(packed, 16.0), t) / 15.0;
   if (hash(aPosA + 9.1) > uChaosShare) rad *= smoothstep(0.05, 0.45, t);
@@ -305,8 +310,16 @@ void main() {
   float h1 = hash(aPosB + 1.7), h2 = hash(aPosB + 3.1), h3 = hash(aPosB + 5.3);
   vec2 squash = 1.0 + 0.22 * (vec2(h1, h2) * 2.0 - 1.0);
   float ang = h3 * 6.2831853;
-  vEll = vec4(squash, cos(ang), sin(ang));
   float px = 2.0 * rad * uRadMax * mix(uRadScale.x, uRadScale.y * uBallGrain, t) * uCountScale * attGrow * uPointScale / -mv.z * max(squash.x, squash.y);   // device pixels
+  // a moving grain is drawn stretched along its motion by its travel in the shutter (a streak, still solid)
+  float bl = length(blur);
+  if (bl > 0.5 && px > 0.0) {
+    float k = 1.0 + bl / px;
+    squash = vec2(max(squash.x, squash.y) * k, min(squash.x, squash.y));
+    ang = atan(blur.y, blur.x);
+    px *= k;
+  }
+  vEll = vec4(squash, cos(ang), sin(ang));
   // below a minimum the grain keeps its area through coverage, so it never shimmers
   vAlpha = clamp((px * px) / (uMinPx * uMinPx), 0.0, 1.0);
   gl_PointSize = max(px, uMinPx);
