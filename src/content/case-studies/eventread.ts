@@ -45,5 +45,7 @@ export const eventread: CaseStudy = {
     ],
     link: { href: "https://eventread.vercel.app", label: "Try it" },
   },
-  budget: STANDARD_BUDGET,
+  // How it works walks the product (search and acts, followed dates, tours), so
+  // it takes about two screens; the Danger Score band gives back 0.4 to stay in the cap.
+  budget: { ...STANDARD_BUDGET, signature: 1.6, supporting: 1.9 },
 };
