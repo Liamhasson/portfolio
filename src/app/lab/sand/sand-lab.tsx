@@ -236,13 +236,9 @@ export function SandLab() {
       if (new URLSearchParams(window.location.search).get("streams") === "0") drift.streams = 0;   // compare: all loose
       drift.mesh.layers.set(SAND_LAYER);
       stage.scene.add(drift.mesh);
-      // once the ball has formed nothing hangs around it: grains only come out of it under the cursor, and go back in
-      const burst = new DriftGrains(field.material, tier === "low" ? 140 : 320);
-      burst.burst = true; burst.streams = 0;
-      burst.mesh.layers.set(SAND_LAYER);
-      stage.scene.add(burst.mesh);
+      // once the ball has formed nothing hangs around it: under the cursor its own grains come out and go back in
       let hover = 0;
-      const hoverRay = new THREE.Vector3();
+      const hoverRay = new THREE.Vector3(), hoverDir = new THREE.Vector3(0, 0, 1);
       const lean = new THREE.Vector2();     // the eased lean, -1..1 each way
       let spacerTick = 0;
       let leanRoom = 1;                     // how much of the lean the desk's edge allows (top view)
@@ -800,8 +796,8 @@ export function SandLab() {
           drift.update(state.time, reduced || still ? 0 : dt, focus, r, reduced ? density * 0.5 : density, r * 3.5, grainR,
             pointer.active && !reduced ? cursorWorld : null, dir, 0.45,
             new THREE.Vector3(...CURSOR_WARM).multiplyScalar(5.0 * cursorI), cam);
-          // the formed ball under the cursor: where the cursor's line of sight meets it, grains come out and go back in
-          // (only while it is sand: from the ball forming until 2.3's build begins)
+          // the formed ball under the cursor: where the cursor's line of sight meets it, its own grains come out and go
+          // back in (the sand shader; only while it is sand: from the ball forming until 2.3's build begins)
           const sandBall = formed > 0.5 && hero && pg < TL.build[0];
           hoverRay.subVectors(ballC, cam.position);
           const along = hoverRay.dot(dir);
@@ -811,12 +807,9 @@ export function SandLab() {
           if (over) {
             // the near side's point under the cursor, as a direction from the ball's centre
             const into = Math.sqrt(Math.max(ballR * ballR - miss * miss, 0));
-            burst.burstAt.copy(cam.position).addScaledVector(dir, along - into).sub(ballC).normalize();
+            hoverDir.copy(cam.position).addScaledVector(dir, along - into).sub(ballC).normalize();
           }
-          burst.burstOn = hover > 0.3;
-          burst.update(state.time, reduced || still ? 0 : dt, ballC, ballR, sandBall ? 1 : 0, ballR * 0.7, grainR,
-            pointer.active && !reduced ? cursorWorld : null, dir, 0.45,
-            new THREE.Vector3(...CURSOR_WARM).multiplyScalar(5.0 * cursorI), cam);
+          field!.setHover(hover, hoverDir);
         }
         if (!reduced) {
           paint!.update(stage!.renderer, dt);
@@ -832,7 +825,7 @@ export function SandLab() {
         field!.update(state);
       });
       stage.start();
-      (window as unknown as { __sand?: unknown }).__sand = { stage, field, state, glass, drift, burst };   // lab debugging
+      (window as unknown as { __sand?: unknown }).__sand = { stage, field, state, glass, drift };   // lab debugging
     })().catch((err) => {
       setStatus(String(err));
       setFallback(true);

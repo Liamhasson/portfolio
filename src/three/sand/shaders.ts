@@ -128,6 +128,9 @@ uniform mat3 uBallRot;       // the ball's spin (object -> world)
 uniform vec3 uChaosC;
 uniform mat3 uChaosRot;      // the chaos moving around itself
 uniform float uTime;
+uniform float uHover;        // the cursor over the formed ball: how much (0..1)
+uniform vec3 uHoverDir;      // and where: the direction from the ball's centre to the point under it (world)
+uniform vec2 uHoverShape;    // the patch's edge (cosine of its angle) and how far a grain lifts (ball radii)
 uniform float uDrift;        // ambient flow amplitude (world units)
 uniform float uDriftFreq;
 uniform float uDriftSpeed;
@@ -277,6 +280,27 @@ void main() {
     pPrev = pathAt(A, normalize(dir) * (bDist * uBallPosMaxPrev), uCompactPrev, uBallCPrev, uBallRotPrev, uChaosRotPrev,
                    tPrev) + drift;
     pPrev += flowOffset(pPrev, tPrev, uTimePrev);
+  }
+  // the cursor over the formed ball (Liam, 2026-10-10): the ball's own grains lift out of it there and settle back,
+  // each at its own moment and height, so the patch thins while they're out; never streaked (the lift is in the
+  // previous frame's place too)
+  if (uHover > 0.001 && t > 0.5) {
+    vec3 rel = p - uBallC;
+    float rl = length(rel);
+    vec3 nd = rel / max(rl, 1e-5);
+    float capW = smoothstep(uHoverShape.x, mix(uHoverShape.x, 1.0, 0.6), dot(nd, uHoverDir));
+    float shell = smoothstep(0.6, 0.92, rl / uBallR);       // the surface's grains leave; the core holds the shape
+    float hk = hash(aPosA + 11.3);
+    float leaves = step(hk, 0.6);                            // about six in ten of them
+    float cyc = fract(uTime * (0.35 + 0.3 * hash(aPosB + 2.9)) + hash(aPosB + 6.1));
+    float arc = sin(3.14159265 * cyc);
+    // out of the surface and away from the point under the cursor (along the surface): on the face toward the viewer a
+    // lift straight out would only come at the lens, so they spray outward and the spot opens
+    vec3 away = nd - uHoverDir * dot(nd, uHoverDir);
+    away = dot(away, away) > 1e-6 ? normalize(away) : vec3(0.0);
+    vec3 lift = (nd * 0.55 + away * 0.9 + vec3(0.0, 0.15, 0.0)) * arc * arc * (0.2 + 0.8 * hash(aPosA + 4.4)) * uHoverShape.y * uBallR
+      * capW * shell * leaves * uHover * smoothstep(0.5, 0.9, t);
+    p += lift; pMoved += lift; pPrev += lift;
   }
   // 2.2: inside an attempt the grains pack onto the surface (closing the gaps), then drain toward glass
   vClear = 0.0;

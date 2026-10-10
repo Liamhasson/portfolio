@@ -170,6 +170,9 @@ export class SandField {
         uOutScale: { value: 1 },
         uGroundCol: { value: new THREE.Vector3() },
         uGround: { value: new THREE.Vector2(-1e3, 1) },
+        uHover: { value: 0 },
+        uHoverDir: { value: new THREE.Vector3(0, 0, 1) },
+        uHoverShape: { value: new THREE.Vector2(0.74, 0.8) },
         uFillCol: { value: new THREE.Vector3() },
         uUpView: { value: new THREE.Vector3(0, 1, 0) },
         uSpec: { value: SAND_LOOK.spec },
@@ -249,6 +252,13 @@ export class SandField {
     u.uBallR.value = radius;
     u.uBallVolS.value = 1 / s;
     u.uBallGrain.value = s;
+  }
+
+  /** The cursor over the formed ball: how much (0..1), and the direction from its centre to the point under it. */
+  setHover(amount: number, dir: THREE.Vector3): void {
+    const u = this.material.uniforms;
+    u.uHover.value = amount;
+    (u.uHoverDir.value as THREE.Vector3).copy(dir);
   }
 
   /** The desk below as a broad light (colour x strength, 0 = none), reaching the loose sand up to about `reach` above
