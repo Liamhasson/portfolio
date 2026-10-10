@@ -125,8 +125,8 @@ const TURN_RATE = 6;                // per second: how fast a grain turns to fac
 // Streams (Liam, 2026-10-10, from the C4D particles tutorial: an emitter's trail, held together by a flock): most grains
 // leave the sand in streams. A stream's emitter wanders slowly over the sand's surface and lets a grain go every
 // tenth of a second or so; they all follow the same sinuous path, so together they draw a tendril
-const PER_STREAM = 160;          // ~10 streams of the hero's 1600 (fewer, fuller: thin ones read as dotted lines)
-const LOOSE = 0.3;                  // the share that stays loose, alone (the spray around the streams)
+const PER_STREAM = 400;          // 4 streams of the hero's 1600 (Liam: fewer, denser, so they read in the hero)
+const LOOSE = 0.15;                 // the share that stays loose, alone (the spray around the streams)
 // the flock (Sedov's C4D setup: separation + cohesion): grains in a stream don't overlap, and gather like a loose liquid
 const SEPARATION = 150;             // per second squared, per unit of overlap (the path's own pull is 120)
 const SEPARATION_R = 2.2;           // grain radii
@@ -168,6 +168,9 @@ export class DriftGrains {
   private readonly push = new THREE.Vector3();
   private readonly up = new THREE.Vector3(0, 1, 0);
   private readonly alt = new THREE.Vector3(1, 0, 0);
+  private readonly vFwd = new THREE.Vector3();
+  private readonly vRight = new THREE.Vector3();
+  private readonly vUp = new THREE.Vector3();
 
   /** `sand`: the sand's material (its palette and lights: shared). */
   constructor(sand: THREE.ShaderMaterial, max = 1600) {
@@ -256,6 +259,10 @@ export class DriftGrains {
     const damp = Math.exp(-dt * VELOCITY_DAMPING_RATE);
     const turn = 1 - Math.exp(-dt * TURN_RATE);
     const cam = camera.position;
+    // the view's frame at the sand: toward the viewer, and the screen's right and up (the streams' emitters ring it)
+    const vFwd = this.vFwd.subVectors(cam, centre).normalize();
+    const vRight = this.vRight.crossVectors(Math.abs(vFwd.y) > 0.99 ? this.alt : this.up, vFwd).normalize();
+    const vUp = this.vUp.crossVectors(vFwd, vRight);
     this.flockForces(count, grainR);
     for (let i = 0; i < count; i++) {
       const s0 = this.seed[i * 4], s1 = this.seed[i * 4 + 1], s2 = this.seed[i * 4 + 2], s3 = this.seed[i * 4 + 3];
@@ -269,45 +276,58 @@ export class DriftGrains {
       const cyc = loose ? time / L + s0 * 7 : time / L + hk(1) * 7 + ((i % PER_STREAM) + 0.4 * s0) / PER_STREAM;
       const life = cyc - Math.floor(cyc), gen = Math.floor(cyc);
       const h = (n: number) => { const x = Math.sin((gen + 1) * 12.9898 * (n + 1) + s0 * 78.233 + s1 * 37.719) * 43758.5453; return x - Math.floor(x); };
-      let px: number, py: number, pz: number, swirl: number;
+      let tx: number, ty: number, tz: number;
       if (loose) {
         // its path this life: born on the sand's shell (one in ten partway toward the camera: in front of the sand)
         const a = h(0) * Math.PI * 2, b = Math.acos(2 * h(1) - 1), rr = 0.85 + 0.25 * h(2);
-        px = centre.x + Math.sin(b) * Math.cos(a) * radius * rr;
-        py = centre.y + Math.cos(b) * radius * rr;
-        pz = centre.z + Math.sin(b) * Math.sin(a) * radius * rr;
+        let px = centre.x + Math.sin(b) * Math.cos(a) * radius * rr;
+        let py = centre.y + Math.cos(b) * radius * rr;
+        let pz = centre.z + Math.sin(b) * Math.sin(a) * radius * rr;
         if (s2 < 0.1) {
           const f = 0.3 + 0.25 * h(3);
           px += (cam.x - centre.x) * f; py += (cam.y - centre.y) * f; pz += (cam.z - centre.z) * f;
         }
-        swirl = s3 * 1.8 - 0.9;
+        // out and up in a slow swirl
+        const go = life * travel;
+        const dx = px - centre.x, dy = py - centre.y, dz = pz - centre.z, dl = Math.hypot(dx, dy, dz) || 1;
+        ty = py + (dy / dl) * go * 0.45 + go * 0.75;
+        tx = px + (dx / dl) * go * 0.45; tz = pz + (dz / dl) * go * 0.45;
+        const sw = life * (s3 * 1.8 - 0.9), cs = Math.cos(sw), sn = Math.sin(sw);
+        const rx = tx - centre.x, rz = tz - centre.z;
+        tx = centre.x + rx * cs - rz * sn; tz = centre.z + rx * sn + rz * cs;
       } else {
-        // born where its stream's emitter was when it left: the emitter wanders slowly over the shell, so the grains
-        // after it leave from beside it and the stream bends
+        // born where its stream's emitter was when it left. The emitters sit on the sand's side facing the viewer, in
+        // a ring around the view, a third of the way toward the lens (in front of the sand, where they read), spread
+        // evenly around it; each wanders slowly, so the grains after it leave from beside it and the stream bends
         const tb = time - life * L;
-        const a = hk(2) * Math.PI * 2 + 0.6 * Math.sin(tb * 0.11 + hk(3) * 6.28) + 0.3 * Math.sin(tb * 0.23 + hk(4) * 6.28);
-        const b = Math.min(Math.max(Math.acos(2 * hk(5) - 1) + 0.35 * Math.sin(tb * 0.13 + hk(6) * 6.28), 0.25), Math.PI - 0.25);
-        const nx = Math.sin(b) * Math.cos(a), ny = Math.cos(b), nz = Math.sin(b) * Math.sin(a);
+        const a = ((k + 0.5 + 0.4 * (hk(2) - 0.5)) / Math.ceil(this.max / PER_STREAM)) * Math.PI * 2
+          + 0.6 * Math.sin(tb * 0.11 + hk(3) * 6.28) + 0.3 * Math.sin(tb * 0.23 + hk(4) * 6.28);
+        const b = Math.min(Math.max(0.55 + 0.35 * hk(5) + 0.2 * Math.sin(tb * 0.13 + hk(6) * 6.28), 0.3), 1.2);
+        const ca0 = Math.cos(a) * Math.sin(b), sa0 = Math.sin(a) * Math.sin(b), cb = Math.cos(b);
+        // out from the view's centre, across the screen
+        const ox = vRight.x * Math.cos(a) + vUp.x * Math.sin(a);
+        const oy = vRight.y * Math.cos(a) + vUp.y * Math.sin(a);
+        const oz = vRight.z * Math.cos(a) + vUp.z * Math.sin(a);
+        const pull = 0.3 + 0.15 * hk(9);
+        let px = centre.x + (vFwd.x * cb + vRight.x * ca0 + vUp.x * sa0) * radius * 0.95;
+        let py = centre.y + (vFwd.y * cb + vRight.y * ca0 + vUp.y * sa0) * radius * 0.95;
+        let pz = centre.z + (vFwd.z * cb + vRight.z * ca0 + vUp.z * sa0) * radius * 0.95;
+        px += (cam.x - px) * pull; py += (cam.y - py) * pull; pz += (cam.z - pz) * pull;
         // its place across the stream (the stream thickens as it goes, as smoke does)
-        this.side.set(nx, ny, nz).cross(Math.abs(ny) > 0.99 ? this.alt : this.up).normalize();
-        this.back.set(nx, ny, nz).cross(this.side);
-        const across = grainR * 8 * (0.4 + life * 1.6) * Math.sqrt(h(4)), ang = h(5) * Math.PI * 2;
+        const across = grainR * 16 * (0.4 + life * 1.6) * Math.sqrt(h(4)), ang = h(5) * Math.PI * 2;
         const ca = Math.cos(ang) * across, sa = Math.sin(ang) * across;
-        // and the stream sways sideways along its length (one curve for all its grains, by their age)
-        const sway = 0.12 * life * travel * Math.sin(life * 7.5 + hk(7) * 6.28);
-        px = centre.x + nx * radius * 0.95 + this.side.x * (ca + sway) + this.back.x * sa;
-        py = centre.y + ny * radius * 0.95 + this.side.y * (ca + sway) + this.back.y * sa;
-        pz = centre.z + nz * radius * 0.95 + this.side.z * (ca + sway) + this.back.z * sa;
-        swirl = hk(8) * 1.8 - 0.9;
+        // out across the screen and up, swaying sideways along its length (one curve for all its grains, by their
+        // age); half the loose grains' travel, so the whole stream stays in view
+        const go = life * travel * 0.5;
+        const sway = 0.25 * go * Math.sin(life * 7.5 + hk(7) * 6.28);
+        // the sway and the thickness across the stream, in the screen's plane (perpendicular to its way out)
+        const qx = vUp.x * Math.cos(a) - vRight.x * Math.sin(a);
+        const qy = vUp.y * Math.cos(a) - vRight.y * Math.sin(a);
+        const qz = vUp.z * Math.cos(a) - vRight.z * Math.sin(a);
+        tx = px + ox * go * 0.6 + qx * (ca + sway) + vFwd.x * sa;
+        ty = py + oy * go * 0.6 + go * 0.5 + qy * (ca + sway) + vFwd.y * sa;
+        tz = pz + oz * go * 0.6 + qz * (ca + sway) + vFwd.z * sa;
       }
-      // out and up in a slow swirl
-      const go = life * travel;
-      const dx = px - centre.x, dy = py - centre.y, dz = pz - centre.z, dl = Math.hypot(dx, dy, dz) || 1;
-      const ty = py + (dy / dl) * go * 0.45 + go * 0.75;
-      let tx = px + (dx / dl) * go * 0.45, tz = pz + (dz / dl) * go * 0.45;
-      const sw = life * swirl, cs = Math.cos(sw), sn = Math.sin(sw);
-      const rx = tx - centre.x, rz = tz - centre.z;
-      tx = centre.x + rx * cs - rz * sn; tz = centre.z + rx * sn + rz * cs;
       const o = i * 3;
       if (this.gen[i] !== gen) {
         // reborn: a new place, at rest
