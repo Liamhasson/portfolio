@@ -32,6 +32,8 @@ function countUp(el, instant) {
 
 /** Opens column i (null closes all). Statistics count up as they open. */
 export function openPanel(list, i, { instant = false } = {}) {
+  // Whatever opens a column (a beat, a click, a key) cancels a hover still waiting to fire.
+  clearTimeout(list.hoverTimer);
   const tabs = [...list.querySelectorAll('[role="tab"]')];
   tabs.forEach((t, k) => {
     t.setAttribute("aria-selected", String(k === i));
@@ -42,20 +44,29 @@ export function openPanel(list, i, { instant = false } = {}) {
   if (num) countUp(num, instant);
 }
 
+/* Where the mouse last was, so a column moving under a still mouse isn't mistaken for a hover. */
+const lastPointer = { x: NaN, y: NaN };
+// Half a pixel of tolerance: Chrome quantises pointer positions (to 1/64px).
+const pointerMoved = (e) => !(Math.abs(e.clientX - lastPointer.x) < 0.5 && Math.abs(e.clientY - lastPointer.y) < 0.5);
+// Bubble phase: columns compare first, then the position is recorded.
+document.addEventListener("pointermove", (e) => { lastPointer.x = e.clientX; lastPointer.y = e.clientY; });
+
 /** Hover (mouse only, after a beat), click/tap and arrow keys, as on the live site. */
 export function bindPanels(root, { instant = false } = {}) {
   root.querySelectorAll('.panels[role="tablist"]').forEach((list) => {
     const tabs = [...list.querySelectorAll('[role="tab"]')];
     const vertical = !!list.closest(".is-phone");
-    let timer = 0;
     tabs.forEach((t, i) => {
       t.addEventListener("click", () => openPanel(list, i, { instant }));
-      t.addEventListener("pointerenter", (e) => {
-        if (e.pointerType !== "mouse") return;
-        clearTimeout(timer);
-        timer = setTimeout(() => openPanel(list, i, { instant }), reduce ? 0 : 90);
+      // Hover means the mouse moved onto a column. A column sliding under a resting mouse
+      // (the story scrolling) sends events at the same position; those don't count.
+      t.addEventListener("pointermove", (e) => {
+        if (e.pointerType !== "mouse" || !pointerMoved(e)) return;
+        if (t.getAttribute("aria-selected") === "true") return;
+        clearTimeout(list.hoverTimer);
+        list.hoverTimer = setTimeout(() => openPanel(list, i, { instant }), reduce ? 0 : 90);
       });
-      t.addEventListener("pointerleave", () => clearTimeout(timer));
+      t.addEventListener("pointerleave", () => clearTimeout(list.hoverTimer));
       t.addEventListener("keydown", (e) => {
         const step = vertical ? { ArrowDown: 1, ArrowUp: -1 } : { ArrowRight: 1, ArrowLeft: -1 };
         let j = null;
@@ -188,10 +199,11 @@ export function mountStory(story, name) {
     fill = setBar(site, b, within);
     if (BEATS[b].kind === "scrub") {
       const t = scrubTime(within, video.duration);
-      // Seek only once a frame is decoded (HAVE_CURRENT_DATA): seeking at metadata-only can
-      // leave the stage unpainted in some Chromium builds.
-      if (video.readyState >= 2 && Math.abs(video.currentTime - t) > 0.03) video.currentTime = t;
-      setCaption(video.readyState >= 2 ? captionAt(t) : -1);
+      // Seek only after a first frame has been decoded: seeking at metadata-only can leave the
+      // stage unpainted. (readyState itself dips during every seek, so it can't be the gate.)
+      if (video.dataset.decoded && Math.abs(video.currentTime - t) > 0.03) video.currentTime = t;
+      // The caption follows where the scroll is taking the clip, once the clip's length is known.
+      setCaption(Number.isFinite(video.duration) && video.duration > 0 ? captionAt(t) : -1);
     }
   };
 
@@ -203,7 +215,8 @@ export function mountStory(story, name) {
     onRefreshInit: layout,
     onUpdate: (self) => update(self.progress, self.direction),
   });
-  video.addEventListener("loadeddata", () => update(st.progress, 0));
+  video.addEventListener("loadeddata", () => { video.dataset.decoded = "1"; update(st.progress, 0); });
+  if (video.readyState >= 2) video.dataset.decoded = "1"; // it may have loaded before we listened
   // Scrubbing needs the whole clip in memory: a blob URL seeks instantly on any host,
   // including servers without byte-range support. Skipped if the source was changed meanwhile.
   const original = video.getAttribute("src");

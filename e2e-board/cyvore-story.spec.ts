@@ -119,14 +119,33 @@ test.describe("beats", () => {
     await expect(page.locator('.story[data-story="desktop"] .chap[data-go="why"]')).toHaveAttribute("data-done", "");
   });
 
+  test("moving the mouse onto a column opens it, as on the live site", async ({ page }) => {
+    await story(page).go(1);
+    await page.waitForTimeout(700); // let the columns finish resizing before aiming at one
+    const box = (await page.locator('.story[data-story="desktop"] [data-chapter="why"] .pan[aria-label="Coverage"]').boundingBox())!;
+    await page.mouse.move(box.x + 4, box.y + box.height / 2);
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 8 });
+    await page.waitForTimeout(400);
+    expect((await story(page).state()).open.why).toBe(2);
+  });
+
   test("a column the visitor picks gives way to the next beat", async ({ page }) => {
     await story(page).go(2);
+    await page.waitForTimeout(700); // let the columns finish resizing before aiming at one
     // Click where it is on screen, as a mouse does: locator.click() would first scroll the
     // element into view, and inside a sticky pin that scroll moves the story itself.
     const box = (await page.locator('.story[data-story="desktop"] [data-chapter="why"] .pan[aria-label="Enables"]').boundingBox())!;
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     expect((await story(page).state()).open.why).toBe(3);
     await story(page).go(3);
+    // The mouse is still resting where it clicked while the columns move under it. Chrome then
+    // sends a pointer-enter with no movement; that must not count as hovering.
+    await page.evaluate(([x, y]) => {
+      const t = document.querySelector('.story[data-story="desktop"] [data-chapter="why"] .pan[aria-label="Enables"]')!;
+      t.dispatchEvent(new PointerEvent("pointerenter", { pointerType: "mouse", clientX: x, clientY: y }));
+      t.dispatchEvent(new PointerEvent("pointermove", { pointerType: "mouse", clientX: x, clientY: y, bubbles: true }));
+    }, [box.x + box.width / 2, box.y + box.height / 2]);
+    await page.waitForTimeout(400);
     expect((await story(page).state()).open.why).toBe(2);
   });
 });
