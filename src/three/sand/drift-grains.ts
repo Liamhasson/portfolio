@@ -8,9 +8,10 @@ import * as THREE from "three";
  * sphere that shoves them out and hands them some of its own speed), and turned to face where it is going plus its own
  * fixed tumble. Ours do the same with our grains: the shape the sand is made of in Blender (an icosphere, smooth shaded,
  * randomly squashed and turned; roughness 0.62), in the sand's palette, lit by the scene's lights and the cursor's warm
- * light. Each is born on the sand's surface, carried up and out in a slow swirl, shrinks away and is reborn. Most leave
- * in streams (one wandering emitter each, its grains let go one after another along one sinuous path: a tendril), held
- * together as a flock (separation + cohesion, from the C4D particles tutorial); the rest stay loose, a spray.
+ * light. Each is born on the sand's surface, carried up and out in a slow swirl, shrinks away and is reborn. About half
+ * leave in streams (one wandering emitter each, its grains let go one after another along one sinuous path: a tendril
+ * that fans out into a plume as it goes; each stream its own size, pace, length and depth), held together as a flock
+ * (separation + cohesion, from the C4D particles tutorial); the rest stay loose, a spray.
  *
  * Solid, never see-through: a grain with no light on it simply isn't there (it shrinks to nothing), so none shows as a
  * dark speck over the lit desk. Motion blur: each grain is stretched behind itself along its motion by how far it moves
@@ -125,7 +126,7 @@ const TURN_RATE = 6;                // per second: how fast a grain turns to fac
 // Streams (Liam, 2026-10-10, from the C4D particles tutorial: an emitter's trail, held together by a flock): most grains
 // leave the sand in streams. A stream's emitter wanders slowly over the sand's surface and lets a grain go every
 // tenth of a second or so; they all follow the same sinuous path, so together they draw a tendril
-const PER_STREAM = 400;          // 4 streams of the hero's 1600 (Liam: fewer, denser, so they read in the hero)
+const PER_STREAM = 270;          // 6 streams of the hero's 1600, each holding only some of its grains (its fill)
 const LOOSE = 0.15;                 // the share that stays loose, alone (the spray around the streams)
 // the flock (Sedov's C4D setup: separation + cohesion): grains in a stream don't overlap, and gather like a loose liquid
 const SEPARATION = 150;             // per second squared, per unit of overlap (the path's own pull is 120)
@@ -266,12 +267,14 @@ export class DriftGrains {
     this.flockForces(count, grainR);
     for (let i = 0; i < count; i++) {
       const s0 = this.seed[i * 4], s1 = this.seed[i * 4 + 1], s2 = this.seed[i * 4 + 2], s3 = this.seed[i * 4 + 3];
-      const loose = s1 >= this.streams;
       // a stream's own randoms (its grains share them)
       const k = Math.floor(i / PER_STREAM);
       const hk = (n: number) => { const x = Math.sin((k + 1) * 91.733 + n * 13.317) * 43758.5453; return x - Math.floor(x); };
-      const sk = loose ? s3 : hk(0);
-      const L = 10 * (0.7 + 0.6 * sk);
+      // each stream holds only part of its grains (Liam: less dense), the rest join the loose spray
+      const fill = 0.45 + 0.3 * hk(10);
+      const loose = s1 >= this.streams || s1 / this.streams >= fill;
+      // and has its own pace (Liam: streams of different sizes, paces, lengths and depths)
+      const L = loose ? 10 * (0.7 + 0.6 * s3) : 10 * (0.55 + 0.9 * hk(0));
       // a stream's grains are let go one after another, evenly through its life (a little jitter: not a metronome)
       const cyc = loose ? time / L + s0 * 7 : time / L + hk(1) * 7 + ((i % PER_STREAM) + 0.4 * s0) / PER_STREAM;
       const life = cyc - Math.floor(cyc), gen = Math.floor(cyc);
@@ -297,33 +300,38 @@ export class DriftGrains {
         tx = centre.x + rx * cs - rz * sn; tz = centre.z + rx * sn + rz * cs;
       } else {
         // born where its stream's emitter was when it left. The emitters sit on the sand's side facing the viewer, in
-        // a ring around the view, a third of the way toward the lens (in front of the sand, where they read), spread
+        // a ring around the view, each at its own depth (from the sand's surface to halfway to the lens), spread
         // evenly around it; each wanders slowly, so the grains after it leave from beside it and the stream bends
         const tb = time - life * L;
         const a = ((k + 0.5 + 0.4 * (hk(2) - 0.5)) / Math.ceil(this.max / PER_STREAM)) * Math.PI * 2
           + 0.6 * Math.sin(tb * 0.11 + hk(3) * 6.28) + 0.3 * Math.sin(tb * 0.23 + hk(4) * 6.28);
-        const b = Math.min(Math.max(0.55 + 0.35 * hk(5) + 0.2 * Math.sin(tb * 0.13 + hk(6) * 6.28), 0.3), 1.2);
+        // (b: how far round from the side facing the viewer; it alone sets where on screen the stream starts: the pull
+        // toward the lens moves it along the line of sight)
+        const b = Math.min(Math.max(0.2 + 0.4 * hk(5) + 0.12 * Math.sin(tb * 0.13 + hk(6) * 6.28), 0.12), 0.75);
         const ca0 = Math.cos(a) * Math.sin(b), sa0 = Math.sin(a) * Math.sin(b), cb = Math.cos(b);
-        // out from the view's centre, across the screen
+        // out from the view's centre, across the screen; q: across the stream, in the screen's plane
         const ox = vRight.x * Math.cos(a) + vUp.x * Math.sin(a);
         const oy = vRight.y * Math.cos(a) + vUp.y * Math.sin(a);
         const oz = vRight.z * Math.cos(a) + vUp.z * Math.sin(a);
-        const pull = 0.3 + 0.15 * hk(9);
+        const qx = vUp.x * Math.cos(a) - vRight.x * Math.sin(a);
+        const qy = vUp.y * Math.cos(a) - vRight.y * Math.sin(a);
+        const qz = vUp.z * Math.cos(a) - vRight.z * Math.sin(a);
+        const pull = 0.05 + 0.45 * hk(9);
         let px = centre.x + (vFwd.x * cb + vRight.x * ca0 + vUp.x * sa0) * radius * 0.95;
         let py = centre.y + (vFwd.y * cb + vRight.y * ca0 + vUp.y * sa0) * radius * 0.95;
         let pz = centre.z + (vFwd.z * cb + vRight.z * ca0 + vUp.z * sa0) * radius * 0.95;
         px += (cam.x - px) * pull; py += (cam.y - py) * pull; pz += (cam.z - pz) * pull;
-        // its place across the stream (the stream thickens as it goes, as smoke does)
-        const across = grainR * 16 * (0.4 + life * 1.6) * Math.sqrt(h(4)), ang = h(5) * Math.PI * 2;
+        // its length: a share of the loose grains' travel; each grain a little faster or slower than its stream, so
+        // the stream loosens along its length too
+        const go = life * travel * (0.3 + 0.45 * hk(12)) * (0.8 + 0.4 * h(7));
+        // tight where it leaves the sand, then each grain drifts off on its own heading, across the stream and in
+        // depth: it fans out into a plume as it goes (Liam: spread as they get further from the sand)
+        const width = grainR * (3 + 4 * hk(13)), fan = 0.06 + 0.12 * hk(14);
+        const r = Math.sqrt(h(4)), ang = h(5) * Math.PI * 2;
+        const across = (width + go * fan) * r;
         const ca = Math.cos(ang) * across, sa = Math.sin(ang) * across;
-        // out across the screen and up, swaying sideways along its length (one curve for all its grains, by their
-        // age); half the loose grains' travel, so the whole stream stays in view
-        const go = life * travel * 0.5;
-        const sway = 0.25 * go * Math.sin(life * 7.5 + hk(7) * 6.28);
-        // the sway and the thickness across the stream, in the screen's plane (perpendicular to its way out)
-        const qx = vUp.x * Math.cos(a) - vRight.x * Math.sin(a);
-        const qy = vUp.y * Math.cos(a) - vRight.y * Math.sin(a);
-        const qz = vUp.z * Math.cos(a) - vRight.z * Math.sin(a);
+        // and the stream sways sideways along its length (one curve for all its grains, by their age)
+        const sway = 0.25 * go * Math.sin(life * (5 + 5 * hk(15)) + hk(7) * 6.28);
         tx = px + ox * go * 0.6 + qx * (ca + sway) + vFwd.x * sa;
         ty = py + oy * go * 0.6 + go * 0.5 + qy * (ca + sway) + vFwd.y * sa;
         tz = pz + oz * go * 0.6 + qz * (ca + sway) + vFwd.z * sa;
@@ -371,7 +379,8 @@ export class DriftGrains {
       }
       // born small, full most of its life, shrinking away at the end (Lusion's life curve)
       const env = Math.min(life / 0.08, 1) * (1 - Math.min(Math.max((life - 0.55) / 0.45, 0), 1));
-      this.sizes[i * 2] = grainR * (0.6 + s2 * 1.0) * env;
+      // a stream's grains share its own size (Liam: streams of different sizes)
+      this.sizes[i * 2] = grainR * (0.6 + s2 * 1.0) * (loose ? 1 : 0.6 + 0.8 * hk(11)) * env;
     }
     this.aPos.needsUpdate = true; this.aVel.needsUpdate = true; this.aRot.needsUpdate = true; this.aSize.needsUpdate = true;
   }
