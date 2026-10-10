@@ -236,6 +236,13 @@ export function SandLab() {
       if (new URLSearchParams(window.location.search).get("streams") === "0") drift.streams = 0;   // compare: all loose
       drift.mesh.layers.set(SAND_LAYER);
       stage.scene.add(drift.mesh);
+      // once the ball has formed nothing hangs around it: grains only come out of it under the cursor, and go back in
+      const burst = new DriftGrains(field.material, tier === "low" ? 140 : 320);
+      burst.burst = true; burst.streams = 0;
+      burst.mesh.layers.set(SAND_LAYER);
+      stage.scene.add(burst.mesh);
+      let hover = 0;
+      const hoverRay = new THREE.Vector3();
       const lean = new THREE.Vector2();     // the eased lean, -1..1 each way
       let spacerTick = 0;
       let leanRoom = 1;                     // how much of the lean the desk's edge allows (top view)
@@ -781,8 +788,9 @@ export function SandLab() {
           const chaosR = 0.5 * Math.min(cs.x, cs.y, cs.z);
           const ballR = field!.material.uniforms.uBallR.value as number;
           const pg = progressRef.current;
-          const density = !hero ? DRIFT.hero
-            : THREE.MathUtils.lerp(DRIFT.hero, DRIFT.desk, ease(pg, TL.pullback)) * (1 - ease(pg, [TL.build[1] - 0.02, TL.build[1]]));   // none once the dive begins
+          const formed = ease(state.compact, [0.5, 0.92]);   // none around the formed ball (Liam, 2026-10-10)
+          const density = (!hero ? DRIFT.hero
+            : THREE.MathUtils.lerp(DRIFT.hero, DRIFT.desk, ease(pg, TL.pullback)) * (1 - ease(pg, [TL.build[1] - 0.02, TL.build[1]]))) * (1 - formed);   // none once the dive begins
           const r = THREE.MathUtils.lerp(chaosR, ballR * 1.05, state.compact);
           const um = field!.material.uniforms;
           // the sand's own grain size (its largest grain x its look's scale x the tier's count scale), typical grain
@@ -790,6 +798,23 @@ export function SandLab() {
             * THREE.MathUtils.lerp((um.uRadScale.value as THREE.Vector2).x, (um.uRadScale.value as THREE.Vector2).y, state.compact);
           // the cursor at full strength on these (Lusion's and Oryzo's loose particles): a warm light, and a push
           drift.update(state.time, reduced || still ? 0 : dt, focus, r, reduced ? density * 0.5 : density, r * 3.5, grainR,
+            pointer.active && !reduced ? cursorWorld : null, dir, 0.45,
+            new THREE.Vector3(...CURSOR_WARM).multiplyScalar(5.0 * cursorI), cam);
+          // the formed ball under the cursor: where the cursor's line of sight meets it, grains come out and go back in
+          // (only while it is sand: from the ball forming until 2.3's build begins)
+          const sandBall = formed > 0.5 && hero && pg < TL.build[0];
+          hoverRay.subVectors(ballC, cam.position);
+          const along = hoverRay.dot(dir);
+          const miss = Math.sqrt(Math.max(hoverRay.lengthSq() - along * along, 0));
+          const over = sandBall && pointer.active && !reduced && along > 0 && miss < ballR * 1.08;
+          hover = damp(hover, over ? 1 : 0, over ? 8 : 4, dt);
+          if (over) {
+            // the near side's point under the cursor, as a direction from the ball's centre
+            const into = Math.sqrt(Math.max(ballR * ballR - miss * miss, 0));
+            burst.burstAt.copy(cam.position).addScaledVector(dir, along - into).sub(ballC).normalize();
+          }
+          burst.burstOn = hover > 0.3;
+          burst.update(state.time, reduced || still ? 0 : dt, ballC, ballR, sandBall ? 1 : 0, ballR * 0.7, grainR,
             pointer.active && !reduced ? cursorWorld : null, dir, 0.45,
             new THREE.Vector3(...CURSOR_WARM).multiplyScalar(5.0 * cursorI), cam);
         }
@@ -807,7 +832,7 @@ export function SandLab() {
         field!.update(state);
       });
       stage.start();
-      (window as unknown as { __sand?: unknown }).__sand = { stage, field, state, glass, drift };   // lab debugging
+      (window as unknown as { __sand?: unknown }).__sand = { stage, field, state, glass, drift, burst };   // lab debugging
     })().catch((err) => {
       setStatus(String(err));
       setFallback(true);

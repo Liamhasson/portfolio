@@ -141,6 +141,17 @@ export class DriftGrains {
   readonly max: number;
   /** The share of grains that leave in streams (the rest stay loose); 0 = all loose, as before the streams. */
   streams = 1 - LOOSE;
+  /**
+   * Burst mode (Liam, 2026-10-10: once the ball has formed, no grains hang around it; under the cursor they come out of
+   * the ball and go back in): every grain is born on the ball's surface near `burstAt` (the direction from the centre
+   * to where the cursor meets the ball), arcs out and sinks back in. A grain only starts a new life while `burstOn`;
+   * otherwise it finishes the one it has (back into the ball) and rests, unseen.
+   */
+  burst = false;
+  burstOn = false;
+  readonly burstAt = new THREE.Vector3(0, 0, 1);
+  private readonly bdir: Float32Array;     // burst: the direction it left the ball by (this life)
+  private readonly live: Uint8Array;       // burst: whether this life is one it was born into (else it rests)
   private readonly pos: Float32Array;
   private readonly vel: Float32Array;
   private readonly rot: Float32Array;
@@ -183,6 +194,8 @@ export class DriftGrains {
     this.seed = new Float32Array(max * 4);
     this.gen = new Float32Array(max).fill(-1);
     this.home = new Float32Array(max * 3);
+    this.bdir = new Float32Array(max * 3);
+    this.live = new Uint8Array(max);
     this.sizes = new Float32Array(max * 2);
     this.flock = new Float32Array(max * 3);
     this.gridNext = new Int32Array(max);
@@ -278,10 +291,28 @@ export class DriftGrains {
       const L = loose ? 10 * (0.7 + 0.6 * s3) : 10 * (0.55 + 0.9 * hk(0));
       // a stream's grains are let go one after another, evenly through its life (a little jitter: not a metronome)
       const cyc = loose ? time / L + s0 * 7 : time / L + hk(1) * 7 + ((i % PER_STREAM) + 0.4 * s0) / PER_STREAM;
-      const life = cyc - Math.floor(cyc), gen = Math.floor(cyc);
+      const bcyc = time / (1.5 * (0.8 + 0.4 * s3)) + s0 * 7;
+      const life = this.burst ? bcyc - Math.floor(bcyc) : cyc - Math.floor(cyc);
+      const gen = this.burst ? Math.floor(bcyc) : Math.floor(cyc);
       const h = (n: number) => { const x = Math.sin((gen + 1) * 12.9898 * (n + 1) + s0 * 78.233 + s1 * 37.719) * 43758.5453; return x - Math.floor(x); };
       let tx: number, ty: number, tz: number;
-      if (loose) {
+      if (this.burst) {
+        // out of the ball near the cursor and back in: a short life, an arc along the surface's normal
+        const o3 = i * 3;
+        if (this.gen[i] !== Math.floor(time / (1.5 * (0.8 + 0.4 * s3)) + s0 * 7)) {
+          // a new life: where it leaves (a spot within ~25 degrees of the cursor's), and whether it's born at all
+          const jx = h(0) - 0.5, jy = h(1) - 0.5, jz = h(2) - 0.5;
+          this.dir.set(this.burstAt.x + jx * 0.9, this.burstAt.y + jy * 0.9, this.burstAt.z + jz * 0.9).normalize();
+          this.bdir[o3] = this.dir.x; this.bdir[o3 + 1] = this.dir.y; this.bdir[o3 + 2] = this.dir.z;
+          this.live[i] = this.burstOn ? 1 : 0;
+        }
+        const bl = 1.5 * (0.8 + 0.4 * s3), bc = time / bl + s0 * 7, bli = bc - Math.floor(bc);
+        const out = travel * (0.35 + 0.65 * h(3)) * Math.sin(Math.PI * bli);
+        const bx = this.bdir[o3], by = this.bdir[o3 + 1], bz = this.bdir[o3 + 2];
+        tx = centre.x + bx * (radius * 0.96 + out);
+        ty = centre.y + by * (radius * 0.96 + out) + out * 0.25;
+        tz = centre.z + bz * (radius * 0.96 + out);
+      } else if (loose) {
         // its path this life: born on the sand's shell (one in ten partway toward the camera: in front of the sand)
         const a = h(0) * Math.PI * 2, b = Math.acos(2 * h(1) - 1), rr = 0.85 + 0.25 * h(2);
         let px = centre.x + Math.sin(b) * Math.cos(a) * radius * rr;
@@ -379,7 +410,9 @@ export class DriftGrains {
         this.q.fromArray(this.rot, i * 4).slerp(this.q2, turn).toArray(this.rot, i * 4);
       }
       // born small, full most of its life, shrinking away at the end (Lusion's life curve)
-      const env = Math.min(life / 0.08, 1) * (1 - Math.min(Math.max((life - 0.55) / 0.45, 0), 1));
+      const env = this.burst
+        ? this.live[i] * Math.min(life / 0.12, 1) * (1 - Math.min(Math.max((life - 0.82) / 0.18, 0), 1))   // up out of it, back in
+        : Math.min(life / 0.08, 1) * (1 - Math.min(Math.max((life - 0.55) / 0.45, 0), 1));
       // the main sand's own grain sizes, and on screen the size they would be at the sand (Liam: never bigger than the
       // grains of the main object): one nearer the lens is smaller, so depth shows as parallax and overlap, not growth
       const toCam = Math.hypot(this.pos[o] - cam.x, this.pos[o + 1] - cam.y, this.pos[o + 2] - cam.z);
