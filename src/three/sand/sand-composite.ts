@@ -106,6 +106,8 @@ export class SandComposite {
       depth.type = THREE.FloatType;
       this.bg = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.UnsignedByteType, samples: 4, depthBuffer: true, depthTexture: depth });
       this.bg.texture.colorSpace = THREE.NoColorSpace;   // the desk writes display values already: stored as they are
+      this.bg.texture.generateMipmaps = true;              // frosted glass reads it blurred, by mip level
+      this.bg.texture.minFilter = THREE.LinearMipmapLinearFilter;
     }
     return this.bg;
   }

@@ -108,7 +108,10 @@ export class SandField {
         uAttBreak: { value: 0 },
         uAttDepth: { value: 0 },
         uAttFull: { value: 0 },
+        uMelt: { value: 0 },
+        uMeltUp: { value: new THREE.Vector3(0, 0, 1) },
         uDrain: { value: 0 },
+        uSinkClear: { value: 0.9 },
         uClearAlb: { value: new THREE.Vector3(0.58, 0.44, 0.36) },   // calibrated with the frost skin (frost-skin.ts)
         uBallRot: { value: this.ballRot },
         uChaosC: { value: this.chaosCentre() },
@@ -224,12 +227,18 @@ export class SandField {
   }
 
   /** 2.2: the current attempt (lo 1 = none; lower = a bigger patch), how broken, how clear; `up` faces the patch. */
-  /** 2.3 build: how far the held attempt's clearing has swept over the whole ball (0..1), and how far the cleared
-   *  grains have drained into the skin (0..1, gone at 1). */
-  setBuild(full: number, drain: number): void {
+  /** 2.3 build: how far the held attempt's clearing has swept over the whole ball (0..1), how far the grains have
+   *  drained into the frost (0..1, gone at 1), and how far the frost has cleared into glass (0..1, a wave). */
+  setBuild(full: number, drain: number, melt: number): void {
     const u = this.material.uniforms;
     u.uAttFull.value = full;
     u.uDrain.value = drain;
+    u.uMelt.value = melt;
+  }
+
+  /** The ball's turn now (object -> world). */
+  get ballRotation(): THREE.Matrix3 {
+    return this.material.uniforms.uBallRot.value as THREE.Matrix3;
   }
 
   setAttempt(lo: number, breakup: number, depth: number, up?: THREE.Vector3): void {

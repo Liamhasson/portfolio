@@ -60,12 +60,19 @@ float snoise(vec3 v) {
  * noise, plus break-up noise when an attempt fails. Fixed in world space, so the grains flow through it as the ball
  * turns. rank ~ the share of the surface below this point (d.up is uniform on a sphere).
  */
+/**
+ * The attempts and the build, on the ball itself: every direction here is in the ball's own frame (it turns with the
+ * ball's spin, the scroll's turn and the roll), so the patches, the frost and the clearing ride the ball.
+ * uAttUp: where the current attempt was born (the side that faced the viewer then), in the ball's frame.
+ */
 export const ATTEMPT_FIELD = /* glsl */ `
 uniform vec3 uAttUp;
 uniform float uAttLo;        // 1 = no attempt; lower = a bigger patch
 uniform float uAttBreak;     // 0..1: the patch fractures into islands
 uniform float uAttDepth;     // 0..1: how clear its centre gets
 uniform float uAttFull;      // 2.3 build: 0..1, the held attempt's clearing sweeps on over the whole ball
+uniform float uMelt;         // 2.3 build: 0..1, the frost clears into glass, a soft wave
+uniform vec3 uMeltUp;        // where the wave starts (the side that faced the viewer when the build began), ball frame
 float attField(vec3 d) {
   float f = dot(d, uAttUp) + 0.22 * (0.5 * snoise(d * 1.7 + vec3(3.0, 0.0, 5.0)));
   f += uAttBreak * 0.55 * (0.5 * snoise(d * 4.2 + vec3(11.0, 2.0, 7.0)));
@@ -77,6 +84,20 @@ float attBand(vec3 d) {
   // the build: a front leaves the patch and runs down to the far side, everything behind it fully clear
   float front = mix(uAttLo + 0.05, -0.35, uAttFull);
   return uAttFull > 0.0 ? max(band, smoothstep(front, front + 0.3, rank)) : band;
+}
+// how far a point of the frost has cleared into glass (0 frost .. 1 glass): a wave that leaves the attempt's centre and
+// runs over the ball, its front uneven (two scales of noise) and soft (no edge, no holes)
+float meltAt(vec3 d) {
+  if (uMelt <= 0.0) return 0.0;
+  if (uMelt >= 1.0) return 1.0;
+  float far = 0.5 - 0.5 * dot(d, uMeltUp);                   // 0 where it starts .. 1 opposite
+  // a gradient broken up by noise in three octaves (the front's outline organic at every scale), then pushed toward
+  // black and white so the two materials meet at a defined front, a narrow soft edge, not a fog
+  float n = far * 0.75 + 0.15 * snoise(d * 1.6 + vec3(1.7, 4.1, 2.9)) + 0.07 * snoise(d * 3.7 + vec3(5.0))
+          + 0.035 * snoise(d * 8.5 + vec3(9.0, 1.0, 3.0));
+  // it starts facing the viewer: the visible side gets most of the scroll, the hidden back clears quickly at the end
+  float front = -0.27 + 1.4 * pow(uMelt, 1.8);
+  return smoothstep(n - 0.05, n + 0.05, front);
 }
 `;
 
@@ -98,6 +119,7 @@ uniform float uDelaySpan;
 uniform float uRampLen;
 uniform vec3 uBallC;
 uniform float uDrain;        // 2.3 build: 0..1, the cleared grains drain into the skin (gone at 1)
+uniform float uSinkClear;    // 2.2: how far the clearest grains of an attempt have drained into its frost
 uniform vec3 uBallVolC;      // the ball the density volume was baked for (the hero's): retargeted balls map into it
 uniform float uBallVolS;     // volume units per world unit (hero radius / this ball's radius)
 uniform float uBallGrain;    // grain size scale for a retargeted ball (its radius / the hero's)
@@ -215,17 +237,21 @@ void main() {
     vec3 rel = p - uBallC;
     float rn = length(rel) / uBallR;
     vec3 dir = rel / max(length(rel), 1e-5);
-    float band = attBand(dir);
+    vec3 dObj = transpose(uBallRot) * dir;                   // the ball's own frame: the field turns with the ball
+    float band = attBand(dObj);
     float clear = pow(band, 1.4) * uAttDepth;
     float pull = clamp(band * 2.5, 0.0, 1.0); pull = pull * pull * (3.0 - 2.0 * pull);
     float rr = rn + (0.997 + 0.03 * hash(aPosB + 7.7) - 0.03 * clear - rn) * pull;
     p = uBallC + dir * rr * uBallR;
     vClear = clear;
     attGrow = 1.0 + 0.7 * clear;
-    // the build: cleared grains sink into the skin one by one (each at its own moment), leaving glass
-    if (uDrain > 0.0) {
-      float when = 0.15 + 0.7 * hash(aPosB + 3.1) + 0.3 * (1.0 - clear);
-      attGrow *= 1.0 - smoothstep(when - 0.15, when, uDrain * 1.15);
+    // the build: the grains sink into the frost one by one (each at its own moment) just ahead of the clearing wave,
+    // so a point is frost when it clears; uDrain carries them under where the wave hasn't reached yet
+    // (and inside an attempt, the clearest grains have already drained into the frost: Blender's attempts clip)
+    float sink = max(max(meltAt(dObj) * 1.6, uDrain), smoothstep(0.45, 1.0, clear) * uSinkClear * (1.0 - uAttFull));   // 2.2 only
+    if (sink > 0.0) {
+      float when = 0.1 + 0.6 * hash(aPosB + 3.1);
+      attGrow *= 1.0 - smoothstep(when - 0.2, when, sink);
     }
   }
 

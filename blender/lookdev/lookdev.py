@@ -1268,7 +1268,8 @@ def build_desk():
         fusing_ball(ball_c, R, lo=lo, hi=1.01, toward=(0, 0, 1) if view == "top" else (0.0, -0.8, 0.6), breakup=brk, depth=dep,
                     dense=True, roll=BALL_ROLL)    # an attempt: clarity sweeping out from the core
     else:
-        s = glass_sphere(R); s.location = ball_c      # it holds: glass, resting on the desk
+        fc = os.environ.get("FROST_CLEAR")              # 2.3 references: Blender's frost glass at a uniform clearness
+        s = glass_sphere(R, clear_fn=(lambda d: np.full(len(d), float(fc), np.float32)) if fc else None); s.location = ball_c   # it holds: glass, resting on the desk
     MOVE_CTX["ball"] = [o for o in bpy.data.objects if o not in before]; MOVE_CTX["ball_c"] = ball_c   # the camera moves carry these
     # The laptop is on the desk in every view: shut in steps 1 and 2, it opens in step 3 ("And I build it").
     laptop((0.27, 0.04, 0.0), math.radians(-24), open_deg=MOVE_CTX.get("open", 108 if view == "side" else 0))

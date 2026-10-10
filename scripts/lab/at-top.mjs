@@ -13,7 +13,12 @@ await page.addStyleTag({ content: "nextjs-portal,nav,[data-testid=hero-overlay]{
 await page.mouse.move(959, 599);
 for (const f of frames) {
   const p = 0.71 + ((f - 1) / 143) * 0.26;
-  await page.evaluate((p) => window.scrollTo(0, p * (document.documentElement.scrollHeight - innerHeight)), p);
+  // sand-lab.tsx: progress is in units of the first 1600vh of scroll (PROGRESS_SCALE = (PAGE_VH - 100) / 1600)
+  await page.evaluate((p) => {
+    const max = document.documentElement.scrollHeight - innerHeight;
+    const scale = ((document.documentElement.scrollHeight / innerHeight) * 100 - 100) / 1600;
+    window.scrollTo(0, (p / scale) * max);
+  }, p);
   await page.waitForTimeout(3500);
   for (const [i, l] of looks.entries()) {
     await page.evaluate((l) => window.__frost(l), l);
