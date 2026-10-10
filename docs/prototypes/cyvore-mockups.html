@@ -140,7 +140,7 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
 /* one light source, behind the product (Raycast reference) */
 .tray::before { content: ""; position: absolute; left: 50%; top: 58%; width: calc(var(--u) * 1100); height: calc(var(--u) * 520); transform: translate(-50%, -50%); background: radial-gradient(closest-side, rgba(138,56,245,.38), rgba(138,56,245,0)); pointer-events: none; }
 /* the recording sits on pure black; lighten lets that black drop out so the glow shows through */
-.tray video, .m-tray video, .mission video, .attack video { mix-blend-mode: lighten; }
+.tray video, .m-tray video, .cta-clip video, .attack video { mix-blend-mode: lighten; }
 .tray video { position: absolute; left: calc(var(--u) * 56); top: calc(var(--u) * 46); width: calc(var(--u) * 1184); height: auto; }
 
 /* ------------------------------ 2 at a glance ------------------------------ */
@@ -271,9 +271,8 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
 
 /* ------------------------------ 5 how it works ------------------------------ */
 .how { padding: calc(var(--u) * 112) 0 calc(var(--u) * 104); }
-.mission { position: relative; margin: calc(var(--u) * 64) calc(var(--u) * 72) 0; border-radius: calc(var(--u) * 24); background: var(--panel); padding: calc(var(--u) * 40) calc(var(--u) * 56); box-shadow: inset 0 0 0 calc(var(--u) * 1) var(--hair); }
-.mission video { display: block; width: 100%; height: auto; }
-.mission-cap { display: flex; justify-content: space-between; margin-top: calc(var(--u) * 20); }
+.cta-clip { position: relative; margin: calc(var(--u) * 56) calc(var(--u) * 72) 0; border-radius: calc(var(--u) * 24); background: var(--panel); padding: calc(var(--u) * 28); box-shadow: inset 0 0 0 calc(var(--u) * 1) var(--hair); overflow: hidden; }
+.cta-clip video { display: block; width: 100%; height: auto; border-radius: calc(var(--u) * 12); mix-blend-mode: lighten; }
 .ds { display: grid; grid-template-columns: calc(var(--u) * 380) 1fr calc(var(--u) * 480); gap: calc(var(--u) * 24); margin: calc(var(--u) * 24) calc(var(--u) * 72) 0; }
 .ds > div { border-radius: calc(var(--u) * 20); background: var(--panel); box-shadow: inset 0 0 0 calc(var(--u) * 1) var(--hair); padding: calc(var(--u) * 28) calc(var(--u) * 28) calc(var(--u) * 30); }
 .ds .label { margin-bottom: calc(var(--u) * 22); }
@@ -643,16 +642,15 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
 
 <!-- ============================== 5 HOW IT WORKS ============================== -->
 <section class="block">
-  <div class="cap"><span><b>05 · How it works</b> — the mission animation, then the design system as one strip (rebuilt, so "Main CFA" reads "Main CTA")</span><span>~1.9 screens · 1440 × ~1700</span></div>
+  <div class="cap"><span><b>05 · How it works</b> — the shipped motion (the main CTA), then the design system as one strip; the attack now plays in the story</span><span>~1.1 screens · 1440 × ~1000</span></div>
   <div class="frame"><div class="f how">
     <div class="fold" style="top:calc(var(--u) * 900)"><span>900</span></div>
     <div class="g12" style="align-items:end">
       <h2 class="title" style="grid-column:1/7;margin-left:calc(var(--u) * -3)">How it works</h2>
       <p class="body" style="grid-column:8/13"><span class="lead">Motion with a job.</span> Every animation carries the founder from one answer to the next. A 7-second sequence tells the product's mission: a phishing link lands in a video call, and Cyvore blocks it.</p>
     </div>
-    <div class="mission">
-      <video data-inview src="cyvore-mockups/mission.mp4" poster="cyvore-mockups/mission-poster.jpg" muted loop playsinline aria-label="A phishing link lands in a video call; the security bot flags it and Cyvore blocks it"></video>
-      <div class="mission-cap"><span class="label">The mission, in 7 seconds</span><span class="label">Shipped on the site, the full video one click away</span></div>
+    <div class="cta-clip">
+      <video data-inview src="cyvore-mockups/cta-hover.mp4" poster="cyvore-mockups/cta-hover-poster.jpg" muted loop playsinline aria-label="The main call to action on the shipped site: it glows after a delay, ripples on hover, fills on press"></video>
     </div>
     <div class="g12" style="margin-top:calc(var(--u) * 64)">
       <p class="body" style="grid-column:1/7">The design system behind it: type, colour tokens and component states.</p>

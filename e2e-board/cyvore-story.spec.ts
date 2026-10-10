@@ -216,7 +216,7 @@ test.describe("attack and engines", () => {
     await page.waitForFunction(() => (window as any).__cyvoreStories?.desktop);
     await page.waitForFunction(() => {
       const v = document.querySelector('.story[data-story="desktop"] [data-chapter="attack"] video') as HTMLVideoElement;
-      return v.dataset.scrub === "ready" && v.readyState >= 1;
+      return v.dataset.scrub === "ready" && v.readyState >= 2;
     });
   });
 
@@ -234,6 +234,27 @@ test.describe("attack and engines", () => {
     expect(mid.t).toBeGreaterThan(3.5);
     expect(mid.caption).toBe(1);
     expect((await at(0.95)).caption).toBe(2);
+  });
+
+  test("the scrubbed frame is actually painted, not a black stage", async ({ page }) => {
+    await story(page).go(9, 0.9);
+    await page.waitForTimeout(800);
+    const png = await page.locator('.story[data-story="desktop"] [data-chapter="attack"] .attack').screenshot();
+    const mean = await page.evaluate(async (b64) => {
+      const img = new Image();
+      img.src = "data:image/png;base64," + b64;
+      await img.decode();
+      const c = document.createElement("canvas");
+      c.width = img.width; c.height = img.height;
+      const ctx = c.getContext("2d")!;
+      ctx.drawImage(img, 0, 0);
+      const d = ctx.getImageData(0, 0, c.width, c.height).data;
+      let sum = 0;
+      for (let i = 0; i < d.length; i += 4) sum += (d[i] + d[i + 1] + d[i + 2]) / 3;
+      return sum / (d.length / 4);
+    }, png.toString("base64"));
+    // The empty stage is ~8; the BLOCK frame of the Zoom call averages well above 15.
+    expect(mean).toBeGreaterThan(15);
   });
 
   test("What powers us draws its diagram and lights the three engines in turn", async ({ page }) => {
@@ -306,5 +327,41 @@ test.describe("phone", () => {
     const frame = await page.$eval('.story[data-story="phone"]', (el) => el.closest(".frame")!.getBoundingClientRect().width / 390);
     expect(tabs).toHaveLength(4);
     for (const h of tabs) expect(h / frame).toBeGreaterThanOrEqual(44);
+  });
+});
+
+test.describe("page", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/cyvore-mockups.html", { waitUntil: "load" });
+    await page.waitForFunction(() => (window as any).__cyvoreStories?.desktop);
+  });
+
+  test("How it works no longer repeats the attack video; it shows the shipped CTA motion", async ({ page }) => {
+    const how = page.locator(".f.how");
+    await expect(how.locator(".mission")).toHaveCount(0);
+    await expect(how.locator('video[src$="cta-hover.mp4"]')).toHaveCount(1);
+    await expect(how).toContainText("Motion with a job.");
+    await expect(how).toContainText("A 7-second sequence tells the product's mission: a phishing link lands in a video call, and Cyvore blocks it.");
+    await expect(how.locator(".ds")).toHaveCount(1);
+  });
+
+  test("what is seen stays within 8 screens (pinned scroll not counted)", async ({ page }) => {
+    const screens = await page.evaluate(() => {
+      const frames = [...document.querySelectorAll(".f")].filter((f) => !f.classList.contains("m") && !f.classList.contains("demo"));
+      const u = frames[0].getBoundingClientRect().width / 1440;
+      const track = document.querySelector('.story[data-story="desktop"] .story-track') as HTMLElement;
+      const pin = document.querySelector('.story[data-story="desktop"] .story-pin') as HTMLElement;
+      const total = frames.reduce((s, f) => s + f.getBoundingClientRect().height, 0) - (track.offsetHeight - pin.offsetHeight);
+      return total / (900 * u);
+    });
+    expect(screens).toBeLessThanOrEqual(8);
+  });
+
+  test("no console errors while the whole story plays", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+    for (let b = 0; b < 12; b++) await story(page).go(b);
+    expect(errors).toEqual([]);
   });
 });

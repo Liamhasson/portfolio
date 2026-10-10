@@ -188,8 +188,10 @@ export function mountStory(story, name) {
     fill = setBar(site, b, within);
     if (BEATS[b].kind === "scrub") {
       const t = scrubTime(within, video.duration);
-      if (video.readyState >= 1 && Math.abs(video.currentTime - t) > 0.03) video.currentTime = t;
-      setCaption(video.readyState >= 1 ? captionAt(t) : -1);
+      // Seek only once a frame is decoded (HAVE_CURRENT_DATA): seeking at metadata-only can
+      // leave the stage unpainted in some Chromium builds.
+      if (video.readyState >= 2 && Math.abs(video.currentTime - t) > 0.03) video.currentTime = t;
+      setCaption(video.readyState >= 2 ? captionAt(t) : -1);
     }
   };
 
@@ -201,7 +203,7 @@ export function mountStory(story, name) {
     onRefreshInit: layout,
     onUpdate: (self) => update(self.progress, self.direction),
   });
-  video.addEventListener("loadedmetadata", () => update(st.progress, 0));
+  video.addEventListener("loadeddata", () => update(st.progress, 0));
   // Scrubbing needs the whole clip in memory: a blob URL seeks instantly on any host,
   // including servers without byte-range support. Skipped if the source was changed meanwhile.
   const original = video.getAttribute("src");
@@ -209,7 +211,7 @@ export function mountStory(story, name) {
     .then((r) => r.blob())
     .then((blob) => {
       if (video.getAttribute("src") !== original) return;
-      video.addEventListener("loadedmetadata", () => { video.dataset.scrub = "ready"; }, { once: true });
+      video.addEventListener("loadeddata", () => { video.dataset.scrub = "ready"; }, { once: true });
       video.src = URL.createObjectURL(blob);
     })
     .catch(() => {});
