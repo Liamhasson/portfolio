@@ -27,7 +27,7 @@ describe("revealAt (the index's first reveal on the laptop screen)", () => {
   });
   test("the rows surface in turn", () => {
     const f = revealAt(1.2);   // every row has started, the first furthest along
-    const rows = f.elements.filter((_, i) => REVEAL.elements[i].name.startsWith("row"));
+    const rows = f.elements.filter((_, i) => REVEAL.elements[i].name.startsWith("card"));
     for (let i = 1; i < rows.length; i++) expect(rows[i].opacity).toBeLessThan(rows[i - 1].opacity);
   });
   test("ends on the finished index at full light", () => {

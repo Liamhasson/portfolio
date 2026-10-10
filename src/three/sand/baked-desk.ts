@@ -407,6 +407,7 @@ function withBlenderView(material: THREE.Material, lut: THREE.Data3DTexture, ope
 }
 
 const REV_N = REVEAL.elements.length;
+const MED_N = REVEAL.media.length;
 
 /**
  * The laptop screen plays the index's first reveal: drawn from the finished index (the still), each animated element
@@ -421,12 +422,23 @@ function withScreenReveal(material: THREE.Material, u: Record<string, THREE.IUni
     Object.assign(shader.uniforms, u);
     shader.fragmentShader =
       `uniform vec4 uRevBox[${REV_N}];\nuniform vec3 uRevAnim[${REV_N}];\nuniform float uRevWake;\nuniform vec3 uRevBg;\n` +
+      `uniform vec4 uMedBox[${MED_N}];\nuniform float uMedOn[${MED_N}];\n` +
+      Array.from({ length: MED_N }, (_, i) => `uniform sampler2D uMed${i};\n`).join("") +
       shader.fragmentShader.replace(
+        // the screen at a point: the still, or a card's loop where it plays (sharp: the blur of the reveal is the still's)
+        "void main() {",
+        `vec3 screenAt(vec2 uv, float lod) {
+        vec3 c = textureLod(emissiveMap, uv, lod).rgb;
+        ${Array.from({ length: MED_N }, (_, i) => `if (uMedOn[${i}] > 0.0 && all(greaterThanEqual(uv, uMedBox[${i}].xy)) && all(lessThan(uv, uMedBox[${i}].zw)))
+          c = mix(c, texture(uMed${i}, (uv - uMedBox[${i}].xy) / (uMedBox[${i}].zw - uMedBox[${i}].xy)).rgb, uMedOn[${i}] * (1.0 - smoothstep(1.0, 3.0, lod)));`).join("\n        ")}
+        return c;
+      }\n` + "void main() {",
+      ).replace(
         "#include <emissivemap_fragment>",
         `#ifdef USE_EMISSIVEMAP
         {
           vec2 suv = vEmissiveMapUv;
-          vec3 col = texture2D(emissiveMap, suv).rgb;
+          vec3 col = screenAt(suv, 0.0);
           // the footprint the hardware would pick (texels), so a blurred read is never sharper than a plain one
           vec2 tsz = vec2(textureSize(emissiveMap, 0));
           vec2 ddx = dFdx(suv * tsz), ddy = dFdy(suv * tsz);
@@ -442,7 +454,7 @@ function withScreenReveal(material: THREE.Material, u: Record<string, THREE.IUni
             vec2 src = suv - vec2(0.0, a.y);
             if (any(lessThan(src, b.xy)) || any(greaterThanEqual(src, b.zw))) continue;
             float lod = log2(max(max(foot, a.z * 3.46), 1.0));
-            col += a.x * (textureLod(emissiveMap, src, lod).rgb - uRevBg);
+            col += a.x * (screenAt(src, lod) - uRevBg);
           }
           totalEmissiveRadiance *= col * (1.0 - uRevWake);
         }
@@ -513,6 +525,9 @@ export class BakedDesk {
     return { lamp: { pos: lamp.light.getWorldPosition(new THREE.Vector3()), radius: r * this.heroPerMetre, radiance: lampRad }, rects };
   }
   screen: { material: THREE.MeshPhysicalMaterial; emission: number; reveal: Record<string, THREE.IUniform> } | null = null;
+  /** The cards' loops on the screen (played while it is awake). */
+  media: HTMLVideoElement[] = [];
+  private mediaPlaying = false;
   /** The lid on its hinge; its rectangle and the screen's, as corners (origin, along U, along V) in the pivot's frame. */
   private lid: { pivot: THREE.Object3D; q0: THREE.Quaternion; bakedDeg: number; corners: THREE.Vector3[]; screen: THREE.Vector3[] | null } | null = null;
   private readonly tmp = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
@@ -587,6 +602,14 @@ export class BakedDesk {
     if (!this.screen) return;
     const u = this.screen.reveal;
     u.uRevWake.value = f ? f.wake : 1;
+    // the loops play only while the screen is awake (no decoding for a dark screen)
+    const play = !!f && f.wake < 0.999;
+    if (play !== this.mediaPlaying) {
+      this.mediaPlaying = play;
+      for (const v of this.media) {
+        if (play) v.play().catch(() => {}); else v.pause();
+      }
+    }
     // what the deck and keys mirror of it: the finished index at the reveal's light
     VIEW.uScrGain.value = f ? this.screen.emission * f.light : 0;
     if (!f) return;
@@ -676,7 +699,24 @@ export class BakedDesk {
         });
         withBlenderView(mat, lut);
         withExactFresnel(mat, etaForLevel(0.02));   // Blender: black glass, Specular IOR Level 0.02
+        // the cards' loops, playing on the screen once it wakes (videos muted, inline: allowed to autoplay)
+        const media = REVEAL.media.map((m) => {
+          if (!m.src) return null;
+          const v = document.createElement("video");
+          v.src = m.src; v.muted = true; v.loop = true; v.playsInline = true; v.preload = "auto"; v.crossOrigin = "anonymous";
+          const t = new THREE.VideoTexture(v);
+          t.colorSpace = THREE.SRGBColorSpace;
+          t.flipY = false;   // the screen's UVs run top-down (glTF), as the still's
+          return { video: v, texture: t };
+        });
+        d.media = media.filter((m): m is { video: HTMLVideoElement; texture: THREE.VideoTexture } => !!m).map((m) => m.video);
+        // the live index starts its own copies in step with these (a seamless handover): found by their source
+        (window as unknown as { __screenMedia?: Record<string, HTMLVideoElement> }).__screenMedia =
+          Object.fromEntries(d.media.map((v) => [v.getAttribute("src") ?? "", v]));
         const reveal = {
+          uMedBox: { value: REVEAL.media.map((m) => new THREE.Vector4(m.box[0], m.box[1], m.box[2], m.box[3])) },
+          uMedOn: { value: REVEAL.media.map((m) => (m.src ? 1 : 0)) },
+          ...Object.fromEntries(REVEAL.media.map((_, i) => [`uMed${i}`, { value: media[i]?.texture ?? null }])),
           uRevBox: { value: REVEAL.elements.map((e) => new THREE.Vector4(e.box[0], e.box[1], e.box[2], e.box[3])) },
           uRevAnim: { value: REVEAL.elements.map(() => new THREE.Vector3(0, 0, 0)) },
           uRevWake: { value: 1 },

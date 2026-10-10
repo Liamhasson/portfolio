@@ -22,6 +22,8 @@ export const REVEAL = layout as {
   surface: { duration: number; ease: number[]; rise: number; blur_px: number; width_px: number };
   wake: { duration: number; ease: number[] };
   elements: RevealElement[];
+  /** Each card's media area (screen 0..1, y down) and its loop (null: a still). */
+  media: { box: number[]; src: string | null }[];
   background_light: number;
 };
 

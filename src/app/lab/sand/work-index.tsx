@@ -13,13 +13,13 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { matrix3d, type Pt } from "@/three/sand/homography";
 
-/** The three finished projects open their case studies; Nordic Logic and the stub have none yet (in progress). */
-const ROWS: { n: string; name: string; kind: string; line: string; href?: string; soon?: boolean }[] = [
-  { n: "01", name: "Eventread", kind: "SaaS web app", line: "The check every booker skips.", href: "/eventread" },
-  { n: "02", name: "Cyvore", kind: "B2B website", line: "A cybersecurity startup needed a site investors would believe in.", href: "/cyvore" },
-  { n: "03", name: "Pulse", kind: "Fitness app", line: "A goal-focused fitness app designed around four retention milestones.", href: "/pulse" },
-  { n: "04", name: "Nordic Logic", kind: "B2B website", line: "A carrier invoice audit startup that needed to build trust without any social proof or clients." },
-  { n: "05", name: "Stub", kind: "", line: "Coming soon", soon: true },
+/** The projects (copy and tags from the approved plan and the current portfolio). The three finished ones open their
+ *  case studies; Nordic Logic is in progress (a still, not a link). */
+const CARDS: { n: string; name: string; tags: string[]; line: string; href?: string; video?: string; poster: string; progress?: boolean }[] = [
+  { n: "01", name: "Eventread", tags: ["SaaS web app", "Designer-builder"], line: "The check every booker skips.", href: "/eventread", video: "/work/eventread", poster: "/work/eventread.jpg" },
+  { n: "02", name: "Cyvore", tags: ["B2B website", "Information architecture"], line: "A cybersecurity startup needed a site investors would believe in.", href: "/cyvore", video: "/work/cyvore", poster: "/work/cyvore.jpg" },
+  { n: "03", name: "Pulse", tags: ["Fitness app", "User research"], line: "A goal-focused fitness app designed around four retention milestones.", href: "/pulse", video: "/work/pulse", poster: "/work/pulse.jpg" },
+  { n: "04", name: "Nordic Logic", tags: ["B2B website", "Design system"], line: "A carrier invoice audit startup that needed to build trust without any social proof or clients.", poster: "/work/nordic-logic.jpg", progress: true },
 ];
 
 export interface WorkIndexHandle {
@@ -38,67 +38,91 @@ export interface WorkIndexHandle {
 }
 
 const CSS = `
-.wi { --bg:#0a0a0b; --ink:#f4f1ee; --dim:rgba(244,241,238,.38); --rule:rgba(244,241,238,.14);
+.wi { --bg:#0a0a0b; --ink:#f4f1ee; --dim:rgba(244,241,238,.42); --rule:rgba(244,241,238,.14);
   position:fixed; left:0; top:0; transform-origin:0 0; background:var(--bg); color:var(--ink); font-family:var(--font-sans);
   overflow:hidden; container-type:inline-size; will-change:transform,opacity; line-height:normal; }
-.wi .top { position:absolute; left:3.6cqw; right:3.6cqw; top:3.4cqw; display:flex; justify-content:space-between; align-items:flex-end; }
+.wi .page { position:absolute; inset:0; overflow-y:auto; scrollbar-width:none; overscroll-behavior:contain; }
+.wi .page::-webkit-scrollbar { display:none; }
+.wi .top { padding:3.4cqw 3.6cqw 0; }
 .wi .title { font-size:4.8cqw; font-weight:400; line-height:.98; letter-spacing:-.02em; margin:0; }
-.wi .rows { position:absolute; left:3.6cqw; right:3.6cqw; top:15.5cqw; border-top:1px solid var(--rule); margin:0; padding:0; list-style:none; }
-.wi .row { display:grid; grid-template-columns:7cqw 1fr 38cqw; align-items:baseline; padding:1.75cqw 0 1.95cqw; border-bottom:1px solid var(--rule); color:inherit; }
-.wi .row .n { font:400 1.15cqw/1 var(--font-mono); letter-spacing:.04em; }
-.wi .row .name { font-size:2.15cqw; font-weight:400; }
-.wi .row .name small { font-size:1.2cqw; margin-left:1.2cqw; letter-spacing:.02em; opacity:.8; }
-.wi .row .line { font-size:1.55cqw; line-height:1.35; }
-.wi .row.soon .line { font:400 1.15cqw/1.4 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; }
-.wi a.row, .wl a.row { text-decoration:none; color:inherit; }
-.wi li, .wl li { color:var(--dim); transition:color .35s cubic-bezier(.22,1,.36,1); }
-.wi li.on, .wl li.on { color:var(--ink); }
-.wi a.row:focus-visible, .wl a.row:focus-visible { outline:1px solid var(--ink); outline-offset:4px; }
+.wi .grid { display:grid; grid-template-columns:1fr 1fr; gap:3.2cqw 2.4cqw; padding:3.4cqw 3.6cqw 0; margin:0; list-style:none; }
+.wi .card, .wl .card { display:block; color:inherit; text-decoration:none; }
+.wi .media, .wl .media { position:relative; aspect-ratio:16/10; overflow:hidden; background:#151517; }
+.wi .media { border-radius:.8cqw; }
+.wl .media { border-radius:10px; }
+.wi .media video, .wi .media img, .wl .media video, .wl .media img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transition:transform .9s cubic-bezier(.22,1,.36,1); }
+.wi .card:hover .media video, .wi .card:hover .media img, .wi .card:focus-visible .media video { transform:scale(1.035); }
+.wi .card:focus-visible, .wl .card:focus-visible { outline:1px solid var(--ink); outline-offset:6px; border-radius:4px; }
+.wi .tag, .wl .tag { position:absolute; left:1.2cqw; top:1.2cqw; font:500 .85cqw/1 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; color:var(--ink); background:rgba(10,10,11,.72); border-radius:999px; padding:.55cqw .9cqw; }
+.wi .meta { display:flex; gap:.9cqw; margin-top:1.3cqw; font:400 .85cqw/1.2 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; color:var(--dim); }
+.wi .meta .n, .wl .meta .n { color:var(--ink); }
+.wi .name { font-size:2.15cqw; font-weight:400; letter-spacing:-.01em; margin:.7cqw 0 0; }
+.wi .line { font-size:1.3cqw; line-height:1.35; color:var(--dim); margin:.5cqw 0 0; max-width:36cqw; }
+.wi .more { margin:3.6cqw 3.6cqw 3.4cqw; padding-top:1.6cqw; border-top:1px solid var(--rule); display:flex; gap:.9cqw; font:400 .85cqw/1 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; color:var(--dim); }
+.wi .more .n, .wl .more .n { color:var(--ink); }
 .wi-panel { position:fixed; left:0; top:0; background:#0a0a0b; pointer-events:none; transform-origin:0 0; }
-.wl { --ink:#f4f1ee; --dim:rgba(244,241,238,.38); --rule:rgba(244,241,238,.14);
+.wl { --ink:#f4f1ee; --dim:rgba(244,241,238,.42); --rule:rgba(244,241,238,.14);
   position:fixed; inset:0; color:var(--ink); font-family:var(--font-sans); line-height:normal;
-  padding:clamp(88px,22vw,120px) 4.9vw 32px; overflow-y:auto; }
-.wl .title { font-size:clamp(34px,10vw,44px); font-weight:400; line-height:1; letter-spacing:-.02em; margin:0 0 28px; }
-.wl .rows { margin:0; padding:0; list-style:none; border-top:1px solid var(--rule); }
-.wl .row { display:grid; grid-template-columns:44px 1fr; row-gap:6px; padding:16px 0 18px; border-bottom:1px solid var(--rule);
-  color:inherit; }
-.wl .row .n { font:400 11px/1 var(--font-mono); letter-spacing:.04em; padding-top:6px; }
-.wl .row .name { font-size:20px; font-weight:400; }
-.wl .row .name small { font-size:12px; margin-left:10px; letter-spacing:.02em; opacity:.8; }
-.wl .row .line { grid-column:2; font-size:15px; line-height:1.35; }
-.wl .row.soon .line { font:400 11px/1.4 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; }
+  padding:clamp(88px,22vw,120px) 4.9vw 32px; overflow-y:auto; overscroll-behavior:contain; }
+.wl .title { font-size:clamp(34px,10vw,44px); font-weight:400; line-height:1; letter-spacing:-.02em; margin:0 0 24px; }
+.wl .grid { display:grid; gap:32px; margin:0; padding:0; list-style:none; }
+.wl .tag { left:10px; top:10px; font-size:10px; padding:6px 9px; }
+.wl .meta { display:flex; gap:8px; margin-top:12px; font:400 10px/1.2 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; color:var(--dim); }
+.wl .name { font-size:22px; font-weight:400; margin:6px 0 0; }
+.wl .line { font-size:15px; line-height:1.35; color:var(--dim); margin:4px 0 0; }
+.wl .more { margin-top:32px; padding-top:14px; border-top:1px solid var(--rule); display:flex; gap:8px; font:400 10px/1 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; color:var(--dim); }
 `;
 
-function Rows({ active, onActive, rowRef }: { active: number; onActive: (i: number) => void; rowRef?: (el: HTMLElement | null, i: number) => void }) {
+function Media({ c, playing }: { c: (typeof CARDS)[number]; playing: boolean }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    if (playing) {
+      // in step with the same loop on the laptop screen, so the handover shows one picture
+      const twin = (window as unknown as { __screenMedia?: Record<string, HTMLVideoElement> }).__screenMedia?.[`${c.video}.mp4`];
+      if (twin && twin.readyState > 0) v.currentTime = twin.currentTime;
+      v.play().catch(() => {});
+    } else v.pause();
+  }, [playing, c.video]);
   return (
-    <ol className="rows">
-      {ROWS.map((r, i) => {
-        const cells = (
-          <>
-            <span className="n">{r.n}</span>
-            <span className="name">{r.name}{r.kind && <small>{r.kind}</small>}</span>
-            <span className="line">{r.line}</span>
-          </>
-        );
-        const cls = `row${r.soon ? " soon" : ""}`;
-        return (
-          // the row lights where the pointer is (or the finger lands); a project with a case study opens it
-          <li
-            key={r.n}
-            ref={rowRef ? (el) => rowRef(el, i) : undefined}
-            className={i === active ? "on" : undefined}
-            onPointerEnter={() => onActive(i)}
-            onPointerDown={() => onActive(i)}
-          >
-            {r.href ? (
-              <Link href={r.href} className={cls} onFocus={() => onActive(i)}>{cells}</Link>
-            ) : (
-              <div className={cls}>{cells}</div>
-            )}
-          </li>
-        );
-      })}
-    </ol>
+    <div className="media">
+      {c.video ? (
+        <video ref={ref} poster={c.poster} muted loop playsInline preload="metadata" aria-hidden>
+          <source src={`${c.video}.webm`} type="video/webm; codecs=av01.0.05M.08" />
+          <source src={`${c.video}.mp4`} type="video/mp4" />
+        </video>
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element -- a still inside a transformed layer (no layout shift)
+        <img src={c.poster} alt="" />
+      )}
+      {c.progress && <span className="tag">In progress</span>}
+    </div>
+  );
+}
+
+function Cards({ playing, itemRef }: { playing: boolean; itemRef?: (el: HTMLElement | null, i: number) => void }) {
+  return (
+    <>
+      <ol className="grid">
+        {CARDS.map((c, i) => {
+          const inner = (
+            <>
+              <Media c={c} playing={playing} />
+              <div className="meta"><span className="n">{c.n}</span>{c.tags.flatMap((t, k) => (k ? [<span key={`d${k}`}>·</span>, <span key={t}>{t}</span>] : [<span key={t}>{t}</span>]))}</div>
+              <h3 className="name">{c.name}</h3>
+              <p className="line">{c.line}</p>
+            </>
+          );
+          return (
+            <li key={c.n} ref={itemRef ? (el) => itemRef(el, i) : undefined}>
+              {c.href ? <Link href={c.href} className="card">{inner}</Link> : <div className="card" aria-label={`${c.name}, in progress`}>{inner}</div>}
+            </li>
+          );
+        })}
+      </ol>
+      <div className="more" ref={itemRef ? (el) => itemRef(el, CARDS.length) : undefined}><span className="n">05</span><span>More coming soon</span></div>
+    </>
   );
 }
 
@@ -107,7 +131,7 @@ export function WorkIndex({ bind }: { bind: (h: WorkIndexHandle) => void }) {
   const panelEl = useRef<HTMLDivElement>(null);
   const listEl = useRef<HTMLDivElement>(null);
   const listItems = useRef<(HTMLElement | null)[]>([]);
-  const [active, setActive] = useState(0);
+  const [playing, setPlaying] = useState({ wide: false, list: false });
   useEffect(() => {
     const sz = () => ({ w: window.innerWidth, h: window.innerWidth / 1.6 });
     const apply = () => {
@@ -127,6 +151,8 @@ export function WorkIndex({ bind }: { bind: (h: WorkIndexHandle) => void }) {
         if (!el) return;
         el.style.opacity = String(opacity);
         el.style.visibility = opacity > 0.001 ? "visible" : "hidden";
+        const on = opacity > 0.001;
+        setPlaying((p) => (p.wide === on ? p : { ...p, wide: on }));
       },
       panel(rect) {
         const el = panelEl.current;
@@ -138,7 +164,9 @@ export function WorkIndex({ bind }: { bind: (h: WorkIndexHandle) => void }) {
         const el = listEl.current;
         if (!el) return;
         el.style.visibility = progress > 0.001 ? "visible" : "hidden";
-        // the title, then each row, rising from 16px below, unblurring (the screen's wake reveal, on scroll)
+        const on = progress > 0.001;
+        setPlaying((p) => (p.list === on ? p : { ...p, list: on }));
+        // the title, then each card, rising from 16px below, unblurring (the screen's wake reveal, on scroll)
         const items = [el.querySelector<HTMLElement>(".title"), ...listItems.current];
         items.forEach((it, i) => {
           if (!it) return;
@@ -163,14 +191,16 @@ export function WorkIndex({ bind }: { bind: (h: WorkIndexHandle) => void }) {
       <style>{CSS}</style>
       <div ref={panelEl} className="wi-panel z-[5] h-screen w-screen" style={{ visibility: "hidden" }} aria-hidden />
       <section ref={box} className="wi z-[6]" style={{ opacity: 0, visibility: "hidden", pointerEvents: "none" }} aria-label="Selected work">
-        <div className="top">
-          <h2 className="title">Selected work</h2>
+        <div className="page">
+          <div className="top">
+            <h2 className="title">Selected work</h2>
+          </div>
+          <Cards playing={playing.wide} />
         </div>
-        <Rows active={active} onActive={setActive} />
       </section>
       <section ref={listEl} className="wl z-[7]" style={{ visibility: "hidden", pointerEvents: "none" }} aria-label="Selected work">
         <h2 className="title" style={{ opacity: 0 }}>Selected work</h2>
-        <Rows active={active} onActive={setActive} rowRef={(el, i) => { listItems.current[i] = el; if (el && !el.style.opacity) el.style.opacity = "0"; }} />
+        <Cards playing={playing.list} itemRef={(el, i) => { listItems.current[i] = el; if (el && !el.style.opacity) el.style.opacity = "0"; }} />
       </section>
     </>
   );

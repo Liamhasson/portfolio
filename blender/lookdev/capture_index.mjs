@@ -11,11 +11,14 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");
 mkdirSync(join(here, "textures-local"), { recursive: true });
 
-const browser = await chromium.launch();
+const browser = await chromium.launch({ args: ["--autoplay-policy=no-user-gesture-required"] });
 const page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 2 });
 await page.goto(pathToFileURL(join(root, "docs/prototypes/work-index.html")).href + "#still");
 await page.evaluate(() => document.fonts.ready);
 await page.addStyleTag({ content: ".replay{display:none!important} .wake{display:none!important}" });
+// the cards' media at their posters (the site plays the loops over them)
+await page.evaluate(() => Promise.all([...document.querySelectorAll("video")].map((v) => { v.pause(); v.removeAttribute("autoplay"); v.load(); return new Promise((r) => { v.addEventListener("loadeddata", r, { once: true }); setTimeout(r, 4000); }); })));
+await page.waitForTimeout(500);
 const still = join(here, "textures-local", "work-index-screen.png");
 await page.screenshot({ path: still, clip: { x: 0, y: 0, width: 1600, height: 1000 } });
 
@@ -29,8 +32,14 @@ const layout = await page.evaluate(async (src) => {
   };
   const els = [
     { name: "title", el: document.querySelector(".title"), delay: 0.2 },
-    ...[...document.querySelectorAll(".row")].map((el, i) => ({ name: `row${i + 1}`, el, delay: 0.55 + 0.13 * i })),
+    ...[...document.querySelectorAll("li .card")].map((el, i) => ({ name: `card${i + 1}`, el, delay: 0.45 + 0.13 * i })),
+    { name: "more", el: document.querySelector(".more"), delay: 0.97 },
   ];
+  // where each card's media sits (the loops play there), and its source
+  const media = [...document.querySelectorAll("li .card .media")].map((m) => {
+    const v = m.querySelector("video");
+    return { box: box(m).map((x) => +x.toFixed(5)), src: v ? v.getAttribute("src").replace(/^.*public/, "") : null };
+  });
   const img = new Image();
   img.src = src;
   await img.decode();
@@ -47,11 +56,12 @@ const layout = await page.evaluate(async (src) => {
   const out = els.map(({ name, el, delay }) => {
     const b = box(el);
     let sum = 0;
-    for (let y = Math.floor(b[1] * c.height); y < Math.ceil(b[3] * c.height); y++)
-      for (let x = Math.floor(b[0] * c.width); x < Math.ceil(b[2] * c.width); x++) sum += lum((y * c.width + x) * 4) - bg;
+    // (only what is on the screen: the second row runs off its bottom)
+    for (let y = Math.max(Math.floor(b[1] * c.height), 0); y < Math.min(Math.ceil(b[3] * c.height), c.height); y++)
+      for (let x = Math.max(Math.floor(b[0] * c.width), 0); x < Math.min(Math.ceil(b[2] * c.width), c.width); x++) sum += lum((y * c.width + x) * 4) - bg;
     return { name, box: b.map((v) => +v.toFixed(5)), delay, light: +(sum / total).toFixed(5) };
   });
-  return { elements: out, background_light: +((bg * c.width * c.height) / total).toFixed(5), bg_linear: bg };
+  return { elements: out, media, background_light: +((bg * c.width * c.height) / total).toFixed(5), bg_linear: bg };
 }, "data:image/png;base64," + (await import("node:fs")).readFileSync(still).toString("base64"));
 
 const reveal = {

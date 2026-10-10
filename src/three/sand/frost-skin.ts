@@ -71,13 +71,13 @@ const FRAGMENT = /* glsl */ `
 precision highp float;
 out highp vec4 pc_fragColor;
 #define gl_FragColor pc_fragColor
+${SIMPLEX_DECL}
+${ATTEMPT_FIELD}
 in vec3 vDir;
 in float vBand;
-uniform float uAttDepth;
-uniform float uAttLo;
 void main() {
   float exists = smoothstep(0.0, 0.3, vBand) * step(0.001, uAttDepth) * step(uAttLo, 0.999);
-  if (exists < 0.5) discard;
+  if (exists < 0.5 || meltAt(normalize(vDir)) > 0.5) discard;   // none where it has cleared into glass
   gl_FragColor = vec4(0.0);
 }
 `;

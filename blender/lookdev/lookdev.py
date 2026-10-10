@@ -2010,9 +2010,11 @@ def build_through():
       40-110  once glass, it rushes up the camera's path and the camera descends to meet it, both slowing into the
               contact (a held breath: the desk magnified and upside down in the glass fills the frame), passing through
               its centre at 110 (inside, the world rights itself)
-      110-170 out the other side, low between the ball and the desk, the camera tips down and turns toward the laptop
-              as the lid opens in front of it, ending square to the screen with the 16:10 screen filling the frame;
-              the screen wakes near the end. The glass stays above, out of frame (the dark screen may catch it)
+      110-165 out the other side, low between the ball and the desk, the camera tips down and turns to face the shut
+              laptop from a little way off (all of it in view)
+      160-188 it holds there, drifting in, while the lid opens in front of it (Liam: the lid opens in view)
+      182-210 the screen wakes; the camera pushes in until the 16:10 screen fills the frame, square to it
+    The glass stays above, out of frame (the dark screen may catch it)
     Writes the frames and a JSON path (camera, ball, lid angle, screen corners per frame) like the other moves."""
     import json
     args.view, args.dstate = "top", "glass"
@@ -2026,7 +2028,7 @@ def build_through():
     c_ = Vector(CHAOS_C)
     area_light("rim", tuple(c_ + Vector((0.18, 0.78, 0.3))), 0.24, 26.0, ROSE_SOFT, target=tuple(c_))   # as the 3D desk
     R = 0.07
-    F = 170
+    F = 210
     scene.frame_start, scene.frame_end = 1, F
     scene.render.fps = 24
     def ease(t, a=0.0, b=1.0):
@@ -2057,9 +2059,12 @@ def build_through():
     q_end = (sc - END).to_track_quat("-Z", "Y")
     TOP = Vector((0.0, 0.02, 1.35))
     q_top = (Vector((0.0, 0.0201, 0.0)) - TOP).to_track_quat("-Z", "Y")
-    # the camera's path: straight down from the top view, then a curve that arrives moving into the screen
+    # the camera's path: straight down from the top view, then a curve that arrives facing the laptop from W (all of it in
+    # view), then straight in to the screen
+    W = sc + sn * fit * 2.3 + Vector((0, 0, 0.04))
+    q_w = (sc - W).to_track_quat("-Z", "Y")
     P0, P1 = TOP, Vector((0.0, 0.03, 0.42))
-    P2, P3 = END + sn * 0.35, END
+    P2, P3 = W + sn * 0.3, W
     def bez(s):
         u = 1 - s
         return P0 * u ** 3 + P1 * 3 * u * u * s + P2 * 3 * u * s * s + P3 * s ** 3
@@ -2071,14 +2076,18 @@ def build_through():
     cam.rotation_mode = "QUATERNION"
     path = []
     for f in range(1, F + 1):
-        # the approach: fast in its middle, slowing into the contact (smootherstep), then out and into the screen
+        # the approach: fast in its middle, slowing into the contact (smootherstep), out to W, a slow drift in while the
+        # lid opens, then into the screen
         if f <= 40:
             s = 0.0
         elif f <= 110:
             s = S_MEET * ease((f - 40) / 70)
         else:
-            s = S_MEET + (1 - S_MEET) * ease((f - 110) / 60)
+            s = S_MEET + (1 - S_MEET) * ease((f - 110) / 55)
         pos = bez(min(s, 1.0))
+        if f > 165:
+            k = 0.12 * ease(f, 165, 190) + 0.88 * ease(f, 186, 210)    # a little in while the lid opens, then all the way
+            pos = W.lerp(END, k)
         # the glass: drifting slowly up, then rushing to the meeting point (it arrives with the camera), then held
         if f <= 40:
             ball = B0.lerp(B1, ease(f, 1, 40))
@@ -2089,12 +2098,12 @@ def build_through():
         rig.location = ball
         # looking straight down until through the glass, then turning to the screen
         cam.location = pos
-        cam.rotation_quaternion = q_top.slerp(q_end, ease(f, 112, 166))
-        cam_d.lens = 45 + 5 * ease(f, 110, 170)
-        hinge.rotation_euler.x = shut + (opened - shut) * ease(f, 118, 160)
-        fill.energy = fill_e * ease(f, 116, 160)
-        glow.energy = glow_e * ease(f, 152, 168)
-        emit.default_value = emit_s if f >= 152 else 0.0
+        cam.rotation_quaternion = q_top.slerp(q_w, ease(f, 112, 165)) if f <= 165 else q_w.slerp(q_end, ease(f, 165, 200))
+        cam_d.lens = 45 + 5 * ease(f, 110, 165)
+        hinge.rotation_euler.x = shut + (opened - shut) * ease(f, 160, 188)
+        fill.energy = fill_e * ease(f, 150, 188)
+        glow.energy = glow_e * ease(f, 188, 202)
+        emit.default_value = emit_s if f >= 188 else 0.0
         for ob, prop in ((cam, "location"), (cam, "rotation_quaternion"), (rig, "location")):
             ob.keyframe_insert(prop, frame=f)
         cam_d.keyframe_insert("lens", frame=f); hinge.keyframe_insert("rotation_euler", frame=f)
@@ -2115,6 +2124,29 @@ def build_through():
     scene.frame_set(int(one or 1))
     if one:
         scene.frame_start = scene.frame_end = scene.frame_current
+    if os.environ.get("PROBE_AT"):
+        # the room as the glass sees it at a point of its rise (laptop shut, the ball hidden, lights and dome visible)
+        for o in MOVE_CTX["ball"]:
+            o.hide_render = True
+        for o in bpy.data.objects:
+            if o.type == "LIGHT":
+                o.visible_camera = True
+        scene.world.cycles_visibility.camera = True
+        pc = bpy.data.cameras.new("glass_probe"); pc.type = "PANO"
+        try:
+            pc.panorama_type = "EQUIRECTANGULAR"
+        except Exception:
+            pc.cycles.panorama_type = "EQUIRECTANGULAR"
+        pr = bpy.data.objects.new("glass_probe", pc); scene.collection.objects.link(pr)
+        pr.location = tuple(float(v) for v in os.environ["PROBE_AT"].split(","))
+        pr.rotation_euler = (math.pi / 2, 0, -math.pi / 2)
+        scene.camera = pr
+        render_settings(256, 2048, 1024)
+        scene.render.image_settings.file_format = "OPEN_EXR"; scene.render.image_settings.color_depth = "16"
+        scene.render.filepath = os.path.join(args.out, os.environ.get("PROBE_NAME", "glass-probe") + ".exr")
+        bpy.ops.render.render(write_still=True)
+        print("WROTE", scene.render.filepath)
+        sys.exit(0)
 
 def build_deskmove():
     """The camera moves between the three desk views, one continuous space, no cuts:

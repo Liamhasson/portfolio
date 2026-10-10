@@ -40,42 +40,38 @@ const TL = {
   settle: [0.33, 0.52], compact: [0.35, 0.5],                                  // 2.1: the ball forms on the desk
   leave21: [0.54, 0.6], rise: [0.56, 0.68], enter22: [0.64, 0.7],               // 2.1 -> 2.2
   attempts: [0.71, 0.97],                                                      // 2.2: three attempts
-  leave22: [0.975, 1.03], descend: [0.99, 1.122], enter23: [1.09, 1.135],      // 2.2 -> 2.3: down to the side view
-  build: [1.15, 1.4], ship: [1.42, 1.48],                                      // 2.3: it turns to glass (slowly), then lands
-  leave23: [1.52, 1.56], push: [1.53, 1.7],                                     // 2.3 -> 3: into the screen
-  takeover: [1.665, 1.7], indexIn: [1.7, 1.74],                                 // the live index takes over, settles
+  // 2.3, in the same top view (Liam, 2026-10-10): the frost spreads and clears into glass as the ball drifts up, then
+  // the glass rushes to the lens and the camera passes through it, comes out low, faces the laptop while its lid opens,
+  // and pushes into the screen (lookdev.py deskmove --move through; its frames: drift 1-40, rush 40-110, out 110-165,
+  // lid 165-188, push 188-210)
+  leave22: [0.975, 1.0], enter23: [1.0, 1.04], build: [0.99, 1.24], leave23: [1.23, 1.27],
+  rush: [1.24, 1.38], out: [1.38, 1.48], lid: [1.48, 1.56], push: [1.56, 1.66],
+  takeover: [1.63, 1.66], indexIn: [1.66, 1.7],                                 // the live index takes over, settles
 } as const;
 /**
  * The page's length. Progress is measured in units of the first 1600vh of scroll (the timeline above was laid out on
  * a 1700vh page), so each chapter added after it keeps the earlier ones' pace.
  */
-const PAGE_VH = 3000;
+const PAGE_VH = 2900;
 const PROGRESS_SCALE = (PAGE_VH - 100) / 1600;
-/**
- * The descend (lookdev.py deskmove --move descend, 100 frames): the scroll carries the camera to its arrival (frame 66,
- * where the view settles); the lid opens on the way (frames 27-60), the low view's fill rises (31-66), and the screen
- * wakes at frame 50 and plays the index's reveal in time, as a real screen would (scroll back up and it sleeps).
- */
-const DESCEND = { arrive: 65, wake: 49, lid: [0.26, 0.6], open: [0.3, 0.66], openDeg: 108 } as const;
-/** The low view's fill (lookdev.py: area light, 0.9 m, 38 W), lighting the sand from the camera's side. */
-const SIDE_FILL = { pos: [1.35, -0.95, 0.45], watts: 38, color: [1.0, 0.86, 0.72], radius: 4.5 };
-/**
- * 2.3 (production plan §2): build, then ship. Build: the held attempt's clearing sweeps on over the whole ball, the
- * grains drain into the skin, the frost melts into glass, all while it hovers. Ship: only then it falls, like a real fall
- * (height goes with the square of the scroll: constant scrolling is constant time), and the last millimetre is absorbed
- * in a quick soft stop: glass on wood, no bounce. Scroll back and it lifts, loses its weight and turns back to sand.
- */
-// the frost covers the ball, then a wave of clarity runs over it from where the attempt began; the grains sink into the
-// frost just ahead of the wave (drain: a floor that takes the last ones under)
-const BUILD = { sweep: [0, 0.3], drain: [0.6, 0.97], melt: [0.2, 1] } as const;
-const SHIP = { hover: 0.15, rest: 0.0705, contact: 0.9, settleM: 0.0012 } as const;   // metres (lookdev.py: the side view)
-/** Ship progress 0..1 -> how far down it has come, 0..1. */
-function fall(s: number): number {
-  const eps = SHIP.settleM / (SHIP.hover - SHIP.rest);
-  if (s <= SHIP.contact) { const u = s / SHIP.contact; return u * u * (1 - eps); }
-  const x = (s - SHIP.contact) / (1 - SHIP.contact) * 6;   // critically damped: the wood takes the last millimetre
-  return Math.min(1 - eps * (1 + x) * Math.exp(-x), 1);
+/** Progress -> the through move's frame (0-based): each beat gets its own share of the scroll. */
+const THROUGH_KEYS: [keyof typeof TL, number][] = [["build", 39], ["rush", 109], ["out", 164], ["lid", 187], ["push", 209]];
+function throughFrame(p: number): number {
+  let prevP: number = TL.build[0], prevF = 0;
+  for (const [k, f] of THROUGH_KEYS) {
+    const end = TL[k][1];
+    if (p <= end) return prevF + (f - prevF) * Math.min(Math.max((p - prevP) / (end - prevP), 0), 1);
+    prevP = end; prevF = f;
+  }
+  return 209;
 }
+/** The frame the screen wakes on (Blender: 188), and the lid's open angle in the bake. */
+const WAKE_FRAME = 187;
+/** The open laptop's fill (lookdev.py: area light, 0.9 m, 38 W, rising with the lid), lighting the sand too. */
+const SIDE_FILL = { pos: [1.35, -0.95, 0.45], watts: 38, color: [1.0, 0.86, 0.72], radius: 4.5 };
+/** 2.3's build, over the drift: the frost covers the ball, then a wave of clarity runs over it; the grains sink just
+ *  ahead of the wave. */
+const BUILD = { sweep: [0, 0.3], drain: [0.6, 0.97], melt: [0.2, 1] } as const;
 /**
  * The scene leans with the cursor (Lusion's camera, read from their code 2026-10-10): the camera turns toward it by up to
  * LEAN radians (their about hero settles at 0.035), closing 10% of the gap each 60 fps frame; the scene moves the way
@@ -191,18 +187,15 @@ export function SandLab() {
       const desk3d = hero && !compare && !usePlates ? await BakedDesk.load(stage.renderer) : null;
       if (disposed) return;
       if (desk3d) stage.scene.add(desk3d.group);
-      // 2.2 -> 2.3: the descend to the low side view (the 3D desk only: no plates were rendered for it)
-      const descend = desk3d ? await Pullback.load("/lab/descend", false).catch(() => null) : null;
-      // 2.3 -> 3: the push into the screen (lookdev.py deskmove --move push, approved)
-      const push = desk3d ? await Pullback.load("/lab/push", false).catch(() => null) : null;
+      // 2.3 -> 3: through the glass and into the screen (lookdev.py deskmove --move through; the 3D desk only)
+      const through = desk3d ? await Pullback.load("/lab/through", false).catch(() => null) : null;
       if (disposed) return;
       // the screen's reveal: seconds since it woke; and how far it has gone back to sleep (scrolling back up)
       let revealT = 0, sleep = 1;
-      // ?dsframe=N holds the camera on a descend frame; ?reveal=S holds the screen's reveal at S seconds (calibration)
-      const dsFrame = Number(new URLSearchParams(window.location.search).get("dsframe") || NaN);
-      const pushFrame = Number(new URLSearchParams(window.location.search).get("pushframe") || NaN);   // calibration
+      // ?thframe=N holds the camera on a through frame; ?reveal=S holds the screen's reveal at S seconds (calibration)
+      const thFrame = Number(new URLSearchParams(window.location.search).get("thframe") || NaN);
       const indexMix = Number(new URLSearchParams(window.location.search).get("indexmix") || NaN);   // calibration: the index's opacity
-      const holdDescend = Number.isFinite(dsFrame) || Number.isFinite(pushFrame);
+      const holdThrough = Number.isFinite(thFrame);
       const lidHold = Number(new URLSearchParams(window.location.search).get("lid") || NaN);   // ?lid=deg (calibration)
       const revealHold = Number(new URLSearchParams(window.location.search).get("reveal") || NaN);
       let fillGain = 1;
@@ -212,19 +205,18 @@ export function SandLab() {
       // where the current attempt was born, in the ball's frame (the side that faced the viewer then); it rides the ball
       const attUp = new THREE.Vector3(0, 1, 0);
       let attBorn = false, meltBorn = false;
-      let probes: { top: THREE.Texture; hover: THREE.Texture; land: THREE.Texture } | null = null;
+      let probes: { top: THREE.Texture; meet: THREE.Texture } | null = null;
       if (glass && composite) {
         stage.scene.add(glass.mesh);
         composite.glass = glass;
-        // what the glass sees from its own place, hovering and landed (lookdev.py PROBE_AT; the lights in them)
-        // and where it hangs in 2.2, over the shut laptop
-        Promise.all(["top", "hover", "land"].map((n) => new EXRLoader().loadAsync(`/lab/glass/probe-${n}.exr`)))
-          .then(([t, h, l]) => { probes = { top: t, hover: h, land: l }; glass.setProbes(t, h); })
+        // what the glass sees from its own place: where it hangs over the shut laptop, and where it meets the camera
+        // (lookdev.py PROBE_AT; the lights in them)
+        Promise.all(["top", "meet"].map((n) => new EXRLoader().loadAsync(`/lab/glass/probe-${n}.exr`)))
+          .then(([t, m]) => { probes = { top: t, meet: m }; glass.setProbes(t, m); })
           .catch(() => {});   // without them it reads the desk's probe and draws the lights itself
       }
-      // ?build=B / ?ship=S hold 2.3's beats (calibration)
+      // ?build=B holds 2.3's build (calibration)
       const buildHold = Number(new URLSearchParams(window.location.search).get("build") || NaN);
-      const shipHold = Number(new URLSearchParams(window.location.search).get("ship") || NaN);
       const glassLook = { shadow: 0.88, ao: 0.6, lampR: 2.0, reflect: 0.3, lights: 0.3, radius: 1.0 };
       (window as unknown as { __glass?: (l: Partial<typeof glassLook>) => void }).__glass = (l) => Object.assign(glassLook, l);
       (window as unknown as { __fill?: (g: number) => void }).__fill = (g) => { fillGain = g; };
@@ -404,10 +396,13 @@ export function SandLab() {
         const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
         const progress = window.scrollY / max;
         progressRef.current = damp(progressRef.current, hero ? progress * PROGRESS_SCALE : progress, 6, dt);
-        // ?dsframe holds a descend frame: everything before it (the ball, the third attempt) as the page has it there
-        if (holdDescend) progressRef.current = TL.descend[0] + 0.01;
-        if (Number.isFinite(pushFrame)) progressRef.current = TL.push[0] + (TL.push[1] - TL.push[0]) * Math.max((pushFrame - 1) / 71, 1e-4);
-        if (Number.isFinite(buildHold) && !Number.isFinite(dsFrame)) progressRef.current = TL.build[0] + (TL.build[1] - TL.build[0]) * buildHold;
+        // ?build / ?thframe hold a moment of 2.3 (everything before it as the page has it there)
+        if (Number.isFinite(buildHold)) progressRef.current = TL.build[0] + (TL.build[1] - TL.build[0]) * buildHold;
+        if (holdThrough) {
+          let lo: number = TL.build[0], hi: number = TL.push[1];
+          for (let i = 0; i < 30; i++) { const m = (lo + hi) / 2; if (throughFrame(m) < thFrame - 1) lo = m; else hi = m; }
+          progressRef.current = Math.max(hi, TL.build[0] + 1e-4);
+        }
         state.compact = pullback
           ? (() => { const x = span(progressRef.current, TL.compact); return x * x * (3 - 2 * x); })()
           : damp(state.compact, compactFor(progress), 6, dt);
@@ -436,37 +431,41 @@ export function SandLab() {
           // ?rtframe=N holds the camera on a rise frame (calibration)
           const rtFrame = Number(new URLSearchParams(window.location.search).get("rtframe") || NaN);
           const rt = rise ? (Number.isFinite(rtFrame) ? Math.max((rtFrame - 1) / (rise.data.frames - 1), 1e-4) : span(progressRef.current, TL.rise)) : 0;
-          const ds = descend ? (Number.isFinite(dsFrame) ? Math.max((dsFrame - 1) / DESCEND.arrive, 1e-4) : span(progressRef.current, TL.descend)) : 0;
-          const pt = push ? (Number.isFinite(pushFrame) ? Math.max((pushFrame - 1) / (push.data.frames - 1), 1e-4) : span(progressRef.current, TL.push)) : 0;
-          const move = push && pt > 0 ? push : descend && ds > 0 ? descend : rise && rt > 0 ? rise : settle && st > 0 ? settle : pullback;
-          const f = move === push ? pt * (push!.data.frames - 1)
-            : move === descend ? (Number.isFinite(dsFrame) ? dsFrame - 1 : ds * DESCEND.arrive)
+          const pg0 = progressRef.current;
+          const move = through && pg0 > TL.build[0] ? through : rise && rt > 0 ? rise : settle && st > 0 ? settle : pullback;
+          const f = move === through ? throughFrame(pg0)
             : move === rise ? rt * (rise.data.frames - 1) : move === settle ? st * (settle!.data.frames - 1) : t * (pullback.data.frames - 1);
           if (rise) {
             rise.plate.visible = move === rise;
-            // the ball rides the rise: up off the desk, rolling forward 45 degrees (scroll turns the ball); then the
-            // descend carries it beside the laptop, still turned
+            // the ball rides the rise: up off the desk, rolling forward 45 degrees (scroll turns the ball); then in 2.3 it
+            // drifts up and rushes to the lens, still turned
             const fi = Math.min(Math.max(Math.round(f), 0), rise.data.frames - 1);
             const fr = rise.data.path[move === rise ? fi : 0] as unknown as { ball: number[]; ball_roll: number };
             const end = rise.data.path[rise.data.frames - 1] as unknown as { ball_roll: number };
-            if ((move === descend || move === push) && descend) {
-              const fd = move === push ? descend.data.frames - 1 : f;
-              const a = descend.data.path[Math.min(Math.floor(fd), descend.data.frames - 2)] as unknown as { ball: number[] };
-              const b = descend.data.path[Math.min(Math.floor(fd) + 1, descend.data.frames - 1)] as unknown as { ball: number[] };
-              field!.setBallTarget(descend.toHero(a.ball).lerp(descend.toHero(b.ball), Math.min(fd - Math.floor(fd), 1)), 0.07 / descend.data.chaos_scale);
+            if (move === through && through) {
+              const a = through.data.path[Math.min(Math.floor(f), through.data.frames - 2)] as unknown as { ball: number[] };
+              const b = through.data.path[Math.min(Math.floor(f) + 1, through.data.frames - 1)] as unknown as { ball: number[] };
+              field!.setBallTarget(through.toHero(a.ball).lerp(through.toHero(b.ball), Math.min(f - Math.floor(f), 1)), 0.07 / through.data.chaos_scale);
               state.ballRoll = end.ball_roll;
             } else {
               field!.setBallTarget(rise.toHero(fr.ball), 0.07 / rise.data.chaos_scale);
               state.ballRoll = move === rise ? fr.ball_roll : 0;
             }
           }
-          // 2.3's arrival: the lid opens, the low view's fill rises, the screen wakes and plays the index's reveal
+          // 2.3's end: the lid opens in view (the path carries its angle), the fill rises with it, the screen wakes and
+          // plays the index's reveal
           let openF = 0;
           if (desk3d) {
-            const tb = move === push ? 1 : move === descend ? f / (descend!.data.frames - 1) : 0;
-            openF = ease(tb, DESCEND.open);
-            desk3d.setLid(Number.isFinite(lidHold) ? lidHold : DESCEND.openDeg * ease(tb, DESCEND.lid));
-            const awake = move === push || (move === descend && f >= DESCEND.wake);
+            let lidDeg = 0;
+            if (move === through && through) {
+              const fi = Math.min(Math.floor(f), through.data.frames - 2), fr = f - fi;
+              const a = through.data.path[fi] as unknown as { lid_open_deg: number };
+              const b = through.data.path[fi + 1] as unknown as { lid_open_deg: number };
+              lidDeg = a.lid_open_deg + (b.lid_open_deg - a.lid_open_deg) * fr;
+            }
+            openF = lidDeg / 108;
+            desk3d.setLid(Number.isFinite(lidHold) ? lidHold : lidDeg);
+            const awake = move === through && f >= WAKE_FRAME;
             if (Number.isFinite(revealHold)) { revealT = revealHold; sleep = 0; }
             else if (awake) { sleep = Math.max(sleep - dt / 0.35, 0); if (sleep === 0 || revealT > 0) revealT += dt; }
             else { sleep = Math.min(sleep + dt / 0.35, 1); if (sleep === 1) revealT = 0; }
@@ -497,10 +496,11 @@ export function SandLab() {
               ? new THREE.Vector2(Math.min(Math.max((pointer.x / W) * 2 - 1, -1), 1), Math.min(Math.max(1 - (pointer.y / H) * 2, -1), 1))
               : new THREE.Vector2();
             const k = 1 - Math.exp(-LEAN_DAMP * dt);
-            lean.lerp(reduced || calibrating || holdDescend ? new THREE.Vector2() : want, k);
+            lean.lerp(reduced || calibrating || holdThrough ? new THREE.Vector2() : want, k);
             const pg = progressRef.current;
-            const landing = ease(pg, [TL.ship[0] + 0.5 * (TL.ship[1] - TL.ship[0]), TL.ship[1]]) * (1 - ease(pg, [TL.ship[1] + 0.01, TL.ship[1] + 0.035]));
-            const w = (1 - landing) * (1 - ease(pg, [TL.takeover[0] - 0.02, TL.takeover[1]]));
+            // still while the camera passes through the glass (from the rush's end until it is out)
+            const passing = ease(pg, [TL.rush[1] - 0.04, TL.rush[1]]) * (1 - ease(pg, [TL.out[0] + 0.03, TL.out[0] + 0.07]));
+            const w = (1 - passing) * (1 - ease(pg, [TL.takeover[0] - 0.02, TL.takeover[1]]));
             const cam = stage!.camera;
             // looking down on the desk, its top fills the frame: the frame (and the lean) must never pass its edge into
             // the void. The lens tightens once, for the pose (never with the cursor); the lean then goes only as far as
@@ -543,7 +543,9 @@ export function SandLab() {
           }
           // 3: the live index over the screen's quad, crossfading in where they coincide, then settling into the view
           const ix = indexRef.current;
-          if (ix && desk3d && push) {
+          if (ix && desk3d && through) {
+            // the screen is in play once the camera faces the laptop (the takeover itself at the push's end)
+            const pt = move === through ? Math.min(Math.max((f - 164) / (209 - 164), 0), 1) : 0;
             const take = ease(span(progressRef.current, TL.takeover), [0, 1]);
             const sett = ease(span(progressRef.current, TL.indexIn), [0, 1]);
             const W = canvas.clientWidth, H = canvas.clientHeight;
@@ -553,7 +555,7 @@ export function SandLab() {
               const q = p.clone().project(cam);
               return [(q.x + 1) / 2 * W, (1 - q.y) / 2 * H] as [number, number];
             });
-            if (move === push && portrait) {
+            if (move === through && pt > 0 && portrait) {
               // phones: the 16:10 screen is far wider than the view; toward the push's end the lens widens just enough
               // to keep the whole screen in (with the site's side margins), so the takeover happens on the whole screen
               const xs = project().map((p) => p[0]);
@@ -606,9 +608,8 @@ export function SandLab() {
             if (settle) settle.plate.visible = false;
             if (rise) rise.plate.visible = false;
           }
-          // 2.3: build, then ship
-          const b = Number.isFinite(buildHold) ? buildHold : Number.isFinite(shipHold) ? 1 : span(progressRef.current, TL.build);
-          const sp = Number.isFinite(shipHold) ? shipHold : span(progressRef.current, TL.ship);
+          // 2.3: the build, while the ball drifts up
+          const b = Number.isFinite(buildHold) ? buildHold : span(progressRef.current, TL.build);
           const glassF = Math.min(Math.max((b - BUILD.melt[0]) / (BUILD.melt[1] - BUILD.melt[0]), 0), 1);   // how much is glass (its shadow)
           if (glassF > 0 && !meltBorn) {
             // the clearing starts on the side facing the viewer the moment it starts (the scroll turns the ball before
@@ -622,18 +623,13 @@ export function SandLab() {
           const meltT = Math.min(Math.max((b - BUILD.melt[0]) / (BUILD.melt[1] - BUILD.melt[0]), 0), 1);
           field!.setBuild(ease(b, BUILD.sweep), ease(b, BUILD.drain), meltT);
           if (glass) {
-            // the frost exists from the first attempt on; the glass surface is the frost, clearing; it lands in the ship
+            // the frost exists from the first attempt on; the glass surface is the frost, clearing
             const on = span(progressRef.current, TL.attempts) > 0 || b > 0;
-            let c = ballC;
-            if (descend && sp > 0) {
-              const end = descend.data.path[descend.data.frames - 1] as unknown as { ball: number[] };
-              c = descend.toHero([end.ball[0], end.ball[1], SHIP.hover - (SHIP.hover - SHIP.rest) * fall(sp)]);
-            }
-            glass.update(c, field!.material.uniforms.uBallR.value, on ? 1 : 0);
-            // the room it sees: from over the shut laptop (2.2), then from its hover beside the open one, then landed
-            if (probes) {
-              if (sp > 0) { glass.setProbes(probes.hover, probes.land); glass.probeMix = fall(sp); }
-              else { glass.setProbes(probes.top, probes.hover); glass.probeMix = move === descend || move === push ? ease(f / (descend!.data.frames - 1), [0.2, 0.66]) : 0; }
+            glass.update(ballC, field!.material.uniforms.uBallR.value, on ? 1 : 0);
+            // the room it sees: from over the shut laptop, then from where it meets the camera (by its height)
+            if (probes && through) {
+              const zTop = through.toHero([0, 0.03, 0.2]).y, zMeet = through.toHero([0, 0, 0.76]).y;
+              glass.probeMix = Math.min(Math.max((ballC.y - zTop) / (zMeet - zTop), 0), 1);
             }
             if (on) desk3d!.glassLights().rects.forEach((r, i) => glass.setRectRadiance(i, r.radiance));
           }
@@ -668,10 +664,10 @@ export function SandLab() {
               const db = deskBall && !calibrating ? deskBall.lights[i] : d0;
               const d = { pos: d0.pos, col: d0.col.clone().lerp(db.col, state.compact), r: d0.r };
               // the third light (the desk bounce, off on the desk) becomes the low view's fill as it rises
-              if (i === 2 && descend && openF > 0) {
-                d.pos = descend.toHero(SIDE_FILL.pos);
+              if (i === 2 && through && openF > 0) {
+                d.pos = through.toHero(SIDE_FILL.pos);
                 d.col = new THREE.Vector3(...(SIDE_FILL.color as [number, number, number]))
-                  .multiplyScalar((SIDE_FILL.watts / (descend.data.chaos_scale ** 2)) * g.wattsToIrradiance * fillGain * openF);
+                  .multiplyScalar((SIDE_FILL.watts / (through.data.chaos_scale ** 2)) * g.wattsToIrradiance * fillGain * openF);
                 d.r = SIDE_FILL.radius;
               }
               const pos = l.pos.clone().lerp(d.pos, h);
@@ -711,7 +707,7 @@ export function SandLab() {
           const ballR = field!.material.uniforms.uBallR.value as number;
           const pg = progressRef.current;
           const density = !hero ? DRIFT.hero
-            : THREE.MathUtils.lerp(DRIFT.hero, DRIFT.desk, ease(pg, TL.pullback)) * (1 - ease(pg, [TL.push[0], TL.push[0] + 0.06]));
+            : THREE.MathUtils.lerp(DRIFT.hero, DRIFT.desk, ease(pg, TL.pullback)) * (1 - ease(pg, [TL.lid[0], TL.lid[0] + 0.05]));
           const r = THREE.MathUtils.lerp(chaosR, ballR * 1.05, state.compact);
           const um = field!.material.uniforms;
           // the sand's own grain size (its largest grain x its look's scale x the tier's count scale), typical grain

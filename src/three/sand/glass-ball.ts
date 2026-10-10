@@ -33,12 +33,13 @@ export interface GlassLights {
 
 const MAX_RECTS = 2;
 
+// a full-screen pass (the sphere is traced per pixel): it works with the camera close to the glass or inside it, where a
+// sphere mesh would be clipped by the near plane or seen from behind
 const VERTEX = /* glsl */ `
-out vec3 vWorld;
+out vec2 vNdc;
 void main() {
-  vec4 w = modelMatrix * vec4(position, 1.0);
-  vWorld = w.xyz;
-  gl_Position = projectionMatrix * viewMatrix * w;
+  vNdc = position.xy;
+  gl_Position = vec4(position.xy, 0.0, 1.0);
 }
 `;
 
@@ -47,7 +48,9 @@ precision highp float;
 precision highp sampler3D;
 out highp vec4 pc_fragColor;
 #define gl_FragColor pc_fragColor
-in vec3 vWorld;
+in vec2 vNdc;
+uniform mat4 uInvProj;         // the camera's inverse projection and its world matrix (the pixel's ray)
+uniform mat4 uCamWorld;
 uniform mat4 projectionMatrix;
 uniform vec3 uC;
 uniform float uR;
@@ -241,10 +244,27 @@ vec3 frostAt(vec3 p, vec3 n, vec3 v, float clear) {
 void main() {
   vec2 suv = gl_FragCoord.xy * uBgTexel;
   vec3 under = texture(uBg, suv).rgb;
-  vec3 ro = cameraPosition, rd = normalize(vWorld - cameraPosition);
+  vec4 vv = uInvProj * vec4(vNdc, 1.0, 1.0);
+  vec3 ro = cameraPosition, rd = normalize(mat3(uCamWorld) * (vv.xyz / vv.w));
   vec3 oc = ro - uC;
   float b = dot(oc, rd), c = dot(oc, oc) - uR * uR, h = b * b - c;
   if (h <= 0.0) discard;
+  if (c < 0.0) {
+    // the camera is inside the glass (2.3: passing through it): every ray leaves through the far surface, bending out
+    // of the glass (from its centre, not at all: inside, the world is the right way up again)
+    vec3 pe = ro + rd * (-b + sqrt(h));
+    vec3 ne = (pe - uC) / uR;
+    vec3 te = refract(rd, -ne, uEta);
+    float cosE = clamp(dot(rd, ne), 0.0, 1.0);
+    if (dot(te, te) < 0.5) te = reflect(rd, -ne);
+    float Fe = fresnel(clamp(sqrt(max(1.0 - (1.0 - cosE * cosE) * uEta * uEta, 0.0)), 0.0, 1.0), uEta);
+    vec3 dE; bool hE;
+    vec3 Le = seen(pe, te, 0.0, dE, hE);
+    vec3 Lin = (1.0 - Fe) * exp(-uAbsorb * (-b + sqrt(h))) * Le;
+    gl_FragColor = vec4(clamp(dE + toDisplay(Lin) - toDisplay(Le), 0.0, 1.0), 1.0);
+    gl_FragColor.rgb = mix(under, gl_FragColor.rgb, uAmount);
+    return;
+  }
   vec3 p1 = ro + rd * (-b - sqrt(h));
   vec3 n1 = (p1 - uC) / uR;
   // the frost and how far it has cleared here, on the ball's own frame (Blender's frost glass: clear 0 frost .. 1)
@@ -367,6 +387,8 @@ export class GlassBall {
         uRectL: { value: [0, 1].map((i) => (lights.rects[i] ? lights.rects[i].radiance.clone() : new THREE.Vector3())) },
         uAmount: { value: 0 },
         uDebug: { value: 0 },
+        uInvProj: { value: new THREE.Matrix4() },
+        uCamWorld: { value: new THREE.Matrix4() },
         uBallRot: su.uBallRot,
         uAttUp: su.uAttUp, uAttLo: su.uAttLo, uAttBreak: su.uAttBreak, uAttDepth: su.uAttDepth, uAttFull: su.uAttFull, uMelt: su.uMelt, uMeltUp: su.uMeltUp,
         uLightPos: su.uLightPos, uLightCol: su.uLightCol, uLightR2: su.uLightR2, uSpotDir: su.uSpotDir, uSpotCos: su.uSpotCos,
@@ -388,10 +410,15 @@ export class GlassBall {
         uFrostOn: { value: 1 },
       },
     });
-    this.mesh = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 24), this.material);
+    this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.material);
     this.mesh.layers.set(GLASS_LAYER);
     this.mesh.frustumCulled = false;
     this.mesh.visible = false;
+    this.mesh.onBeforeRender = (_r, _s, camera) => {
+      const u = this.material.uniforms;
+      (u.uInvProj.value as THREE.Matrix4).copy((camera as THREE.PerspectiveCamera).projectionMatrixInverse);
+      (u.uCamWorld.value as THREE.Matrix4).copy(camera.matrixWorld);
+    };
   }
 
   /** The ball (hero units) and how present the glass is, 0..1. */
@@ -400,8 +427,6 @@ export class GlassBall {
     (u.uC.value as THREE.Vector3).copy(center);
     u.uR.value = radius;
     u.uAmount.value = amount;
-    this.mesh.position.copy(center);
-    this.mesh.scale.setScalar(radius * 1.004);   // the mesh only bounds the true sphere; a hair wider so it never clips it
     this.mesh.visible = amount > 0.001;
   }
 
