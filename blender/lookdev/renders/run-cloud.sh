@@ -2,7 +2,7 @@
 # The cloud move (2.3, sand only) review clip, full grain counts (210 frames, 960x600), resuming after Blender's occasional silent crash.
 cd "$(dirname "$0")/.."
 B=/Applications/Blender.app/Contents/MacOS/Blender
-rm -rf renders/deskmove-cloud
+[ -n "$KEEP" ] || rm -rf renders/deskmove-cloud
 for t in 1 2 3 4 5 6; do
   LOOKDEV_REVIEW=1 caffeinate -i $B --background --python lookdev.py -- --scene deskmove --move cloud --out renders > renders/deskmove-cloud.log 2>&1
   n=$(ls renders/deskmove-cloud/*.png 2>/dev/null | wc -l | tr -d ' ')

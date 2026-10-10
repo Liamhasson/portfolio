@@ -2184,11 +2184,13 @@ def build_through():
         cam_d.lens = 45 + 5 * ease(s, s_meet, 0.95)
         if cloud:
             # depth of field on the desk ahead: the sand near the lens goes soft, a passage, never specks on the lens
-            # (on the ball until it opens, then on the desk ahead)
+            # (on the ball until it opens, then on the desk ahead, then on the screen)
             cam_d.dof.use_dof = True; cam_d.dof.aperture_fstop = 4.0
             desk_d = max(pos.z / max(-(cam.rotation_quaternion @ Vector((0, 0, -1))).z, 0.35), 0.2)
             ball_d = max((ball - pos).length, 0.05)
-            cam_d.dof.focus_distance = ball_d + (desk_d - ball_d) * ease(f, 68, 92)
+            focus = ball_d + (desk_d - ball_d) * ease(f, 68, 92)
+            scr_d = (disp.matrix_world.translation - pos).length   # then on the screen, once the laptop is the subject
+            cam_d.dof.focus_distance = focus + (scr_d - focus) * ease(f, 96, 130)
             cam_d.dof.keyframe_insert("focus_distance", frame=f)
         fill.energy = fill_e * ease(s, sl0 - 0.05, sl1)
         glow.energy = glow_e * ease(s, sl1, sl1 + 0.06)
