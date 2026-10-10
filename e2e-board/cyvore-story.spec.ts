@@ -1,0 +1,488 @@
+import { expect, test, type Page } from "@playwright/test";
+
+/** The board's test hook (docs/prototypes/cyvore-mockups/story-board.js). */
+type StoryApi = {
+  state(): State & Partial<{ static: boolean; copies: number }>;
+  scrollToBeat(beat: number, within?: number): void;
+};
+declare global {
+  interface Window { __cyvoreStories: Record<string, StoryApi> }
+}
+
+const site = (page: Page) => page.locator('.story[data-story="desktop"] .site');
+
+test.describe("markup", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/cyvore-mockups.html");
+  });
+
+  test("all four chapters of the shipped site are there", async ({ page }) => {
+    for (const ch of ["why", "risk", "attack", "powers"]) {
+      await expect(site(page).locator(`[data-chapter="${ch}"]`)).toHaveCount(1);
+    }
+    await expect(site(page).locator(".chap[data-go]")).toHaveText([
+      "Why it matters", "The risk is real", "Real-world attack", "What powers us",
+    ]);
+  });
+
+  test("What powers us uses the live site's words exactly", async ({ page }) => {
+    const powers = site(page).locator('[data-chapter="powers"]');
+    await expect(powers.locator("h4")).toHaveText("WHAT POWERS US");
+    await expect(powers.locator(".s-head p")).toHaveText("Three proprietary engines");
+    await expect(powers.locator(".eng h5")).toHaveText(["OPR", "TIAO", "DAN"]);
+    await expect(powers.locator(".eng-x")).toHaveText([
+      "(Optical Phishing Recognition)",
+      "(Threat Intelligence Autonomous Operation)",
+      "(Data Analysis NLU)",
+    ]);
+    await expect(powers.locator(".eng-d")).toHaveText([
+      "AI driven visual phishing detection",
+      "Proactive threat engine that mimics analyst behavior, catching Zero-Day threats before they are launched.",
+      "Context-aware language model that understands behavioral patterns across human and AI agents.",
+    ]);
+  });
+
+  test("the attack chapter carries the three approved captions and a paused video", async ({ page }) => {
+    const attack = site(page).locator('[data-chapter="attack"]');
+    await expect(attack.locator(".s-caps li")).toHaveText([
+      "A link lands in the call.", "Cyvore reads it.", "Blocked.",
+    ]);
+    await expect(attack.locator("video")).not.toHaveAttribute("autoplay", /.*/);
+    await expect(attack.locator("video")).not.toHaveAttribute("data-inview", /.*/);
+  });
+
+  test("refined type (version C): descriptions in Inter 15px, headings and column names stay Michroma", async ({ page }) => {
+    const t = await page.evaluate(() => {
+      const site = document.querySelector('.story[data-story="desktop"] .site') as HTMLElement;
+      const u = (site.closest(".frame") as HTMLElement).getBoundingClientRect().width / 1440;
+      const font = (sel: string) => getComputedStyle(site.querySelector(sel)!).fontFamily.split(",")[0].replace(/"/g, "");
+      const desc = site.querySelector(".pan-desc") as HTMLElement;
+      return {
+        desc: font(".pan-desc"),
+        size: parseFloat(getComputedStyle(desc).fontSize) / u,
+        heading: font(".s-head h4"),
+        column: font(".pan-name"),
+        color: getComputedStyle(desc).color,
+      };
+    });
+    expect(t).toMatchObject({ desc: "Inter", heading: "Michroma", column: "Michroma", color: "rgb(223, 225, 244)" });
+    expect(t.size).toBeCloseTo(15, 0);
+  });
+
+  test("refined depth (version C): one glowing call to action per screen", async ({ page }) => {
+    const glows = await page.$$eval('.story[data-story="desktop"] [data-chapter="why"] .s-cta, .story[data-story="desktop"] .s-nav .s-cta', (els) =>
+      els.filter((e) => getComputedStyle(e).boxShadow.includes("rgba(156, 131, 251")).length);
+    expect(glows).toBe(1);
+  });
+
+  test("the pin can stick: sticky pin, frames clip instead of hiding overflow", async ({ page }) => {
+    const styles = await page.evaluate(() => {
+      const pin = document.querySelector('.story[data-story="desktop"] .story-pin') as HTMLElement;
+      return {
+        pin: getComputedStyle(pin).position,
+        frame: getComputedStyle(pin.closest(".frame")!).overflow,
+        f: getComputedStyle(pin.closest(".f")!).overflow,
+      };
+    });
+    expect(styles).toEqual({ pin: "sticky", frame: "clip", f: "clip" });
+  });
+});
+
+type State = {
+  beat: number; chapter: string; settled: boolean; visible: string[];
+  open: { why: number; risk: number }; fill: Record<string, number>;
+  caption: number; lit: number[]; statText: string | null;
+};
+
+const story = (page: Page, name = "desktop") => ({
+  state: () => page.evaluate((n) => window.__cyvoreStories[n].state(), name) as Promise<State>,
+  go: async (beat: number, within = 0.5) => {
+    await page.evaluate(([n, b, w]) => window.__cyvoreStories[n].scrollToBeat(b, w), [name, beat, within] as const);
+    await page.waitForFunction(([n, b]) => {
+      const s = window.__cyvoreStories[n].state();
+      return s.beat === b && s.settled;
+    }, [name, beat] as const);
+  },
+});
+
+test.describe("beats", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/cyvore-mockups.html", { waitUntil: "load" });
+    await page.waitForFunction(() => window.__cyvoreStories?.desktop);
+  });
+
+  test("the site arrives with every column closed", async ({ page }) => {
+    await story(page).go(0, 0.5);
+    const s = await story(page).state();
+    expect(s.chapter).toBe("why");
+    expect(s.open.why).toBe(-1);
+  });
+
+  test("each beat of Why it matters opens the next column", async ({ page }) => {
+    for (const [beat, col] of [[1, 0], [2, 1], [3, 2], [4, 3]] as const) {
+      await story(page).go(beat);
+      expect((await story(page).state()).open.why).toBe(col);
+    }
+  });
+
+  test("The risk is real opens its statistics in turn and counts each one up to its value", async ({ page }) => {
+    await story(page).go(7);
+    await page.waitForTimeout(1500);
+    const s = await story(page).state();
+    expect(s.chapter).toBe("risk");
+    expect(s.open.risk).toBe(2);
+    expect(s.statText).toBe("967%");
+  });
+
+  test("the bar fills with the story and marks finished chapters", async ({ page }) => {
+    await story(page).go(6, 0.5);
+    const s = await story(page).state();
+    expect(s.fill.why).toBe(1);
+    expect(s.fill.risk).toBeCloseTo(0.375, 2);
+    expect(s.fill.attack).toBe(0);
+    await expect(page.locator('.story[data-story="desktop"] .chap[data-go="why"]')).toHaveAttribute("data-done", "");
+  });
+
+  test("moving the mouse onto a column opens it, as on the live site", async ({ page }) => {
+    await story(page).go(1);
+    await page.waitForTimeout(700); // let the columns finish resizing before aiming at one
+    const box = (await page.locator('.story[data-story="desktop"] [data-chapter="why"] .pan[aria-label="Coverage"]').boundingBox())!;
+    await page.mouse.move(box.x + 4, box.y + box.height / 2);
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 8 });
+    await page.waitForTimeout(400);
+    expect((await story(page).state()).open.why).toBe(2);
+  });
+
+  test("a column the visitor picks gives way to the next beat", async ({ page }) => {
+    await story(page).go(2);
+    await page.waitForTimeout(700); // let the columns finish resizing before aiming at one
+    // Click where it is on screen, as a mouse does: locator.click() would first scroll the
+    // element into view, and inside a sticky pin that scroll moves the story itself.
+    const box = (await page.locator('.story[data-story="desktop"] [data-chapter="why"] .pan[aria-label="Enables"]').boundingBox())!;
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    expect((await story(page).state()).open.why).toBe(3);
+    await story(page).go(3);
+    // The mouse is still resting where it clicked while the columns move under it. Chrome then
+    // sends a pointer-enter with no movement; that must not count as hovering.
+    await page.evaluate(([x, y]) => {
+      const t = document.querySelector('.story[data-story="desktop"] [data-chapter="why"] .pan[aria-label="Enables"]')!;
+      t.dispatchEvent(new PointerEvent("pointerenter", { pointerType: "mouse", clientX: x, clientY: y }));
+      t.dispatchEvent(new PointerEvent("pointermove", { pointerType: "mouse", clientX: x, clientY: y, bubbles: true }));
+    }, [box.x + box.width / 2, box.y + box.height / 2]);
+    await page.waitForTimeout(400);
+    expect((await story(page).state()).open.why).toBe(2);
+  });
+});
+
+test.describe("handovers", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/cyvore-mockups.html", { waitUntil: "load" });
+    await page.waitForFunction(() => window.__cyvoreStories?.desktop);
+  });
+
+  test("at rest, exactly one chapter is visible, and the others can't be reached", async ({ page }) => {
+    for (const [beat, ch] of [[0, "why"], [5, "risk"], [9, "attack"], [10, "powers"]] as const) {
+      await story(page).go(beat);
+      expect((await story(page).state()).visible).toEqual([ch]);
+      const inert = await page.$$eval('.story[data-story="desktop"] .s-chapter', (els) => els.map((e) => (e as HTMLElement).inert));
+      expect(inert.filter((x) => !x)).toHaveLength(1);
+    }
+  });
+
+  test("the outgoing chapter is gone before the next arrives, moving up when going forward", async ({ page }) => {
+    await story(page).go(4);
+    const samples = await page.evaluate(async () => {
+      const api = window.__cyvoreStories.desktop;
+      const why = document.querySelector('.story[data-story="desktop"] [data-chapter="why"]') as HTMLElement;
+      const risk = document.querySelector('.story[data-story="desktop"] [data-chapter="risk"]') as HTMLElement;
+      api.scrollToBeat(5, 0.5);
+      const out: { why: number; risk: number; whyY: number }[] = [];
+      for (let i = 0; i < 24; i++) {
+        await new Promise((r) => setTimeout(r, 40));
+        out.push({
+          why: parseFloat(getComputedStyle(why).opacity),
+          risk: parseFloat(getComputedStyle(risk).opacity),
+          whyY: new DOMMatrix(getComputedStyle(why).transform).m42,
+        });
+      }
+      return out;
+    });
+    expect(samples.some((s) => s.why > 0.05 && s.risk > 0.05)).toBe(false);
+    expect(samples.some((s) => s.whyY < -1)).toBe(true);
+  });
+
+  test("a fast flick to the end settles on What powers us alone", async ({ page }) => {
+    await story(page).go(0);
+    await page.evaluate(() => window.__cyvoreStories.desktop.scrollToBeat(11, 0.5));
+    await page.waitForFunction(() => window.__cyvoreStories.desktop.state().settled);
+    await page.waitForTimeout(600);
+    expect((await story(page).state()).visible).toEqual(["powers"]);
+  });
+
+  test("clicking the bar jumps to that chapter; the last click wins", async ({ page }) => {
+    const bar = page.locator('.story[data-story="desktop"] .chap');
+    await story(page).go(0);
+    // On-screen clicks (see ledger): locator.click() would scroll the sticky pin itself.
+    const tap = async (name: string) => {
+      const box = (await bar.filter({ hasText: name }).boundingBox())!;
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    };
+    await tap("What powers us");
+    await tap("The risk is real");
+    await page.waitForFunction(() => {
+      const s = window.__cyvoreStories.desktop.state();
+      return s.chapter === "risk" && s.settled;
+    }, null, { timeout: 5000 });
+    await page.waitForTimeout(600);
+    expect((await story(page).state()).visible).toEqual(["risk"]);
+  });
+
+  test("a reload mid-story opens on the right chapter without replaying the rest", async ({ page }) => {
+    await story(page).go(9);
+    const y = await page.evaluate(() => window.scrollY);
+    await page.reload();
+    await page.waitForFunction(() => window.__cyvoreStories?.desktop);
+    // The browser may restore the scroll before or after the story mounts; either way,
+    // within one handover's time it must rest on the attack, alone.
+    await page.evaluate((top) => { if (Math.abs(window.scrollY - top) > 2) window.scrollTo(0, top); }, y);
+    await page.waitForFunction(() => {
+      const s = window.__cyvoreStories.desktop.state();
+      return s.chapter === "attack" && s.settled;
+    }, null, { timeout: 2000 });
+    expect((await story(page).state()).visible).toEqual(["attack"]);
+  });
+});
+
+test.describe("attack and engines", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/cyvore-mockups.html", { waitUntil: "load" });
+    await page.waitForFunction(() => window.__cyvoreStories?.desktop);
+    await page.waitForFunction(() => {
+      const v = document.querySelector('.story[data-story="desktop"] [data-chapter="attack"] video') as HTMLVideoElement;
+      return v.dataset.scrub === "ready" && v.readyState >= 2;
+    });
+  });
+
+  test("the attack follows the scroll, captions in order", async ({ page }) => {
+    const at = async (within: number) => {
+      await story(page).go(9, within);
+      await page.waitForTimeout(250);
+      return page.evaluate(() => {
+        const v = document.querySelector('.story[data-story="desktop"] [data-chapter="attack"] video') as HTMLVideoElement;
+        return { t: v.currentTime, caption: window.__cyvoreStories.desktop.state().caption };
+      });
+    };
+    expect((await at(0.1)).caption).toBe(-1);
+    const mid = await at(0.45);
+    expect(mid.t).toBeGreaterThan(3.5);
+    expect(mid.caption).toBe(1);
+    expect((await at(0.95)).caption).toBe(2);
+  });
+
+  test("the scrubbed frame is actually painted, not a black stage", async ({ page }) => {
+    await story(page).go(9, 0.9);
+    await page.waitForTimeout(800);
+    const png = await page.locator('.story[data-story="desktop"] [data-chapter="attack"] .attack').screenshot();
+    const mean = await page.evaluate(async (b64) => {
+      const img = new Image();
+      img.src = "data:image/png;base64," + b64;
+      await img.decode();
+      const c = document.createElement("canvas");
+      c.width = img.width; c.height = img.height;
+      const ctx = c.getContext("2d")!;
+      ctx.drawImage(img, 0, 0);
+      const d = ctx.getImageData(0, 0, c.width, c.height).data;
+      let sum = 0;
+      for (let i = 0; i < d.length; i += 4) sum += (d[i] + d[i + 1] + d[i + 2]) / 3;
+      return sum / (d.length / 4);
+    }, png.toString("base64"));
+    // The empty stage is ~8; the BLOCK frame of the Zoom call averages well above 15.
+    expect(mean).toBeGreaterThan(15);
+  });
+
+  test("What powers us draws its diagram and lights the three engines in turn", async ({ page }) => {
+    await story(page).go(10);
+    await page.waitForTimeout(1600);
+    const s = await story(page).state();
+    expect(s.lit.map((x) => Math.round(x))).toEqual([1, 1, 1]);
+    const clip = await page.$eval('.story[data-story="desktop"] .wires', (el) => getComputedStyle(el).clipPath);
+    expect(clip).toMatch(/inset\(0(px|%)?\)|none/);
+  });
+
+  test("coming back to What powers us builds it again from the start", async ({ page }) => {
+    await story(page).go(10);
+    await page.waitForTimeout(1600);
+    await story(page).go(9);
+    await story(page).go(10);
+    const early = (await story(page).state()).lit;
+    expect(early.every((x) => x < 1)).toBe(true);
+  });
+
+  test("scrubbing before the video has loaded raises no errors", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await page.evaluate(() => {
+      const v = document.querySelector('.story[data-story="desktop"] [data-chapter="attack"] video') as HTMLVideoElement;
+      v.removeAttribute("src"); v.load();
+    });
+    await story(page).go(9, 0.5);
+    expect(errors).toEqual([]);
+    expect((await story(page).state()).caption).toBe(-1);
+  });
+});
+
+test.describe("reduced motion", () => {
+  test.use({ reducedMotion: "reduce" });
+
+  test("four still screens, one per chapter, nothing pinned", async ({ page }) => {
+    await page.goto("/cyvore-mockups.html", { waitUntil: "load" });
+    await page.waitForFunction(() => window.__cyvoreStories?.desktop);
+    const s = await page.evaluate(() => window.__cyvoreStories.desktop.state());
+    expect(s).toEqual({ static: true, copies: 4 });
+    const story = page.locator('.story[data-story="desktop"]');
+    await expect(story.locator(".site")).toHaveCount(4);
+    expect(await story.locator(".story-pin").evaluate((el) => getComputedStyle(el).position)).toBe("static");
+    await expect(story.locator('.site [data-chapter="risk"].is-on .stat-num').first()).toHaveText("2,535%");
+    const lit = await story.locator('.site [data-chapter="powers"].is-on .eng').evaluateAll((els) =>
+      els.map((e) => parseFloat(getComputedStyle(e).getPropertyValue("--lit"))));
+    expect(lit).toEqual([1, 1, 1]);
+    await expect(story.locator('.site [data-chapter="attack"].is-on .s-caps li')).toHaveCount(3);
+  });
+});
+
+test.describe("phone", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/cyvore-mockups.html", { waitUntil: "load" });
+    await page.waitForFunction(() => window.__cyvoreStories?.phone);
+  });
+
+  test("the phone tells the same story, stacked", async ({ page }) => {
+    await story(page, "phone").go(3);
+    expect((await story(page, "phone").state()).open.why).toBe(2);
+    const dir = await page.$eval('.story[data-story="phone"] [data-chapter="why"] .panels', (el) => getComputedStyle(el).flexDirection);
+    expect(dir).toBe("column");
+    await story(page, "phone").go(5);
+    expect((await story(page, "phone").state()).visible).toEqual(["risk"]);
+  });
+
+  test("the phone's chapter bar is a 2 × 2 grid of 44px-or-taller tabs", async ({ page }) => {
+    const tabs = await page.$$eval('.story[data-story="phone"] .chap', (els) => els.map((e) => e.getBoundingClientRect().height));
+    const frame = await page.$eval('.story[data-story="phone"]', (el) => el.closest(".frame")!.getBoundingClientRect().width / 390);
+    expect(tabs).toHaveLength(4);
+    for (const h of tabs) expect(h / frame).toBeGreaterThanOrEqual(44);
+  });
+});
+
+test.describe("page", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/cyvore-mockups.html", { waitUntil: "load" });
+    await page.waitForFunction(() => window.__cyvoreStories?.desktop);
+  });
+
+  test("How it works no longer repeats the attack video; it shows the shipped CTA motion", async ({ page }) => {
+    const how = page.locator(".f.how");
+    await expect(how.locator(".mission")).toHaveCount(0);
+    await expect(how.locator('video[src$="cta-hover.mp4"]')).toHaveCount(1);
+    await expect(how).toContainText("Motion with a job.");
+    await expect(how).toContainText("A 7-second sequence tells the product's mission: a phishing link lands in a video call, and Cyvore blocks it.");
+    await expect(how.locator(".ds")).toHaveCount(1);
+  });
+
+  test("what is seen stays within 8 screens (pinned scroll not counted)", async ({ page }) => {
+    const screens = await page.evaluate(() => {
+      const frames = [...document.querySelectorAll(".f")].filter((f) => !f.classList.contains("m") && !f.classList.contains("demo"));
+      const u = frames[0].getBoundingClientRect().width / 1440;
+      const track = document.querySelector('.story[data-story="desktop"] .story-track') as HTMLElement;
+      const pin = document.querySelector('.story[data-story="desktop"] .story-pin') as HTMLElement;
+      const total = frames.reduce((s, f) => s + f.getBoundingClientRect().height, 0) - (track.offsetHeight - pin.offsetHeight);
+      return total / (900 * u);
+    });
+    expect(screens).toBeLessThanOrEqual(8);
+  });
+
+  test("no console errors while the whole story plays", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+    for (let b = 0; b < 12; b++) await story(page).go(b);
+    expect(errors).toEqual([]);
+  });
+});
+
+test.describe("final review", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/cyvore-mockups.html", { waitUntil: "load" });
+    await page.waitForFunction(() => window.__cyvoreStories?.desktop);
+  });
+
+  test("the keyboard reaches every chapter in the bar and Enter jumps there", async ({ page }) => {
+    await story(page).go(0);
+    await page.locator('.story[data-story="desktop"] .chap[data-go="why"]').focus();
+    await page.keyboard.press("Tab");
+    const focused = await page.evaluate(() => (document.activeElement as HTMLElement).dataset.go);
+    expect(focused).toBe("risk");
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(() => {
+      const s = window.__cyvoreStories.desktop.state();
+      return s.chapter === "risk" && s.settled;
+    }, null, { timeout: 5000 });
+  });
+
+  test("a fast multi-step scroll never flashes a chapter it is passing", async ({ page }) => {
+    await story(page).go(4);
+    const jumps = await page.evaluate(async () => {
+      const api = window.__cyvoreStories.desktop;
+      const els = [...document.querySelectorAll('.story[data-story="desktop"] .s-chapter')] as HTMLElement[];
+      const read = () => els.map((e) => parseFloat(getComputedStyle(e).opacity));
+      let prev = read();
+      let worst = 0;
+      let sampling = true;
+      const tick = () => {
+        const now = read();
+        now.forEach((o, i) => { if (prev[i] < 0.05 && o > 0.9) worst++; });
+        prev = now;
+        if (sampling) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+      for (const b of [5, 6, 7, 8, 9]) {
+        api.scrollToBeat(b, 0.5);
+        await new Promise((r) => setTimeout(r, 30));
+      }
+      await new Promise((r) => setTimeout(r, 1500));
+      sampling = false;
+      return worst;
+    });
+    expect(jumps).toBe(0);
+    expect((await story(page).state()).visible).toEqual(["attack"]);
+  });
+
+  test("scrolling back from the end keeps the engines diagram built", async ({ page }) => {
+    await story(page).go(10);
+    await page.waitForTimeout(1600);
+    await story(page).go(11);
+    await story(page).go(10, 0.9);
+    await page.waitForTimeout(100);
+    expect((await story(page).state()).lit.map((x) => Math.round(x))).toEqual([1, 1, 1]);
+  });
+
+  test("clicking the statistic already open leaves its number alone", async ({ page }) => {
+    await story(page).go(7);
+    await page.waitForTimeout(1600);
+    const box = (await page.locator('.story[data-story="desktop"] [data-chapter="risk"] .pan[aria-label="967%"]').boundingBox())!;
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await page.waitForTimeout(300);
+    expect((await story(page).state()).statText).toBe("967%");
+  });
+
+  test("a column opens while the mouse is still moving across it, as on the live site", async ({ page }) => {
+    await story(page).go(1);
+    await page.waitForTimeout(700);
+    const box = (await page.locator('.story[data-story="desktop"] [data-chapter="why"] .pan[aria-label="Coverage"]').boundingBox())!;
+    const y = box.y + box.height / 2;
+    for (let k = 0; k < 8; k++) {
+      await page.mouse.move(box.x + 6 + k * 3, y);
+      await page.waitForTimeout(30);
+    }
+    expect((await story(page).state()).open.why).toBe(2);
+  });
+});
