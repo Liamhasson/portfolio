@@ -45,8 +45,8 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
 .block { margin-top: 80px; }
 .cap { display: flex; justify-content: space-between; gap: 16px; margin: 0 auto 12px; max-width: 1440px; font: 400 12px/1.4 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: #8c8c96; }
 .cap b { font-weight: 400; color: #e6e6ea; }
-.frame { container-type: inline-size; max-width: 1440px; margin: 0 auto; border-radius: 3px; overflow: hidden; box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 30px 80px -40px rgba(0,0,0,.9); }
-.f { --u: calc(100cqw / 1440); position: relative; overflow: hidden; background: var(--void); color: var(--ink); font-family: var(--sans); font-weight: 400; }
+.frame { container-type: inline-size; max-width: 1440px; margin: 0 auto; border-radius: 3px; overflow: clip; box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 30px 80px -40px rgba(0,0,0,.9); }
+.f { --u: calc(100cqw / 1440); position: relative; overflow: clip; background: var(--void); color: var(--ink); font-family: var(--sans); font-weight: 400; }
 .f.m { --u: calc(100cqw / 390); }
 .f p { margin: 0; }
 .f h1, .f h2, .f h3 { margin: 0; font-weight: 400; }
@@ -163,38 +163,41 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
 .pitch { font-size: calc(var(--u) * 40); line-height: 1.15; letter-spacing: -.016em; }
 .pitch em { font-style: italic; color: var(--ink-3); }
 
-/* ------------------------------ 4 solution: the replica ------------------------------ */
+/* ------------------------------ 4 solution: the story replica ------------------------------ */
 .solution { padding: calc(var(--u) * 112) 0 calc(var(--u) * 104); }
 .sol-glow { position: absolute; left: 50%; top: calc(var(--u) * 760); width: calc(var(--u) * 1500); height: calc(var(--u) * 700); transform: translate(-50%, -50%); background: radial-gradient(closest-side, rgba(138,56,245,.22), rgba(138,56,245,0)); pointer-events: none; }
-.rep-wrap { position: relative; margin: calc(var(--u) * 72) calc(var(--u) * 72) 0; }
+.story { position: relative; margin: calc(var(--u) * 72) calc(var(--u) * 72) 0; }
+.story-track { position: relative; } /* height set by story-board.js: pin + the pinned scroll */
+.story-pin { position: sticky; top: var(--pin-top, 24px); }
 .rep-anno { display: flex; justify-content: space-between; margin-bottom: calc(var(--u) * 16); }
 .rep-anno span { font: 400 calc(var(--u) * 12)/1 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); display: flex; align-items: center; gap: calc(var(--u) * 10); }
 .rep-anno span::before { content: ""; width: calc(var(--u) * 14); height: calc(var(--u) * 1); background: var(--ink-3); }
 .sol-foot { margin-top: calc(var(--u) * 72); align-items: end; }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* The site itself (Cyvore's own UI: Michroma, Iceland, Inter in the cards) */
 .site { --s: var(--u); position: relative; height: calc(var(--s) * 776); border-radius: calc(var(--s) * 20); background: var(--site); overflow: hidden; box-shadow: 0 0 0 calc(var(--s) * 1) rgba(156,131,251,.18), 0 calc(var(--s) * 40) calc(var(--s) * 120) calc(var(--s) * -40) rgba(138,56,245,.45); font-family: var(--mich); color: #fff; }
 .site::before { content: ""; position: absolute; left: 50%; top: calc(var(--s) * 300); width: calc(var(--s) * 1200); height: calc(var(--s) * 560); transform: translate(-50%, -50%); background: radial-gradient(closest-side, rgba(138,56,245,.42), rgba(138,56,245,0)); pointer-events: none; }
-.s-nav { position: absolute; left: calc(var(--s) * 36); right: calc(var(--s) * 36); top: calc(var(--s) * 24); height: calc(var(--s) * 40); display: flex; align-items: center; justify-content: space-between; z-index: 2; }
+.s-nav { position: absolute; left: calc(var(--s) * 36); right: calc(var(--s) * 36); top: calc(var(--s) * 24); height: calc(var(--s) * 40); display: flex; align-items: center; justify-content: space-between; z-index: 4; }
 .s-logo { display: flex; align-items: center; gap: calc(var(--s) * 8); font: 700 calc(var(--s) * 20)/1 var(--ui); letter-spacing: -.02em; }
 .s-logo img { width: calc(var(--s) * 15); height: auto; }
 .s-logo sup { font-size: .4em; font-weight: 500; margin-left: calc(var(--s) * 1); opacity: .7; }
 .s-links { display: flex; gap: calc(var(--s) * 34); font-size: calc(var(--s) * 9); letter-spacing: .02em; color: rgba(255,255,255,.82); }
 .s-cta { height: calc(var(--s) * 32); padding: 0 calc(var(--s) * 16); border-radius: calc(var(--s) * 999); display: inline-flex; align-items: center; font: 400 calc(var(--s) * 8.5)/1 var(--mich); letter-spacing: .04em; color: #111011; background: #fff; box-shadow: 0 0 calc(var(--s) * 18) rgba(156,131,251,.65); white-space: nowrap; }
 .s-cta.ghost { background: transparent; color: #fff; box-shadow: inset 0 0 0 calc(var(--s) * 1) rgba(255,255,255,.55); }
-.s-head { position: absolute; left: 0; right: 0; top: calc(var(--s) * 92); text-align: center; z-index: 1; }
+/* the stage is only a frame: it never moves; chapters draw into it */
+.s-stage { position: absolute; left: calc(var(--s) * 96); right: calc(var(--s) * 96); top: calc(var(--s) * 208); height: calc(var(--s) * 544); border-radius: calc(var(--s) * 18); background: #07060b; box-shadow: 0 0 0 calc(var(--s) * 1) rgba(156,131,251,.14), 0 0 calc(var(--s) * 60) rgba(138,56,245,.35); z-index: 1; }
+.s-chapter { position: absolute; inset: 0; z-index: 2; opacity: 0; visibility: hidden; }
+.s-chapter.is-on { opacity: 1; visibility: visible; }
+.s-head { position: absolute; left: 0; right: 0; top: calc(var(--s) * 92); text-align: center; }
 .s-head h4 { margin: 0; font: 400 calc(var(--s) * 24)/1.1 var(--mich); letter-spacing: .01em; }
-.s-head p { margin: calc(var(--s) * 8) 0 0; font: 400 calc(var(--s) * 9)/1.4 var(--mich); color: rgba(255,255,255,.7); }
-.s-head .s-btns { display: flex; justify-content: center; gap: calc(var(--s) * 10); margin-top: calc(var(--s) * 16); }
-.s-stage { position: absolute; left: calc(var(--s) * 96); right: calc(var(--s) * 96); top: calc(var(--s) * 208); height: calc(var(--s) * 544); border-radius: calc(var(--s) * 18); background: #07060b; box-shadow: 0 0 0 calc(var(--s) * 1) rgba(156,131,251,.14), 0 0 calc(var(--s) * 60) rgba(138,56,245,.35); padding: calc(var(--s) * 16); z-index: 1; }
-.s-chapter { position: absolute; inset: calc(var(--s) * 16) calc(var(--s) * 16) calc(var(--s) * 88); opacity: 0; visibility: hidden; transition: opacity 360ms var(--settle), visibility 0s linear 360ms; }
-.s-chapter.is-on { opacity: 1; visibility: visible; transition: opacity 360ms var(--settle) 80ms, visibility 0s; }
-.s-heads .s-head { opacity: 0; visibility: hidden; transition: opacity 300ms var(--settle), visibility 0s linear 300ms; }
-.s-heads .s-head.is-on { opacity: 1; visibility: visible; transition: opacity 300ms var(--settle) 60ms, visibility 0s; }
+.site .s-head p { margin: calc(var(--s) * 8) 0 0; font: 400 calc(var(--s) * 9)/1.4 var(--mich); color: rgba(255,255,255,.7); }
+.s-btns { display: flex; justify-content: center; gap: calc(var(--s) * 10); margin-top: calc(var(--s) * 16); }
+.s-body { position: absolute; left: calc(var(--s) * 112); right: calc(var(--s) * 112); top: calc(var(--s) * 224); bottom: calc(var(--s) * 112); }
 
-/* panels: one opens, the rest stay as labelled columns */
+/* columns: one opens, the rest stay as labelled columns */
 .panels { display: flex; gap: calc(var(--s) * 14); height: 100%; }
-.pan { position: relative; flex: 1 1 0; min-width: 0; border: 0; padding: 0; margin: 0; border-radius: calc(var(--s) * 14); background: var(--tab); color: #fff; font: inherit; cursor: pointer; overflow: hidden; text-align: left;
+.pan { position: relative; flex: 1 1 0; min-width: 0; min-height: 0; border: 0; padding: 0; margin: 0; border-radius: calc(var(--s) * 14); background: var(--tab); color: #fff; font: inherit; cursor: pointer; overflow: hidden; text-align: left;
   transition: flex-grow 560ms var(--settle), background-color 420ms var(--settle); -webkit-tap-highlight-color: transparent; }
 .pan::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: radial-gradient(70% 70% at 50% 48%, #5a1fb8 0%, #6f29df 55%, #7f31f0 100%); opacity: 0; transition: opacity 420ms var(--settle); }
 .pan[aria-selected="true"] { flex-grow: 3.3; cursor: default; }
@@ -205,54 +208,66 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
 .pan-body { position: absolute; inset: 0; padding: calc(var(--s) * 28) calc(var(--s) * 30); display: flex; flex-direction: column; justify-content: flex-end; opacity: 0; transition: opacity 240ms var(--settle); pointer-events: none; }
 .pan[aria-selected="true"] .pan-body { opacity: 1; transition: opacity 380ms var(--settle) 400ms; } /* after the column has mostly widened */
 .pan-title { text-align: center; font: 400 calc(var(--s) * 24)/1 var(--mich); letter-spacing: .03em; text-shadow: 0 calc(var(--s) * 2) calc(var(--s) * 10) rgba(20,0,60,.45); white-space: nowrap; }
-.pan-desc { margin-top: calc(var(--s) * 22); font: 400 calc(var(--s) * 10.5)/1.85 var(--mich); color: rgba(255,255,255,.92); max-width: 46ch; }
-.pan-art { position: absolute; left: 0; right: 0; top: calc(var(--s) * 34); height: calc(var(--s) * 220); }
-/* every animated piece enters on the panel's open, staggered by --d */
+.pan-desc { margin-top: calc(var(--s) * 20); font: 400 calc(var(--s) * 13)/1.7 var(--mich); color: rgba(255,255,255,.96); max-width: 44ch; }
+.pan-art { position: absolute; left: 0; right: 0; top: calc(var(--s) * 30); height: calc(var(--s) * 220); }
 .pan .bit { opacity: 0; transform: translateY(calc(var(--s) * 14)) scale(.96); transition: opacity 420ms var(--settle), transform 520ms var(--settle); }
 .pan[aria-selected="true"] .bit { opacity: 1; transform: none; transition-delay: calc(520ms + var(--d, 0) * 110ms); }
-/* Security: three alerts land as a loose stack */
-.card { position: absolute; width: calc(var(--s) * 210); padding: calc(var(--s) * 14) calc(var(--s) * 16); border-radius: calc(var(--s) * 12); background: linear-gradient(180deg, #fff, #f1ecfb); color: #2a2440; font: 400 calc(var(--s) * 12)/1.35 var(--ui); box-shadow: 0 calc(var(--s) * 10) calc(var(--s) * 24) rgba(30,0,80,.35); }
+.card { position: absolute; width: calc(var(--s) * 214); padding: calc(var(--s) * 14) calc(var(--s) * 16); border-radius: calc(var(--s) * 12); background: linear-gradient(180deg, #fff, #f1ecfb); color: #2a2440; font: 400 calc(var(--s) * 13)/1.35 var(--ui); box-shadow: 0 calc(var(--s) * 10) calc(var(--s) * 24) rgba(30,0,80,.35); }
 .card .ic { color: var(--v1); width: calc(var(--s) * 15); height: calc(var(--s) * 15); display: block; margin-bottom: calc(var(--s) * 10); }
 .pan[aria-selected="true"] .card.bit { transform: rotate(var(--r, 0deg)); }
-/* Exposure: the chain of events, one link at a time */
 .chain { position: absolute; left: 50%; top: calc(var(--s) * 6); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; }
 .link { width: calc(var(--s) * 46); height: calc(var(--s) * 46); border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.28); color: #fff; margin-top: calc(var(--s) * -6); }
 .link:first-child { border-radius: calc(var(--s) * 12) calc(var(--s) * 12) calc(var(--s) * 30) calc(var(--s) * 30); width: calc(var(--s) * 52); height: calc(var(--s) * 52); margin-top: 0; }
 .link.last { background: #fff; color: var(--v1); box-shadow: 0 0 calc(var(--s) * 24) rgba(255,255,255,.35); }
 .link .ic { width: calc(var(--s) * 18); height: calc(var(--s) * 18); }
-/* Coverage: every channel, then "and beyond" */
 .tiles { position: absolute; left: 50%; top: calc(var(--s) * 10); transform: translateX(-50%); display: grid; grid-template-columns: repeat(4, calc(var(--s) * 54)); gap: calc(var(--s) * 12); justify-items: center; }
 .tile { width: calc(var(--s) * 54); height: calc(var(--s) * 54); border-radius: calc(var(--s) * 12); background: linear-gradient(180deg, #fff, #efe9fb); color: var(--v1); display: grid; place-items: center; font: 600 calc(var(--s) * 15)/1 var(--ui); box-shadow: 0 calc(var(--s) * 8) calc(var(--s) * 18) rgba(30,0,80,.28); }
 .tile.word { font-size: calc(var(--s) * 10); letter-spacing: -.02em; }
 .tile .ic { width: calc(var(--s) * 20); height: calc(var(--s) * 20); }
 .plus { grid-column: 1 / -1; width: calc(var(--s) * 26); height: calc(var(--s) * 26); border-radius: 50%; background: rgba(255,255,255,.3); display: grid; place-items: center; margin-top: calc(var(--s) * 2); }
 .plus .ic { width: calc(var(--s) * 14); height: calc(var(--s) * 14); }
-/* Enables: indicators, each one investigable */
-.iocs { position: absolute; left: 50%; top: calc(var(--s) * 0); transform: translateX(-50%); display: flex; flex-direction: column; gap: calc(var(--s) * 12); }
-.ioc { display: flex; align-items: center; gap: calc(var(--s) * 14); width: calc(var(--s) * 260); padding: calc(var(--s) * 11) calc(var(--s) * 14); border-radius: calc(var(--s) * 14); background: rgba(255,255,255,.92); color: #2a2440; font: 400 calc(var(--s) * 11.5)/1.35 var(--ui); }
+.iocs { position: absolute; left: 50%; top: 0; transform: translateX(-50%); display: flex; flex-direction: column; gap: calc(var(--s) * 12); }
+.ioc { display: flex; align-items: center; gap: calc(var(--s) * 14); width: calc(var(--s) * 270); padding: calc(var(--s) * 11) calc(var(--s) * 14); border-radius: calc(var(--s) * 14); background: rgba(255,255,255,.92); color: #2a2440; font: 400 calc(var(--s) * 13)/1.35 var(--ui); }
 .ioc b { flex: none; width: calc(var(--s) * 32); height: calc(var(--s) * 32); border-radius: calc(var(--s) * 8); display: grid; place-items: center; background: #fff; color: var(--v1); font: 600 calc(var(--s) * 8.5)/1 var(--ui); box-shadow: 0 0 0 calc(var(--s) * 1) rgba(42,36,64,.08); }
 .ioc b .ic { width: calc(var(--s) * 15); height: calc(var(--s) * 15); }
 /* The risk is real: the same columns, numbers instead of pictures */
 .pan.stat .pan-name { top: calc(var(--s) * 30); transform: none; left: calc(var(--s) * 20); text-align: left; font-size: calc(var(--s) * 15); }
-.pan.stat[aria-selected="true"] .pan-name { opacity: 1; }
 .pan.stat .pan-body { justify-content: center; }
-.stat-num { font: 400 calc(var(--s) * 34)/1 var(--mich); }
-.stat-desc { margin-top: calc(var(--s) * 18); font: 400 calc(var(--s) * 10.5)/1.8 var(--mich); color: rgba(255,255,255,.92); max-width: 30ch; }
-.pan.stat[aria-selected="true"] .pan-name { opacity: 0; }
-/* Real-world attack: the mission animation, on the stage */
+.stat-num { font: 400 calc(var(--s) * 34)/1 var(--mich); font-variant-numeric: tabular-nums; }
+.stat-desc { margin-top: calc(var(--s) * 18); font: 400 calc(var(--s) * 13)/1.7 var(--mich); color: rgba(255,255,255,.96); max-width: 30ch; }
+/* Real-world attack: the mission animation fills the stage; the captions sit under the heading */
 .attack { position: absolute; inset: 0; }
-.attack video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
-/* the second nav: chapters, always on screen */
-.s-chapters { position: absolute; left: calc(var(--s) * 16); right: calc(var(--s) * 16); bottom: calc(var(--s) * 16); height: calc(var(--s) * 58); border-radius: calc(var(--s) * 14); background: #040306; display: grid; grid-template-columns: repeat(4, 1fr); gap: calc(var(--s) * 8); padding: calc(var(--s) * 7); z-index: 3; }
-.chap { border: 0; margin: 0; border-radius: calc(var(--s) * 10); background: transparent; color: rgba(255,255,255,.82); font: 400 calc(var(--s) * 13)/1 var(--ice); letter-spacing: .14em; text-transform: uppercase; cursor: pointer; box-shadow: inset 0 0 0 calc(var(--s) * 1) transparent; transition: background-color 320ms var(--settle), box-shadow 320ms var(--settle), color 320ms var(--settle); }
+.attack video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; mix-blend-mode: lighten; }
+.s-caps { position: relative; height: calc(var(--s) * 18); margin: calc(var(--s) * 10) 0 0; padding: 0; list-style: none; font: 400 calc(var(--s) * 11)/1.6 var(--mich); color: rgba(255,255,255,.9); }
+.s-caps li { position: absolute; left: 0; right: 0; opacity: 0; transform: translateY(calc(var(--s) * 6)); transition: opacity 300ms var(--settle), transform 300ms var(--settle); }
+.s-caps li.is-on { opacity: 1; transform: none; }
+/* What powers us: three engines on a dashed diagram */
+.wires { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; clip-path: inset(0% 0% 100% 0%); }
+.wires path { fill: none; stroke: rgba(156,131,251,.6); stroke-width: 1.2; stroke-dasharray: 6 6; vector-effect: non-scaling-stroke; }
+.wires .node { fill: #9c83fb; }
+.engines { position: absolute; left: 0; right: 0; top: 27.3%; height: 45.5%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(var(--s) * 24); padding: 0 calc(var(--s) * 24); }
+.eng { --lit: 0; border-radius: calc(var(--s) * 16); background: rgba(26,18,48,.92); padding: calc(var(--s) * 24) calc(var(--s) * 22); opacity: calc(.25 + .75 * var(--lit));
+  box-shadow: inset 0 0 0 calc(var(--s) * 1) rgba(156,131,251, calc(.14 + .32 * var(--lit))), 0 0 calc(var(--s) * 28) rgba(138,56,245, calc(.35 * var(--lit))); }
+.eng h5 { margin: 0; font: 400 calc(var(--s) * 18)/1 var(--mich); letter-spacing: .02em; }
+.site .eng-x { margin-top: calc(var(--s) * 10); font: 400 calc(var(--s) * 11.5)/1.6 var(--mich); color: rgba(255,255,255,.86); }
+.site .eng-d { margin-top: calc(var(--s) * 16); font: 400 calc(var(--s) * 13)/1.7 var(--mich); color: rgba(255,255,255,.96); }
+/* the second nav: chapters, always on screen; a line fills as the story moves */
+.s-chapters { position: absolute; left: calc(var(--s) * 112); right: calc(var(--s) * 112); bottom: calc(var(--s) * 40); height: calc(var(--s) * 58); border-radius: calc(var(--s) * 14); background: #040306; display: grid; grid-template-columns: repeat(4, 1fr); gap: calc(var(--s) * 8); padding: calc(var(--s) * 7); z-index: 3; }
+.chap { position: relative; border: 0; margin: 0; border-radius: calc(var(--s) * 10); background: transparent; color: rgba(255,255,255,.82); font: 400 calc(var(--s) * 13)/1 var(--ice); letter-spacing: .14em; text-transform: uppercase; cursor: pointer; box-shadow: inset 0 0 0 calc(var(--s) * 1) transparent; transition: background-color 320ms var(--settle), box-shadow 320ms var(--settle), color 320ms var(--settle); }
 .chap:hover { color: #fff; background: rgba(255,255,255,.04); }
 .chap[aria-selected="true"] { color: #fff; background: #170d2a; box-shadow: inset 0 0 0 calc(var(--s) * 1) var(--v1), 0 0 calc(var(--s) * 18) rgba(138,56,245,.35); }
 .chap:focus-visible { outline: calc(var(--s) * 2) solid #fff; outline-offset: calc(var(--s) * 2); }
-.chap[aria-disabled="true"] { color: rgba(255,255,255,.4); cursor: not-allowed; background: transparent; }
+.chap-fill { position: absolute; left: calc(var(--s) * 14); right: calc(var(--s) * 14); bottom: calc(var(--s) * 7); height: calc(var(--s) * 2); border-radius: calc(var(--s) * 2); background: var(--v1); transform-origin: 0 50%; transform: scaleX(var(--fill, 0)); }
+.chap[data-done] .chap-fill { opacity: .45; }
 @media (prefers-reduced-motion: reduce) {
-  .pan, .pan::before, .pan-name, .pan-body, .pan .bit, .s-chapter, .s-heads .s-head, .chap { transition: none !important; }
+  .pan, .pan::before, .pan-name, .pan-body, .pan .bit, .chap, .s-caps li { transition: none !important; }
   .pan .bit { transform: none !important; }
 }
+/* reduced motion: four still screens, one under another */
+.story.is-static .story-track { height: auto !important; }
+.story.is-static .story-pin { position: static; display: flex; flex-direction: column; gap: calc(var(--u) * 32); }
+.story.is-static .s-caps { height: auto; }
+.story.is-static .s-caps li { position: static; opacity: 1; transform: none; }
 
 /* ------------------------------ 5 how it works ------------------------------ */
 .how { padding: calc(var(--u) * 112) 0 calc(var(--u) * 104); }
@@ -470,7 +485,7 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
 
 <!-- ============================== 4 SOLUTION ============================== -->
 <section class="block">
-  <div class="cap"><span><b>04 · Solution</b> — a working replica: hover or click the columns, switch chapters in the lower bar</span><span>~1.7 screens · 1440 × ~1500</span></div>
+  <div class="cap"><span><b>04 · Solution</b> — the story: scroll plays it, hover or click explores, the bar jumps</span><span>~1.7 screens seen · pinned scroll not counted</span></div>
   <div class="frame"><div class="f solution">
     <div class="fold" style="top:calc(var(--u) * 900)"><span>900</span></div>
     <div class="sol-glow" aria-hidden="true"></div>
@@ -479,89 +494,121 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
       <p class="body" style="grid-column:8/13"><span class="lead">One screen, everything.</span> I rebuilt the information architecture around the meeting, not the scroll. The main screen swaps between Security, Exposure, Coverage and Enables with hover and click animations, while both navigation bars stay visible the whole time.</p>
     </div>
 
-    <div class="rep-wrap">
-      <div class="rep-anno"><span>Top bar: the site</span><span>Lower bar: the chapters</span></div>
-      <div class="site" data-replica>
-        <div class="s-nav">
-          <div class="s-logo"><img src="cyvore-mockups/logo-mark.svg" alt="">cyvore<sup>TM</sup></div>
-          <div class="s-links"><span>Technology</span><span>Solutions</span><span>Resources</span><span>About Us</span><span>Contact</span></div>
-          <span class="s-cta">REQUEST YOUR DEMO</span>
-        </div>
-        <div class="s-heads">
-          <div class="s-head is-on" data-head="why"><h4>SECURITY IN EVERY PART OF YOUR WORKPLACE</h4><div class="s-btns"><span class="s-cta">REQUEST YOUR DEMO</span><span class="s-cta ghost">ABOUT US</span></div></div>
-          <div class="s-head" data-head="risk"><h4>THE RISK IS REAL</h4><p>The numbers you need to see</p></div>
-          <div class="s-head" data-head="attack"><h4>REAL-WORLD ATTACK</h4></div>
-        </div>
-        <div class="s-stage">
-          <div class="s-chapter is-on" data-chapter="why" id="ch-why" role="tabpanel" aria-label="Why it matters">
-            <div class="panels" role="tablist" aria-label="What Cyvore does">
-              <button aria-label="Security" class="pan" role="tab" aria-selected="true">
-                <span class="pan-name" aria-hidden="true">SECURITY</span>
-                <span class="pan-body">
-                  <span class="pan-art" aria-hidden="true">
-                    <span class="card bit" style="left:calc(50% + var(--s) * -124);top:0;--r:-1.5deg;--d:0"><svg class="ic"><use href="#i-user"/></svg>Got a business offer from WhatsApp Business</span>
-                    <span class="card bit" style="left:calc(50% + var(--s) * -84);top:calc(var(--s) * 74);--r:3deg;--d:1"><svg class="ic"><use href="#i-mail"/></svg>Received a suspicious email</span>
-                    <span class="card bit" style="left:calc(50% + var(--s) * -110);top:calc(var(--s) * 140);width:calc(var(--s) * 150);--r:-1deg;--d:2"><svg class="ic"><use href="#i-phone"/></svg>Called back to an unknown number</span>
-                  </span>
-                  <span class="pan-title">SECURITY</span>
-                  <span class="pan-desc">Secures employee activity and AI agent operations, internally and externally.</span>
-                </span>
-              </button>
-              <button aria-label="Exposure" class="pan" role="tab" aria-selected="false">
-                <span class="pan-name" aria-hidden="true">EXPOSURE</span>
-                <span class="pan-body">
-                  <span class="pan-art" aria-hidden="true"><span class="chain">
-                    <span class="link bit" style="--d:0"><svg class="ic"><use href="#i-at"/></svg></span>
-                    <span class="link bit" style="--d:1"><svg class="ic"><use href="#i-headphones"/></svg></span>
-                    <span class="link bit" style="--d:2"><svg class="ic"><use href="#i-link-out"/></svg></span>
-                    <span class="link last bit" style="--d:3"><svg class="ic"><use href="#i-pin"/></svg></span>
-                  </span></span>
-                  <span class="pan-title">EXPOSURE</span>
-                  <span class="pan-desc">Exposes the complete chain of events to stop phishing and fraud.</span>
-                </span>
-              </button>
-              <button aria-label="Coverage" class="pan" role="tab" aria-selected="false">
-                <span class="pan-name" aria-hidden="true">COVERAGE</span>
-                <span class="pan-body">
-                  <span class="pan-art" aria-hidden="true"><span class="tiles">
-                    <span class="tile word bit" style="--d:0">zoom</span><span class="tile bit" style="--d:1">T</span><span class="tile bit" style="--d:2">#</span><span class="tile bit" style="--d:3"><svg class="ic"><use href="#i-chat"/></svg></span>
-                    <span class="tile bit" style="--d:4">M</span><span class="tile bit" style="--d:5"><svg class="ic"><use href="#i-cloud"/></svg></span><span class="tile bit" style="--d:6">O</span><span class="tile bit" style="--d:7">G</span>
-                    <span class="plus bit" style="--d:8"><svg class="ic"><use href="#i-plus"/></svg></span>
-                  </span></span>
-                  <span class="pan-title">COVERAGE</span>
-                  <span class="pan-desc">Covers Zoom, Teams, Slack, WhatsApp Business, email, CRM systems, and beyond.</span>
-                </span>
-              </button>
-              <button aria-label="Enables" class="pan" role="tab" aria-selected="false">
-                <span class="pan-name" aria-hidden="true">ENABLES</span>
-                <span class="pan-body">
-                  <span class="pan-art" aria-hidden="true"><span class="iocs">
-                    <span class="ioc bit" style="--d:0"><b>zoom</b>Manipulation behavior during zoom call</span>
-                    <span class="ioc bit" style="--d:1"><b><svg class="ic"><use href="#i-user"/></svg></b>AI image of company representative</span>
-                    <span class="ioc bit" style="--d:2"><b><svg class="ic"><use href="#i-mail"/></svg></b>New business inquiry via email</span>
-                  </span></span>
-                  <span class="pan-title">ENABLES</span>
-                  <span class="pan-desc">Enables precise investigation of every Indicator of Compromise (IOC).</span>
-                </span>
-              </button>
+    <div class="story" data-story="desktop">
+      <div class="story-track">
+        <div class="story-pin">
+          <div class="rep-anno"><span>Scroll: the story plays</span><span>Hover or click: explore · bar: jump</span></div>
+          <div class="site" data-replica>
+            <div class="s-nav">
+              <div class="s-logo"><img src="cyvore-mockups/logo-mark.svg" alt="">cyvore<sup>TM</sup></div>
+              <div class="s-links"><span>Technology</span><span>Solutions</span><span>Resources</span><span>About Us</span><span>Contact</span></div>
+              <span class="s-cta">REQUEST YOUR DEMO</span>
             </div>
-          </div>
-          <div class="s-chapter" data-chapter="risk" id="ch-risk" role="tabpanel" aria-label="The risk is real">
-            <div class="panels" role="tablist" aria-label="The numbers">
-              <button aria-label="2,535%" class="pan stat" role="tab" aria-selected="true"><span class="pan-name" aria-hidden="true">2,535%</span><span class="pan-body"><span class="stat-num bit" style="--d:0">2,535%</span><span class="stat-desc bit" style="--d:1">Increase in malicious phishing messages from Q4 2022</span></span></button>
-              <button aria-label="83%" class="pan stat" role="tab" aria-selected="false"><span class="pan-name" aria-hidden="true">83%</span><span class="pan-body"><span class="stat-num bit" style="--d:0">83%</span><span class="stat-desc bit" style="--d:1">Cybersecurity professionals polled reported being targets of phishing attacks</span></span></button>
-              <button aria-label="967%" class="pan stat" role="tab" aria-selected="false"><span class="pan-name" aria-hidden="true">967%</span><span class="pan-body"><span class="stat-num bit" style="--d:0">967%</span><span class="stat-desc bit" style="--d:1">Increase in credential phishing from Q4 2022</span></span></button>
-              <button aria-label="15B" class="pan stat" role="tab" aria-selected="false"><span class="pan-name" aria-hidden="true">15B</span><span class="pan-body"><span class="stat-num bit" style="--d:0">15B</span><span class="stat-desc bit" style="--d:1">Cyberattacks are launched every single day</span></span></button>
+            <div class="s-stage" aria-hidden="true"></div>
+
+            <section class="s-chapter is-on" data-chapter="why" aria-label="Why it matters">
+              <div class="s-head"><h4>SECURITY IN EVERY PART OF YOUR WORKPLACE</h4><div class="s-btns"><span class="s-cta">REQUEST YOUR DEMO</span><span class="s-cta ghost">ABOUT US</span></div></div>
+              <div class="s-body">
+                <div class="panels" role="tablist" aria-label="What Cyvore does">
+                  <button class="pan" role="tab" aria-selected="false" aria-label="Security">
+                    <span class="pan-name" aria-hidden="true">SECURITY</span>
+                    <span class="pan-body">
+                      <span class="pan-art" aria-hidden="true">
+                        <span class="card bit" style="left:calc(50% + var(--s) * -124);top:0;--r:-1.5deg;--d:0"><svg class="ic"><use href="#i-user"/></svg>Got a business offer from WhatsApp Business</span>
+                        <span class="card bit" style="left:calc(50% + var(--s) * -84);top:calc(var(--s) * 74);--r:3deg;--d:1"><svg class="ic"><use href="#i-mail"/></svg>Received a suspicious email</span>
+                        <span class="card bit" style="left:calc(50% + var(--s) * -110);top:calc(var(--s) * 140);width:calc(var(--s) * 154);--r:-1deg;--d:2"><svg class="ic"><use href="#i-phone"/></svg>Called back to an unknown number</span>
+                      </span>
+                      <span class="pan-title">SECURITY</span>
+                      <span class="pan-desc">Secures employee activity and AI agent operations, internally and externally.</span>
+                    </span>
+                  </button>
+                  <button class="pan" role="tab" aria-selected="false" aria-label="Exposure">
+                    <span class="pan-name" aria-hidden="true">EXPOSURE</span>
+                    <span class="pan-body">
+                      <span class="pan-art" aria-hidden="true"><span class="chain">
+                        <span class="link bit" style="--d:0"><svg class="ic"><use href="#i-at"/></svg></span>
+                        <span class="link bit" style="--d:1"><svg class="ic"><use href="#i-headphones"/></svg></span>
+                        <span class="link bit" style="--d:2"><svg class="ic"><use href="#i-link-out"/></svg></span>
+                        <span class="link last bit" style="--d:3"><svg class="ic"><use href="#i-pin"/></svg></span>
+                      </span></span>
+                      <span class="pan-title">EXPOSURE</span>
+                      <span class="pan-desc">Exposes the complete chain of events to stop phishing and fraud.</span>
+                    </span>
+                  </button>
+                  <button class="pan" role="tab" aria-selected="false" aria-label="Coverage">
+                    <span class="pan-name" aria-hidden="true">COVERAGE</span>
+                    <span class="pan-body">
+                      <span class="pan-art" aria-hidden="true"><span class="tiles">
+                        <span class="tile word bit" style="--d:0">zoom</span><span class="tile bit" style="--d:1">T</span><span class="tile bit" style="--d:2">#</span><span class="tile bit" style="--d:3"><svg class="ic"><use href="#i-chat"/></svg></span>
+                        <span class="tile bit" style="--d:4">M</span><span class="tile bit" style="--d:5"><svg class="ic"><use href="#i-cloud"/></svg></span><span class="tile bit" style="--d:6">O</span><span class="tile bit" style="--d:7">G</span>
+                        <span class="plus bit" style="--d:8"><svg class="ic"><use href="#i-plus"/></svg></span>
+                      </span></span>
+                      <span class="pan-title">COVERAGE</span>
+                      <span class="pan-desc">Covers Zoom, Teams, Slack, WhatsApp Business, email, CRM systems, and beyond.</span>
+                    </span>
+                  </button>
+                  <button class="pan" role="tab" aria-selected="false" aria-label="Enables">
+                    <span class="pan-name" aria-hidden="true">ENABLES</span>
+                    <span class="pan-body">
+                      <span class="pan-art" aria-hidden="true"><span class="iocs">
+                        <span class="ioc bit" style="--d:0"><b>zoom</b>Manipulation behavior during zoom call</span>
+                        <span class="ioc bit" style="--d:1"><b><svg class="ic"><use href="#i-user"/></svg></b>AI image of company representative</span>
+                        <span class="ioc bit" style="--d:2"><b><svg class="ic"><use href="#i-mail"/></svg></b>New business inquiry via email</span>
+                      </span></span>
+                      <span class="pan-title">ENABLES</span>
+                      <span class="pan-desc">Enables precise investigation of every Indicator of Compromise (IOC).</span>
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <section class="s-chapter" data-chapter="risk" aria-label="The risk is real">
+              <div class="s-head"><h4>THE RISK IS REAL</h4><p>The numbers you need to see</p></div>
+              <div class="s-body">
+                <div class="panels" role="tablist" aria-label="The numbers">
+                  <button class="pan stat" role="tab" aria-selected="false" aria-label="2,535%"><span class="pan-name" aria-hidden="true">2,535%</span><span class="pan-body"><span class="stat-num bit" data-stat="0" style="--d:0">2,535%</span><span class="stat-desc bit" style="--d:1">Increase in malicious phishing messages from Q4 2022</span></span></button>
+                  <button class="pan stat" role="tab" aria-selected="false" aria-label="83%"><span class="pan-name" aria-hidden="true">83%</span><span class="pan-body"><span class="stat-num bit" data-stat="1" style="--d:0">83%</span><span class="stat-desc bit" style="--d:1">Cybersecurity professionals polled reported being targets of phishing attacks</span></span></button>
+                  <button class="pan stat" role="tab" aria-selected="false" aria-label="967%"><span class="pan-name" aria-hidden="true">967%</span><span class="pan-body"><span class="stat-num bit" data-stat="2" style="--d:0">967%</span><span class="stat-desc bit" style="--d:1">Increase in credential phishing from Q4 2022</span></span></button>
+                  <button class="pan stat" role="tab" aria-selected="false" aria-label="15B"><span class="pan-name" aria-hidden="true">15B</span><span class="pan-body"><span class="stat-num bit" data-stat="3" style="--d:0">15B</span><span class="stat-desc bit" style="--d:1">Cyberattacks are launched every single day</span></span></button>
+                </div>
+              </div>
+            </section>
+
+            <section class="s-chapter" data-chapter="attack" aria-label="Real-world attack">
+              <div class="s-head"><h4>REAL-WORLD ATTACK</h4><ol class="s-caps"><li>A link lands in the call.</li><li>Cyvore reads it.</li><li>Blocked.</li></ol></div>
+              <div class="s-body"><div class="attack"><video src="cyvore-mockups/mission.mp4" poster="cyvore-mockups/mission-poster.jpg" muted playsinline preload="auto" aria-label="A phishing link lands in a video call; the security bot flags it and Cyvore blocks it"></video></div></div>
+            </section>
+
+            <section class="s-chapter" data-chapter="powers" aria-label="What powers us">
+              <div class="s-head"><h4>WHAT POWERS US</h4><p>Three proprietary engines</p></div>
+              <div class="s-body">
+                <svg class="wires" viewBox="0 0 1052 440" preserveAspectRatio="none" aria-hidden="true">
+                  <circle class="node" cx="526" cy="18" r="4"/>
+                  <path d="M526 22 V70"/>
+                  <path d="M526 70 C526 96 183 92 183 120"/>
+                  <path d="M526 70 V120"/>
+                  <path d="M526 70 C526 96 869 92 869 120"/>
+                  <path d="M183 320 C183 352 526 348 526 392"/>
+                  <path d="M526 320 V392"/>
+                  <path d="M869 320 C869 352 526 348 526 392"/>
+                  <path d="M520 398 L526 406 L532 398"/>
+                </svg>
+                <div class="engines">
+                  <article class="eng"><h5>OPR</h5><p class="eng-x">(Optical Phishing Recognition)</p><p class="eng-d">AI driven visual phishing detection</p></article>
+                  <article class="eng"><h5>TIAO</h5><p class="eng-x">(Threat Intelligence Autonomous Operation)</p><p class="eng-d">Proactive threat engine that mimics analyst behavior, catching Zero-Day threats before they are launched.</p></article>
+                  <article class="eng"><h5>DAN</h5><p class="eng-x">(Data Analysis NLU)</p><p class="eng-d">Context-aware language model that understands behavioral patterns across human and AI agents.</p></article>
+                </div>
+              </div>
+            </section>
+
+            <div class="s-chapters" role="tablist" aria-label="Chapters">
+              <button class="chap" role="tab" aria-selected="true" data-go="why"><i class="chap-fill" aria-hidden="true"></i>Why it matters</button>
+              <button class="chap" role="tab" aria-selected="false" data-go="risk"><i class="chap-fill" aria-hidden="true"></i>The risk is real</button>
+              <button class="chap" role="tab" aria-selected="false" data-go="attack"><i class="chap-fill" aria-hidden="true"></i>Real-world attack</button>
+              <button class="chap" role="tab" aria-selected="false" data-go="powers"><i class="chap-fill" aria-hidden="true"></i>What powers us</button>
             </div>
-          </div>
-          <div class="s-chapter" data-chapter="attack" id="ch-attack" role="tabpanel" aria-label="Real-world attack">
-            <div class="attack"><video data-chapter-video src="cyvore-mockups/mission.mp4" poster="cyvore-mockups/mission-poster.jpg" muted loop playsinline aria-label="A phishing link lands in a video call and Cyvore blocks it"></video></div>
-          </div>
-          <div class="s-chapters" role="tablist" aria-label="Chapters">
-            <button class="chap" role="tab" aria-selected="true" aria-controls="ch-why" data-go="why">Why it matters</button>
-            <button class="chap" role="tab" aria-selected="false" aria-controls="ch-risk" data-go="risk">The risk is real</button>
-            <button class="chap" role="tab" aria-selected="false" aria-controls="ch-attack" data-go="attack">Real-world attack</button>
-            <button class="chap" role="tab" aria-selected="false" aria-disabled="true" title="Not in the captures yet">What powers us</button>
+            <p class="sr-only" data-where aria-live="polite">Chapter 1 of 4</p>
           </div>
         </div>
       </div>
@@ -841,50 +888,9 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
 
 </script>
 <script>
-/* The replica: hover (mouse) or click/tap opens a column; arrows move between tabs.
-   The chapter bar swaps what's on the stage while both bars stay put. */
+/* Hero loops play only while on screen, and never under reduced motion. */
 (() => {
   const reduce = matchMedia("(prefers-reduced-motion: reduce)");
-  const openTab = (tab, focus) => {
-    const list = tab.closest('[role="tablist"]');
-    list.querySelectorAll('[role="tab"]').forEach((t) => t.setAttribute("aria-selected", String(t === tab)));
-    if (focus) tab.focus();
-  };
-  document.querySelectorAll('.panels[role="tablist"]').forEach((list) => {
-    const tabs = [...list.querySelectorAll('[role="tab"]')];
-    let timer = 0;
-    tabs.forEach((t, i) => {
-      t.tabIndex = t.getAttribute("aria-selected") === "true" ? 0 : -1;
-      t.addEventListener("click", () => { openTab(t); tabs.forEach((x) => (x.tabIndex = x === t ? 0 : -1)); });
-      // Hover opens on a mouse only, after a beat, so sweeping across doesn't flicker.
-      t.addEventListener("pointerenter", (e) => {
-        if (e.pointerType !== "mouse") return;
-        clearTimeout(timer); timer = setTimeout(() => openTab(t), reduce.matches ? 0 : 90);
-      });
-      t.addEventListener("pointerleave", () => clearTimeout(timer));
-      t.addEventListener("keydown", (e) => {
-        const dir = list.closest(".m-site") ? { ArrowDown: 1, ArrowUp: -1 } : { ArrowRight: 1, ArrowLeft: -1 };
-        let j = null;
-        if (e.key in dir) j = (i + dir[e.key] + tabs.length) % tabs.length;
-        if (e.key === "Home") j = 0;
-        if (e.key === "End") j = tabs.length - 1;
-        if (j === null) return;
-        e.preventDefault(); openTab(tabs[j], true); tabs.forEach((x, k) => (x.tabIndex = k === j ? 0 : -1));
-      });
-    });
-  });
-  document.querySelectorAll(".site[data-replica]").forEach((site) => {
-    const chaps = [...site.querySelectorAll(".chap[data-go]")];
-    const go = (name) => {
-      chaps.forEach((c) => c.setAttribute("aria-selected", String(c.dataset.go === name)));
-      site.querySelectorAll("[data-chapter]").forEach((c) => c.classList.toggle("is-on", c.dataset.chapter === name));
-      site.querySelectorAll("[data-head]").forEach((h) => h.classList.toggle("is-on", h.dataset.head === name));
-      const v = site.querySelector("[data-chapter-video]");
-      if (v) { if (name === "attack" && !reduce.matches) { v.currentTime = 0; v.play().catch(() => {}); } else v.pause(); }
-    };
-    chaps.forEach((c) => c.addEventListener("click", () => go(c.dataset.go)));
-  });
-  // Videos play only while on screen, and never under reduced motion.
   const io = new IntersectionObserver((entries) => entries.forEach((en) => {
     const v = en.target;
     if (en.isIntersecting && !reduce.matches) v.play().catch(() => {}); else v.pause();
