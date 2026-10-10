@@ -209,3 +209,60 @@ test.describe("handovers", () => {
     expect((await story(page).state()).visible).toEqual(["attack"]);
   });
 });
+
+test.describe("attack and engines", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/cyvore-mockups.html", { waitUntil: "load" });
+    await page.waitForFunction(() => (window as any).__cyvoreStories?.desktop);
+    await page.waitForFunction(() => {
+      const v = document.querySelector('.story[data-story="desktop"] [data-chapter="attack"] video') as HTMLVideoElement;
+      return v.dataset.scrub === "ready" && v.readyState >= 1;
+    });
+  });
+
+  test("the attack follows the scroll, captions in order", async ({ page }) => {
+    const at = async (within: number) => {
+      await story(page).go(9, within);
+      await page.waitForTimeout(250);
+      return page.evaluate(() => {
+        const v = document.querySelector('.story[data-story="desktop"] [data-chapter="attack"] video') as HTMLVideoElement;
+        return { t: v.currentTime, caption: (window as any).__cyvoreStories.desktop.state().caption };
+      });
+    };
+    expect((await at(0.1)).caption).toBe(-1);
+    const mid = await at(0.45);
+    expect(mid.t).toBeGreaterThan(3.5);
+    expect(mid.caption).toBe(1);
+    expect((await at(0.95)).caption).toBe(2);
+  });
+
+  test("What powers us draws its diagram and lights the three engines in turn", async ({ page }) => {
+    await story(page).go(10);
+    await page.waitForTimeout(1600);
+    const s = await story(page).state();
+    expect(s.lit.map((x) => Math.round(x))).toEqual([1, 1, 1]);
+    const clip = await page.$eval('.story[data-story="desktop"] .wires', (el) => getComputedStyle(el).clipPath);
+    expect(clip).toMatch(/inset\(0(px|%)?\)|none/);
+  });
+
+  test("coming back to What powers us builds it again from the start", async ({ page }) => {
+    await story(page).go(10);
+    await page.waitForTimeout(1600);
+    await story(page).go(9);
+    await story(page).go(10);
+    const early = (await story(page).state()).lit;
+    expect(early.every((x) => x < 1)).toBe(true);
+  });
+
+  test("scrubbing before the video has loaded raises no errors", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await page.evaluate(() => {
+      const v = document.querySelector('.story[data-story="desktop"] [data-chapter="attack"] video') as HTMLVideoElement;
+      v.removeAttribute("src"); v.load();
+    });
+    await story(page).go(9, 0.5);
+    expect(errors).toEqual([]);
+    expect((await story(page).state()).caption).toBe(-1);
+  });
+});

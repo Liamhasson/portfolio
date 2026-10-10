@@ -96,6 +96,19 @@ function setBar(site, beat, within) {
   return fill;
 }
 
+/** The diagram draws from the top node down, the engines light one by one, the lines meet below. */
+export function powersTimeline(site) {
+  const ch = chapterEl(site, "powers");
+  const wires = ch.querySelector(".wires");
+  const engines = [...ch.querySelectorAll(".eng")];
+  gsap.set(wires, { clipPath: "inset(0% 0% 100% 0%)" });
+  gsap.set(engines, { "--lit": 0 });
+  return gsap.timeline({ paused: true })
+    .to(wires, { clipPath: "inset(0% 0% 72% 0%)", duration: 0.35, ease: "none" })
+    .to(engines, { "--lit": 1, duration: 0.3, stagger: 0.18, ease: "power1.out" })
+    .to(wires, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.35, ease: "none" });
+}
+
 /* ---------- a story ---------- */
 
 export function mountStory(story, name) {
@@ -103,6 +116,11 @@ export function mountStory(story, name) {
   const pin = story.querySelector(".story-pin");
   const site = story.querySelector(".site");
   const where = site.querySelector("[data-where]");
+  const powers = powersTimeline(site);
+  const video = chapterEl(site, "attack").querySelector("video");
+  const caps = [...chapterEl(site, "attack").querySelectorAll(".s-caps li")];
+  const setCaption = (k) => caps.forEach((li, i) => li.classList.toggle("is-on", i === k));
+  video.pause();
 
   let beat = -1;
   let chapter = null;
@@ -120,12 +138,17 @@ export function mountStory(story, name) {
   const applyBeat = (b, instant) => {
     const B = BEATS[b];
     if (B.chapter === "why" || B.chapter === "risk") openPanel(listIn(site, B.chapter), B.panel, { instant });
+    if (B.kind === "build") instant ? powers.progress(1) : powers.restart();
+    if (B.kind === "release") powers.progress(1);
   };
 
   const goTo = (b, dir, instant = false) => {
     const next = BEATS[b].chapter;
     if (next !== chapter) {
       const from = chapter;
+      // A chapter left behind starts fresh next time it is entered.
+      if (from === "powers") powers.pause(0);
+      if (from === "attack") setCaption(-1);
       chapter = next;
       where.textContent = `Chapter ${CHAPTERS.indexOf(next) + 1} of ${CHAPTERS.length}`;
       // A new handover finishes the running one first, so chapters never stack up.
@@ -163,6 +186,11 @@ export function mountStory(story, name) {
     const { beat: b, within } = beatAt(progress);
     if (b !== beat) goTo(b, dir || (b > beat ? 1 : -1));
     fill = setBar(site, b, within);
+    if (BEATS[b].kind === "scrub") {
+      const t = scrubTime(within, video.duration);
+      if (video.readyState >= 1 && Math.abs(video.currentTime - t) > 0.03) video.currentTime = t;
+      setCaption(video.readyState >= 1 ? captionAt(t) : -1);
+    }
   };
 
   const st = ScrollTrigger.create({
@@ -173,6 +201,18 @@ export function mountStory(story, name) {
     onRefreshInit: layout,
     onUpdate: (self) => update(self.progress, self.direction),
   });
+  video.addEventListener("loadedmetadata", () => update(st.progress, 0));
+  // Scrubbing needs the whole clip in memory: a blob URL seeks instantly on any host,
+  // including servers without byte-range support. Skipped if the source was changed meanwhile.
+  const original = video.getAttribute("src");
+  fetch(original)
+    .then((r) => r.blob())
+    .then((blob) => {
+      if (video.getAttribute("src") !== original) return;
+      video.addEventListener("loadedmetadata", () => { video.dataset.scrub = "ready"; }, { once: true });
+      video.src = URL.createObjectURL(blob);
+    })
+    .catch(() => {});
 
   bindPanels(site);
 
