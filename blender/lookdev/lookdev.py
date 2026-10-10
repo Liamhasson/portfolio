@@ -23,7 +23,7 @@ from mathutils import Matrix, Vector
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 ap = argparse.ArgumentParser()
-ap.add_argument("--scene", choices=["ball", "chaos", "glass", "studio", "desk", "bench", "canvas", "hero", "pullback", "deskmove", "attempts", "export", "settle", "raygrid", "bakedesk"], required=True)
+ap.add_argument("--scene", choices=["ball", "chaos", "glass", "studio", "desk", "bench", "canvas", "hero", "pullback", "deskmove", "attempts", "export", "settle", "raygrid", "bakedesk", "concept"], required=True)
 ap.add_argument("--move", choices=["rise", "descend", "push", "through"], default="rise", help="deskmove: which camera move")
 ap.add_argument("--move-name", dest="move_name", default="pullback", help="raygrid: which move's camera path (pullback, settle)")
 ap.add_argument("--grid", choices=["etched", "glow", "mat"], default="etched", help="bench scene only")
@@ -2542,12 +2542,117 @@ def build_export():
     print("EXPORT", json.dumps({k: v for k, v in meta.items() if k in ("count", "bounds", "files")}))
     sys.exit(0)
 
+
+def build_concept():
+    """2.3 without the glass (Liam, 2026-10-10: "both, sand only"): two ways the sand itself becomes the product, as
+    three stills each from one camera (concept frames to choose between, not production).
+      CONCEPT=ui    the grains leave the ball in ordered streams, land on the open screen and lock into the project
+                    grid (cards, title, lines made of sand); then the sand cards light up as the real index
+      CONCEPT=pour  the ball pours into the open laptop like an hourglass; where the sand lands the screen wakes
+      BEAT=1|2|3    early, middle, end"""
+    kind, beat = os.environ.get("CONCEPT", "ui"), int(os.environ.get("BEAT", "1"))
+    os.environ["LOOKDEV_NO_SAND"] = "1"
+    MOVE_CTX["open"] = 108; MOVE_CTX["side_fill"] = True
+    args.view = "tq"
+    build_desk()
+    for o in [o for o in bpy.data.objects if o.type == "CAMERA"]:
+        bpy.data.objects.remove(o)
+    R = 0.07
+    C = np.array([-0.03, 0.06, 0.16])
+    disp = bpy.data.objects["display"]; bpy.context.view_layer.update()
+    mw = disp.matrix_world
+    nrm = np.array((mw.to_3x3() @ Vector((0, 0, 1))).normalized())
+    cen = np.array(mw.translation)
+    if np.dot(np.array([0.0, -1.0, 0.3]), nrm) < 0:
+        nrm = -nrm                                          # the side the screen shows on
+    ax = np.array(mw.to_3x3() @ Vector((1, 0, 0))); ay = np.array(mw.to_3x3() @ Vector((0, 1, 0)))
+    def on_screen(u, v, lift):
+        # u, v: the index's frame (0..1, v down), onto the display's plane, `lift` in front of it
+        return cen + ax[None, :] * (u - 0.5)[:, None] + ay[None, :] * (0.5 - v)[:, None] + nrm[None, :] * lift[:, None]
+    pts, hue, radius = dense_points(R)
+    n = len(pts)
+    rng = np.random.default_rng(7)
+    start = pts + C
+    to_screen = cen - C; to_screen /= np.linalg.norm(to_screen)
+    dirs = pts / np.maximum(np.linalg.norm(pts, axis=1, keepdims=True), 1e-6)
+    p = {1: 0.22, 2: 0.62, 3: 1.0}[beat]
+    def bez(a, c, b, t):
+        t = t[:, None]
+        return a * (1 - t) ** 2 + c * 2 * t * (1 - t) + b * t * t
+    screen_e = 0.0
+    if kind == "ui":
+        # where each grain lands: a lattice inside the index's blocks (title, card images, name and line under each),
+        # built in reading order, row by row, each block fed by its own narrow ribbon of sand
+        blocks = [(0.036, 0.054, 0.55, 0.13)]
+        for x0, x1 in ((0.036, 0.488), (0.512, 0.964)):
+            blocks += [(x0, 0.184, x1, 0.636), (x0, 0.668, x0 + (x1 - x0) * 0.32, 0.69), (x0, 0.71, x0 + (x1 - x0) * 0.72, 0.724)]
+        blocks += [(0.036, 0.845, 0.488, 1.0), (0.512, 0.845, 0.964, 1.0)]
+        sw, sh = disp.scale.x, disp.scale.y
+        step = float(np.median(radius)) * 2.1
+        su, sv, sb, so = [], [], [], []
+        for bi, (x0, y0, x1, y1) in enumerate(blocks):
+            nu, nv = max(int((x1 - x0) * sw / step), 1), max(int((y1 - y0) * sh / step), 1)
+            vv, uu = np.meshgrid(np.linspace(y0, y1, nv), np.linspace(x0, x1, nu), indexing="ij")
+            su.append(uu.ravel()); sv.append(vv.ravel()); sb.append(np.full(nu * nv, bi))
+            so.append(bi + np.linspace(0, 1, nu * nv, endpoint=False))   # row by row within the block
+        su, sv, sb, so = (np.concatenate(x) for x in (su, sv, sb, so))
+        so = so / len(blocks)
+        # every slot gets grains (layers in front if there are more grains than slots); the grains nearest the screen
+        # leave first, into the first slots
+        order_slots = np.argsort(so)
+        reps = int(np.ceil(n / len(su)))
+        slot_seq = np.tile(order_slots, reps)[:n]
+        layer = (np.arange(n) // len(su)).astype(np.float32)
+        grain_rank = np.argsort(-(dirs @ to_screen) + rng.normal(0, 0.05, n))
+        sl = np.empty(n, np.int64); sl[grain_rank] = slot_seq
+        ly = np.empty(n, np.float32); ly[grain_rank] = layer
+        u, v, blk, key = su[sl], sv[sl], sb[sl], so[sl]
+        target = on_screen(u, v, radius * 1.1 + ly * radius * 1.6)
+        # each block's ribbon: through its own gate in the air between the ball and the screen
+        bu = np.array([(b_[0] + b_[2]) / 2 for b_ in blocks]); bv = np.array([(b_[1] + b_[3]) / 2 for b_ in blocks])
+        gate_c = C + (cen - C) * 0.5 + np.array([0.0, 0.0, 0.06])
+        gates = gate_c[None, :] + (ax[None, :] * (bu - 0.5)[:, None] + ay[None, :] * (0.5 - bv)[:, None]) * 0.35
+        g = gates[blk] + rng.normal(0, 0.0015, (n, 3))
+        t = np.clip((p * 1.4 - key) / 0.4, 0.0, 1.0)
+        t = t * t * (3 - 2 * t)
+        pos = bez(start, g, target, t)
+        if beat == 3:
+            # landed: the sand cards become the UI; a few grains still settling along the cards' edges
+            keep = np.zeros(n, bool)
+            pos, hue, radius = pos[keep], hue[keep], radius[keep]
+            screen_e = 1.1
+    else:
+        # one stream from the ball's lower side into the screen's middle; the ball empties from that side
+        exit_ = C + to_screen * R * 0.9 + np.array([0, 0, -0.02])
+        land = cen + nrm * 0.004
+        key = (1 - (dirs @ to_screen)) * 0.5
+        key = (key - key.min()) / (key.max() - key.min())
+        t = np.clip((p * 1.35 - key) / 0.35, 0.0, 1.0)
+        spread = rng.normal(0, 1, (n, 3)) * (0.0035 + 0.006 * t[:, None])
+        # the ball shrinks as it empties (an hourglass, never hollowed); a grain leaves from where it sits on the shrunk
+        # ball, gathers at the ball's lip and falls along the stream into the screen
+        left = float(np.mean(t <= 0.0))
+        start = C + (start - C) * max(left, 0.05) ** (1 / 3)
+        lip = C + (exit_ - C) * max(left, 0.05) ** (1 / 3)
+        pos = np.where((t <= 0.0)[:, None], start, bez(start, lip[None, :] + np.array([0.0, 0.0, 0.03]), land[None, :], t) + spread)
+        gone = t >= 0.999                                   # absorbed into the screen
+        pos, hue, radius = pos[~gone], hue[~gone], radius[~gone]
+        screen_e = {1: 0.0, 2: 0.45, 3: 1.1}[beat]
+    grains("concept_sand", pos.astype(np.float32), hue.astype(np.float32), radius.astype(np.float32))
+    # the screen: dark until the sand makes it
+    bsdf = bpy.data.materials["display"].node_tree.nodes["Principled BSDF"]
+    bsdf.inputs["Emission Strength"].default_value = screen_e
+    if "screen_glow" in bpy.data.objects:
+        bpy.data.objects["screen_glow"].data.energy *= screen_e / 1.1
+    camera((0.02, -0.56, 0.3), (0.14, 0.06, 0.1), lens=38, focus=0.6, fstop=5.6)
+    scene.render.filepath = os.path.abspath(os.path.join(args.out, f"concept-{kind}-{beat}.png"))
+
 # ---------------------------------------------------------------- go
 
 {"ball": build_ball, "chaos": build_chaos, "glass": build_glass, "studio": build_studio,
  "desk": build_desk, "bench": build_bench, "canvas": build_canvas, "hero": build_hero, "pullback": build_pullback,
  "deskmove": build_deskmove, "attempts": build_attempts, "export": build_export,
- "settle": build_settle, "raygrid": build_raygrid, "bakedesk": build_bakedesk}[args.scene]()
+ "settle": build_settle, "raygrid": build_raygrid, "bakedesk": build_bakedesk, "concept": build_concept}[args.scene]()
 if args.preview:
     render_settings(24, *( (960, 600) if os.environ.get("LOOKDEV_BIGPREVIEW") else (480, 300) ))
 elif os.environ.get("LOOKDEV_REVIEW"):
@@ -2602,6 +2707,8 @@ if args.scene in ("pullback", "deskmove", "settle"):
     sys.exit(0)
 os.makedirs(args.out, exist_ok=True)
 tag = f"{args.scene}-{args.state}" if args.scene == "studio" else f"{args.scene}-{args.grid}" if args.scene == "bench" else f"{args.scene}-{args.phase}-{args.word}-L{args.light:g}" if args.scene == "hero" else f"desk-{args.view}-{args.dstate}" if args.scene == "desk" else args.scene
+if args.scene == "concept":
+    tag = f"concept-{os.environ.get('CONCEPT', 'ui')}-{os.environ.get('BEAT', '1')}"
 path = os.path.abspath(os.path.join(args.out, f"{tag}{'-preview' if args.preview else ''}.png"))
 scene.render.filepath = path
 bpy.ops.render.render(write_still=True)
