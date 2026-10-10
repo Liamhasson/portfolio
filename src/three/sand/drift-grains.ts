@@ -38,6 +38,7 @@ uniform float uCursorReach;
 uniform sampler2D uPaint;
 uniform float uPaintScale;
 uniform vec2 uViewport;
+uniform float uExposure;
 out vec3 vAlbedo;
 out vec3 vL0; out vec3 vL1; out vec3 vL2; out vec3 vL3;
 out vec3 vE0; out vec3 vE1; out vec3 vE2; out vec3 vE3;
@@ -99,6 +100,9 @@ void main() {
   // near the camera: large and soft, as if out of focus (light spread over the disc: dimmer, never brighter)
   vSoft = smoothstep(10.0, 40.0, px);
   vAlpha = clamp((px * px) / (uMinPx * uMinPx), 0.0, 1.0) * env * mix(1.0, 0.35, vSoft);
+  // only where the light reaches it: an unlit grain is not drawn (dark specks over the lit desk otherwise)
+  vec3 Es = (E[0] + E[1] + E[2]) * uExposure;
+  vAlpha *= smoothstep(0.015, 0.12, dot(Es, vec3(0.2126, 0.7152, 0.0722)));
   gl_PointSize = clamp(max(px, uMinPx), 0.0, 96.0);
 }
 `;

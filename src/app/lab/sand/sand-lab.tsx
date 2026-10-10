@@ -241,6 +241,16 @@ export function SandLab() {
       drift.points.layers.set(SAND_LAYER);
       stage.scene.add(drift.points);
       const lean = new THREE.Vector2();     // the eased lean, -1..1 each way
+      // the desk's top as a rectangle in the hero's units (x, z) and its height, for keeping the top view inside it
+      let deskTop: { min: THREE.Vector2; max: THREE.Vector2; y: number } | null = null;
+      if (desk3d) {
+        desk3d.group.updateMatrixWorld(true);
+        const top = desk3d.group.getObjectByName("bake_desk_top");
+        if (top) {
+          const b = new THREE.Box3().setFromObject(top);
+          deskTop = { min: new THREE.Vector2(b.min.x, b.min.z), max: new THREE.Vector2(b.max.x, b.max.z), y: b.max.y };
+        }
+      }
       const leanQ = new THREE.Quaternion(), leanE = new THREE.Euler();
       if (pullback) stage.scene.add(pullback.plate);
       let shadow: BallShadow | null = null;
@@ -491,10 +501,44 @@ export function SandLab() {
             const pg = progressRef.current;
             const landing = ease(pg, [TL.ship[0] + 0.5 * (TL.ship[1] - TL.ship[0]), TL.ship[1]]) * (1 - ease(pg, [TL.ship[1] + 0.01, TL.ship[1] + 0.035]));
             const w = (1 - landing) * (1 - ease(pg, [TL.takeover[0] - 0.02, TL.takeover[1]]));
+            const cam = stage!.camera;
+            // looking down on the desk, its top fills the frame: the frame (and the lean) must never pass its edge into
+            // the void. The lens tightens once, for the pose (never with the cursor); the lean then goes only as far as
+            // the desk allows
+            const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+            const down = deskTop ? THREE.MathUtils.smoothstep(-fwd.y, 0.9, 0.97) : 0;
+            const q0 = cam.quaternion.clone();
+            const inside = (scale: number, q: THREE.Quaternion) => {
+              const th = Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2) * scale, tw = th * cam.aspect;
+              for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+                const d = new THREE.Vector3(sx * tw, sy * th, -1).applyQuaternion(q);
+                if (d.y >= -1e-4) return false;
+                const t = (deskTop!.y - cam.position.y) / d.y;
+                const x = cam.position.x + d.x * t, z = cam.position.z + d.z * t;
+                if (x < deskTop!.min.x || x > deskTop!.max.x || z < deskTop!.min.y || z > deskTop!.max.y) return false;
+              }
+              return true;
+            };
+            if (down > 0 && !inside(1, q0)) {
+              let lo = 0.5, hi = 1;
+              for (let i = 0; i < 12; i++) { const m = (lo + hi) / 2; if (inside(m, q0)) lo = m; else hi = m; }
+              const k = THREE.MathUtils.lerp(1, lo * 0.97, down);   // a 3% margin for the lean
+              cam.fov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2) * k));
+              cam.updateProjectionMatrix();
+            }
             if (w > 0.0001) {
-              leanE.set(-lean.y * LEAN * w, lean.x * LEAN * w, 0, "YXZ");
-              stage!.camera.quaternion.multiply(leanQ.setFromEuler(leanE));
-              stage!.camera.updateMatrixWorld();
+              const leaned = (f: number) => {
+                leanE.set(-lean.y * LEAN * w * f, lean.x * LEAN * w * f, 0, "YXZ");
+                return q0.clone().multiply(leanQ.setFromEuler(leanE));
+              };
+              let f = 1;
+              if (down > 0.5 && !inside(1, leaned(1))) {
+                let lo = 0, hi = 1;
+                for (let i = 0; i < 10; i++) { const m = (lo + hi) / 2; if (inside(1, leaned(m))) lo = m; else hi = m; }
+                f = lo;
+              }
+              cam.quaternion.copy(leaned(f));
+              cam.updateMatrixWorld();
             }
           }
           // 3: the live index over the screen's quad, crossfading in where they coincide, then settling into the view
