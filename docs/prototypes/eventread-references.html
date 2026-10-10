@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eventread references</title>
+<style>
+  :root {
+    --bg: #141414; --panel: #1c1c1c; --line: #2c2c2c;
+    --fg: #ececec; --dim: #9a9a9a; --faint: #6a6a6a;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.55 var(--sans); }
+  main { max-width: 1320px; margin: 0 auto; padding: 56px 32px 120px; }
+  header { margin-bottom: 56px; }
+  h1 { font-size: 28px; font-weight: 500; margin: 0 0 8px; letter-spacing: -0.01em; }
+  .lede { color: var(--dim); max-width: 760px; margin: 0; }
+  nav { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 8px; }
+  nav a { font: 12px var(--mono); color: var(--dim); border: 1px solid var(--line); padding: 4px 10px; border-radius: 99px; text-decoration: none; }
+  nav a:hover { color: var(--fg); border-color: var(--faint); }
+  section { border-top: 1px solid var(--line); padding: 48px 0 24px; }
+  h2 { font-size: 22px; font-weight: 500; margin: 0 0 4px; }
+  h3 { font-size: 16px; font-weight: 500; margin: 32px 0 4px; }
+  .url { font: 12px var(--mono); color: var(--dim); word-break: break-all; }
+  .url a { color: inherit; }
+  .label { font: 11px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--faint); margin: 20px 0 8px; }
+  ul.notes { margin: 14px 0 20px; padding-left: 18px; max-width: 900px; }
+  ul.notes li { margin: 4px 0; }
+  ul.notes li b { font-weight: 600; }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  figure { margin: 0; }
+  figure a { display: block; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: #000; }
+  figure img { display: block; width: 100%; height: auto; aspect-ratio: 1440 / 900; }
+  figcaption { font: 11px var(--mono); color: var(--dim); margin-top: 6px; }
+  table { border-collapse: collapse; width: 100%; max-width: 980px; font-size: 13px; margin: 8px 0 16px; }
+  th, td { text-align: left; padding: 7px 12px 7px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font: 11px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--faint); font-weight: 400; }
+  td code, .mono { font: 12px var(--mono); }
+  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin: 8px 0 24px; }
+  .sw { border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--panel); }
+  .sw .chip { height: 76px; }
+  .sw .meta { padding: 8px 10px 10px; }
+  .sw .name { font-size: 13px; }
+  .sw .hex { font: 12px var(--mono); color: var(--dim); }
+  .sw .use { font-size: 11px; color: var(--faint); margin-top: 2px; }
+  .fontrow { display: flex; flex-wrap: wrap; gap: 24px; margin: 8px 0 8px; }
+  .fontrow div { color: var(--dim); font-size: 13px; }
+  @media (max-width: 760px) {
+    main { padding: 32px 16px 80px; }
+    .grid, .grid.three { grid-template-columns: 1fr; }
+    table { font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>Eventread case study: reference board</h1>
+  <p class="lede">Captured 9 Oct 2026 with Playwright at 1440×900 (headless Chromium, WebGL on). Screenshots are taken from scroll steps on each page. Type measurements come from <span class="mono">getComputedStyle</span>. Colours sampled from a screenshot are marked "≈". Click any image to open it full size.</p>
+  <nav>
+    <a href="#lusion">Lusion: system</a><a href="#oryzo">Lusion: Oryzo AI</a><a href="#devin">Lusion: Devin AI</a><a href="#atlas">Lusion: Atlas Motion</a>
+    <a href="#interos">Clay: Interos</a><a href="#okta">Ramotion: Okta</a><a href="#tipalti">Clay: Tipalti</a><a href="#eventread">Eventread world</a>
+  </nav>
+</header>
+
+<!-- ============ LUSION SYSTEM ============ -->
+<section id="lusion">
+  <h2>Lusion: project page system</h2>
+  <div class="url"><a href="https://lusion.co/projects">https://lusion.co/projects</a></div>
+  <ul class="notes">
+    <li><b>The page scrolls sideways.</b> The mouse wheel moves a horizontal strip. The first panel is text only: title, two short paragraphs, Services and Links lists, and a "Launch project" pill. Every panel after it is media in rounded frames. The frames are about 637px tall in a 900px viewport (y 145 to 782), with a gap of about 80px between them.</li>
+    <li><b>The project brings its accent colour.</b> The Lusion chrome (logo, "scroll to explore", section labels, inline links) takes each project's colour. Oryzo uses <span class="mono">#DC5000</span> with cream text <span class="mono">#FFEDD7</span>. Devin uses teal <span class="mono">#64E1CE</span>. Atlas uses pink <span class="mono">#F65893</span> with <span class="mono">#FFFDE0</span>. The page backgrounds are near-black and tinted per project: ≈<span class="mono">#191410</span>, ≈<span class="mono">#121413</span>, ≈<span class="mono">#181818</span>.</li>
+    <li><b>Media sits inside the strip.</b> Frames hold screenshots of the product site, video loops and 3D renders. Some frames have their own full-bleed backgrounds, like the light-blue Devin panel. Text never sits on top of the frames.</li>
+    <li><b>The end shows the next project.</b> The strip stops with a light panel (≈<span class="mono">#F3F4F9</span>) peeking in from the right, about 360px wide. It holds the next title at 72px in grey <span class="mono">rgb(194,195,199)</span> and the label "NEXT PROJECT ——→" at 14px. Clicking it did not navigate in headless Chromium, so the transition between projects was not observed.</li>
+  </ul>
+  <div class="label">Measured type scale (identical on Oryzo, Devin, Atlas). Font: Aeonik 400/500, plus IBM Plex Mono and LusionMono loaded.</div>
+  <table>
+    <tr><th>Role</th><th>Size / line-height</th><th>Ratio</th><th>Weight · case · tracking</th><th>Example</th></tr>
+    <tr><td>Project title (h2)</td><td class="mono">72px / 68.4px</td><td class="mono">0.95</td><td>400 · none · normal</td><td>"Oryzo AI", "Devin AI"</td></tr>
+    <tr><td>Next-project title (h2)</td><td class="mono">72px / 68.4px</td><td class="mono">0.95</td><td>400 · grey #C2C3C7</td><td>"Of The Oak", "Atlas Motion"</td></tr>
+    <tr><td>Menu items</td><td class="mono">26px / 26px</td><td class="mono">1.0</td><td>400 · uppercase</td><td>"Home"</td></tr>
+    <tr><td>Nav pills</td><td class="mono">14px / 16.1px</td><td class="mono">1.15</td><td>500 · uppercase</td><td>"Back", "Let's talk", "Menu"</td></tr>
+    <tr><td>Next-project label</td><td class="mono">14px / 16.1px</td><td class="mono">1.15</td><td>400 · uppercase</td><td>"NEXT PROJECT"</td></tr>
+    <tr><td>Body paragraph</td><td class="mono">12px / 18px</td><td class="mono">1.5</td><td>400 · none</td><td>intro text, about 330px column</td></tr>
+    <tr><td>Inline link in body</td><td class="mono">12px / 18px</td><td class="mono">1.5</td><td>500 · accent colour</td><td>"GitHub page"</td></tr>
+    <tr><td>List items (services/links)</td><td class="mono">12px / 16.8px</td><td class="mono">1.4</td><td>400</td><td>"Concept", "WebGL"</td></tr>
+    <tr><td>Section labels</td><td class="mono">12px / 13.8px</td><td class="mono">1.15</td><td>400 · uppercase · accent</td><td>"Services", "scroll to explore"</td></tr>
+  </table>
+  <div class="grid">
+    <figure><a href="eventread-references/lusion-projects-00-top.jpg"><img loading="lazy" src="eventread-references/lusion-projects-00-top.jpg" alt="Lusion projects index"></a><figcaption>/projects index, opening</figcaption></figure>
+  </div>
+</section>
+
+<section id="oryzo">
+  <h2>Lusion: Oryzo AI</h2>
+  <div class="url"><a href="https://lusion.co/projects/oryzo_ai">https://lusion.co/projects/oryzo_ai</a></div>
+  <ul class="notes">
+    <li><b>Opening:</b> the text panel sits on the left, about 330px wide. The first media frame is already bleeding in from the right in the first viewport, so the work is visible before any scrolling.</li>
+    <li><b>Rhythm:</b> big product-site frames (hero, "sustainability" type moment) alternate with pairs of smaller frames (render plus texture). A founder video frame comes late in the strip.</li>
+    <li><b>End:</b> the last frame is a warm "sketch" image. The next-project panel ("Atlas Motion") cuts in on the right.</li>
+  </ul>
+  <div class="grid three">
+    <figure><a href="eventread-references/lusion-oryzo-00-top.jpg"><img loading="lazy" src="eventread-references/lusion-oryzo-00-top.jpg" alt=""></a><figcaption>opening / text panel</figcaption></figure>
+    <figure><a href="eventread-references/lusion-oryzo-02-s4.jpg"><img loading="lazy" src="eventread-references/lusion-oryzo-02-s4.jpg" alt=""></a><figcaption>media: product-site frames</figcaption></figure>
+    <figure><a href="eventread-references/lusion-oryzo-07-s14.jpg"><img loading="lazy" src="eventread-references/lusion-oryzo-07-s14.jpg" alt=""></a><figcaption>media: paired frames</figcaption></figure>
+    <figure><a href="eventread-references/lusion-oryzo-13-s26.jpg"><img loading="lazy" src="eventread-references/lusion-oryzo-13-s26.jpg" alt=""></a><figcaption>media: founder video frame</figcaption></figure>
+    <figure><a href="eventread-references/lusion-oryzo-19-end.jpg"><img loading="lazy" src="eventread-references/lusion-oryzo-19-end.jpg" alt=""></a><figcaption>end: next project peeks in</figcaption></figure>
+  </div>
+</section>
+
+<section id="devin">
+  <h2>Lusion: Devin AI (closest to a SaaS product story)</h2>
+  <div class="url"><a href="https://lusion.co/projects/devin_ai">https://lusion.co/projects/devin_ai</a></div>
+  <ul class="notes">
+    <li><b>Product UI is the hero.</b> Website screenshots in a light bezel frame start in the first viewport. Real UI states follow: a customer-story page, a workspace menu, an integrations grid.</li>
+    <li><b>Light panels inside a dark page.</b> The page switches to a pale blue-grey full-height panel (≈<span class="mono">#D2DDE7</span>) for a sequence of UI cards. One centre card is in focus and the cards on either side are angled in 3D. It is captioned "Engaging visuals" in small white type.</li>
+    <li><b>Media ends on a device shot:</b> a laptop on a dark set shows the product, followed by the next-project panel ("Of The Oak").</li>
+  </ul>
+  <div class="grid three">
+    <figure><a href="eventread-references/lusion-devin-00-top.jpg"><img loading="lazy" src="eventread-references/lusion-devin-00-top.jpg" alt=""></a><figcaption>opening</figcaption></figure>
+    <figure><a href="eventread-references/lusion-devin-03-s6.jpg"><img loading="lazy" src="eventread-references/lusion-devin-03-s6.jpg" alt=""></a><figcaption>media: light product pages</figcaption></figure>
+    <figure><a href="eventread-references/lusion-devin-07-s14.jpg"><img loading="lazy" src="eventread-references/lusion-devin-07-s14.jpg" alt=""></a><figcaption>media: UI cards, 3D carousel on a light panel</figcaption></figure>
+    <figure><a href="eventread-references/lusion-devin-13-s26.jpg"><img loading="lazy" src="eventread-references/lusion-devin-13-s26.jpg" alt=""></a><figcaption>media: device shot</figcaption></figure>
+    <figure><a href="eventread-references/lusion-devin-19-end.jpg"><img loading="lazy" src="eventread-references/lusion-devin-19-end.jpg" alt=""></a><figcaption>end: next project panel</figcaption></figure>
+  </div>
+</section>
+
+<section id="atlas">
+  <h2>Lusion: Atlas Motion</h2>
+  <div class="url"><a href="https://lusion.co/projects/atlas_motion">https://lusion.co/projects/atlas_motion</a></div>
+  <ul class="notes">
+    <li><b>Opening:</b> the first frame is a line-drawn "grid" placeholder that resolves into the product site. The scroll reveals a wipe from one frame to the next, and a vertical seam between two frames is visible mid-transition.</li>
+    <li><b>Type moments come from the product site</b> ("INNOVATE", "THE ATLAS ECOSYSTEM"). Lusion's own words stay in the intro panel only.</li>
+    <li>36 wheel steps of 600px did not reach the end of this strip. The last capture is still media.</li>
+  </ul>
+  <div class="grid">
+    <figure><a href="eventread-references/lusion-atlas-00-top.jpg"><img loading="lazy" src="eventread-references/lusion-atlas-00-top.jpg" alt=""></a><figcaption>opening</figcaption></figure>
+    <figure><a href="eventread-references/lusion-atlas-06-s12.jpg"><img loading="lazy" src="eventread-references/lusion-atlas-06-s12.jpg" alt=""></a><figcaption>media: frame-to-frame wipe</figcaption></figure>
+    <figure><a href="eventread-references/lusion-atlas-11-s22.jpg"><img loading="lazy" src="eventread-references/lusion-atlas-11-s22.jpg" alt=""></a><figcaption>media: type moment from the product</figcaption></figure>
+    <figure><a href="eventread-references/lusion-atlas-19-end.jpg"><img loading="lazy" src="eventread-references/lusion-atlas-19-end.jpg" alt=""></a><figcaption>deepest capture</figcaption></figure>
+  </div>
+</section>
+
+<!-- ============ CLAY INTEROS ============ -->
+<section id="interos">
+  <h2>Clay: Interos (light + navy, SaaS risk platform)</h2>
+  <div class="url"><a href="https://clay.global/work/interos">https://clay.global/work/interos</a></div>
+  <ul class="notes">
+    <li><b>Type scale:</b> UniversalSans. Title h1 is 74/81.4px, weight 740, tracking −2.96px (−0.04em). Section h2 is 52/57.2px, 740, −1.56px (−0.03em). The intro line is 28/39.2px, 500. Body is 22/29.7px, 500, −0.44px, in columns about 516–637px wide. Ink is <span class="mono">#050411</span>.</li>
+    <li><b>Rhythm:</b> sections are 1,100–1,600px tall with 80px top and bottom padding. Background bands step from white to a lavender tint <span class="mono">#E9ECFD</span>, then to three full navy sections <span class="mono">#031046</span>.</li>
+    <li><b>How product media sits:</b> tablet and phone frames sit on the navy band, with the tablet cropped by the band edges. There are side-by-side "Before / After" panels with 20px captions underneath.</li>
+    <li><b>End:</b> "Next Case Study" at 28px with an arrow on white. The next title (PalmPalm, 74px) is in the DOM but had not drawn in the capture. A dark "Let's Talk" footer follows.</li>
+  </ul>
+  <div class="grid three">
+    <figure><a href="eventread-references/clay-interos-00-top.jpg"><img loading="lazy" src="eventread-references/clay-interos-00-top.jpg" alt=""></a><figcaption>opening</figcaption></figure>
+    <figure><a href="eventread-references/clay-interos-01-s3.jpg"><img loading="lazy" src="eventread-references/clay-interos-01-s3.jpg" alt=""></a><figcaption>text section + before/after</figcaption></figure>
+    <figure><a href="eventread-references/clay-interos-02-s6.jpg"><img loading="lazy" src="eventread-references/clay-interos-02-s6.jpg" alt=""></a><figcaption>lavender band, data patterns</figcaption></figure>
+    <figure><a href="eventread-references/clay-interos-05-s15.jpg"><img loading="lazy" src="eventread-references/clay-interos-05-s15.jpg" alt=""></a><figcaption>large type moment</figcaption></figure>
+    <figure><a href="eventread-references/clay-interos-06-s18.jpg"><img loading="lazy" src="eventread-references/clay-interos-06-s18.jpg" alt=""></a><figcaption>navy band, product on tablet</figcaption></figure>
+    <figure><a href="eventread-references/clay-interos-07-s21.jpg"><img loading="lazy" src="eventread-references/clay-interos-07-s21.jpg" alt=""></a><figcaption>end: next case study</figcaption></figure>
+  </div>
+</section>
+
+<!-- ============ RAMOTION OKTA ============ -->
+<section id="okta">
+  <h2>Ramotion: Okta (light + navy, identity SaaS)</h2>
+  <div class="url"><a href="https://www.ramotion.com/okta/">https://www.ramotion.com/okta/</a></div>
+  <ul class="notes">
+    <li><b>Type scale:</b> Graphik. Title h1 is 92/101.2px, weight 600, −3.2px. Section h2 is 36/43.2px, 600. Body is 18/27px, 400, in columns about 532–640px wide. The testimonial quote is 24/37.2px. Ink is <span class="mono">#262626</span> on a page background of <span class="mono">#FAFAFA</span>.</li>
+    <li><b>Navy is the brand colour, not the page:</b> navy ≈<span class="mono">#012F84</span> appears in headings (a two-tone "Iconography &amp; Illustrations <i>Hierarchy</i>" with the second part in grey), icon tiles, and one full navy tile per grid.</li>
+    <li><b>How product media sits:</b> real product screens (docs, help centre, sign-in) are arranged as a flat collage of cards on a cool grey <span class="mono">#F0F1F5</span>, with no device frames. The hero crops a laptop at the top edge.</li>
+    <li><b>End:</b> client quote with portrait, then "Let's talk" and the footer. No next-project link.</li>
+  </ul>
+  <div class="grid three">
+    <figure><a href="eventread-references/ram-okta-00-top.jpg"><img loading="lazy" src="eventread-references/ram-okta-00-top.jpg" alt=""></a><figcaption>opening</figcaption></figure>
+    <figure><a href="eventread-references/ram-okta-01-s3.jpg"><img loading="lazy" src="eventread-references/ram-okta-01-s3.jpg" alt=""></a><figcaption>two-tone navy heading + grid</figcaption></figure>
+    <figure><a href="eventread-references/ram-okta-02-s6.jpg"><img loading="lazy" src="eventread-references/ram-okta-02-s6.jpg" alt=""></a><figcaption>product screens as a flat collage</figcaption></figure>
+    <figure><a href="eventread-references/ram-okta-03-s9.jpg"><img loading="lazy" src="eventread-references/ram-okta-03-s9.jpg" alt=""></a><figcaption>navy tiles on light</figcaption></figure>
+    <figure><a href="eventread-references/ram-okta-07-s21.jpg"><img loading="lazy" src="eventread-references/ram-okta-07-s21.jpg" alt=""></a><figcaption>end: quote → contact</figcaption></figure>
+  </div>
+</section>
+
+<!-- ============ CLAY TIPALTI ============ -->
+<section id="tipalti">
+  <h2>Clay: Tipalti (light, finance SaaS, product UI)</h2>
+  <div class="url"><a href="https://clay.global/work/tipalti">https://clay.global/work/tipalti</a></div>
+  <ul class="notes">
+    <li><b>Same Clay type scale as Interos:</b> 74px title, 52px h2 (for example "Bringing a Human Touch to Tech", set on two lines), 22px body, ink <span class="mono">#06070A</span>. Brand yellow is used only in the hero band and one awards card.</li>
+    <li><b>How product media sits:</b> UI fragments (cards, a chart, a newsletter form, an "AI" chip) float on white as separate components, not as a full-page screenshot. Mobile screens are shown in a row on black.</li>
+    <li><b>End:</b> a white band reads "Next Case Study", then "STC Bank →" at 74px with an underline. Directly below, a full-width image of the next project shows a "View case study" cursor pill.</li>
+  </ul>
+  <div class="grid">
+    <figure><a href="eventread-references/clay-tipalti-00-top.jpg"><img loading="lazy" src="eventread-references/clay-tipalti-00-top.jpg" alt=""></a><figcaption>opening</figcaption></figure>
+    <figure><a href="eventread-references/clay-tipalti-01-s3.jpg"><img loading="lazy" src="eventread-references/clay-tipalti-01-s3.jpg" alt=""></a><figcaption>text section</figcaption></figure>
+    <figure><a href="eventread-references/clay-tipalti-04-s12.jpg"><img loading="lazy" src="eventread-references/clay-tipalti-04-s12.jpg" alt=""></a><figcaption>UI components floating on white</figcaption></figure>
+    <figure><a href="eventread-references/clay-tipalti-06-s18.jpg"><img loading="lazy" src="eventread-references/clay-tipalti-06-s18.jpg" alt=""></a><figcaption>end: next case study + image</figcaption></figure>
+  </div>
+</section>
+
+<!-- ============ EVENTREAD WORLD ============ -->
+<section id="eventread">
+  <h2>Eventread world</h2>
+  <div class="url"><a href="https://eventread.vercel.app">https://eventread.vercel.app</a> · <a href="https://eventread.vercel.app/results?city=Berlin&amp;country=Germany&amp;countryCode=DE&amp;placeId=hero-berlin&amp;lat=52.52&amp;lon=13.405&amp;date=2026-11-01&amp;range=month&amp;genre=Rock&amp;capacity=1000&amp;day=2026-11-18">/results (Berlin, Rock, 1,000 cap, 18 Nov 2026)</a></div>
+  <div class="label">Palette (computed styles; the only :root variable is --page-bg)</div>
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:#F8F8F6"></div><div class="meta"><div class="name">Page background</div><div class="hex">#F8F8F6</div><div class="use">--page-bg, main bg-grey-50</div></div></div>
+    <div class="sw"><div class="chip" style="background:#FFFFFF"></div><div class="meta"><div class="name">Surface</div><div class="hex">#FFFFFF</div><div class="use">cards, header (95% alpha)</div></div></div>
+    <div class="sw"><div class="chip" style="background:#1A1A2E"></div><div class="meta"><div class="name">Navy / ink</div><div class="hex">#1A1A2E</div><div class="use">text, active pill, "Follow this date" button, selected day border</div></div></div>
+    <div class="sw"><div class="chip" style="background:#2D7D9A"></div><div class="meta"><div class="name">Teal 500</div><div class="hex">#2D7D9A</div><div class="use">"Until now.", holiday tags (10% tint), dots</div></div></div>
+    <div class="sw"><div class="chip" style="background:#374151"></div><div class="meta"><div class="name">Grey 700</div><div class="hex">#374151</div><div class="use">nav links</div></div></div>
+    <div class="sw"><div class="chip" style="background:#6B7280"></div><div class="meta"><div class="name">Grey 500</div><div class="hex">#6B7280</div><div class="use">eyebrows, meta, icons</div></div></div>
+    <div class="sw"><div class="chip" style="background:#D1D5DB"></div><div class="meta"><div class="name">Grey 300</div><div class="hex">#D1D5DB</div><div class="use">breadcrumb chevrons</div></div></div>
+    <div class="sw"><div class="chip" style="background:#E5E7EB"></div><div class="meta"><div class="name">Grey 200</div><div class="hex">#E5E7EB</div><div class="use">borders, inputs, meter track</div></div></div>
+    <div class="sw"><div class="chip" style="background:#F3F4F6"></div><div class="meta"><div class="name">Grey 100</div><div class="hex">#F3F4F6</div><div class="use">event chips in calendar, list dividers</div></div></div>
+    <div class="sw"><div class="chip" style="background:#30A46C"></div><div class="meta"><div class="name">Safe</div><div class="hex">#30A46C</div><div class="use">label text + dot (success-500)</div></div></div>
+    <div class="sw"><div class="chip" style="background:#F5A623"></div><div class="meta"><div class="name">Threat</div><div class="hex">#F5A623</div><div class="use">label text + corner dot</div></div></div>
+    <div class="sw"><div class="chip" style="background:#FFFBEB"></div><div class="meta"><div class="name">Threat tint</div><div class="hex">#FFFBEB</div><div class="use">calendar day cell bg</div></div></div>
+    <div class="sw"><div class="chip" style="background:#E5484D"></div><div class="meta"><div class="name">Critical</div><div class="hex">#E5484D</div><div class="use">label text, corner dot, "8 conflicts"</div></div></div>
+    <div class="sw"><div class="chip" style="background:#FFF0F0"></div><div class="meta"><div class="name">Critical tint</div><div class="hex">#FFF0F0</div><div class="use">calendar day cell bg</div></div></div>
+  </div>
+  <div class="label">Fonts</div>
+  <div class="fontrow">
+    <div><b style="color:var(--fg)">DM Sans</b> (next/font): 400, 500, 600, 700 loaded. It is the only family. The fallback is system-ui.</div>
+  </div>
+  <div class="label">Type observed</div>
+  <table>
+    <tr><th>Role</th><th>Size / line-height</th><th>Weight · case · tracking</th><th>Example</th></tr>
+    <tr><td>Home H1</td><td class="mono">44px / 48.4px</td><td>700</td><td>"The check every booker skips. <span style="color:#2D7D9A">Until now.</span>"</td></tr>
+    <tr><td>Wordmark</td><td class="mono">20px / 30px</td><td>700</td><td>"Eventread"</td></tr>
+    <tr><td>Card H2 / day H3</td><td class="mono">20/30 · 18/27 · 16/24</td><td>600</td><td>"Berlin, if you book a 1,000-cap rock show", "November 2026", "Nov 18, 2026"</td></tr>
+    <tr><td>Event title</td><td class="mono">15px / 22.5px</td><td>500–600</td><td>"Muse — The Wow! Signal Europa Tour"</td></tr>
+    <tr><td>Body / meta</td><td class="mono">16/24 · 14/21 · 13/19.5 · 12/18</td><td>400</td><td>"Uber Arena, Berlin · 17,000 cap · Rock"</td></tr>
+    <tr><td>Risk label</td><td class="mono">13px (home) · 11px (results)</td><td>600 · Safe/Threat/Critical colour</td><td>"Critical"</td></tr>
+    <tr><td>Eyebrow</td><td class="mono">11px / 16.5px</td><td>500 · uppercase · 0.88px (0.08em)</td><td>"Pre-Booking Intelligence"</td></tr>
+    <tr><td>Calendar chips</td><td class="mono">9px / 11.25px</td><td>400–500</td><td>"Cirque du Soleil ALIZÉ"</td></tr>
+  </table>
+  <ul class="notes">
+    <li>Light, flat surfaces: white cards with <span class="mono">rounded-xl</span> and <span class="mono">shadow-sm</span> on <span class="mono">#F8F8F6</span>. Navy is used for ink and solid controls, never as a background band.</li>
+    <li>Risk colour shows up three ways: as text on the label, as a 6px dot in a calendar cell corner, and as a pale tint across the whole day cell.</li>
+  </ul>
+  <div class="grid three">
+    <figure><a href="eventread-references/er-home-00-top.jpg"><img loading="lazy" src="eventread-references/er-home-00-top.jpg" alt=""></a><figcaption>home</figcaption></figure>
+    <figure><a href="eventread-references/er-results-00-top.jpg"><img loading="lazy" src="eventread-references/er-results-00-top.jpg" alt=""></a><figcaption>results: calendar + day panel</figcaption></figure>
+    <figure><a href="eventread-references/er-results-01-s2.jpg"><img loading="lazy" src="eventread-references/er-results-01-s2.jpg" alt=""></a><figcaption>results: scrolled</figcaption></figure>
+  </div>
+</section>
+</main>
+</body>
+</html>
