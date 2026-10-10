@@ -20,6 +20,21 @@
       "port": 4321
     },
     {
+      "name": "case-studies-prototypes",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "-e",
+        "const h=require('http'),f=require('fs'),p=require('path'),r=p.resolve('docs/prototypes'),t={'.html':'text/html','.jpg':'image/jpeg','.png':'image/png','.css':'text/css','.js':'text/javascript','.mp4':'video/mp4','.svg':'image/svg+xml'};h.createServer((q,s)=>{const u=decodeURIComponent(q.url.split('?')[0]);const x=p.join(r,u.endsWith('/')?u+'index.html':u);if(!x.startsWith(r))return s.writeHead(403).end();f.readFile(x,(e,d)=>e?s.writeHead(404).end():s.writeHead(200,{'content-type':t[p.extname(x)]||'application/octet-stream'}).end(d))}).listen(4322)"
+      ],
+      "port": 4322
+    },
+    {
+      "name": "case-studies-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "-p", "3200"],
+      "port": 3200
+    },
+    {
       "name": "sand-lab",
       "runtimeExecutable": "npm",
       "runtimeArgs": [

@@ -11,7 +11,7 @@ export const eventread: CaseStudy = {
     role: "Research, design and build, end to end",
     timeline: "Mar 2026 – ongoing",
     team: "Solo",
-    tools: ["Figma", "Figma MCP", "Claude Code", "Next.js", "Vercel", "Ticketmaster API", "JamBase API"],
+    tools: ["Figma", "Figma MCP", "Claude Code", "Next.js", "Vercel", "Ticketmaster", "JamBase", "football-data.org", "Wikidata"],
   },
   challenges: [
     {
@@ -31,10 +31,11 @@ export const eventread: CaseStudy = {
     },
     {
       kind: "design",
-      title: "A feature I cut the same day",
-      happened: "Showing the distance to each competing show meant asking for the venue first.",
-      did: "I removed it. People come to Eventread to find the venue; asking for it first asks them for the answer.",
-      changed: "People get their answer first; no venue needed to start.",
+      title: "One product, two visual languages",
+      happened:
+        "The interface had grown by feature: pill-shaped navigation next to square buttons, colour used for decoration as much as for risk.",
+      did: "I surveyed product design systems and built one from three references: Vercel's type, Ramp's colour discipline, Cal.com's month view. Risk became the only colour, shown as a dot and a word.",
+      changed: "One type family, one set of shapes, three colours that always mean risk, and a CI test that fails if an old style comes back.",
     },
   ],
   outcome: {
@@ -44,5 +45,7 @@ export const eventread: CaseStudy = {
     ],
     link: { href: "https://eventread.vercel.app", label: "Try it" },
   },
-  budget: STANDARD_BUDGET,
+  // How it works walks the product (search and acts, followed dates, tours), so
+  // it takes about two screens; the Danger Score band gives back 0.4 to stay in the cap.
+  budget: { ...STANDARD_BUDGET, signature: 1.6, supporting: 1.9 },
 };

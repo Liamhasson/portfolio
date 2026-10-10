@@ -5,9 +5,8 @@ export function ChallengeList({ challenges }: { challenges: readonly Challenge[]
   const headingId = useId();
   return (
     <section aria-labelledby={headingId} className="px-[5vw] py-[12vh]">
-      <p className="font-mono text-xs uppercase tracking-[0.08em] text-ink-3">Challenges</p>
-      <h2 id={headingId} className="mt-2 text-[clamp(2rem,4vw,3.6rem)] font-normal leading-[1.15]">
-        What got in the way
+      <h2 id={headingId} className="text-[clamp(2rem,4vw,3.6rem)] font-normal leading-[1.15]">
+        Challenges
       </h2>
       <ol role="list" className="mt-10 grid gap-10 md:grid-cols-3">
         {challenges.map((c) => (

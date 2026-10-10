@@ -106,7 +106,7 @@ export function band(score: number): Band {
 export const BERLIN_SHOW: YourShow = { capacity: 1000, genre: "Rock", startTime: "20:00" };
 
 export const BERLIN_EVENTS: readonly CompetingEvent[] = [
-  { name: "Muse — The Wow! Signal Europa Tour", venue: "Uber Arena", capacity: 7366, genre: "Alternative", time: "20:00", category: "Music" },
+  { name: "Muse — The Wow! Signal Europa Tour", venue: "Uber Arena", capacity: 17000, genre: "Rock", time: "19:30", category: "Music" },
   { name: "Horse Lords", venue: "Silent Green", capacity: 532, genre: "Rock", time: "20:00", category: "Music" },
   { name: "TAEMIN", venue: "Verti Music Hall", capacity: 3638, genre: "Other", time: "20:00", category: "Music" },
 ];

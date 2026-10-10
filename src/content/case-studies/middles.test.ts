@@ -8,5 +8,7 @@ test.each(["eventread", "cyvore", "pulse"])(
     const source = readFileSync(path.join(__dirname, `${slug}.mdx`), "utf8");
     const kinds = [...source.matchAll(/kind="([^"]+)"/g)].map((m) => m[1]);
     expect(kinds).toEqual(["problem", "signature", "supporting"]);
+    const titles = [...source.matchAll(/title="([^"]+)"/g)].map((m) => m[1]);
+    expect(titles).toEqual(["Problem", "Solution", "How it works"]);
   },
 );
