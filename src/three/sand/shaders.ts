@@ -291,7 +291,7 @@ void main() {
     float capW = smoothstep(uHoverShape.x, mix(uHoverShape.x, 1.0, 0.6), dot(nd, uHoverDir));
     float shell = smoothstep(0.6, 0.92, rl / uBallR);       // the surface's grains leave; the core holds the shape
     float hk = hash(aPosA + 11.3);
-    float leaves = step(hk, 0.6);                            // about six in ten of them
+    float leaves = step(hk, 0.12);                           // about one in eight of them (Liam: much less)
     float cyc = fract(uTime * (0.35 + 0.3 * hash(aPosB + 2.9)) + hash(aPosB + 6.1));
     float arc = sin(3.14159265 * cyc);
     // out of the surface and away from the point under the cursor (along the surface): on the face toward the viewer a

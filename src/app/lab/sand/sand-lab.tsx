@@ -237,7 +237,7 @@ export function SandLab() {
       drift.mesh.layers.set(SAND_LAYER);
       stage.scene.add(drift.mesh);
       // once the ball has formed nothing hangs around it: under the cursor its own grains come out and go back in
-      let hover = 0;
+      let hover = 0, hoverPx = -1, hoverPy = -1;   // (the cursor's last place: the ball answers its moves, not its rest)
       const hoverRay = new THREE.Vector3(), hoverDir = new THREE.Vector3(0, 0, 1);
       const lean = new THREE.Vector2();     // the eased lean, -1..1 each way
       let spacerTick = 0;
@@ -803,7 +803,10 @@ export function SandLab() {
           const along = hoverRay.dot(dir);
           const miss = Math.sqrt(Math.max(hoverRay.lengthSq() - along * along, 0));
           const over = sandBall && pointer.active && !reduced && along > 0 && miss < ballR * 1.08;
-          hover = damp(hover, over ? 1 : 0, over ? 8 : 4, dt);
+          // moving over the ball sets it off; at rest it answers once, then settles back (Liam: don't lock on the hover)
+          const moved = Math.hypot(pointer.x - hoverPx, pointer.y - hoverPy) > 0.5;
+          hoverPx = pointer.x; hoverPy = pointer.y;
+          hover = over && moved ? damp(hover, 1, 10, dt) : damp(hover, 0, 2.2, dt);
           if (over) {
             // the near side's point under the cursor, as a direction from the ball's centre
             const into = Math.sqrt(Math.max(ballR * ballR - miss * miss, 0));
