@@ -55,7 +55,7 @@ export const SAND_LOOK = {
   frontFalloff: 0.25,   // transmittance below which a grain counts as behind
   // the flow between chaos and ball (shaders.ts flowOffset; Ducky 3D's particle flow, 2026-10-10): its reach at the
   // halfway point (world units; the ball's radius is 1.1), the size of its folds, how much they curl, how fast they move
-  flow: 0.55,
+  flow: 0.88,   // Liam, 2026-10-10: stronger (1.6x the first 0.55)
   flowFreq: 0.35,
   flowWarp: 1.0,
   flowSpeed: 0.04,
