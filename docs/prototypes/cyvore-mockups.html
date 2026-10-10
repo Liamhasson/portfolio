@@ -269,6 +269,41 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
 .story.is-static .s-caps { height: auto; }
 .story.is-static .s-caps li { position: static; opacity: 1; transform: none; }
 
+/* =====================================================================
+   Refined for this portfolio (version C, chosen 10 Oct 2026 from cyvore-refine.html).
+   Part 1 · Evervault: colour and text tokens, type roles.
+   Michroma keeps headings, nav, buttons and column names; anything read
+   moves to Inter. Text is a cool off-white, shadows carry violet, not black.
+   ===================================================================== */
+.site.t-b, .site.t-c { --txt: #dfe1f4; --txt-hi: #ececfb; --txt-2: #babcd2; --txt-3: #9fa2b9; color: var(--txt); }
+.t-b .s-head h4, .t-c .s-head h4, .t-b .pan-title, .t-c .pan-title { color: var(--txt-hi); }
+.site.t-b .s-head p, .site.t-c .s-head p, .t-b .s-caps, .t-c .s-caps { font: 400 calc(var(--s) * 13)/1.5 var(--ui); letter-spacing: 0; color: var(--txt-2); }
+.t-b .pan-desc, .t-c .pan-desc, .t-b .stat-desc, .t-c .stat-desc { font: 400 calc(var(--s) * 15)/1.6 var(--ui); letter-spacing: -.005em; color: var(--txt); }
+.t-b .s-links, .t-c .s-links { color: var(--txt-2); }
+.t-b .chap, .t-c .chap { color: var(--txt-2); }
+.t-b .card, .t-c .card, .t-b .tile, .t-c .tile { box-shadow: 0 calc(var(--s) * 10) calc(var(--s) * 24) rgba(46,42,76,.55); }
+.site.t-b .eng-x, .site.t-c .eng-x { font: 400 calc(var(--s) * 12)/1.5 var(--ui); color: var(--txt-3); }
+.site.t-b .eng-d, .site.t-c .eng-d { font: 400 calc(var(--s) * 14)/1.6 var(--ui); color: var(--txt); }
+
+/* =====================================================================
+   Part 2 · Twingate's instrument-panel components, Doppler's rules.
+   Hairline insets instead of glows; one light source behind the stage;
+   engineered radii (16 frame / 12 surfaces / 10 cards / 8 tabs, pills stay
+   pills); surfaces step up from the canvas; one glowing CTA per screen.
+   ===================================================================== */
+.site.t-c { border-radius: calc(var(--s) * 16); box-shadow: 0 0 0 calc(var(--s) * 1) rgba(184,140,255,.14), 0 calc(var(--s) * 40) calc(var(--s) * 120) calc(var(--s) * -60) rgba(138,56,245,.35); }
+.t-c .s-stage { border-radius: calc(var(--s) * 16); background: #0d0a16; box-shadow: inset 0 0 0 calc(var(--s) * 1) rgba(184,140,255,.16), inset 0 calc(var(--s) * 1) 0 rgba(255,255,255,.04); }
+.t-c .pan { border-radius: calc(var(--s) * 12); background: #161025; box-shadow: inset 0 0 0 calc(var(--s) * 1) rgba(236,230,250,.06); }
+.t-c .pan::before { background: linear-gradient(160deg, #8a38f5 0%, #6a24d6 55%, #4e1aa8 100%); box-shadow: inset 0 calc(var(--s) * 1) 0 rgba(255,255,255,.18); }
+.t-c .pan-name { font-size: calc(var(--s) * 12); letter-spacing: .06em; color: var(--txt-2); }
+.t-c .card { border-radius: calc(var(--s) * 10); box-shadow: inset 0 calc(var(--s) * 1) 0 #fff, 0 calc(var(--s) * 12) calc(var(--s) * 28) rgba(46,42,76,.6); }
+.t-c .tile, .t-c .ioc { border-radius: calc(var(--s) * 10); }
+.t-c .s-nav .s-cta { background: transparent; color: var(--txt-hi); box-shadow: inset 0 0 0 calc(var(--s) * 1) rgba(236,230,250,.35); }
+.t-c .s-chapters { border-radius: calc(var(--s) * 12); background: #0d0a16; box-shadow: inset 0 0 0 calc(var(--s) * 1) rgba(236,230,250,.07); }
+.t-c .chap { border-radius: calc(var(--s) * 8); font-size: calc(var(--s) * 12); letter-spacing: .22em; }
+.t-c .chap[aria-selected="true"] { background: rgba(138,56,245,.14); box-shadow: inset 0 0 0 calc(var(--s) * 1) rgba(184,140,255,.55); }
+.t-c .eng { border-radius: calc(var(--s) * 12); background: #120d1f; }
+
 /* ------------------------------ 5 how it works ------------------------------ */
 .how { padding: calc(var(--u) * 112) 0 calc(var(--u) * 104); }
 .cta-clip { position: relative; margin: calc(var(--u) * 56) calc(var(--u) * 72) 0; border-radius: calc(var(--u) * 24); background: var(--panel); padding: calc(var(--u) * 28); box-shadow: inset 0 0 0 calc(var(--u) * 1) var(--hair); overflow: hidden; }
@@ -518,7 +553,7 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
       <div class="story-track">
         <div class="story-pin">
           <div class="rep-anno"><span>Scroll: the story plays</span><span>Hover or click: explore · bar: jump</span></div>
-          <div class="site" data-replica>
+          <div class="site t-c" data-replica>
             <div class="s-nav">
               <div class="s-logo"><img src="cyvore-mockups/logo-mark.svg" alt="">cyvore<sup>TM</sup></div>
               <div class="s-links"><span>Technology</span><span>Solutions</span><span>Resources</span><span>About Us</span><span>Contact</span></div>

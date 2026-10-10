@@ -51,13 +51,28 @@ test.describe("markup", () => {
     await expect(attack.locator("video")).not.toHaveAttribute("data-inview", /.*/);
   });
 
-  test("panel text is readable: 13px at the 1440 frame", async ({ page }) => {
-    const px = await page.evaluate(() => {
-      const desc = document.querySelector('.story[data-story="desktop"] .pan-desc') as HTMLElement;
-      const frame = desc.closest(".frame") as HTMLElement;
-      return parseFloat(getComputedStyle(desc).fontSize) / (frame.getBoundingClientRect().width / 1440);
+  test("refined type (version C): descriptions in Inter 15px, headings and column names stay Michroma", async ({ page }) => {
+    const t = await page.evaluate(() => {
+      const site = document.querySelector('.story[data-story="desktop"] .site') as HTMLElement;
+      const u = (site.closest(".frame") as HTMLElement).getBoundingClientRect().width / 1440;
+      const font = (sel: string) => getComputedStyle(site.querySelector(sel)!).fontFamily.split(",")[0].replace(/"/g, "");
+      const desc = site.querySelector(".pan-desc") as HTMLElement;
+      return {
+        desc: font(".pan-desc"),
+        size: parseFloat(getComputedStyle(desc).fontSize) / u,
+        heading: font(".s-head h4"),
+        column: font(".pan-name"),
+        color: getComputedStyle(desc).color,
+      };
     });
-    expect(px).toBeCloseTo(13, 0);
+    expect(t).toMatchObject({ desc: "Inter", heading: "Michroma", column: "Michroma", color: "rgb(223, 225, 244)" });
+    expect(t.size).toBeCloseTo(15, 0);
+  });
+
+  test("refined depth (version C): one glowing call to action per screen", async ({ page }) => {
+    const glows = await page.$$eval('.story[data-story="desktop"] [data-chapter="why"] .s-cta, .story[data-story="desktop"] .s-nav .s-cta', (els) =>
+      els.filter((e) => getComputedStyle(e).boxShadow.includes("rgba(156, 131, 251")).length);
+    expect(glows).toBe(1);
   });
 
   test("the pin can stick: sticky pin, frames clip instead of hiding overflow", async ({ page }) => {

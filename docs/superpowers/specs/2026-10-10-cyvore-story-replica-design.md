@@ -138,3 +138,15 @@ No pinning, no scrubbing. The four chapters sit one under another as still scree
 1. Approve the three attack captions (§7) or replace them.
 2. Keep or move the How it works sentence about the 7-second sequence (§11).
 3. Then: the design-system pairing from styles.refero.design (next step after this build, per Liam).
+
+## 17. Amendment (2026-10-10): refined look, version C
+
+Liam compared three looks on `docs/prototypes/cyvore-refine.html` (A as shipped, B Evervault only, C Evervault + Twingate with Doppler's rules, from styles.refero.design) and chose **C**. This supersedes §2 "Faithful look" and §10:
+
+- Content and layout stay as shipped; the look is refined for this portfolio, and the case study says so in one line (wording approved by Liam separately).
+- Type roles: Michroma for headings, nav, buttons and column names; Inter 15px (at the 1440 frame) for descriptions, sub-headings and captions; Iceland for the chapter bar.
+- Text: cool off-white `#dfe1f4` (brightest `#ececfb`, secondary `#babcd2`); shadows tinted `#2e2a4c`, never black.
+- Depth: one light source behind the site; hairline insets on the stage, tabs and cards instead of glows; closed columns step up from the canvas (`#161025`).
+- Radii: 16 frame and stage, 12 surfaces and columns, 10 cards and tiles, 8 chapter tabs; pills stay pills.
+- One glowing call to action per screen (the hero's); the nav's is an outline.
+- Open column: a directional violet gradient with a top highlight.
