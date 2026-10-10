@@ -24,7 +24,7 @@ from mathutils import Matrix, Vector
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 ap = argparse.ArgumentParser()
 ap.add_argument("--scene", choices=["ball", "chaos", "glass", "studio", "desk", "bench", "canvas", "hero", "pullback", "deskmove", "attempts", "export", "settle", "raygrid", "bakedesk"], required=True)
-ap.add_argument("--move", choices=["rise", "descend", "push"], default="rise", help="deskmove: which camera move")
+ap.add_argument("--move", choices=["rise", "descend", "push", "through"], default="rise", help="deskmove: which camera move")
 ap.add_argument("--move-name", dest="move_name", default="pullback", help="raygrid: which move's camera path (pullback, settle)")
 ap.add_argument("--grid", choices=["etched", "glow", "mat"], default="etched", help="bench scene only")
 ap.add_argument("--word", choices=["solid", "light", "cutout", "none"], default="light", help="hero scene only")
@@ -2004,6 +2004,118 @@ def build_raygrid():
     print("WROTE depth", move, out.shape)
     sys.exit(0)
 
+def build_through():
+    """2.3 → 3, revised 2026-10-10 (Liam): from the top view, the glass comes to the viewer and the camera goes through it.
+      1-40    the ball (glass here; the frost clearing is live only) drifts slowly up; the camera holds the top view
+      40-110  once glass, it rushes up the camera's path and the camera descends to meet it, both slowing into the
+              contact (a held breath: the desk magnified and upside down in the glass fills the frame), passing through
+              its centre at 110 (inside, the world rights itself)
+      110-170 out the other side, low between the ball and the desk, the camera tips down and turns toward the laptop
+              as the lid opens in front of it, ending square to the screen with the 16:10 screen filling the frame;
+              the screen wakes near the end. The glass stays above, out of frame (the dark screen may catch it)
+    Writes the frames and a JSON path (camera, ball, lid angle, screen corners per frame) like the other moves."""
+    import json
+    args.view, args.dstate = "top", "glass"
+    MOVE_CTX["open"] = 108; MOVE_CTX["side_fill"] = True
+    plate = bool(os.environ.get("DESKMOVE_PLATE"))
+    if plate:
+        os.environ["LOOKDEV_NO_SAND"] = "1"
+    build_desk()
+    for o in [o for o in bpy.data.objects if o.type == "CAMERA"]:
+        bpy.data.objects.remove(o)
+    c_ = Vector(CHAOS_C)
+    area_light("rim", tuple(c_ + Vector((0.18, 0.78, 0.3))), 0.24, 26.0, ROSE_SOFT, target=tuple(c_))   # as the 3D desk
+    R = 0.07
+    F = 170
+    scene.frame_start, scene.frame_end = 1, F
+    scene.render.fps = 24
+    def ease(t, a=0.0, b=1.0):
+        t = min(max((t - a) / (b - a), 0.0), 1.0)
+        return t * t * t * (t * (t * 6 - 15) + 10)
+    def clamp01(t):
+        return min(max(t, 0.0), 1.0)
+    rig = bpy.data.objects.new("ball_rig", None); scene.collection.objects.link(rig)
+    rig.location = MOVE_CTX["ball_c"]; bpy.context.view_layer.update()
+    for o in MOVE_CTX["ball"]:
+        if o.parent is None:
+            o.parent = rig; o.matrix_parent_inverse = rig.matrix_world.inverted()
+    disp = bpy.data.objects["display"]; hinge = bpy.data.objects["hinge"]
+    fill = bpy.data.objects["side_fill"].data; fill_e = fill.energy
+    glow = bpy.data.objects["screen_glow"].data; glow_e = glow.energy
+    emit = bpy.data.materials["display"].node_tree.nodes["Principled BSDF"].inputs["Emission Strength"]; emit_s = emit.default_value
+    shut, opened = math.radians(90), math.radians(-18)
+    # the end: square to the open screen, at the distance where the 16:10 screen fills a 16:10 frame at 50 mm
+    hinge.rotation_euler.x = opened; bpy.context.view_layer.update()
+    mw = disp.matrix_world
+    corners = [mw @ Vector((x, y, 0)) for x, y in ((-0.5, 0.5), (0.5, 0.5), (0.5, -0.5), (-0.5, -0.5))]
+    sc = sum(corners, Vector()) / 4
+    sn = (mw.to_3x3() @ Vector((0, 0, 1))).normalized()
+    if (Vector((0.0, -1.0, 0.3))).dot(sn) < 0:
+        sn = -sn                                         # the side the index shows on (toward the front of the desk)
+    fit = disp.scale.x / (36.0 / 50.0)
+    END = sc + sn * fit
+    q_end = (sc - END).to_track_quat("-Z", "Y")
+    TOP = Vector((0.0, 0.02, 1.35))
+    q_top = (Vector((0.0, 0.0201, 0.0)) - TOP).to_track_quat("-Z", "Y")
+    # the camera's path: straight down from the top view, then a curve that arrives moving into the screen
+    P0, P1 = TOP, Vector((0.0, 0.03, 0.42))
+    P2, P3 = END + sn * 0.35, END
+    def bez(s):
+        u = 1 - s
+        return P0 * u ** 3 + P1 * 3 * u * u * s + P2 * 3 * u * s * s + P3 * s ** 3
+    S_MEET = 0.3
+    M = bez(S_MEET)                                     # where camera and glass meet
+    B0 = Vector(MOVE_CTX["ball_c"]); B1 = B0 + Vector((0, 0, 0.1))
+    cam_d = bpy.data.cameras.new("cam"); cam_d.sensor_width = 36; cam_d.dof.use_dof = False
+    cam = bpy.data.objects.new("cam", cam_d); scene.collection.objects.link(cam); scene.camera = cam
+    cam.rotation_mode = "QUATERNION"
+    path = []
+    for f in range(1, F + 1):
+        # the approach: fast in its middle, slowing into the contact (smootherstep), then out and into the screen
+        if f <= 40:
+            s = 0.0
+        elif f <= 110:
+            s = S_MEET * ease((f - 40) / 70)
+        else:
+            s = S_MEET + (1 - S_MEET) * ease((f - 110) / 60)
+        pos = bez(min(s, 1.0))
+        # the glass: drifting slowly up, then rushing to the meeting point (it arrives with the camera), then held
+        if f <= 40:
+            ball = B0.lerp(B1, ease(f, 1, 40))
+        elif f <= 110:
+            ball = B1.lerp(M, ease((f - 40) / 70))
+        else:
+            ball = M.copy()
+        rig.location = ball
+        # looking straight down until through the glass, then turning to the screen
+        cam.location = pos
+        cam.rotation_quaternion = q_top.slerp(q_end, ease(f, 112, 166))
+        cam_d.lens = 45 + 5 * ease(f, 110, 170)
+        hinge.rotation_euler.x = shut + (opened - shut) * ease(f, 118, 160)
+        fill.energy = fill_e * ease(f, 116, 160)
+        glow.energy = glow_e * ease(f, 152, 168)
+        emit.default_value = emit_s if f >= 152 else 0.0
+        for ob, prop in ((cam, "location"), (cam, "rotation_quaternion"), (rig, "location")):
+            ob.keyframe_insert(prop, frame=f)
+        cam_d.keyframe_insert("lens", frame=f); hinge.keyframe_insert("rotation_euler", frame=f)
+        fill.keyframe_insert("energy", frame=f); glow.keyframe_insert("energy", frame=f); emit.keyframe_insert("default_value", frame=f)
+    for f in range(1, F + 1):
+        scene.frame_set(f)
+        mw = cam.matrix_world; q = mw.to_quaternion(); dm = disp.matrix_world
+        cs = [list(dm @ Vector((x, y, 0))) for x, y in ((-0.5, 0.5), (0.5, 0.5), (0.5, -0.5), (-0.5, -0.5))]
+        path.append({"frame": f, "position": list(mw.translation), "quaternion": [q.w, q.x, q.y, q.z],
+                     "lens_mm": cam_d.lens, "sensor_mm": 36, "ball": list(rig.matrix_world.translation), "ball_radius": R,
+                     "lid_open_deg": math.degrees(shut - hinge.rotation_euler.x), "screen_corners": cs})
+    os.makedirs(args.out, exist_ok=True)
+    with open(os.path.join(args.out, "deskmove-through-camera.json"), "w") as fh:
+        json.dump({"move": "through", "fps": 24, "frames": F, "units": "metres", "up": "z", "meet_frame": 110,
+                   "plate_overscan": 1.0, "chaos_center": list(c_), "chaos_scale": CHAOS_SCALE,
+                   "screen_corners_order": "top-left, top-right, bottom-right, bottom-left (as seen on the screen)", "path": path}, fh)
+    one = os.environ.get("MOVE_FRAME")
+    scene.frame_set(int(one or 1))
+    if one:
+        scene.frame_start = scene.frame_end = scene.frame_current
+
 def build_deskmove():
     """The camera moves between the three desk views, one continuous space, no cuts:
       rise     2.1 → 2.2  three-quarter → top-down; the dense ball rises with it
@@ -2015,6 +2127,8 @@ def build_deskmove():
     frame, so the live sphere follows the move and the live index can sit exactly on the screen and take over."""
     import json
     move = args.move
+    if move == "through":
+        return build_through()
     args.view, args.dstate = {"rise": ("tq", "dense"), "descend": ("top", "attempt"), "push": ("side", "glass")}[move]
     if move == "descend":
         MOVE_CTX["open"] = 108; MOVE_CTX["side_fill"] = True
