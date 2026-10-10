@@ -10,7 +10,7 @@ import { HeroOverlay } from "./hero-overlay";
 import { WorkIndex, type WorkIndexHandle } from "./work-index";
 import { BallShadow } from "@/three/sand/ball-shadow";
 import { FrostSkin } from "@/three/sand/frost-skin";
-import { attemptAt } from "@/three/sand/attempts";
+import { burstAt } from "@/three/sand/attempts";
 import { BakedDesk } from "@/three/sand/baked-desk";
 import { revealAt } from "@/three/sand/screen-reveal";
 import { GLASS_LAYER, GlassBall } from "@/three/sand/glass-ball";
@@ -207,7 +207,7 @@ export function SandLab() {
         ? new GlassBall(desk3d.env, desk3d.lut, desk3d.invLut, desk3d.glassLights(), desk3d.heroPerMetre, field.material) : null;
       // where the current attempt was born, in the ball's frame (the side that faced the viewer then); it rides the ball
       const attUp = new THREE.Vector3(0, 1, 0);
-      let attBorn = false, meltBorn = false;
+      let attIndex = -1, meltBorn = false;   // (which 2.2 burst is on; the 2.3 clearing born)
       let probes: { top: THREE.Texture; meet: THREE.Texture } | null = null;
       if (glass && composite) {
         stage.scene.add(glass.mesh);
@@ -531,18 +531,23 @@ export function SandLab() {
             desk3d.setScreen(rf);
             desk3d.setState(openF, rf.light);
           }
-          // 2.2: the attempts, scrubbed by scroll, facing the camera above (world up)
+          // 2.2: the attempts, as bursts of the ball's own sand (no frost: Liam, 2026-10-10), scrubbed by scroll; each born
+          // on the side facing the viewer, then riding the ball (its spin, the scroll's turn, the roll)
           const ax = span(progressRef.current, TL.attempts);
-          const [lo, brk, dep] = attemptAt(ax);
-          const live = ax > 0 && lo < 0.999;
-          if (live && !attBorn) {
-            // born on the side facing the viewer, then it rides the ball (its spin, the scroll's turn, the roll)
-            const toCam = stage!.camera.position.clone().sub(ballC).normalize();
-            attUp.copy(toCam.applyMatrix3(field!.ballRotation.clone().transpose())).normalize();
-            attBorn = true;
+          const bk = burstAt(ax);
+          if (bk.index !== attIndex) {
+            attIndex = bk.index;
+            if (bk.index >= 0) {
+              // (the patch turned ~50 degrees toward the side: facing the lens, it only broke toward the viewer)
+              const toCam = stage!.camera.position.clone().sub(ballC).normalize();
+              const side = new THREE.Vector3(1, 0, 0).applyQuaternion(stage!.camera.quaternion);
+              const tilt = bk.shape === 0 ? 0.87 : 0;
+              toCam.multiplyScalar(Math.cos(tilt)).addScaledVector(side, Math.sin(tilt)).normalize();
+              attUp.copy(toCam.applyMatrix3(field!.ballRotation.clone().transpose())).normalize();
+            }
           }
-          if (!live && ax < 1) attBorn = false;   // between attempts: the next is born anew
-          field!.setAttempt(ax > 0 ? lo : 1, brk, dep, attUp);
+          field!.setAttempt(1, 0, 0, attUp);
+          field!.setBurst(bk.amount, bk.volume, bk.shape, bk.index * 1.7, attUp);
           const v = move.view(f);
           stage!.setView(v.position, v.quaternion, v.lens);
           // the lean: toward the cursor (or a touching finger), eased; out over the landing and the index takeover
@@ -699,7 +704,7 @@ export function SandLab() {
           field!.setBuild(ease(b, BUILD.sweep), ease(b, BUILD.drain), meltT);
           if (glass) {
             // the frost exists from the first attempt on; the glass surface is the frost, clearing
-            const on = span(progressRef.current, TL.attempts) > 0 || b > 0;
+            const on = b > 0;   // (2.2 is sand only now: no frost before the build)
             glass.update(ballC, field!.material.uniforms.uBallR.value, on ? 1 : 0);
             glass.blurred = meltT < 1;   // fully clear: sharp reads only
             // the room it sees: from over the shut laptop, then from where it meets the camera (by its height)

@@ -30,3 +30,43 @@ export function attemptAt(x: number): AttemptKey {
   if (f <= 128) return mix(REST, OVER, ss((f - 100) / 28));
   return mix(OVER, A3, ss((f - 128) / 16));
 }
+
+/**
+ * 2.2 in sand only (Liam, 2026-10-10): the three attempts as small bursts in which the ball breaks form a little, as
+ * if going back to chaos, each a different shape (a patch, a seam, a ring) and a little stronger than the last. Each:
+ * the ball draws in a touch, breaks as it swells a touch, then settles. x: 0..1 through 2.2 (scrubbed by the scroll).
+ */
+export interface BurstKey {
+  /** which attempt (0..2), or -1 between them */
+  index: number;
+  /** how far it breaks, 0..1 */
+  amount: number;
+  /** the ball's volume, a share of its size (- drawn in, + swollen) */
+  volume: number;
+  /** 0 patch, 1 seam, 2 ring */
+  shape: number;
+}
+
+const BURSTS = [
+  { from: 0.04, to: 0.32, strength: 0.7 },
+  { from: 0.36, to: 0.64, strength: 0.85 },
+  { from: 0.68, to: 0.96, strength: 1 },
+];
+
+export function burstAt(x: number): BurstKey {
+  const sm = (v: number) => { const t = Math.min(Math.max(v, 0), 1); return t * t * (3 - 2 * t); };
+  for (let i = 0; i < BURSTS.length; i++) {
+    const b = BURSTS[i];
+    if (x < b.from || x > b.to) continue;
+    const u = (x - b.from) / (b.to - b.from);
+    const draw = -0.022, swell = 0.03;
+    if (u < 0.2) return { index: i, amount: 0, volume: draw * sm(u / 0.2), shape: i };
+    if (u < 0.45) {
+      const k = sm((u - 0.2) / 0.25);
+      return { index: i, amount: k * b.strength, volume: draw + (swell - draw) * k, shape: i };
+    }
+    const k = 1 - sm((u - 0.45) / 0.55);
+    return { index: i, amount: k * b.strength, volume: swell * k, shape: i };
+  }
+  return { index: -1, amount: 0, volume: 0, shape: 0 };
+}

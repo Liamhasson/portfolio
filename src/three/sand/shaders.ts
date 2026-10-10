@@ -129,6 +129,9 @@ uniform vec3 uChaosC;
 uniform mat3 uChaosRot;      // the chaos moving around itself
 uniform float uTime;
 uniform float uHover;        // the cursor over the formed ball: how much (0..1)
+uniform vec4 uBurst;         // 2.2's attempts: how far it breaks (0..1), the ball's volume (+-), its shape (0 patch,
+                             // 1 seam, 2 ring), its seed
+uniform vec3 uBurstDir;      // where on the ball (its own frame)
 uniform vec3 uHoverDir;      // and where: the direction from the ball's centre to the point under it (world)
 uniform vec2 uHoverShape;    // the patch's edge (cosine of its angle) and how far a grain lifts (ball radii)
 uniform float uDrift;        // ambient flow amplitude (world units)
@@ -280,6 +283,31 @@ void main() {
     pPrev = pathAt(A, normalize(dir) * (bDist * uBallPosMaxPrev), uCompactPrev, uBallCPrev, uBallRotPrev, uChaosRotPrev,
                    tPrev) + drift;
     pPrev += flowOffset(pPrev, tPrev, uTimePrev);
+  }
+  // 2.2's attempts (Liam, 2026-10-10, sand only): the ball breaks form a little, as if going back to chaos, in a small
+  // burst, each attempt a different shape (a patch, a seam, a ring); the ball draws in a touch before and swells a
+  // touch as it breaks, then settles. Its own grains, on its own frame (the bursts turn with the ball)
+  if (t > 0.5 && (uBurst.x > 0.001 || abs(uBurst.y) > 0.0001)) {
+    vec3 rel = p - uBallC;
+    float rl = length(rel);
+    vec3 nd = rel / max(rl, 1e-5);
+    vec3 dObj = transpose(uBallRot) * nd;
+    float c = dot(dObj, uBurstDir);
+    float mask;
+    if (uBurst.z < 0.5) mask = smoothstep(0.72, 0.9, c);                                   // a patch
+    else if (uBurst.z < 1.5) {                                                              // a seam: a crack across it
+      vec3 ax = normalize(cross(uBurstDir, vec3(0.31, 0.89, 0.33)));
+      mask = (1.0 - smoothstep(0.03, 0.14, abs(dot(dObj, ax)))) * smoothstep(0.1, 0.5, c);
+    } else mask = smoothstep(0.62, 0.72, c) * (1.0 - smoothstep(0.82, 0.92, c));          // a ring
+    float shell = smoothstep(0.5, 0.9, rl / uBallR);
+    float hk = hash(aPosA + 21.7 + uBurst.w);
+    float loose = mask * shell * step(hk, 0.55) * uBurst.x;
+    // out, and scattered as the chaos is (a little turbulence, each grain its own way)
+    vec3 qn = rel / uBallR * 2.7 + vec3(uBurst.w * 3.1);
+    vec3 scatter = vec3(snoise(qn), snoise(qn + vec3(19.1, 0.0, 0.0)), snoise(qn + vec3(0.0, 33.7, 0.0)));
+    vec3 brk = (nd * (0.12 + 0.45 * hash(aPosB + 8.8 + uBurst.w)) + scatter * 0.22) * uBallR * loose;
+    vec3 vol = rel * uBurst.y * smoothstep(0.5, 0.9, t);
+    p += brk + vol; pMoved += brk + vol; pPrev += brk + vol;
   }
   // the cursor over the formed ball (Liam, 2026-10-10): the ball's own grains lift out of it there and settle back,
   // each at its own moment and height, so the patch thins while they're out; never streaked (the lift is in the

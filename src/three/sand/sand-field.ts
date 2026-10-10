@@ -171,6 +171,8 @@ export class SandField {
         uGroundCol: { value: new THREE.Vector3() },
         uGround: { value: new THREE.Vector2(-1e3, 1) },
         uHover: { value: 0 },
+        uBurst: { value: new THREE.Vector4(0, 0, 0, 0) },
+        uBurstDir: { value: new THREE.Vector3(0, 0, 1) },
         uHoverDir: { value: new THREE.Vector3(0, 0, 1) },
         uHoverShape: { value: new THREE.Vector2(0.74, 0.8) },
         uFillCol: { value: new THREE.Vector3() },
@@ -252,6 +254,14 @@ export class SandField {
     u.uBallR.value = radius;
     u.uBallVolS.value = 1 / s;
     u.uBallGrain.value = s;
+  }
+
+  /** 2.2's attempts: how far the ball breaks (0..1), its volume (+-, a share of its size), the burst's shape (0 patch,
+   *  1 seam, 2 ring), a seed, and where on the ball (its own frame). */
+  setBurst(amount: number, volume: number, shape: number, seed: number, dir: THREE.Vector3): void {
+    const u = this.material.uniforms;
+    (u.uBurst.value as THREE.Vector4).set(amount, volume, shape, seed);
+    (u.uBurstDir.value as THREE.Vector3).copy(dir);
   }
 
   /** The cursor over the formed ball: how much (0..1), and the direction from its centre to the point under it. */
