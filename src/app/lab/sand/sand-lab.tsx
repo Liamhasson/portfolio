@@ -233,6 +233,7 @@ export function SandLab() {
       if (glass) (window as unknown as { __frost?: (l: Parameters<GlassBall["setLook"]>[0]) => void }).__frost = (l) => glass.setLook(l);
       // grains leaving the sand: the scene's atmosphere (drift-grains.ts)
       const drift = new DriftGrains(field.material, tier === "low" ? 600 : 1600);
+      if (new URLSearchParams(window.location.search).get("streams") === "0") drift.streams = 0;   // compare: all loose
       drift.mesh.layers.set(SAND_LAYER);
       stage.scene.add(drift.mesh);
       const lean = new THREE.Vector2();     // the eased lean, -1..1 each way
@@ -806,7 +807,7 @@ export function SandLab() {
         field!.update(state);
       });
       stage.start();
-      (window as unknown as { __sand?: unknown }).__sand = { stage, field, state, glass };   // lab debugging
+      (window as unknown as { __sand?: unknown }).__sand = { stage, field, state, glass, drift };   // lab debugging
     })().catch((err) => {
       setStatus(String(err));
       setFallback(true);

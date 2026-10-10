@@ -8,7 +8,9 @@ import * as THREE from "three";
  * sphere that shoves them out and hands them some of its own speed), and turned to face where it is going plus its own
  * fixed tumble. Ours do the same with our grains: the shape the sand is made of in Blender (an icosphere, smooth shaded,
  * randomly squashed and turned; roughness 0.62), in the sand's palette, lit by the scene's lights and the cursor's warm
- * light. Each is born on the sand's surface, carried up and out in a slow swirl, shrinks away and is reborn.
+ * light. Each is born on the sand's surface, carried up and out in a slow swirl, shrinks away and is reborn. Most leave
+ * in streams (one wandering emitter each, its grains let go one after another along one sinuous path: a tendril), held
+ * together as a flock (separation + cohesion, from the C4D particles tutorial); the rest stay loose, a spray.
  *
  * Solid, never see-through: a grain with no light on it simply isn't there (it shrinks to nothing), so none shows as a
  * dark speck over the lit desk. Motion blur: each grain is stretched behind itself along its motion by how far it moves
@@ -120,11 +122,24 @@ const CARRY = 0.94;
 const MOUSE_PUSH_FORCE = 0.25;      // per unit of overlap, per 60 fps frame
 const MOUSE_VELOCITY_TRANSFER = 0.1;
 const TURN_RATE = 6;                // per second: how fast a grain turns to face its motion
+// Streams (Liam, 2026-10-10, from the C4D particles tutorial: an emitter's trail, held together by a flock): most grains
+// leave the sand in streams. A stream's emitter wanders slowly over the sand's surface and lets a grain go every
+// tenth of a second or so; they all follow the same sinuous path, so together they draw a tendril
+const PER_STREAM = 160;          // ~10 streams of the hero's 1600 (fewer, fuller: thin ones read as dotted lines)
+const LOOSE = 0.3;                  // the share that stays loose, alone (the spray around the streams)
+// the flock (Sedov's C4D setup: separation + cohesion): grains in a stream don't overlap, and gather like a loose liquid
+const SEPARATION = 150;             // per second squared, per unit of overlap (the path's own pull is 120)
+const SEPARATION_R = 2.2;           // grain radii
+const COHESION = 6;                 // per second squared, toward the neighbours' centre
+const COHESION_R = 7;               // grain radii
+const GRID = 4096;                  // the neighbour grid's hash table size
 
 export class DriftGrains {
   readonly mesh: THREE.InstancedMesh;
   readonly material: THREE.ShaderMaterial;
   readonly max: number;
+  /** The share of grains that leave in streams (the rest stay loose); 0 = all loose, as before the streams. */
+  streams = 1 - LOOSE;
   private readonly pos: Float32Array;
   private readonly vel: Float32Array;
   private readonly rot: Float32Array;
@@ -137,6 +152,9 @@ export class DriftGrains {
   private readonly aVel: THREE.InstancedBufferAttribute;
   private readonly aRot: THREE.InstancedBufferAttribute;
   private readonly aSize: THREE.InstancedBufferAttribute;
+  private readonly flock: Float32Array;    // each grain's acceleration from its neighbours, this frame
+  private readonly gridHead = new Int32Array(GRID);
+  private readonly gridNext: Int32Array;
   private readonly cursorPrev = new THREE.Vector3();
   private cursorHas = false;
   private readonly lastCentre = new THREE.Vector3(NaN, NaN, NaN);
@@ -162,6 +180,8 @@ export class DriftGrains {
     this.gen = new Float32Array(max).fill(-1);
     this.home = new Float32Array(max * 3);
     this.sizes = new Float32Array(max * 2);
+    this.flock = new Float32Array(max * 3);
+    this.gridNext = new Int32Array(max);
     for (let i = 0; i < max * 4; i++) this.seed[i] = Math.random();
     const axis = new THREE.Vector3();
     for (let i = 0; i < max; i++) {
@@ -236,27 +256,56 @@ export class DriftGrains {
     const damp = Math.exp(-dt * VELOCITY_DAMPING_RATE);
     const turn = 1 - Math.exp(-dt * TURN_RATE);
     const cam = camera.position;
+    this.flockForces(count, grainR);
     for (let i = 0; i < count; i++) {
       const s0 = this.seed[i * 4], s1 = this.seed[i * 4 + 1], s2 = this.seed[i * 4 + 2], s3 = this.seed[i * 4 + 3];
-      const L = 10 * (0.7 + 0.6 * s3);
-      const cyc = time / L + s0 * 7;
+      const loose = s1 >= this.streams;
+      // a stream's own randoms (its grains share them)
+      const k = Math.floor(i / PER_STREAM);
+      const hk = (n: number) => { const x = Math.sin((k + 1) * 91.733 + n * 13.317) * 43758.5453; return x - Math.floor(x); };
+      const sk = loose ? s3 : hk(0);
+      const L = 10 * (0.7 + 0.6 * sk);
+      // a stream's grains are let go one after another, evenly through its life (a little jitter: not a metronome)
+      const cyc = loose ? time / L + s0 * 7 : time / L + hk(1) * 7 + ((i % PER_STREAM) + 0.4 * s0) / PER_STREAM;
       const life = cyc - Math.floor(cyc), gen = Math.floor(cyc);
-      // its path this life: born on the sand's shell (one in ten partway toward the camera: in front of the sand), out
-      // and up in a slow swirl
-      const h = (k: number) => { const x = Math.sin((gen + 1) * 12.9898 * (k + 1) + s0 * 78.233 + s1 * 37.719) * 43758.5453; return x - Math.floor(x); };
-      const a = h(0) * Math.PI * 2, b = Math.acos(2 * h(1) - 1), rr = 0.85 + 0.25 * h(2);
-      let px = centre.x + Math.sin(b) * Math.cos(a) * radius * rr;
-      let py = centre.y + Math.cos(b) * radius * rr;
-      let pz = centre.z + Math.sin(b) * Math.sin(a) * radius * rr;
-      if (s2 < 0.1) {
-        const k = 0.3 + 0.25 * h(3);
-        px += (cam.x - centre.x) * k; py += (cam.y - centre.y) * k; pz += (cam.z - centre.z) * k;
+      const h = (n: number) => { const x = Math.sin((gen + 1) * 12.9898 * (n + 1) + s0 * 78.233 + s1 * 37.719) * 43758.5453; return x - Math.floor(x); };
+      let px: number, py: number, pz: number, swirl: number;
+      if (loose) {
+        // its path this life: born on the sand's shell (one in ten partway toward the camera: in front of the sand)
+        const a = h(0) * Math.PI * 2, b = Math.acos(2 * h(1) - 1), rr = 0.85 + 0.25 * h(2);
+        px = centre.x + Math.sin(b) * Math.cos(a) * radius * rr;
+        py = centre.y + Math.cos(b) * radius * rr;
+        pz = centre.z + Math.sin(b) * Math.sin(a) * radius * rr;
+        if (s2 < 0.1) {
+          const f = 0.3 + 0.25 * h(3);
+          px += (cam.x - centre.x) * f; py += (cam.y - centre.y) * f; pz += (cam.z - centre.z) * f;
+        }
+        swirl = s3 * 1.8 - 0.9;
+      } else {
+        // born where its stream's emitter was when it left: the emitter wanders slowly over the shell, so the grains
+        // after it leave from beside it and the stream bends
+        const tb = time - life * L;
+        const a = hk(2) * Math.PI * 2 + 0.6 * Math.sin(tb * 0.11 + hk(3) * 6.28) + 0.3 * Math.sin(tb * 0.23 + hk(4) * 6.28);
+        const b = Math.min(Math.max(Math.acos(2 * hk(5) - 1) + 0.35 * Math.sin(tb * 0.13 + hk(6) * 6.28), 0.25), Math.PI - 0.25);
+        const nx = Math.sin(b) * Math.cos(a), ny = Math.cos(b), nz = Math.sin(b) * Math.sin(a);
+        // its place across the stream (the stream thickens as it goes, as smoke does)
+        this.side.set(nx, ny, nz).cross(Math.abs(ny) > 0.99 ? this.alt : this.up).normalize();
+        this.back.set(nx, ny, nz).cross(this.side);
+        const across = grainR * 8 * (0.4 + life * 1.6) * Math.sqrt(h(4)), ang = h(5) * Math.PI * 2;
+        const ca = Math.cos(ang) * across, sa = Math.sin(ang) * across;
+        // and the stream sways sideways along its length (one curve for all its grains, by their age)
+        const sway = 0.12 * life * travel * Math.sin(life * 7.5 + hk(7) * 6.28);
+        px = centre.x + nx * radius * 0.95 + this.side.x * (ca + sway) + this.back.x * sa;
+        py = centre.y + ny * radius * 0.95 + this.side.y * (ca + sway) + this.back.y * sa;
+        pz = centre.z + nz * radius * 0.95 + this.side.z * (ca + sway) + this.back.z * sa;
+        swirl = hk(8) * 1.8 - 0.9;
       }
+      // out and up in a slow swirl
       const go = life * travel;
       const dx = px - centre.x, dy = py - centre.y, dz = pz - centre.z, dl = Math.hypot(dx, dy, dz) || 1;
       const ty = py + (dy / dl) * go * 0.45 + go * 0.75;
       let tx = px + (dx / dl) * go * 0.45, tz = pz + (dz / dl) * go * 0.45;
-      const sw = life * (s3 * 1.8 - 0.9), cs = Math.cos(sw), sn = Math.sin(sw);
+      const sw = life * swirl, cs = Math.cos(sw), sn = Math.sin(sw);
       const rx = tx - centre.x, rz = tz - centre.z;
       tx = centre.x + rx * cs - rz * sn; tz = centre.z + rx * sn + rz * cs;
       const o = i * 3;
@@ -272,10 +321,10 @@ export class DriftGrains {
         this.pos[o + 2] += (tz - this.home[o + 2]) * CARRY;
       }
       this.home[o] = tx; this.home[o + 1] = ty; this.home[o + 2] = tz;
-      // drawn toward its path (a spring), damped
-      this.vel[o] = (this.vel[o] + (tx - this.pos[o]) * PATH_STIFFNESS * dt) * damp;
-      this.vel[o + 1] = (this.vel[o + 1] + (ty - this.pos[o + 1]) * PATH_STIFFNESS * dt) * damp;
-      this.vel[o + 2] = (this.vel[o + 2] + (tz - this.pos[o + 2]) * PATH_STIFFNESS * dt) * damp;
+      // drawn toward its path (a spring), and by its neighbours (the flock), damped
+      this.vel[o] = (this.vel[o] + ((tx - this.pos[o]) * PATH_STIFFNESS + this.flock[o]) * dt) * damp;
+      this.vel[o + 1] = (this.vel[o + 1] + ((ty - this.pos[o + 1]) * PATH_STIFFNESS + this.flock[o + 1]) * dt) * damp;
+      this.vel[o + 2] = (this.vel[o + 2] + ((tz - this.pos[o + 2]) * PATH_STIFFNESS + this.flock[o + 2]) * dt) * damp;
       // the cursor: a sphere that shoves grains out of it and hands them some of its own speed
       if (cursor) {
         let ex = this.pos[o] - cursor.x, ey = this.pos[o + 1] - cursor.y, ez = this.pos[o + 2] - cursor.z;
@@ -305,6 +354,45 @@ export class DriftGrains {
       this.sizes[i * 2] = grainR * (0.6 + s2 * 1.0) * env;
     }
     this.aPos.needsUpdate = true; this.aVel.needsUpdate = true; this.aRot.needsUpdate = true; this.aSize.needsUpdate = true;
+  }
+
+  /** The flock, from where the grains are now: each pushed off the grains it overlaps (separation) and drawn a little
+   *  toward its neighbours' centre (cohesion). Neighbours found through a hashed grid of cohesion-sized cells. */
+  private flockForces(count: number, grainR: number): void {
+    const pos = this.pos, f = this.flock, head = this.gridHead, next = this.gridNext;
+    const rs = grainR * SEPARATION_R, rc = grainR * COHESION_R, rc2 = rc * rc, inv = 1 / rc;
+    const cell = (x: number, y: number, z: number) => (((x * 73856093) ^ (y * 19349663) ^ (z * 83492791)) >>> 0) % GRID;
+    head.fill(-1);
+    for (let i = 0; i < count; i++) {
+      // only grains in this life (a grain about to be reborn is still where its last life left it)
+      if (this.gen[i] < 0 || this.sizes[i * 2] <= 0) { next[i] = -2; continue; }
+      const c = cell(Math.floor(pos[i * 3] * inv), Math.floor(pos[i * 3 + 1] * inv), Math.floor(pos[i * 3 + 2] * inv));
+      next[i] = head[c]; head[c] = i;
+    }
+    f.fill(0, 0, count * 3);
+    for (let i = 0; i < count; i++) {
+      if (next[i] === -2) continue;
+      const x = pos[i * 3], y = pos[i * 3 + 1], z = pos[i * 3 + 2];
+      const cx = Math.floor(x * inv), cy = Math.floor(y * inv), cz = Math.floor(z * inv);
+      let sx = 0, sy = 0, sz = 0, mx = 0, my = 0, mz = 0, n = 0;
+      for (let ox = -1; ox <= 1; ox++) for (let oy = -1; oy <= 1; oy++) for (let oz = -1; oz <= 1; oz++) {
+        for (let j = head[cell(cx + ox, cy + oy, cz + oz)]; j >= 0; j = next[j]) {
+          if (j === i) continue;
+          const ex = x - pos[j * 3], ey = y - pos[j * 3 + 1], ez = z - pos[j * 3 + 2];
+          const d2 = ex * ex + ey * ey + ez * ez;
+          if (d2 >= rc2) continue;   // also drops the hash's collisions (far grains in the same slot)
+          mx += pos[j * 3]; my += pos[j * 3 + 1]; mz += pos[j * 3 + 2]; n++;
+          if (d2 < rs * rs && d2 > 1e-12) {
+            const d = Math.sqrt(d2), push = SEPARATION * (rs - d) / d;
+            sx += ex * push; sy += ey * push; sz += ez * push;
+          }
+        }
+      }
+      if (n) {
+        sx += (mx / n - x) * COHESION; sy += (my / n - y) * COHESION; sz += (mz / n - z) * COHESION;
+      }
+      f[i * 3] = sx; f[i * 3 + 1] = sy; f[i * 3 + 2] = sz;
+    }
   }
 
   dispose(): void {
