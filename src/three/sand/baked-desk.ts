@@ -3,6 +3,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { EXRLoader } from "three/addons/loaders/EXRLoader.js";
 import { RectAreaLightUniformsLib } from "three/addons/lights/RectAreaLightUniformsLib.js";
 import { REVEAL, type RevealFrame } from "./screen-reveal";
+import { holdLoop, loopVideo } from "./card-loops";
 import type { GlassLights } from "./glass-ball";
 
 /**
@@ -526,7 +527,7 @@ export class BakedDesk {
   }
   screen: { material: THREE.MeshPhysicalMaterial; emission: number; reveal: Record<string, THREE.IUniform> } | null = null;
   /** The cards' loops on the screen (played while it is awake). */
-  media: HTMLVideoElement[] = [];
+  media: string[] = [];
   private mediaPlaying = false;
   /** The lid on its hinge; its rectangle and the screen's, as corners (origin, along U, along V) in the pivot's frame. */
   private lid: { pivot: THREE.Object3D; q0: THREE.Quaternion; bakedDeg: number; corners: THREE.Vector3[]; screen: THREE.Vector3[] | null } | null = null;
@@ -606,9 +607,7 @@ export class BakedDesk {
     const play = !!f && f.wake < 0.999;
     if (play !== this.mediaPlaying) {
       this.mediaPlaying = play;
-      for (const v of this.media) {
-        if (play) v.play().catch(() => {}); else v.pause();
-      }
+      for (const src of this.media) holdLoop(src, "screen", play);
     }
     // what the deck and keys mirror of it: the finished index at the reveal's light
     VIEW.uScrGain.value = f ? this.screen.emission * f.light : 0;
@@ -699,20 +698,15 @@ export class BakedDesk {
         });
         withBlenderView(mat, lut);
         withExactFresnel(mat, etaForLevel(0.02));   // Blender: black glass, Specular IOR Level 0.02
-        // the cards' loops, playing on the screen once it wakes (videos muted, inline: allowed to autoplay)
+        // the cards' loops, playing on the screen once it wakes (shared with the live index: card-loops.ts)
         const media = REVEAL.media.map((m) => {
           if (!m.src) return null;
-          const v = document.createElement("video");
-          v.src = m.src; v.muted = true; v.loop = true; v.playsInline = true; v.preload = "auto"; v.crossOrigin = "anonymous";
-          const t = new THREE.VideoTexture(v);
+          const t = new THREE.VideoTexture(loopVideo(m.src));
           t.colorSpace = THREE.SRGBColorSpace;
           t.flipY = false;   // the screen's UVs run top-down (glTF), as the still's
-          return { video: v, texture: t };
+          return { src: m.src, texture: t };
         });
-        d.media = media.filter((m): m is { video: HTMLVideoElement; texture: THREE.VideoTexture } => !!m).map((m) => m.video);
-        // the live index starts its own copies in step with these (a seamless handover): found by their source
-        (window as unknown as { __screenMedia?: Record<string, HTMLVideoElement> }).__screenMedia =
-          Object.fromEntries(d.media.map((v) => [v.getAttribute("src") ?? "", v]));
+        d.media = media.flatMap((m) => (m ? [m.src] : []));
         const reveal = {
           uMedBox: { value: REVEAL.media.map((m) => new THREE.Vector4(m.box[0], m.box[1], m.box[2], m.box[3])) },
           uMedOn: { value: REVEAL.media.map((m) => (m.src ? 1 : 0)) },

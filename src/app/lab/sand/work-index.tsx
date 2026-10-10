@@ -10,8 +10,9 @@
  *     list surfaces row by row (the same rise as the screen's wake reveal), so the screen becomes the section.
  */
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { matrix3d, type Pt } from "@/three/sand/homography";
+import { holdLoop, loopVideo } from "@/three/sand/card-loops";
 
 /** The projects (copy and tags from the approved plan and the current portfolio). The three finished ones open their
  *  case studies; Nordic Logic is in progress (a still, not a link). */
@@ -50,8 +51,8 @@ const CSS = `
 .wi .media, .wl .media { position:relative; aspect-ratio:16/10; overflow:hidden; background:#151517; }
 .wi .media { border-radius:.8cqw; }
 .wl .media { border-radius:10px; }
-.wi .media video, .wi .media img, .wl .media video, .wl .media img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transition:transform .9s cubic-bezier(.22,1,.36,1); }
-.wi .card:hover .media video, .wi .card:hover .media img, .wi .card:focus-visible .media video { transform:scale(1.035); }
+.wi .media canvas, .wi .media img, .wl .media canvas, .wl .media img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transition:transform .9s cubic-bezier(.22,1,.36,1); }
+.wi .card:hover .media canvas, .wi .card:hover .media img, .wi .card:focus-visible .media canvas, .wi .card:focus-visible .media img { transform:scale(1.035); }
 .wi .card:focus-visible, .wl .card:focus-visible { outline:1px solid var(--ink); outline-offset:6px; border-radius:4px; }
 .wi .tag, .wl .tag { position:absolute; left:1.2cqw; top:1.2cqw; font:500 .85cqw/1 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; color:var(--ink); background:rgba(10,10,11,.72); border-radius:999px; padding:.55cqw .9cqw; }
 .wi .meta { display:flex; gap:.9cqw; margin-top:1.3cqw; font:400 .85cqw/1.2 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; color:var(--dim); }
@@ -74,28 +75,42 @@ const CSS = `
 `;
 
 function Media({ c, playing }: { c: (typeof CARDS)[number]; playing: boolean }) {
-  const ref = useRef<HTMLVideoElement>(null);
+  const ref = useRef<HTMLCanvasElement>(null);
+  const who = useId();
   useEffect(() => {
-    const v = ref.current;
-    if (!v) return;
-    if (playing) {
-      // in step with the same loop on the laptop screen, so the handover shows one picture
-      const twin = (window as unknown as { __screenMedia?: Record<string, HTMLVideoElement> }).__screenMedia?.[`${c.video}.mp4`];
-      if (twin && twin.readyState > 0) v.currentTime = twin.currentTime;
-      v.play().catch(() => {});
-    } else v.pause();
-  }, [playing, c.video]);
+    const cv = ref.current;
+    if (!cv || !c.video || !playing) return;
+    // the loop is the laptop screen's own video (card-loops.ts), drawn here frame by frame: the handover shows one
+    // picture, and no <video> plays in the page (two or more drop Chrome to 30 fps)
+    const src = `${c.video}.mp4`;
+    const v = loopVideo(src);
+    const g = cv.getContext("2d");
+    let alive = true;
+    let raf = 0;
+    const draw = () => {
+      if (!g || v.readyState < 2) return;
+      if (cv.width !== v.videoWidth) { cv.width = v.videoWidth; cv.height = v.videoHeight; }
+      g.drawImage(v, 0, 0);
+    };
+    const rvfc = "requestVideoFrameCallback" in v;
+    const tick = () => {
+      if (!alive) return;
+      draw();
+      if (rvfc) v.requestVideoFrameCallback(tick); else raf = requestAnimationFrame(tick);
+    };
+    holdLoop(src, who, true);
+    tick();
+    return () => {
+      alive = false;
+      cancelAnimationFrame(raf);
+      holdLoop(src, who, false);
+    };
+  }, [playing, c.video, who]);
   return (
     <div className="media">
-      {c.video ? (
-        <video ref={ref} poster={c.poster} muted loop playsInline preload="metadata" aria-hidden>
-          <source src={`${c.video}.webm`} type="video/webm; codecs=av01.0.05M.08" />
-          <source src={`${c.video}.mp4`} type="video/mp4" />
-        </video>
-      ) : (
-        // eslint-disable-next-line @next/next/no-img-element -- a still inside a transformed layer (no layout shift)
-        <img src={c.poster} alt="" />
-      )}
+      {/* eslint-disable-next-line @next/next/no-img-element -- a still inside a transformed layer (no layout shift) */}
+      <img src={c.poster} alt="" />
+      {c.video && <canvas ref={ref} aria-hidden />}
       {c.progress && <span className="tag">In progress</span>}
     </div>
   );
