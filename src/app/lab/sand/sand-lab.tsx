@@ -388,7 +388,14 @@ export function SandLab() {
       };
       sizePaint();
       stage.onSettings(sizePaint);
-      const baseLook = reduced ? { paintScale: 0 } : {};
+      // ?flow=0 / ?mblur=0: compare without the flow between chaos and ball, or without the grains' own blur (a number
+      // sets its strength)
+      const flowParam = Number(params.get("flow") ?? NaN), blurParam = Number(params.get("mblur") ?? NaN);
+      const baseLook: Partial<typeof SAND_LOOK> = {
+        ...(reduced ? { paintScale: 0 } : {}),
+        ...(Number.isFinite(flowParam) ? { flow: SAND_LOOK.flow * flowParam } : {}),
+        ...(Number.isFinite(blurParam) ? { motionBlur: blurParam } : {}),
+      };
       field.setLook(baseLook);
       const pointer = { x: 0, y: 0, active: false, touch: false };
       let cursorI = 0;

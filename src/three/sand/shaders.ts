@@ -164,6 +164,19 @@ uniform vec2 uFront;         // the drift only moves the front layer: optical de
 uniform vec2 uViewport;      // CSS px
 uniform float uBufH;         // device px of the drawing buffer's height
 uniform float uShutter;      // motion blur: seconds
+// the flow between chaos and ball (Ducky 3D's particle flow: a 4D noise, no detail, low scale, distortion, its colour
+// into the offset): the grains travel along curved, shared paths instead of straight lines, so the cloud folds into
+// sheets and tendrils on its way; strongest halfway, nothing at either end (the approved chaos and ball stay as they are)
+uniform vec4 uFlow;          // amplitude (world units), frequency, warp (Blender's distortion), speed
+// the grain's own motion for its blur: everything that places it, as it was the frame before
+uniform float uCompactPrev;
+uniform float uTimePrev;
+uniform mat3 uBallRotPrev;
+uniform mat3 uChaosRotPrev;
+uniform vec3 uBallCPrev;
+uniform float uBallPosMaxPrev;
+uniform float uFrameDt;      // seconds between those two frames
+uniform vec2 uMotionBlur;    // strength (0 = off), longest streak in grain lengths
 
 out vec3 vAlbedo;
 out vec3 vL0; out vec3 vL1; out vec3 vL2; out vec3 vL3;   // light directions, view space (3 = cursor)
@@ -214,6 +227,26 @@ float transmittance(vec3 p, vec3 lightPos, float dist, float jitter, float k) {
 float hash(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
 ${ATTEMPT_FIELD}
 
+// The flow's push on a grain at p, t of the way from chaos to ball: one smooth noise field shared by all the grains
+// (neighbours move together: sheets, not static), its domain warped as Blender's distortion warps it
+vec3 flowOffset(vec3 p, float t, float time) {
+  float k = 4.0 * t * (1.0 - t);
+  if (uFlow.x <= 0.0 || k <= 0.0) return vec3(0.0);
+  vec3 q = p * uFlow.y + vec3(0.0, time * uFlow.w, 0.0);
+  q += uFlow.z * snoise(q * 0.6 + vec3(17.1, 0.0, 0.0)) * vec3(0.8, -0.6, 0.7);
+  return uFlow.x * k * k * vec3(snoise(q), snoise(q + vec3(31.4, 0.0, 0.0)), snoise(q + vec3(0.0, 47.2, 0.0)));
+}
+
+// A grain's straight path from its chaos spot A0 to its place in the ball Bo (both unturned), at a compaction, with
+// the ball's centre, its turn and the chaos's. t: its own progress along it
+vec3 pathAt(vec3 A0, vec3 Bo, float compact, vec3 ballC, mat3 ballRot, mat3 chaosRot, out float t) {
+  vec3 A = uChaosC + chaosRot * (A0 - uChaosC);
+  vec3 Bw = ballC + ballRot * Bo;
+  t = clamp((compact - aAttr.w * uDelaySpan) / uRampLen, 0.0, 1.0);
+  t = t * t * (3.0 - 2.0 * t);
+  return mix(A, Bw, t);
+}
+
 void main() {
   vec3 A = uChaosLo + vec3(float(aPos.x & 2047u) / 2047.0, float((aPos.x >> 11) & 1023u) / 1023.0,
                            float(aPos.x >> 21) / 2047.0) * uChaosSize;
@@ -221,19 +254,30 @@ void main() {
   vec3 dir = vec3(oc, 1.0 - abs(oc.x) - abs(oc.y));
   float fold = max(-dir.z, 0.0);
   dir.xy -= sign(dir.xy) * fold;
-  vec3 B = uBallC + normalize(dir) * (float(aPos.y >> 24) / 255.0 * uBallPosMax);
+  float bDist = float(aPos.y >> 24) / 255.0;
+  vec3 B = uBallC + normalize(dir) * (bDist * uBallPosMax);
   vec3 aPosA = (A - uLo) / uSize;    // normalised, as seeds for the per-grain randomness
   vec3 aPosB = (B - uLo) / uSize;
-  // the chaos turns around itself; the ball spins
-  A = uChaosC + uChaosRot * (A - uChaosC);
-  vec3 Bw = uBallC + uBallRot * (B - uBallC);
-  float t = clamp((uCompact - aAttr.w * uDelaySpan) / uRampLen, 0.0, 1.0);
-  t = t * t * (3.0 - 2.0 * t);
-  vec3 p = mix(A, Bw, t);
+  // the chaos turns around itself; the ball spins; between them, the flow
+  float t;
+  vec3 p = pathAt(A, B - uBallC, uCompact, uBallC, uBallRot, uChaosRot, t);
   // ambient flow: slow, small; calmer once compacted
   float amp = uDrift * mix(1.0, 0.35, t);
   vec3 q = p * uDriftFreq + vec3(0.0, 0.0, uTime * uDriftSpeed);
-  p += amp * vec3(snoise(q), snoise(q + vec3(31.4, 0.0, 0.0)), snoise(q + vec3(0.0, 47.2, 0.0)));
+  vec3 drift = amp * vec3(snoise(q), snoise(q + vec3(31.4, 0.0, 0.0)), snoise(q + vec3(0.0, 47.2, 0.0)));
+  p += drift;
+  // the flow (the shadows are baked for the straight path: they look up where the grain would be without it)
+  vec3 flow = flowOffset(p, t, uTime);
+  p += flow;
+  // the same grain a frame ago, for its blur (only on a frame where something moved it: uMotionBlur.x is 0 otherwise);
+  // the slow ambient drift barely moves in a frame, so it rides along as it is now
+  vec3 pMoved = p, pPrev = p;
+  if (uMotionBlur.x > 0.0) {
+    float tPrev;
+    pPrev = pathAt(A, normalize(dir) * (bDist * uBallPosMaxPrev), uCompactPrev, uBallCPrev, uBallRotPrev, uChaosRotPrev,
+                   tPrev) + drift;
+    pPrev += flowOffset(pPrev, tPrev, uTimePrev);
+  }
   // 2.2: inside an attempt the grains pack onto the surface (closing the gaps), then drain toward glass
   vClear = 0.0;
   float attGrow = 1.0;
@@ -262,7 +306,8 @@ void main() {
   // shadows: march in the volumes' own (unturned) frame, so shadows turn with the chaos and with the ball
   mat3 chaosInv = transpose(uChaosRot);
   mat3 ballInv = transpose(uBallRot);
-  vec3 pv = mix(uChaosC + chaosInv * (p - uChaosC), uBallVolC + ballInv * (p - uBallC) * uBallVolS, t);
+  vec3 ps = p - flow;   // the shadows were baked for the straight path: shaded as it would be there
+  vec3 pv = mix(uChaosC + chaosInv * (ps - uChaosC), uBallVolC + ballInv * (ps - uBallC) * uBallVolS, t);
   float j = hash(aPosA);
   vec3 E[3];
   for (int i = 0; i < 3; i++) {
@@ -317,6 +362,19 @@ void main() {
   vec2 squash = 1.0 + 0.22 * (vec2(h1, h2) * 2.0 - 1.0);
   float ang = h3 * 6.2831853;
   float px = 2.0 * rad * uRadMax * mix(uRadScale.x, uRadScale.y * uBallGrain, t) * uCountScale * attGrow * uPointScale / -mv.z * max(squash.x, squash.y);   // device pixels
+  // and its own motion (the flow, the ball forming, the spin): its travel on screen since the frame before, over the
+  // shutter, never longer than a few grains (a jump in the page is not a motion)
+  if (uMotionBlur.x > 0.0 && px > 0.0) {
+    vec4 c0 = projectionMatrix * modelViewMatrix * vec4(pMoved, 1.0);
+    vec4 c1 = projectionMatrix * modelViewMatrix * vec4(pPrev, 1.0);
+    if (c0.w > 0.0 && c1.w > 0.0) {
+      vec2 bufPx = vec2(uViewport.x * uBufH / uViewport.y, uBufH);
+      vec2 own = (c0.xy / c0.w - c1.xy / c1.w) * 0.5 * bufPx * (uShutter / uFrameDt) * uMotionBlur.x;
+      float ol = length(own), cap = px * uMotionBlur.y;
+      if (ol > cap) own *= cap / ol;
+      blur += own;
+    }
+  }
   // a moving grain is drawn stretched along its motion by its travel in the shutter (a streak, still solid)
   float bl = length(blur);
   if (bl > 0.5 && px > 0.0) {

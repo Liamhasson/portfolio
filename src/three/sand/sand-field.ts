@@ -53,6 +53,16 @@ export const SAND_LOOK = {
   paintScale: 0.01,     // seconds: drift velocity -> grain offset
   frontK: 1.0,          // the drift reaches only grains with little sand between them and the viewer (0 = all grains)
   frontFalloff: 0.25,   // transmittance below which a grain counts as behind
+  // the flow between chaos and ball (shaders.ts flowOffset; Ducky 3D's particle flow, 2026-10-10): its reach at the
+  // halfway point (world units; the ball's radius is 1.1), the size of its folds, how much they curl, how fast they move
+  flow: 0.55,
+  flowFreq: 0.35,
+  flowWarp: 1.0,
+  flowSpeed: 0.04,
+  // each grain streaked along its own motion over the shutter: 0.5 = film's 180-degree shutter (1/120 s; Liam's
+  // reference has a light blur, a full 1/60 s read as rice), and its streak at most this many grain lengths longer
+  motionBlur: 0.5,
+  motionBlurMax: 1.0,
 };
 
 const Y = new THREE.Vector3(0, 1, 0);
@@ -65,6 +75,10 @@ export class SandField {
   private readonly ballRot = new THREE.Matrix3();
   private readonly chaosRot = new THREE.Matrix3();
   private readonly m4 = new THREE.Matrix4();
+  // everything that placed the grains at the last update (their motion blur reads it as "a frame ago")
+  private readonly ballRotPrev = new THREE.Matrix3();
+  private readonly chaosRotPrev = new THREE.Matrix3();
+  private readonly last = { compact: 0, time: 0, ballC: new THREE.Vector3(), posMax: 0, roll: 0, at: -1 };
 
   constructor(data: SandData) {
     this.data = data;
@@ -170,6 +184,15 @@ export class SandField {
         uPaintScale: { value: SAND_LOOK.paintScale },
         uFront: { value: new THREE.Vector2(SAND_LOOK.frontK, SAND_LOOK.frontFalloff) },
         uViewport: { value: new THREE.Vector2(1, 1) },
+        uFlow: { value: new THREE.Vector4(SAND_LOOK.flow, SAND_LOOK.flowFreq, SAND_LOOK.flowWarp, SAND_LOOK.flowSpeed) },
+        uCompactPrev: { value: 0 },
+        uTimePrev: { value: 0 },
+        uBallRotPrev: { value: this.ballRotPrev },
+        uChaosRotPrev: { value: this.chaosRotPrev },
+        uBallCPrev: { value: new THREE.Vector3(...meta.ball.center) },
+        uBallPosMaxPrev: { value: meta.ball_pos_max },
+        uFrameDt: { value: 1 / 60 },
+        uMotionBlur: { value: new THREE.Vector2(SAND_LOOK.motionBlur, SAND_LOOK.motionBlurMax) },
       },
     });
     this.points = new THREE.Points(geo, this.material);
@@ -307,6 +330,20 @@ export class SandField {
 
   update(s: SandState): void {
     const u = this.material.uniforms;
+    // a frame ago, for the blur: the last update's state (the ball's centre as it was then, too)
+    const now = performance.now() / 1000, last = this.last;
+    const ballC = u.uBallC.value as THREE.Vector3;
+    const dt = now - last.at;
+    // the first frame, a stall or a jump in the page: no motion to show
+    const jumped = last.at < 0 || dt > 0.25 || Math.abs(s.compact - last.compact) > 0.15
+      || last.ballC.distanceTo(ballC) > (u.uBallR.value as number);
+    this.ballRotPrev.copy(this.ballRot);
+    this.chaosRotPrev.copy(this.chaosRot);
+    u.uCompactPrev.value = last.compact;
+    u.uTimePrev.value = last.time;
+    (u.uBallCPrev.value as THREE.Vector3).copy(last.ballC);
+    u.uBallPosMaxPrev.value = last.posMax;
+    u.uFrameDt.value = Math.min(Math.max(dt, 1 / 240), 1 / 20);
     u.uCompact.value = s.compact;
     u.uTime.value = s.time;
     // the two density volumes around the current compaction (each grain's own progress varies around it)
@@ -320,6 +357,13 @@ export class SandField {
     if (s.ballRoll) this.m4.premultiply(new THREE.Matrix4().makeRotationX(s.ballRoll));
     this.ballRot.setFromMatrix4(this.m4);
     this.chaosRot.setFromMatrix4(this.m4.makeRotationAxis(Y, s.chaosSpin));
+    // only a frame where the grains moved (the scroll, the ball travelling or rolling) draws streaks: the slow spin and
+    // drift move them far less than a grain in a frame, and skipping them saves the grains a second placing
+    const moved = Math.abs(s.compact - last.compact) > 1e-5 || last.ballC.distanceToSquared(ballC) > 1e-12
+      || last.posMax !== u.uBallPosMax.value || last.roll !== (s.ballRoll ?? 0);
+    (u.uMotionBlur.value as THREE.Vector2).x = moved && !jumped ? this.look.motionBlur : 0;
+    last.compact = s.compact; last.time = s.time; last.ballC.copy(ballC); last.posMax = u.uBallPosMax.value;
+    last.roll = s.ballRoll ?? 0; last.at = now;
   }
 
   /** Lab calibration: override the look (compare mode). Light gains multiply Blender's calibrated power. */
@@ -337,6 +381,8 @@ export class SandField {
     (u.uEdge.value as THREE.Vector2).set(l.edgeChaos, l.edgePx);
     u.uChaosShare.value = l.chaosShare;
     u.uMinPx.value = l.minPx;
+    (u.uFlow.value as THREE.Vector4).set(l.flow, l.flowFreq, l.flowWarp, l.flowSpeed);
+    (u.uMotionBlur.value as THREE.Vector2).set(l.motionBlur, l.motionBlurMax);
     u.uWrap.value = l.wrap;
     u.uBounce.value = l.bounce;
     (u.uCavity.value as THREE.Vector2).set(l.cavityDepth, l.cavity);
