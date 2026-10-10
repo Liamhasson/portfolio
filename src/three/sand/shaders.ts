@@ -352,8 +352,8 @@ void main() {
   vec2 pvel = texture(uPaint, suv).xy * frontness;           // CSS px / s
   vec2 push = pvel * uPaintScale;
   gl_Position.xy += push / (uViewport * 0.5) * gl_Position.w;
-  // motion blur: how far the grain moves on screen in the shutter (device px), from the cursor's push
-  vec2 blur = pvel * uPaintScale * 6.0 * uShutter * 60.0 * (uBufH / uViewport.y);
+  // the cursor only moves the grains, never stretches them (Liam, 2026-10-10: its streak smudged the sand)
+  vec2 blur = vec2(0.0);
   float packed = floor(aAttr.z * 255.0 + 0.5);
   float rad = mix(floor(packed / 16.0), mod(packed, 16.0), t) / 15.0;
   if (hash(aPosA + 9.1) > uChaosShare) rad *= smoothstep(0.05, 0.45, t);
