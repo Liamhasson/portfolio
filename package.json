@@ -9,7 +9,9 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "build:board": "tsc src/lib/case-studies/cyvore-story.ts --target es2020 --module es2020 --lib es2020,dom --skipLibCheck --outDir docs/prototypes/cyvore-mockups",
+    "test:board": "npm run build:board && playwright test -c playwright.board.config.ts"
   },
   "dependencies": {
     "@mdx-js/loader": "^3.1.1",
