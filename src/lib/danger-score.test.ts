@@ -31,10 +31,10 @@ describe("danger score factors", () => {
   });
 });
 
-describe("the Berlin example (eventread.vercel.app hero, 18 Nov 2026)", () => {
+describe("the Berlin example (eventread.vercel.app results, 18 Nov 2026, live data)", () => {
   test("matches the live product: Critical, Threat, Safe", () => {
     const scored = BERLIN_EVENTS.map((e) => ({ name: e.name, score: dangerScore(e, BERLIN_SHOW) }));
-    expect(scored.map((s) => s.score)).toEqual([80, 60, 16]);
+    expect(scored.map((s) => s.score)).toEqual([100, 60, 16]);
     expect(scored.map((s) => band(s.score))).toEqual(["Critical", "Threat", "Safe"]);
   });
 

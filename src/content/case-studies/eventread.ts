@@ -31,10 +31,11 @@ export const eventread: CaseStudy = {
     },
     {
       kind: "design",
-      title: "A feature I cut the same day",
-      happened: "Showing the distance to each competing show meant asking for the venue first.",
-      did: "I removed it. People come to Eventread to find the venue; asking for it first asks them for the answer.",
-      changed: "People get their answer first; no venue needed to start.",
+      title: "One product, two visual languages",
+      happened:
+        "The interface had grown by feature: pill-shaped navigation next to square buttons, colour used for decoration as much as for risk.",
+      did: "I surveyed product design systems and built one from three references: Vercel's type, Ramp's colour discipline, Cal.com's month view. Risk became the only colour, shown as a dot and a word.",
+      changed: "One type family, one set of shapes, three colours that always mean risk, and a CI test that fails if an old style comes back.",
     },
   ],
   outcome: {
