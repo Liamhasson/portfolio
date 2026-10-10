@@ -132,9 +132,15 @@ export class SandComposite {
     camera.layers.disable(SAND_LAYER);
     camera.layers.disable(GLASS_LAYER);
     const autoClear = renderer.autoClear;
-    if (this.glass?.visible) {
+    if (this.glass?.visible && this.glass.inView(camera as THREE.PerspectiveCamera)) {
       // the desk into its target (with depth), onto the screen as is, then the glass looking through it
       const bg = this.background(size);
+      // the blurred reads (frost) need the desk's mip chain; clear glass reads it sharp (no mips: a full-size pass saved)
+      if (bg.texture.generateMipmaps !== this.glass.blurred) {
+        bg.texture.generateMipmaps = this.glass.blurred;
+        bg.texture.minFilter = this.glass.blurred ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter;
+        bg.texture.needsUpdate = true;
+      }
       renderer.setRenderTarget(bg);
       renderer.render(scene, camera);
       renderer.setRenderTarget(null);

@@ -325,8 +325,8 @@ void main() {
   vec3 p3 = p2 + r2 * chord2;
   vec3 n3 = (p3 - uC) / uR;
   vec3 t3 = refract(r2, -n3, uEta);
-  vec3 dispI; bool hitI;
-  vec3 Li = dot(t3, t3) > 0.5 ? seen(p3, t3, coneT * 1.5, dispI, hitI) : vec3(0.0);
+  // (faint: the room it sees, from the probe; no trace through the desk)
+  vec3 Li = dot(t3, t3) > 0.5 ? envAlong(t3) + uEnvLights * lightsAlong(p3, t3) : vec3(0.0);
   vec3 inner = (1.0 - F) * F * (1.0 - F) * exp(-uAbsorb * (chord + chord2)) * T * tint;
   // the light scattered in the frost's skin (none once it is glass)
   vec3 Ls = (1.0 - T) * (1.0 - F) * frostAt(p1, n1, -rd, cl);
@@ -484,6 +484,21 @@ export class GlassBall {
     (u.uBgTexel.value as THREE.Vector2).set(1 / width, 1 / height);
     u.uNear.value = camera.near;
     u.uFar.value = camera.far;
+  }
+
+  /** Whether any of the surface is frosted (the blurred reads need the desk's mips). */
+  blurred = true;
+  private readonly sphere = new THREE.Sphere();
+  private readonly frustum = new THREE.Frustum();
+  private readonly pv = new THREE.Matrix4();
+
+  /** Whether the ball is in the camera's view (the pass is skipped otherwise). */
+  inView(camera: THREE.PerspectiveCamera): boolean {
+    const u = this.material.uniforms;
+    this.sphere.set(u.uC.value as THREE.Vector3, (u.uR.value as number) * 1.02);
+    if (this.sphere.containsPoint(camera.position)) return true;
+    this.frustum.setFromProjectionMatrix(this.pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+    return this.frustum.intersectsSphere(this.sphere);
   }
 
   get visible(): boolean {

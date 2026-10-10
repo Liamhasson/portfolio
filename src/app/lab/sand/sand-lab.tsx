@@ -626,6 +626,7 @@ export function SandLab() {
             // the frost exists from the first attempt on; the glass surface is the frost, clearing
             const on = span(progressRef.current, TL.attempts) > 0 || b > 0;
             glass.update(ballC, field!.material.uniforms.uBallR.value, on ? 1 : 0);
+            glass.blurred = meltT < 1;   // fully clear: sharp reads only
             // the room it sees: from over the shut laptop, then from where it meets the camera (by its height)
             if (probes && through) {
               const zTop = through.toHero([0, 0.03, 0.2]).y, zMeet = through.toHero([0, 0, 0.76]).y;
