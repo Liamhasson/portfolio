@@ -264,6 +264,7 @@ export class DriftGrains {
     const vFwd = this.vFwd.subVectors(cam, centre).normalize();
     const vRight = this.vRight.crossVectors(Math.abs(vFwd.y) > 0.99 ? this.alt : this.up, vFwd).normalize();
     const vUp = this.vUp.crossVectors(vFwd, vRight);
+    const camDist = Math.max(cam.distanceTo(centre), 1e-3);
     this.flockForces(count, grainR);
     for (let i = 0; i < count; i++) {
       const s0 = this.seed[i * 4], s1 = this.seed[i * 4 + 1], s2 = this.seed[i * 4 + 2], s3 = this.seed[i * 4 + 3];
@@ -379,8 +380,10 @@ export class DriftGrains {
       }
       // born small, full most of its life, shrinking away at the end (Lusion's life curve)
       const env = Math.min(life / 0.08, 1) * (1 - Math.min(Math.max((life - 0.55) / 0.45, 0), 1));
-      // a stream's grains share its own size (Liam: streams of different sizes)
-      this.sizes[i * 2] = grainR * (0.6 + s2 * 1.0) * (loose ? 1 : 0.6 + 0.8 * hk(11)) * env;
+      // the main sand's own grain sizes, and on screen the size they would be at the sand (Liam: never bigger than the
+      // grains of the main object): one nearer the lens is smaller, so depth shows as parallax and overlap, not growth
+      const toCam = Math.hypot(this.pos[o] - cam.x, this.pos[o + 1] - cam.y, this.pos[o + 2] - cam.z);
+      this.sizes[i * 2] = grainR * (0.6 + s2 * 1.0) * env * Math.min(Math.max(toCam / camDist, 0.05), 1.5);
     }
     this.aPos.needsUpdate = true; this.aVel.needsUpdate = true; this.aRot.needsUpdate = true; this.aSize.needsUpdate = true;
   }
