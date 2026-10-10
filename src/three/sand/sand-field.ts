@@ -173,6 +173,7 @@ export class SandField {
         uHover: { value: 0 },
         uRough: { value: 0.6 },
         uGapFill: { value: 0.12 },
+        uFrontKey: { value: new THREE.Vector3() },
         uCloud: { value: new THREE.Vector4(0, 0, 0, 0) },
         uCloudAxis: { value: new THREE.Vector3(0, 0, 1) },
         uCloudLife: { value: new THREE.Vector4(1e9, 1e9, 1, 0) },
@@ -260,6 +261,11 @@ export class SandField {
     u.uBallR.value = radius;
     u.uBallVolS.value = 1 / s;
     u.uBallGrain.value = s;
+  }
+
+  /** 2.3's passage: a key light from the camera onto the grains (colour x strength). */
+  setFrontKey(col: THREE.Vector3): void {
+    (this.material.uniforms.uFrontKey.value as THREE.Vector3).copy(col);
   }
 
   /** 2.3's cloud: how far the ball has parted (0..1) at the move's frame `frame`, around the line `axis` (world); out

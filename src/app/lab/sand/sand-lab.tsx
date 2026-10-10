@@ -82,6 +82,8 @@ const LEAN = 0.035;
 const LEAN_DAMP = -Math.log(1 - 0.1) * 60;   // their per-frame 0.1 at 60 fps, as a rate
 /** The floating grains' density through the page (Liam: strong in the hero, sparse over the desk, none on the index). */
 const DRIFT = { hero: 1, desk: 0.12 } as const;
+/** 2.3's passage: the key light from the camera onto the grains (times the fill's colour). */
+let FRONT_KEY = 1.2;
 /** smootherstep of t over [a, b] (Blender's ease in lookdev.py). */
 function ease(t: number, [a, b]: readonly [number, number]): number {
   const x = Math.min(Math.max((t - a) / (b - a), 0), 1);
@@ -288,6 +290,7 @@ export function SandLab() {
       const LIFT = { fill: 0.06, reach: 1.2, ground: 4.0, groundBall: 2.0 };
       const fillCol = new THREE.Vector3(1.0, 0.78, 0.6);
       (window as unknown as { __lift?: (l: Partial<typeof LIFT>) => void }).__lift = (l) => Object.assign(LIFT, l);
+      (window as unknown as { __frontKey?: (k: number) => void }).__frontKey = (k) => { FRONT_KEY = k; };
       (window as unknown as { __pbSat?: (v: number) => void }).__pbSat = (v) => { lampSat = v; };
       const calibrating = new URLSearchParams(window.location.search).has("pbframe") || new URLSearchParams(window.location.search).has("stframe");
       const pbFrame = Number(new URLSearchParams(window.location.search).get("pbframe") || NaN);
@@ -723,10 +726,14 @@ export function SandLab() {
               field!.setCloud(k, fr, cloudAxis, 3.5, cl.axial, cl.clear * m, 74, 100, cl.life, 0.006 * m, 0.012 * m);
               // in the cloud the focus is on the grains: they stay sharp and solid, the desk behind goes softly out of
               // focus (Liam, 2026-10-10)
-              if (composite) composite.defocus = 9 * (stage!.bufferHeight / 900) * ease(fr, [58, 72]) * (1 - ease(fr, [100, 118]));
+              const passage = ease(fr, [58, 72]) * (1 - ease(fr, [100, 118]));
+              if (composite) { composite.defocus = 9 * (stage!.bufferHeight / 900) * passage; composite.deskDim = 0.45 * passage; }
+              // the light comes from the front, onto the grains (Liam, 2026-10-11): a warm key from the camera
+              field!.setFrontKey(fillCol.clone().multiplyScalar(FRONT_KEY * passage));
             } else {
               field!.setCloud(0, 0, cloudAxis, 0, 0, 0, 1e9, 1e9, 1, 0, 1);
-              if (composite) composite.defocus = 0;
+              if (composite) { composite.defocus = 0; composite.deskDim = 0; }
+              field!.setFrontKey(new THREE.Vector3());
             }
           }
           if (shadow && deskNow) {

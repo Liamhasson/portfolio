@@ -65,6 +65,7 @@ uniform sampler2D uTex;       // the desk, full size
 uniform sampler2D uSmall;     // and at a quarter of it
 uniform vec2 uTexel;          // one full-size pixel
 uniform float uRadius;        // the blur's radius, device px
+uniform float uDim;           // how far the desk falls into shadow behind the lit grains (0..1)
 void main() {
   // a disc of 16 reads (golden-angle spiral) from the quarter-size desk, mixed in by how wide the blur is
   vec4 sum = vec4(0.0);
@@ -72,7 +73,7 @@ void main() {
     float r = sqrt((float(i) + 0.5) / 16.0) * uRadius, an = float(i) * 2.39996;
     sum += texture(uSmall, vUv + vec2(cos(an), sin(an)) * r * uTexel);
   }
-  gl_FragColor = vec4(mix(texture(uTex, vUv).rgb, sum.rgb / 16.0, smoothstep(0.5, 3.0, uRadius)), 1.0);
+  gl_FragColor = vec4(mix(texture(uTex, vUv).rgb, sum.rgb / 16.0, smoothstep(0.5, 3.0, uRadius)) * (1.0 - uDim), 1.0);
 }
 `;
 
@@ -101,7 +102,7 @@ export class SandComposite {
   private readonly disc = new THREE.ShaderMaterial({
     glslVersion: THREE.GLSL3, vertexShader: VERTEX, fragmentShader: DISC_FRAGMENT,
     depthTest: false, depthWrite: false, toneMapped: false,
-    uniforms: { uTex: { value: null }, uSmall: { value: null }, uTexel: { value: new THREE.Vector2() }, uRadius: { value: 0 } },
+    uniforms: { uTex: { value: null }, uSmall: { value: null }, uTexel: { value: new THREE.Vector2() }, uRadius: { value: 0 }, uDim: { value: 0 } },
   });
   /** A straight copy (rgba as it is), for the defocus's reduced desk. */
   private readonly rawScene = new THREE.Scene();
@@ -124,6 +125,8 @@ export class SandComposite {
   /** 2.3: the desk out of focus behind the sand as the camera passes through the cloud (device px; 0 = sharp). The sand
    *  stays sharp and solid (Liam, 2026-10-10: the focus is on the grains). */
   defocus = 0;
+  /** And how far it falls into shadow, so the light is on the grains (0..1). */
+  deskDim = 0;
   /** The filter's width at the render's resolution (1600 px wide), in its pixels. Fitted against the renders. */
   sigma = 0.55;
 
@@ -270,6 +273,7 @@ export class SandComposite {
       renderer.setRenderTarget(null);
       const du = this.disc.uniforms;
       du.uTex.value = bg.texture; du.uSmall.value = this.blurRt.texture; du.uRadius.value = this.defocus;
+      du.uDim.value = this.deskDim;
       (du.uTexel.value as THREE.Vector2).set(1 / size.x, 1 / size.y);
       renderer.render(this.discScene, this.ortho);
     } else {

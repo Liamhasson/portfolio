@@ -507,6 +507,7 @@ uniform float uRough;    // Oren-Nayar roughness (radians): a rough grain's edge
 uniform float uBounce;   // light that has hit two grains (Cycles' multiple scattering): saturates toward the sand's colour
 uniform vec3 uGroundCol;   // the lamp-lit desk below, as a broad light from beneath (colour x strength)
 uniform vec3 uFillCol;     // a soft fill from the viewer's side (colour x strength)
+uniform vec3 uFrontKey;    // 2.3's passage: a key light from the camera onto the grains (colour x strength; unshadowed)
 uniform vec3 uUpView;      // world up, in view space
 uniform float uLampSat;
 uniform vec3 uClearAlb;    // 2.2: the colour clearing grains drain to (pale frost)  // the desk lamp: light that reaches a grain through the sand is filtered by it (warmer, deeper)
@@ -552,6 +553,9 @@ void main() {
   col += albedo * uGroundCol * mix(0.4 + 0.6 * down, down * down, vCompact) * vGround;
   col += albedo * uFillCol * (0.35 + 0.65 * max(n.z, 0.0)) * vAmbient;
   col += albedo * albedo * vFillE * uGapFill / 3.14159265;
+  // (Liam, 2026-10-11: in the cloud the light is on the grains from the front, not on the desk)
+  vec3 albK = mix(albedo, albedo * albedo * 2.2, uLampSat);
+  col += albK * uFrontKey * (0.3 + 0.7 * max(n.z, 0.0)) + uFrontKey * pow(max(n.z, 0.0), 12.0) * uSpec;
   // 2.2: clearing grains drain toward pale glass (no heat, no glow) and turn see-through, showing the frost skin
   col *= uExposure * uOutScale;
   gl_FragColor = vec4(col, vAlpha * edge);
