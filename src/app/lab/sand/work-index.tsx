@@ -36,14 +36,18 @@ export interface WorkIndexHandle {
   interactive(which: "none" | "wide" | "list"): void;
   /** The box the 16:10 index lays out in (CSS px). */
   size(): { w: number; h: number };
+  /** How far the settled index's content runs past the view, in CSS px on screen (0: it all fits, or not settled). The
+   *  page grows by this much: the scroll that brought the viewer in carries on through the projects (Liam, 2026-10-10). */
+  overflow(): number;
+  /** Scroll the settled index's content by `px` CSS px on screen. */
+  scroll(px: number): void;
 }
 
 const CSS = `
 .wi { --bg:#0a0a0b; --ink:#f4f1ee; --dim:rgba(244,241,238,.42); --rule:rgba(244,241,238,.14);
   position:fixed; left:0; top:0; transform-origin:0 0; background:var(--bg); color:var(--ink); font-family:var(--font-sans);
   overflow:hidden; container-type:inline-size; will-change:transform,opacity; line-height:normal; }
-.wi .page { position:absolute; inset:0; overflow-y:auto; scrollbar-width:none; overscroll-behavior:contain; }
-.wi .page::-webkit-scrollbar { display:none; }
+.wi .page { position:absolute; inset:0; overflow:hidden; }
 .wi .top { padding:3.4cqw 3.6cqw 0; }
 .wi .title { font-size:4.8cqw; font-weight:400; line-height:.98; letter-spacing:-.02em; margin:0; }
 .wi .grid { display:grid; grid-template-columns:1fr 1fr; gap:3.2cqw 2.4cqw; padding:3.4cqw 3.6cqw 0; margin:0; list-style:none; }
@@ -64,7 +68,7 @@ const CSS = `
 .wi-panel { position:fixed; left:0; top:0; background:#0a0a0b; pointer-events:none; transform-origin:0 0; }
 .wl { --ink:#f4f1ee; --dim:rgba(244,241,238,.42); --rule:rgba(244,241,238,.14);
   position:fixed; inset:0; color:var(--ink); font-family:var(--font-sans); line-height:normal;
-  padding:clamp(88px,22vw,120px) 4.9vw 32px; overflow-y:auto; overscroll-behavior:contain; }
+  padding:clamp(88px,22vw,120px) 4.9vw 32px; overflow:hidden; }
 .wl .title { font-size:clamp(34px,10vw,44px); font-weight:400; line-height:1; letter-spacing:-.02em; margin:0 0 24px; }
 .wl .grid { display:grid; gap:32px; margin:0; padding:0; list-style:none; }
 .wl .tag { left:10px; top:10px; font-size:10px; padding:6px 9px; }
@@ -149,6 +153,9 @@ export function WorkIndex({ bind }: { bind: (h: WorkIndexHandle) => void }) {
   const [playing, setPlaying] = useState({ wide: false, list: false });
   useEffect(() => {
     const sz = () => ({ w: window.innerWidth, h: window.innerWidth / 1.6 });
+    // the settled 16:10 index's scale on screen (contained in the view)
+    const restScale = () => Math.min(window.innerWidth / sz().w, window.innerHeight / sz().h);
+    let mode: "none" | "wide" | "list" = "none";
     const apply = () => {
       const el = box.current;
       if (!el) return;
@@ -193,10 +200,24 @@ export function WorkIndex({ bind }: { bind: (h: WorkIndexHandle) => void }) {
         });
       },
       interactive(which) {
+        mode = which;
         if (box.current) box.current.style.pointerEvents = which === "wide" ? "auto" : "none";
         if (listEl.current) listEl.current.style.pointerEvents = which === "list" ? "auto" : "none";
       },
       size: sz,
+      overflow() {
+        // (before it settles: what it will need, so the page is already long enough when the viewer gets there)
+        const m = mode !== "none" ? mode : window.innerWidth / window.innerHeight < 1 ? "list" : "wide";
+        if (m === "list" && listEl.current) return Math.max(listEl.current.scrollHeight - listEl.current.clientHeight, 0);
+        const page = box.current?.querySelector<HTMLElement>(".page");
+        if (m === "wide" && page) return Math.max(page.scrollHeight - page.clientHeight, 0) * restScale();
+        return 0;
+      },
+      scroll(px) {
+        if (mode === "list" && listEl.current) listEl.current.scrollTop = px;
+        const page = box.current?.querySelector<HTMLElement>(".page");
+        if (page) page.scrollTop = mode === "wide" ? px / restScale() : 0;
+      },
     });
     return () => window.removeEventListener("resize", apply);
   }, [bind]);

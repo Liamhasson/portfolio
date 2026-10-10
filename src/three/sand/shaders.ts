@@ -115,6 +115,7 @@ uniform vec3 uChaosSize;
 uniform float uBallPosMax;
 uniform float uRadMax;
 uniform float uCompact;      // 0 chaos .. 1 ball
+uniform vec2 uGround;        // the desk's top (y) and how far above it its bounce reaches (e-folding height)
 uniform float uDelaySpan;
 uniform float uRampLen;
 uniform vec3 uBallC;
@@ -169,6 +170,7 @@ out vec3 vL0; out vec3 vL1; out vec3 vL2; out vec3 vL3;   // light directions, v
 out vec3 vE0; out vec3 vE1; out vec3 vE2; out vec3 vE3;
 out float vAlpha;
 out float vAmbient;
+out float vCompact;
 out float vBounceW;
 out float vPx;
 out float vEdgePx;
@@ -277,14 +279,18 @@ void main() {
   // grain-scale occlusion on the ball: the deeper below the surface, the darker (too fine for the volume)
   float depth = clamp((uBallR - distance(B, uBallC)) / (uBallR * uCavity.x), 0.0, 1.0);
   float cavity = mix(1.0, 1.0 - uCavity.y * depth, t);
-  vGround = t * (1.0 - depth);
+  // the lamp-lit desk lights the sand from below: the formed ball's open surface, and the loose sand the nearer it is
+  // to the desk (Liam: the cloud's underside must never fall into black)
+  vGround = mix(exp(-max(p.y - uGround.x, 0.0) / uGround.y), 1.0 - depth, t);
   // local density: grains inside dense filaments are shaded by their neighbours, and catch more bounce light
   float rho = density(pv);
   float occl = mix(exp(-rho * uLocal.x), 1.0, t);
   vBounceW = 1.0 - exp(-rho * uLocal.y);
   vE0 = E[0] * cavity * occl; vE1 = E[1] * cavity * occl; vE2 = E[2] * cavity * occl;
   // a little bounce light inside the sand, from how open the grain is to the key
-  vAmbient = 0.0;
+  // the soft fill (from the viewer's side): shadowed by the sand in front, as the cursor's reach is
+  vAmbient = toCam;
+  vCompact = t;
 
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   vL0 = normalize((viewMatrix * vec4(uLightPos[0], 1.0)).xyz - mv.xyz);
@@ -338,6 +344,7 @@ in vec3 vL0; in vec3 vL1; in vec3 vL2; in vec3 vL3;
 in vec3 vE0; in vec3 vE1; in vec3 vE2; in vec3 vE3;
 in float vAlpha;
 in float vAmbient;
+in float vCompact;
 in vec4 vEll;
 in float vGround;
 in float vClear;
@@ -351,6 +358,7 @@ uniform float uSpec;
 uniform float uWrap;     // light reaching past the terminator: grains are lit by the bounce off their neighbours
 uniform float uBounce;   // light that has hit two grains (Cycles' multiple scattering): saturates toward the sand's colour
 uniform vec3 uGroundCol;   // the lamp-lit desk below, as a broad light from beneath (colour x strength)
+uniform vec3 uFillCol;     // a soft fill from the viewer's side (colour x strength)
 uniform vec3 uUpView;      // world up, in view space
 uniform float uLampSat;
 uniform vec3 uClearAlb;    // 2.2: the colour clearing grains drain to (pale frost)  // the desk lamp: light that reaches a grain through the sand is filtered by it (warmer, deeper)
@@ -383,7 +391,9 @@ void main() {
   }
   // the desk below: grains facing down see a broad warm surface (no single ray, so the ball doesn't block it)
   float down = clamp(0.5 - 0.5 * dot(n, uUpView), 0.0, 1.0);
-  col += albedo * uGroundCol * down * down * vGround;
+  // (the loose sand's grains turn every way: a broad wrap; the ball's surface faces out: Blender's falloff)
+  col += albedo * uGroundCol * mix(0.4 + 0.6 * down, down * down, vCompact) * vGround;
+  col += albedo * uFillCol * (0.35 + 0.65 * max(n.z, 0.0)) * vAmbient;
   // 2.2: clearing grains drain toward pale glass (no heat, no glow) and turn see-through, showing the frost skin
   col *= uExposure * uOutScale;
   gl_FragColor = vec4(col, vAlpha * edge);

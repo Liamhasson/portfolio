@@ -2092,14 +2092,17 @@ def build_through():
     s_meet = at_len(travel(F_MEET) * Ltot)
     M = bez(s_meet)
     B0 = Vector(MOVE_CTX["ball_c"]); B1 = B0 + Vector((0, 0, 0.1))
-    S_AIM = min(s_meet + 0.2, 0.8)                     # the laptop is centred in the frame from here on
+    S_AIM = min(s_meet + 0.2, 0.8)                     # the lid's timing (opens as the laptop comes into frame)
     print("S_MEET", round(s_meet, 3), "S_AIM", round(S_AIM, 3))
+    # the turn from straight down to the screen: one slerp, begun on the way into the glass (the glass rides the line of
+    # sight, so it stays centred) and done as the lid opens. Revised 2026-10-10 (Liam: "a big movement bug" after the
+    # glass): the old aim swung a target point from below the camera to the screen, which flipped the camera's roll by
+    # 30 degrees in one frame as it left straight-down, then turned at up to 3.7 degrees a frame. This: 2 degrees a frame
+    # at most, the laptop centred from frame ~123.
+    A0, A1 = s_meet - 0.15, 0.55
+    q_down = Vector((0.0, 0.0001, -1.0)).to_track_quat("-Z", "Y")
     def aim(f, pos, s):
-        # straight down until past the glass, then easing onto the screen's centre
-        down = pos + Vector((0, 0.0001, -1.0))
-        k = ease(s, s_meet, S_AIM)                     # onto the laptop soon after the glass: never a bare desk
-        tgt = down.lerp(sc, k) if k < 1 else sc
-        return (tgt - pos).to_track_quat("-Z", "Y")
+        return q_down.slerp((sc - pos).to_track_quat("-Z", "Y"), ease(s, A0, A1))
     cam_d = bpy.data.cameras.new("cam"); cam_d.sensor_width = 36; cam_d.dof.use_dof = False
     cam_d.clip_start = 0.001                           # it passes within millimetres of the glass (the default clips it)
     cam = bpy.data.objects.new("cam", cam_d); scene.collection.objects.link(cam); scene.camera = cam
@@ -2148,6 +2151,8 @@ def build_through():
         json.dump({"move": "through", "fps": 24, "frames": F, "units": "metres", "up": "z", "meet_frame": F_MEET, "wake_frame": WAKE_F,
                    "plate_overscan": 1.0, "chaos_center": list(c_), "chaos_scale": CHAOS_SCALE,
                    "screen_corners_order": "top-left, top-right, bottom-right, bottom-left (as seen on the screen)", "path": path}, fh)
+    if os.environ.get("PATH_ONLY"):
+        print("WROTE path only"); sys.exit(0)
     one = os.environ.get("MOVE_FRAME")
     scene.frame_set(int(one or 1))
     if one:

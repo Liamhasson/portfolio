@@ -155,6 +155,8 @@ export class SandField {
         uExposure: { value: SAND_LOOK.exposure },
         uOutScale: { value: 1 },
         uGroundCol: { value: new THREE.Vector3() },
+        uGround: { value: new THREE.Vector2(-1e3, 1) },
+        uFillCol: { value: new THREE.Vector3() },
         uUpView: { value: new THREE.Vector3(0, 1, 0) },
         uSpec: { value: SAND_LOOK.spec },
         uSpotDir: { value: new THREE.Vector3(0, 0, -1) },
@@ -226,10 +228,13 @@ export class SandField {
     u.uBallGrain.value = s;
   }
 
-  /** The desk below as a broad light (colour x strength, 0 = none), and the camera (for world up in view space). */
-  setGround(col: THREE.Vector3, camera: THREE.Camera): void {
+  /** The desk below as a broad light (colour x strength, 0 = none), reaching the loose sand up to about `reach` above
+   *  its top at `deskY`; a soft fill from the viewer's side (colour x strength); and the camera (for world up). */
+  setGround(col: THREE.Vector3, camera: THREE.Camera, fill?: THREE.Vector3, deskY = -1e3, reach = 1): void {
     const u = this.material.uniforms;
     (u.uGroundCol.value as THREE.Vector3).copy(col);
+    (u.uFillCol.value as THREE.Vector3).copy(fill ?? new THREE.Vector3());
+    (u.uGround.value as THREE.Vector2).set(deskY, reach);
     (u.uUpView.value as THREE.Vector3).set(0, 1, 0).transformDirection(camera.matrixWorldInverse);
   }
 

@@ -56,6 +56,15 @@ uniform sampler2D uTex;
 void main() { gl_FragColor = vec4(texture(uTex, vUv).rgb, 1.0); }
 `;
 
+const OVER_FRAGMENT = /* glsl */ `
+precision highp float;
+out highp vec4 pc_fragColor;
+#define gl_FragColor pc_fragColor
+in vec2 vUv;
+uniform sampler2D uTex;
+void main() { gl_FragColor = texture(uTex, vUv); }
+`;
+
 export class SandComposite {
   private readonly rt: THREE.WebGLRenderTarget;
   /** 2.3: the glass, drawn between the desk and the sand; it looks through the desk as drawn into `bg`. */
@@ -64,6 +73,14 @@ export class SandComposite {
   private readonly copyScene = new THREE.Scene();
   private readonly copy = new THREE.ShaderMaterial({
     glslVersion: THREE.GLSL3, vertexShader: VERTEX, fragmentShader: COPY_FRAGMENT,
+    depthTest: false, depthWrite: false, toneMapped: false, uniforms: { uTex: { value: null } },
+  });
+  /** The glass drawn smaller (where it fills the view), laid over the screen: premultiplied (its target clears to none). */
+  private glassRt: THREE.WebGLRenderTarget | null = null;
+  private readonly overScene = new THREE.Scene();
+  private readonly over = new THREE.ShaderMaterial({
+    glslVersion: THREE.GLSL3, vertexShader: VERTEX, fragmentShader: OVER_FRAGMENT,
+    transparent: true, blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
     depthTest: false, depthWrite: false, toneMapped: false, uniforms: { uTex: { value: null } },
   });
   private readonly quad: THREE.Mesh;
@@ -96,6 +113,9 @@ export class SandComposite {
     const copyQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.copy);
     copyQuad.frustumCulled = false;
     this.copyScene.add(copyQuad);
+    const overQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.over);
+    overQuad.frustumCulled = false;
+    this.overScene.add(overQuad);
   }
 
   /** The desk drawn into a target with its depth (display values, as drawn), for the glass to look through. */
@@ -149,7 +169,30 @@ export class SandComposite {
       this.glass.setBackground(bg.texture, bg.depthTexture!, size.x, size.y, camera as THREE.PerspectiveCamera);
       camera.layers.set(GLASS_LAYER);
       renderer.autoClear = false;
-      renderer.render(scene, camera);
+      // where the glass fills most of the view (rushing at the lens, passing through it) every pixel traces the desk
+      // twice: it is drawn at 0.7 of the size (half the pixels) and laid over the screen (Liam, 2026-10-10: the frames
+      // there ran 10-17 ms at 120 Hz, and dropped frames read as jitter); it is all refraction there, no sharp edge
+      const cover = this.glass.coverage(camera as THREE.PerspectiveCamera);
+      if (cover > 0.45) {
+        const w = Math.round(size.x * 0.7), h = Math.round(size.y * 0.7);
+        if (!this.glassRt || this.glassRt.width !== w || this.glassRt.height !== h) {
+          this.glassRt?.dispose();
+          this.glassRt = new THREE.WebGLRenderTarget(w, h, { type: THREE.UnsignedByteType, depthBuffer: false });
+          this.glassRt.texture.colorSpace = THREE.NoColorSpace;
+        }
+        this.glass.setTarget(w, h);
+        renderer.setRenderTarget(this.glassRt);
+        renderer.setClearColor(0x000000, 0);
+        renderer.clear();
+        renderer.render(scene, camera);
+        renderer.setRenderTarget(null);
+        renderer.setClearColor(clear, clearA);
+        this.over.uniforms.uTex.value = this.glassRt.texture;
+        renderer.render(this.overScene, this.ortho);
+      } else {
+        this.glass.setTarget(size.x, size.y);
+        renderer.render(scene, camera);
+      }
     } else {
       renderer.render(scene, camera);
     }
@@ -162,7 +205,9 @@ export class SandComposite {
   dispose(): void {
     this.rt.dispose();
     this.bg?.dispose();
+    this.glassRt?.dispose();
     this.copy.dispose();
+    this.over.dispose();
     this.material.dispose();
     this.quad.geometry.dispose();
   }

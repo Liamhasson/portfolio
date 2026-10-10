@@ -112,8 +112,11 @@ void main() {
 `;
 
 // Oryzo's simulation constants (theirs: a bean of radius 0.01, 60 fps), scaled to our grain size where they are lengths
-const PATH_ATTRACTION_RATE = 2;     // per second, toward the path
-const VELOCITY_DAMPING_RATE = 1;    // per second
+const PATH_STIFFNESS = 120;         // per second squared, toward the path (Oryzo's pull, as it acts at 120 fps)
+const VELOCITY_DAMPING_RATE = 3;    // per second: a pushed grain swings back once or twice, then settles (Liam: no long bounce)
+/** How much of the sand's own motion (a scene change: the camera's move, the ball forming, rising) the grains ride
+ *  outright; the spring only catches up the rest, so a transition shows as a barely visible, brief give. */
+const CARRY = 0.94;
 const MOUSE_PUSH_FORCE = 0.25;      // per unit of overlap, per 60 fps frame
 const MOUSE_VELOCITY_TRANSFER = 0.1;
 const TURN_RATE = 6;                // per second: how fast a grain turns to face its motion
@@ -128,6 +131,7 @@ export class DriftGrains {
   private readonly tumble: Float32Array;   // each grain's own fixed turn (quaternion)
   private readonly seed: Float32Array;     // 4 randoms per grain
   private readonly gen: Float32Array;      // its current life's number (rebirth: a new place)
+  private readonly home: Float32Array;     // where its path had it last frame
   private readonly sizes: Float32Array;
   private readonly aPos: THREE.InstancedBufferAttribute;
   private readonly aVel: THREE.InstancedBufferAttribute;
@@ -156,6 +160,7 @@ export class DriftGrains {
     this.tumble = new Float32Array(max * 4);
     this.seed = new Float32Array(max * 4);
     this.gen = new Float32Array(max).fill(-1);
+    this.home = new Float32Array(max * 3);
     this.sizes = new Float32Array(max * 2);
     for (let i = 0; i < max * 4; i++) this.seed[i] = Math.random();
     const axis = new THREE.Vector3();
@@ -228,7 +233,6 @@ export class DriftGrains {
       this.cursorHas = true;
     } else this.cursorHas = false;
     const f60 = dt * 60;
-    const attract = 1 - Math.exp(-dt * PATH_ATTRACTION_RATE);
     const damp = Math.exp(-dt * VELOCITY_DAMPING_RATE);
     const turn = 1 - Math.exp(-dt * TURN_RATE);
     const cam = camera.position;
@@ -261,11 +265,17 @@ export class DriftGrains {
         this.gen[i] = gen;
         this.pos[o] = tx; this.pos[o + 1] = ty; this.pos[o + 2] = tz;
         this.vel[o] = 0; this.vel[o + 1] = 0; this.vel[o + 2] = 0;
+      } else {
+        // it rides most of its path's own motion
+        this.pos[o] += (tx - this.home[o]) * CARRY;
+        this.pos[o + 1] += (ty - this.home[o + 1]) * CARRY;
+        this.pos[o + 2] += (tz - this.home[o + 2]) * CARRY;
       }
+      this.home[o] = tx; this.home[o + 1] = ty; this.home[o + 2] = tz;
       // drawn toward its path (a spring), damped
-      this.vel[o] = (this.vel[o] + (tx - this.pos[o]) * attract / dt * 0.5) * damp;
-      this.vel[o + 1] = (this.vel[o + 1] + (ty - this.pos[o + 1]) * attract / dt * 0.5) * damp;
-      this.vel[o + 2] = (this.vel[o + 2] + (tz - this.pos[o + 2]) * attract / dt * 0.5) * damp;
+      this.vel[o] = (this.vel[o] + (tx - this.pos[o]) * PATH_STIFFNESS * dt) * damp;
+      this.vel[o + 1] = (this.vel[o + 1] + (ty - this.pos[o + 1]) * PATH_STIFFNESS * dt) * damp;
+      this.vel[o + 2] = (this.vel[o + 2] + (tz - this.pos[o + 2]) * PATH_STIFFNESS * dt) * damp;
       // the cursor: a sphere that shoves grains out of it and hands them some of its own speed
       if (cursor) {
         let ex = this.pos[o] - cursor.x, ey = this.pos[o + 1] - cursor.y, ez = this.pos[o + 2] - cursor.z;

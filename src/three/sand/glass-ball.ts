@@ -59,6 +59,7 @@ uniform vec3 uAbsorb;          // absorption per hero unit (Blender: density x (
 uniform sampler2D uBg;         // the desk as drawn (display values)
 uniform sampler2D uBgDepth;    // its depth
 uniform vec2 uBgTexel;
+uniform vec2 uFragTexel;   // 1 / the size of what the pass draws into (the screen, or a smaller target)
 uniform float uNear;
 uniform float uFar;
 uniform sampler2D uEnv;        // the room from where the glass hovers (equirectangular, scene-linear, the lights in it)
@@ -242,7 +243,7 @@ vec3 frostAt(vec3 p, vec3 n, vec3 v, float clear) {
 }
 
 void main() {
-  vec2 suv = gl_FragCoord.xy * uBgTexel;
+  vec2 suv = gl_FragCoord.xy * uFragTexel;
   vec3 under = texture(uBg, suv).rgb;
   vec4 vv = uInvProj * vec4(vNdc, 1.0, 1.0);
   vec3 ro = cameraPosition, rd = normalize(mat3(uCamWorld) * (vv.xyz / vv.w));
@@ -369,6 +370,7 @@ export class GlassBall {
         uBg: { value: null },
         uBgDepth: { value: null },
         uBgTexel: { value: new THREE.Vector2(1, 1) },
+        uFragTexel: { value: new THREE.Vector2(1, 1) },
         uNear: { value: 0.1 },
         uFar: { value: 1000 },
         uEnv: { value: env },
@@ -493,6 +495,23 @@ export class GlassBall {
   private readonly pv = new THREE.Matrix4();
 
   /** Whether the ball is in the camera's view (the pass is skipped otherwise). */
+  /** The size of what the pass draws into, in pixels (the screen's drawing buffer, or a reduced target). */
+  setTarget(width: number, height: number): void {
+    (this.material.uniforms.uFragTexel.value as THREE.Vector2).set(1 / width, 1 / height);
+  }
+
+  /** Roughly how much of the view the glass covers (0..1; 1 from inside it). */
+  coverage(camera: THREE.PerspectiveCamera): number {
+    const u = this.material.uniforms;
+    const c = u.uC.value as THREE.Vector3, r = u.uR.value as number;
+    const d = camera.position.distanceTo(c);
+    if (d <= r) return 1;
+    const ang = Math.asin(r / d);                                      // its angular radius
+    const th = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+    const rr = Math.tan(Math.min(ang, 1.5)) / th;                      // its radius, in half view heights
+    return Math.min((Math.PI * rr * rr) / (4 * camera.aspect), 1);
+  }
+
   inView(camera: THREE.PerspectiveCamera): boolean {
     const u = this.material.uniforms;
     this.sphere.set(u.uC.value as THREE.Vector3, (u.uR.value as number) * 1.02);
