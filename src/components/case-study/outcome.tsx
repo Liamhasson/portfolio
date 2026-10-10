@@ -5,8 +5,8 @@ export function Outcome({ outcome }: { outcome: Data }) {
   const headingId = useId();
   return (
     <section aria-labelledby={headingId} className="px-[5vw] py-[10vh]">
-      <h2 id={headingId} className="font-mono text-xs uppercase tracking-[0.08em] text-ink-3">
-        Outcome
+      <h2 id={headingId} className="text-[clamp(2rem,4vw,3.6rem)] font-normal leading-[1.15]">
+        Impact
       </h2>
       {outcome.lines.map((line) => (
         <p key={line} className="mt-4 max-w-[48ch] text-[clamp(1.25rem,2.6vw,2.4rem)] leading-tight">

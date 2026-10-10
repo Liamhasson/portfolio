@@ -7,7 +7,7 @@ import { Outcome } from "./outcome";
 
 test("outcome with a quote", () => {
   render(<Outcome outcome={cyvore.outcome} />);
-  expect(screen.getByRole("region", { name: "Outcome" })).toBeInTheDocument();
+  expect(screen.getByRole("region", { name: "Impact" })).toBeInTheDocument();
   const quote = screen.getByRole("blockquote");
   expect(quote).toHaveTextContent("we closed our first funding round");
   expect(quote.textContent).not.toMatch(/[“”]/);
