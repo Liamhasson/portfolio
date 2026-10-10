@@ -130,3 +130,82 @@ test.describe("beats", () => {
     expect((await story(page).state()).open.why).toBe(2);
   });
 });
+
+test.describe("handovers", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/cyvore-mockups.html", { waitUntil: "load" });
+    await page.waitForFunction(() => (window as any).__cyvoreStories?.desktop);
+  });
+
+  test("at rest, exactly one chapter is visible, and the others can't be reached", async ({ page }) => {
+    for (const [beat, ch] of [[0, "why"], [5, "risk"], [9, "attack"], [10, "powers"]] as const) {
+      await story(page).go(beat);
+      expect((await story(page).state()).visible).toEqual([ch]);
+      const inert = await page.$$eval('.story[data-story="desktop"] .s-chapter', (els) => els.map((e) => (e as HTMLElement).inert));
+      expect(inert.filter((x) => !x)).toHaveLength(1);
+    }
+  });
+
+  test("the outgoing chapter is gone before the next arrives, moving up when going forward", async ({ page }) => {
+    await story(page).go(4);
+    const samples = await page.evaluate(async () => {
+      const api = (window as any).__cyvoreStories.desktop;
+      const why = document.querySelector('.story[data-story="desktop"] [data-chapter="why"]') as HTMLElement;
+      const risk = document.querySelector('.story[data-story="desktop"] [data-chapter="risk"]') as HTMLElement;
+      api.scrollToBeat(5, 0.5);
+      const out: { why: number; risk: number; whyY: number }[] = [];
+      for (let i = 0; i < 24; i++) {
+        await new Promise((r) => setTimeout(r, 40));
+        out.push({
+          why: parseFloat(getComputedStyle(why).opacity),
+          risk: parseFloat(getComputedStyle(risk).opacity),
+          whyY: new DOMMatrix(getComputedStyle(why).transform).m42,
+        });
+      }
+      return out;
+    });
+    expect(samples.some((s) => s.why > 0.05 && s.risk > 0.05)).toBe(false);
+    expect(samples.some((s) => s.whyY < -1)).toBe(true);
+  });
+
+  test("a fast flick to the end settles on What powers us alone", async ({ page }) => {
+    await story(page).go(0);
+    await page.evaluate(() => (window as any).__cyvoreStories.desktop.scrollToBeat(11, 0.5));
+    await page.waitForFunction(() => (window as any).__cyvoreStories.desktop.state().settled);
+    await page.waitForTimeout(600);
+    expect((await story(page).state()).visible).toEqual(["powers"]);
+  });
+
+  test("clicking the bar jumps to that chapter; the last click wins", async ({ page }) => {
+    const bar = page.locator('.story[data-story="desktop"] .chap');
+    await story(page).go(0);
+    // On-screen clicks (see ledger): locator.click() would scroll the sticky pin itself.
+    const tap = async (name: string) => {
+      const box = (await bar.filter({ hasText: name }).boundingBox())!;
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    };
+    await tap("What powers us");
+    await tap("The risk is real");
+    await page.waitForFunction(() => {
+      const s = (window as any).__cyvoreStories.desktop.state();
+      return s.chapter === "risk" && s.settled;
+    }, null, { timeout: 5000 });
+    await page.waitForTimeout(600);
+    expect((await story(page).state()).visible).toEqual(["risk"]);
+  });
+
+  test("a reload mid-story opens on the right chapter without replaying the rest", async ({ page }) => {
+    await story(page).go(9);
+    const y = await page.evaluate(() => window.scrollY);
+    await page.reload();
+    await page.waitForFunction(() => (window as any).__cyvoreStories?.desktop);
+    // The browser may restore the scroll before or after the story mounts; either way,
+    // within one handover's time it must rest on the attack, alone.
+    await page.evaluate((top) => { if (Math.abs(window.scrollY - top) > 2) window.scrollTo(0, top); }, y);
+    await page.waitForFunction(() => {
+      const s = (window as any).__cyvoreStories.desktop.state();
+      return s.chapter === "attack" && s.settled;
+    }, null, { timeout: 2000 });
+    expect((await story(page).state()).visible).toEqual(["attack"]);
+  });
+});

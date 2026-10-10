@@ -107,6 +107,7 @@ export function mountStory(story, name) {
   let beat = -1;
   let chapter = null;
   let settled = true;
+  let tl = null;
   let fill = chapterFill(0, 0);
 
   const pinTop = () => Math.max(16, (innerHeight - pin.offsetHeight) / 2);
@@ -124,11 +125,37 @@ export function mountStory(story, name) {
   const goTo = (b, dir, instant = false) => {
     const next = BEATS[b].chapter;
     if (next !== chapter) {
+      const from = chapter;
       chapter = next;
       where.textContent = `Chapter ${CHAPTERS.indexOf(next) + 1} of ${CHAPTERS.length}`;
-      showOnly(site, next);
+      // A new handover finishes the running one first, so chapters never stack up.
+      if (tl) { tl.progress(1).kill(); tl = null; }
+      if (!from || instant || reduce) {
+        showOnly(site, next);
+        applyBeat(b, true);
+        settled = true;
+      } else {
+        settled = false;
+        const out = chapterEl(site, from);
+        const inn = chapterEl(site, next);
+        const y = dir > 0 ? -16 : 16;
+        CHAPTERS.forEach((c) => {
+          if (c === from || c === next) return;
+          const el = chapterEl(site, c);
+          el.classList.remove("is-on");
+          el.inert = true;
+          gsap.set(el, { autoAlpha: 0, y: 0 });
+        });
+        out.inert = true;
+        inn.inert = false;
+        tl = gsap.timeline({ onComplete: () => { settled = true; tl = null; } })
+          .to(out, { autoAlpha: 0, y, duration: 0.36, ease: "power2.in" })
+          .call(() => { out.classList.remove("is-on"); gsap.set(out, { y: 0 }); inn.classList.add("is-on"); applyBeat(b, false); })
+          .fromTo(inn, { autoAlpha: 0, y: -y }, { autoAlpha: 1, y: 0, duration: 0.52, ease: SETTLE });
+      }
+    } else {
+      applyBeat(b, instant);
     }
-    applyBeat(b, instant);
     beat = b;
   };
 
@@ -148,6 +175,14 @@ export function mountStory(story, name) {
   });
 
   bindPanels(site);
+
+  // The bar is the live site's chapter switch, and now also the story's index.
+  site.querySelectorAll(".chap[data-go]").forEach((c) => {
+    c.addEventListener("click", () => {
+      const p = beatStart(firstBeatOf(c.dataset.go));
+      window.scrollTo({ top: st.start + p * (st.end - st.start) + 2, behavior: reduce ? "auto" : "smooth" });
+    });
+  });
 
   // Land directly on wherever the page already is (a reload mid-story replays nothing).
   // Read from the scroll position itself: st.progress isn't trustworthy before the first update.
