@@ -132,6 +132,30 @@ export class SandComposite {
     return this.bg;
   }
 
+  /** The glass at 0.7 of the size. */
+  private glassTarget(size: THREE.Vector2): THREE.WebGLRenderTarget {
+    const w = Math.round(size.x * 0.7), h = Math.round(size.y * 0.7);
+    if (!this.glassRt || this.glassRt.width !== w || this.glassRt.height !== h) {
+      this.glassRt?.dispose();
+      this.glassRt = new THREE.WebGLRenderTarget(w, h, { type: THREE.UnsignedByteType, depthBuffer: false });
+      this.glassRt.texture.colorSpace = THREE.NoColorSpace;
+    }
+    return this.glassRt;
+  }
+
+  /** Compiles its own passes' shaders and makes its targets now, not on the frame each is first needed (stalls of up
+   *  to 200 ms mid-scroll). */
+  async warm(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): Promise<void> {
+    await Promise.all([this.scene, this.copyScene, this.overScene].map((sc) => renderer.compileAsync(sc, this.ortho)));
+    // and drawn once each way (the GPU builds its pipelines on a shader's first draw into each kind of target)
+    for (const mode of ["full", "small"] as const) {
+      this.force = mode;
+      this.render(renderer, scene, camera);
+    }
+    this.force = null;
+  }
+  private force: "full" | "small" | null = null;
+
   /** Renders the frame: the sand layer into its target, the rest to the screen, then the filtered sand over it. */
   render(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): void {
     const size = renderer.getDrawingBufferSize(new THREE.Vector2());
@@ -152,7 +176,7 @@ export class SandComposite {
     camera.layers.disable(SAND_LAYER);
     camera.layers.disable(GLASS_LAYER);
     const autoClear = renderer.autoClear;
-    if (this.glass?.visible && this.glass.inView(camera as THREE.PerspectiveCamera)) {
+    if (this.glass && (this.force || (this.glass.visible && this.glass.inView(camera as THREE.PerspectiveCamera)))) {
       // the desk into its target (with depth), onto the screen as is, then the glass looking through it
       const bg = this.background(size);
       // the blurred reads (frost) need the desk's mip chain; clear glass reads it sharp (no mips: a full-size pass saved)
@@ -172,22 +196,17 @@ export class SandComposite {
       // where the glass fills most of the view (rushing at the lens, passing through it) every pixel traces the desk
       // twice: it is drawn at 0.7 of the size (half the pixels) and laid over the screen (Liam, 2026-10-10: the frames
       // there ran 10-17 ms at 120 Hz, and dropped frames read as jitter); it is all refraction there, no sharp edge
-      const cover = this.glass.coverage(camera as THREE.PerspectiveCamera);
+      const cover = this.force ? (this.force === "small" ? 1 : 0) : this.glass.coverage(camera as THREE.PerspectiveCamera);
       if (cover > 0.45) {
-        const w = Math.round(size.x * 0.7), h = Math.round(size.y * 0.7);
-        if (!this.glassRt || this.glassRt.width !== w || this.glassRt.height !== h) {
-          this.glassRt?.dispose();
-          this.glassRt = new THREE.WebGLRenderTarget(w, h, { type: THREE.UnsignedByteType, depthBuffer: false });
-          this.glassRt.texture.colorSpace = THREE.NoColorSpace;
-        }
-        this.glass.setTarget(w, h);
-        renderer.setRenderTarget(this.glassRt);
+        const grt = this.glassTarget(size);
+        this.glass.setTarget(grt.width, grt.height);
+        renderer.setRenderTarget(grt);
         renderer.setClearColor(0x000000, 0);
         renderer.clear();
         renderer.render(scene, camera);
         renderer.setRenderTarget(null);
         renderer.setClearColor(clear, clearA);
-        this.over.uniforms.uTex.value = this.glassRt.texture;
+        this.over.uniforms.uTex.value = grt.texture;
         renderer.render(this.overScene, this.ortho);
       } else {
         this.glass.setTarget(size.x, size.y);

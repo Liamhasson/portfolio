@@ -13,7 +13,7 @@ import { FrostSkin } from "@/three/sand/frost-skin";
 import { attemptAt } from "@/three/sand/attempts";
 import { BakedDesk } from "@/three/sand/baked-desk";
 import { revealAt } from "@/three/sand/screen-reveal";
-import { GlassBall } from "@/three/sand/glass-ball";
+import { GLASS_LAYER, GlassBall } from "@/three/sand/glass-ball";
 import { DriftGrains } from "@/three/sand/drift-grains";
 import { EXRLoader } from "three/addons/loaders/EXRLoader.js";
 import { SAND_ENCODE, SAND_LAYER, SandComposite } from "@/three/sand/sand-composite";
@@ -359,9 +359,10 @@ export function SandLab() {
       // warm-up: every texture uploaded and every shader compiled now, not the first frame each comes into view (Liam,
       // 2026-10-10: the pull-back stuttered as the desk arrived: 25-50 ms frames as its textures and materials loaded)
       {
-        const st = stage, hidden: THREE.Object3D[] = [];
+        const st = stage, hidden: THREE.Object3D[] = [], culled: THREE.Object3D[] = [];
         st.scene.traverse((o) => {
           if (!o.visible) { hidden.push(o); o.visible = true; }
+          if (o.frustumCulled) { culled.push(o); o.frustumCulled = false; }   // (drawn below wherever the camera is)
           const mats = (o as THREE.Mesh).material;
           for (const m of Array.isArray(mats) ? mats : mats ? [mats] : []) {
             for (const v of Object.values(m as unknown as Record<string, unknown>)) if (v instanceof THREE.Texture) st.renderer.initTexture(v);
@@ -369,10 +370,24 @@ export function SandLab() {
             if (u) for (const { value } of Object.values(u)) if (value instanceof THREE.Texture) st.renderer.initTexture(value);
           }
         });
-        const all = st.camera.clone();
-        all.layers.enableAll();
-        await st.renderer.compileAsync(st.scene, all).catch(() => {});
+        // each pass sees its own layers (and with them its own lights: a different shader), drawn to the screen or into
+        // a target (another variant again): every combination the composite uses, compiled now
+        const cam = st.camera.clone();
+        const masks = [cam.layers.mask, 1 << SAND_LAYER, 1 << GLASS_LAYER, cam.layers.mask & ~(1 << SAND_LAYER) & ~(1 << GLASS_LAYER), 0xffffffff];
+        const tmp = new THREE.WebGLRenderTarget(4, 4, { type: THREE.UnsignedByteType });
+        tmp.texture.colorSpace = THREE.NoColorSpace;
+        for (const target of [null, tmp]) {
+          st.renderer.setRenderTarget(target);
+          for (const m of masks) {
+            cam.layers.mask = m;
+            await st.renderer.compileAsync(st.scene, cam).catch(() => {});
+          }
+        }
+        st.renderer.setRenderTarget(null);
+        tmp.dispose();
+        await composite?.warm(st.renderer, st.scene, st.camera).catch(() => {});
         for (const o of hidden) o.visible = false;
+        for (const o of culled) o.frustumCulled = true;
       }
       const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       // ?still: no ambient motion (drift, spin), so a test isolates what the cursor does
@@ -791,7 +806,7 @@ export function SandLab() {
         field!.update(state);
       });
       stage.start();
-      (window as unknown as { __sand?: unknown }).__sand = { stage, field, state };   // lab debugging
+      (window as unknown as { __sand?: unknown }).__sand = { stage, field, state, glass };   // lab debugging
     })().catch((err) => {
       setStatus(String(err));
       setFallback(true);

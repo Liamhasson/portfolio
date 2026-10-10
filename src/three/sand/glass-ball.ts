@@ -250,15 +250,25 @@ void main() {
   vec3 oc = ro - uC;
   float b = dot(oc, rd), c = dot(oc, oc) - uR * uR, h = b * b - c;
   if (h <= 0.0) discard;
+  // (outside it, the ball must be ahead: just after the camera leaves the glass the ray's line still crosses it, behind
+  // the lens; drawn, that was a ghost ball over the frame: Liam, 2026-10-10)
+  if (c >= 0.0 && b >= 0.0) discard;
+  // passing through (Liam, 2026-10-10, frame by frame): the glass is a true lens until the camera is close; then its
+  // upside-down view dissolves into the plain one, and inside it bends nothing, so the camera goes in and out with no
+  // jump. (As a lens all the way, the view flipped through a magnified blur in two frames going in; inside, the far
+  // surface pushed the world away, and it snapped back close coming out.)
+  float dCam = sqrt(dot(oc, oc));
+  float eta = dCam < uR ? 1.0 : uEta;
+  float lensK = smoothstep(uR * 1.05, uR * 2.9, dCam);
   if (c < 0.0) {
     // the camera is inside the glass (2.3: passing through it): every ray leaves through the far surface, bending out
     // of the glass (from its centre, not at all: inside, the world is the right way up again)
     vec3 pe = ro + rd * (-b + sqrt(h));
     vec3 ne = (pe - uC) / uR;
-    vec3 te = refract(rd, -ne, uEta);
+    vec3 te = refract(rd, -ne, eta);
     float cosE = clamp(dot(rd, ne), 0.0, 1.0);
     if (dot(te, te) < 0.5) te = reflect(rd, -ne);
-    float Fe = fresnel(clamp(sqrt(max(1.0 - (1.0 - cosE * cosE) * uEta * uEta, 0.0)), 0.0, 1.0), uEta);
+    float Fe = fresnel(clamp(sqrt(max(1.0 - (1.0 - cosE * cosE) * eta * eta, 0.0)), 0.0, 1.0), eta);
     vec3 dE; bool hE;
     vec3 Le = seen(pe, te, 0.0, dE, hE);
     vec3 Lin = (1.0 - Fe) * exp(-uAbsorb * (-b + sqrt(h))) * Le;
@@ -294,7 +304,7 @@ void main() {
     n1 = normalize(uBallRot * bumpObj);
   }
   float cosi = clamp(dot(-rd, n1), 0.0, 1.0);
-  float F = fresnel(cosi, uEta);
+  float F = fresnel(cosi, eta);
   // reflection
   vec3 rdR = reflect(rd, n1);
   vec3 dispR; bool hitR;
@@ -302,11 +312,11 @@ void main() {
   float coneR = pow(rough, 1.5), coneT = 2.0 * pow(rough, 1.5);
   vec3 Lr = seen(p1, rdR, coneR, dispR, hitR);
   // refraction: in, across, out (a sphere never traps it: the exit angle equals the entry angle); two rough faces
-  vec3 t1 = refract(rd, n1, 1.0 / uEta);
+  vec3 t1 = refract(rd, n1, 1.0 / eta);
   float chord = -2.0 * dot(p1 - uC, t1);
   vec3 p2 = p1 + t1 * chord;
   vec3 n2 = (p2 - uC) / uR;
-  vec3 t2 = refract(t1, -n2, uEta);
+  vec3 t2 = refract(t1, -n2, eta);
   if (dot(t2, t2) < 0.5) t2 = reflect(t1, -n2);
   // very rough glass passes light from all around the straight-through direction: it bends toward it as it frosts
   vec3 tT = normalize(mix(t2, rd, smoothstep(0.03, uBendEnd, coneT)));
@@ -325,7 +335,7 @@ void main() {
   float chord2 = -2.0 * dot(p2 - uC, r2);
   vec3 p3 = p2 + r2 * chord2;
   vec3 n3 = (p3 - uC) / uR;
-  vec3 t3 = refract(r2, -n3, uEta);
+  vec3 t3 = refract(r2, -n3, eta);
   // (faint: the room it sees, from the probe; no trace through the desk)
   vec3 Li = dot(t3, t3) > 0.5 ? envAlong(t3) + uEnvLights * lightsAlong(p3, t3) : vec3(0.0);
   vec3 inner = (1.0 - F) * F * (1.0 - F) * exp(-uAbsorb * (chord + chord2)) * T * tint;
@@ -340,7 +350,7 @@ void main() {
   if (uDebug > 3.5 && uDebug < 4.5) col = toDisplay(F * Lr);                  // reflection only
   if (uDebug > 4.5 && uDebug < 5.5) col = toDisplay(trans * Lt);            // refraction only
   if (uDebug > 5.5) col = toDisplay(inner * Li);                             // the internal reflection only
-  gl_FragColor = vec4(mix(under, clamp(col, 0.0, 1.0), exists * uAmount), 1.0);
+  gl_FragColor = vec4(mix(under, clamp(col, 0.0, 1.0), exists * uAmount * lensK), 1.0);
 }
 `;
 

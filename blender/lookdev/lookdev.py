@@ -2101,8 +2101,10 @@ def build_through():
     # at most, the laptop centred from frame ~123.
     A0, A1 = s_meet - 0.15, 0.55
     q_down = Vector((0.0, 0.0001, -1.0)).to_track_quat("-Z", "Y")
-    def aim(f, pos, s):
-        return q_down.slerp((sc - pos).to_track_quat("-Z", "Y"), ease(s, A0, A1))
+    # it aims at the screen where it is now (Liam, 2026-10-10, frame by frame: aimed at where the open screen would be, the
+    # camera looked at the air above the shut lid and the laptop sank to the frame's bottom, then rose as it opened)
+    def aim(f, pos, s, target):
+        return q_down.slerp((target - pos).to_track_quat("-Z", "Y"), ease(s, A0, A1))
     cam_d = bpy.data.cameras.new("cam"); cam_d.sensor_width = 36; cam_d.dof.use_dof = False
     cam_d.clip_start = 0.001                           # it passes within millimetres of the glass (the default clips it)
     cam = bpy.data.objects.new("cam", cam_d); scene.collection.objects.link(cam); scene.camera = cam
@@ -2112,7 +2114,11 @@ def build_through():
         s = at_len(travel(f) * Ltot)
         pos = bez(s)
         cam.location = pos
-        cam.rotation_quaternion = aim(f, pos, s)
+        # the lid opens in view during the approach; the screen wakes as it finishes
+        sl0, sl1 = S_AIM - 0.04, min(S_AIM + 0.2, 0.9)   # the lid opens once the laptop is framed
+        hinge.rotation_euler.x = shut + (opened - shut) * ease(s, sl0, sl1)
+        bpy.context.view_layer.update()
+        cam.rotation_quaternion = aim(f, pos, s, disp.matrix_world.translation.copy())
         # the glass rides the camera's line of sight: drifting up while it turns to glass, then closing on the lens at
         # the centre of the frame, and the camera passes through its centre at F_MEET; then it stays there, above
         fwd = cam.rotation_quaternion @ Vector((0, 0, -1))
@@ -2128,9 +2134,6 @@ def build_through():
             ball = M.copy()
         rig.location = ball
         cam_d.lens = 45 + 5 * ease(s, s_meet, 0.95)
-        # the lid opens in view during the approach; the screen wakes as it finishes
-        sl0, sl1 = S_AIM - 0.04, min(S_AIM + 0.2, 0.9)   # the lid opens once the laptop is framed
-        hinge.rotation_euler.x = shut + (opened - shut) * ease(s, sl0, sl1)
         fill.energy = fill_e * ease(s, sl0 - 0.05, sl1)
         glow.energy = glow_e * ease(s, sl1, sl1 + 0.06)
         emit.default_value = emit_s if s >= sl1 else 0.0
