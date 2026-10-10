@@ -364,17 +364,38 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
 .m-sol { padding: calc(var(--u) * 64) calc(var(--u) * 16) calc(var(--u) * 72); }
 .m-sol .title { font-size: calc(var(--u) * 44); }
 .m-sol .body { font-size: calc(var(--u) * 16); margin-top: calc(var(--u) * 18); }
-/* phone replica: the same panels, stacked; one opens downward */
-.m-site { --s: var(--u); margin-top: calc(var(--u) * 32); border-radius: calc(var(--u) * 18); background: var(--site); padding: calc(var(--u) * 12); box-shadow: 0 0 0 calc(var(--u) * 1) rgba(156,131,251,.18), 0 calc(var(--u) * 20) calc(var(--u) * 60) calc(var(--u) * -20) rgba(138,56,245,.5); font-family: var(--mich); color: #fff; }
-.m-site .panels { flex-direction: column; height: calc(var(--u) * 560); gap: calc(var(--u) * 8); }
-.m-site .pan[aria-selected="true"] { flex-grow: 6; }
-.m-site .pan-name { font-size: calc(var(--u) * 12); }
-.m-site .pan-body { padding: calc(var(--u) * 18); }
-.m-site .pan-title { font-size: calc(var(--u) * 18); }
-.m-site .pan-desc { font-size: calc(var(--u) * 9.5); margin-top: calc(var(--u) * 12); }
-.m-site .pan-art { top: calc(var(--u) * 16); transform: scale(.82); transform-origin: 50% 0; }
-.m-site .s-chapters { position: static; margin-top: calc(var(--u) * 10); height: auto; grid-template-columns: 1fr 1fr; padding: calc(var(--u) * 6); }
-.m-site .chap { height: calc(var(--u) * 44); font-size: calc(var(--u) * 12); letter-spacing: .1em; }
+/* phone story: the same site, stacked; --s is a 390th of the phone frame */
+.m-story { margin: calc(var(--u) * 28) 0 0; }
+.site.is-phone { height: calc(var(--s) * 720); border-radius: calc(var(--s) * 18); }
+.site.is-phone::before { top: calc(var(--s) * 260); width: calc(var(--s) * 420); height: calc(var(--s) * 420); }
+.is-phone .s-nav { left: calc(var(--s) * 14); right: calc(var(--s) * 14); top: calc(var(--s) * 14); height: calc(var(--s) * 32); }
+.is-phone .s-links, .is-phone .s-btns { display: none; }
+.is-phone .s-logo { font-size: calc(var(--s) * 16); }
+.is-phone .s-cta { height: calc(var(--s) * 28); padding: 0 calc(var(--s) * 10); font-size: calc(var(--s) * 7); }
+.is-phone .s-head { top: calc(var(--s) * 64); padding: 0 calc(var(--s) * 14); }
+.is-phone .s-head h4 { font-size: calc(var(--s) * 14); line-height: 1.25; }
+.site.is-phone .s-head p, .is-phone .s-caps { font-size: calc(var(--s) * 9.5); }
+.is-phone .s-stage { left: calc(var(--s) * 10); right: calc(var(--s) * 10); top: calc(var(--s) * 128); height: calc(var(--s) * 582); }
+.is-phone .s-body { left: calc(var(--s) * 18); right: calc(var(--s) * 18); top: calc(var(--s) * 136); bottom: calc(var(--s) * 132); }
+.is-phone .panels { flex-direction: column; gap: calc(var(--s) * 8); }
+.is-phone .pan[aria-selected="true"] { flex-grow: 6; }
+.is-phone .pan-name { font-size: calc(var(--s) * 11); }
+.is-phone .pan-body { padding: calc(var(--s) * 16); }
+.is-phone .pan-title { font-size: calc(var(--s) * 16); }
+.is-phone .pan-desc { font-size: calc(var(--s) * 10.5); line-height: 1.6; margin-top: calc(var(--s) * 10); }
+.is-phone .pan-art { top: calc(var(--s) * 10); transform: scale(.78); transform-origin: 50% 0; }
+.is-phone .pan.stat .pan-name { top: 50%; transform: translateY(-50%); left: calc(var(--s) * 16); font-size: calc(var(--s) * 12); }
+.is-phone .stat-num { font-size: calc(var(--s) * 26); }
+.is-phone .stat-desc { font-size: calc(var(--s) * 10.5); }
+.is-phone .wires { display: none; }
+.is-phone .engines { top: 0; height: 100%; display: flex; flex-direction: column; gap: calc(var(--s) * 10); padding: 0; }
+.is-phone .engines::before { content: ""; position: absolute; left: 50%; top: calc(var(--s) * -8); bottom: calc(var(--s) * -8); border-left: 1px dashed rgba(156,131,251,.5); z-index: -1; }
+.is-phone .eng { flex: 1; padding: calc(var(--s) * 14) calc(var(--s) * 16); }
+.is-phone .eng h5 { font-size: calc(var(--s) * 15); }
+.site.is-phone .eng-x { font-size: calc(var(--s) * 9.5); }
+.site.is-phone .eng-d { font-size: calc(var(--s) * 10.5); margin-top: calc(var(--s) * 8); }
+.is-phone .s-chapters { left: calc(var(--s) * 18); right: calc(var(--s) * 18); bottom: calc(var(--s) * 18); height: auto; grid-template-columns: 1fr 1fr; grid-auto-rows: calc(var(--s) * 44); padding: calc(var(--s) * 6); gap: calc(var(--s) * 6); }
+.is-phone .chap { font-size: calc(var(--s) * 11); letter-spacing: .1em; }
 
 /* nav-motion demo (board) */
 .replay { font: 500 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #111113; background: #e6e6ea; border: 0; border-radius: 999px; height: 32px; padding: 0 16px; cursor: pointer; }
@@ -750,64 +771,8 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
       <div class="m-sol">
         <h2 class="title">Solution</h2>
         <p class="body"><span class="lead">One screen, everything.</span> I rebuilt the information architecture around the meeting, not the scroll.</p>
-        <div class="m-site" data-replica>
-          <div class="panels" role="tablist" aria-label="What Cyvore does">
-            <button aria-label="Security" class="pan" role="tab" aria-selected="true">
-                <span class="pan-name" aria-hidden="true">SECURITY</span>
-                <span class="pan-body">
-                  <span class="pan-art" aria-hidden="true">
-                    <span class="card bit" style="left:calc(50% + var(--s) * -124);top:0;--r:-1.5deg;--d:0"><svg class="ic"><use href="#i-user"/></svg>Got a business offer from WhatsApp Business</span>
-                    <span class="card bit" style="left:calc(50% + var(--s) * -84);top:calc(var(--s) * 74);--r:3deg;--d:1"><svg class="ic"><use href="#i-mail"/></svg>Received a suspicious email</span>
-                    <span class="card bit" style="left:calc(50% + var(--s) * -110);top:calc(var(--s) * 140);width:calc(var(--s) * 150);--r:-1deg;--d:2"><svg class="ic"><use href="#i-phone"/></svg>Called back to an unknown number</span>
-                  </span>
-                  <span class="pan-title">SECURITY</span>
-                  <span class="pan-desc">Secures employee activity and AI agent operations, internally and externally.</span>
-                </span>
-              </button>
-              <button aria-label="Exposure" class="pan" role="tab" aria-selected="false">
-                <span class="pan-name" aria-hidden="true">EXPOSURE</span>
-                <span class="pan-body">
-                  <span class="pan-art" aria-hidden="true"><span class="chain">
-                    <span class="link bit" style="--d:0"><svg class="ic"><use href="#i-at"/></svg></span>
-                    <span class="link bit" style="--d:1"><svg class="ic"><use href="#i-headphones"/></svg></span>
-                    <span class="link bit" style="--d:2"><svg class="ic"><use href="#i-link-out"/></svg></span>
-                    <span class="link last bit" style="--d:3"><svg class="ic"><use href="#i-pin"/></svg></span>
-                  </span></span>
-                  <span class="pan-title">EXPOSURE</span>
-                  <span class="pan-desc">Exposes the complete chain of events to stop phishing and fraud.</span>
-                </span>
-              </button>
-              <button aria-label="Coverage" class="pan" role="tab" aria-selected="false">
-                <span class="pan-name" aria-hidden="true">COVERAGE</span>
-                <span class="pan-body">
-                  <span class="pan-art" aria-hidden="true"><span class="tiles">
-                    <span class="tile word bit" style="--d:0">zoom</span><span class="tile bit" style="--d:1">T</span><span class="tile bit" style="--d:2">#</span><span class="tile bit" style="--d:3"><svg class="ic"><use href="#i-chat"/></svg></span>
-                    <span class="tile bit" style="--d:4">M</span><span class="tile bit" style="--d:5"><svg class="ic"><use href="#i-cloud"/></svg></span><span class="tile bit" style="--d:6">O</span><span class="tile bit" style="--d:7">G</span>
-                    <span class="plus bit" style="--d:8"><svg class="ic"><use href="#i-plus"/></svg></span>
-                  </span></span>
-                  <span class="pan-title">COVERAGE</span>
-                  <span class="pan-desc">Covers Zoom, Teams, Slack, WhatsApp Business, email, CRM systems, and beyond.</span>
-                </span>
-              </button>
-              <button aria-label="Enables" class="pan" role="tab" aria-selected="false">
-                <span class="pan-name" aria-hidden="true">ENABLES</span>
-                <span class="pan-body">
-                  <span class="pan-art" aria-hidden="true"><span class="iocs">
-                    <span class="ioc bit" style="--d:0"><b>zoom</b>Manipulation behavior during zoom call</span>
-                    <span class="ioc bit" style="--d:1"><b><svg class="ic"><use href="#i-user"/></svg></b>AI image of company representative</span>
-                    <span class="ioc bit" style="--d:2"><b><svg class="ic"><use href="#i-mail"/></svg></b>New business inquiry via email</span>
-                  </span></span>
-                  <span class="pan-title">ENABLES</span>
-                  <span class="pan-desc">Enables precise investigation of every Indicator of Compromise (IOC).</span>
-                </span>
-              </button>
-          </div>
-          <div class="s-chapters" role="tablist" aria-label="Chapters">
-            <button class="chap" role="tab" aria-selected="true">Why it matters</button>
-            <button class="chap" role="tab" aria-selected="false" aria-disabled="true">The risk is real</button>
-            <button class="chap" role="tab" aria-selected="false" aria-disabled="true">Real-world attack</button>
-            <button class="chap" role="tab" aria-selected="false" aria-disabled="true">What powers us</button>
-          </div>
+        <div class="story m-story" data-story="phone" data-clone="desktop">
+          <div class="story-track"><div class="story-pin"></div></div>
         </div>
       </div>
       <div class="m-gap">How it works · Challenges · Impact · Next</div>
@@ -816,9 +781,9 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
       <h3>Phone</h3>
       <ol>
         <li>The hero keeps the same loop, full width, under the line.</li>
-        <li>The replica stacks: the four columns become rows, and the open one grows downward. Tap opens; there is no hover to rely on.</li>
-        <li>The chapter bar drops under the stack as a 2 × 2 grid, each tab 44px tall. On the phone board only the first chapter is wired.</li>
-        <li>Reduced motion: panels switch without growing, the pieces appear without travel, the videos show their poster frame.</li>
+        <li>The story is the same twelve beats, pinned: columns become rows and open downward; the statistics stack the same way; the engines stack along a dashed line.</li>
+        <li>The chapter bar sits under the stage as a 2 × 2 grid, each tab at least 44px tall, and still jumps.</li>
+        <li>Reduced motion: four still screens, fully open, nothing pinned.</li>
       </ol>
     </div>
   </div>

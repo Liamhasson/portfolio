@@ -266,3 +266,45 @@ test.describe("attack and engines", () => {
     expect((await story(page).state()).caption).toBe(-1);
   });
 });
+
+test.describe("reduced motion", () => {
+  test.use({ reducedMotion: "reduce" });
+
+  test("four still screens, one per chapter, nothing pinned", async ({ page }) => {
+    await page.goto("/cyvore-mockups.html", { waitUntil: "load" });
+    await page.waitForFunction(() => (window as any).__cyvoreStories?.desktop);
+    const s = await page.evaluate(() => (window as any).__cyvoreStories.desktop.state());
+    expect(s).toEqual({ static: true, copies: 4 });
+    const story = page.locator('.story[data-story="desktop"]');
+    await expect(story.locator(".site")).toHaveCount(4);
+    expect(await story.locator(".story-pin").evaluate((el) => getComputedStyle(el).position)).toBe("static");
+    await expect(story.locator('.site [data-chapter="risk"].is-on .stat-num').first()).toHaveText("2,535%");
+    const lit = await story.locator('.site [data-chapter="powers"].is-on .eng').evaluateAll((els) =>
+      els.map((e) => parseFloat(getComputedStyle(e).getPropertyValue("--lit"))));
+    expect(lit).toEqual([1, 1, 1]);
+    await expect(story.locator('.site [data-chapter="attack"].is-on .s-caps li')).toHaveCount(3);
+  });
+});
+
+test.describe("phone", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/cyvore-mockups.html", { waitUntil: "load" });
+    await page.waitForFunction(() => (window as any).__cyvoreStories?.phone);
+  });
+
+  test("the phone tells the same story, stacked", async ({ page }) => {
+    await story(page, "phone").go(3);
+    expect((await story(page, "phone").state()).open.why).toBe(2);
+    const dir = await page.$eval('.story[data-story="phone"] [data-chapter="why"] .panels', (el) => getComputedStyle(el).flexDirection);
+    expect(dir).toBe("column");
+    await story(page, "phone").go(5);
+    expect((await story(page, "phone").state()).visible).toEqual(["risk"]);
+  });
+
+  test("the phone's chapter bar is a 2 × 2 grid of 44px-or-taller tabs", async ({ page }) => {
+    const tabs = await page.$$eval('.story[data-story="phone"] .chap', (els) => els.map((e) => e.getBoundingClientRect().height));
+    const frame = await page.$eval('.story[data-story="phone"]', (el) => el.closest(".frame")!.getBoundingClientRect().width / 390);
+    expect(tabs).toHaveLength(4);
+    for (const h of tabs) expect(h / frame).toBeGreaterThanOrEqual(44);
+  });
+});

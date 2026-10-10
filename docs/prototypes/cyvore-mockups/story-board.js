@@ -253,11 +253,45 @@ export function mountStory(story, name) {
   return api;
 }
 
+/** Reduced motion: no pin, no scrub. Four still copies of the site, each on its chapter, fully open. */
+export function mountStatic(story, name) {
+  const site = story.querySelector(".site");
+  story.classList.add("is-static");
+  const copies = CHAPTERS.map((ch, idx) => {
+    const copy = site.cloneNode(true);
+    showOnly(copy, ch);
+    copy.querySelectorAll(".chap[data-go]").forEach((c) => {
+      const on = c.dataset.go === ch;
+      c.setAttribute("aria-selected", String(on));
+      c.style.setProperty("--fill", on ? "1" : "0");
+    });
+    copy.querySelector("[data-where]").textContent = `Chapter ${idx + 1} of ${CHAPTERS.length}`;
+    if (ch === "why" || ch === "risk") openPanel(listIn(copy, ch), 0, { instant: true });
+    if (ch === "attack") copy.querySelectorAll(".s-caps li").forEach((li) => li.classList.add("is-on"));
+    if (ch === "powers") powersTimeline(copy).progress(1);
+    bindPanels(copy, { instant: true });
+    return copy;
+  });
+  copies.forEach((copy) => copy.querySelectorAll(".chap[data-go]").forEach((c) => {
+    c.addEventListener("click", () => copies[CHAPTERS.indexOf(c.dataset.go)].scrollIntoView({ block: "center" }));
+  }));
+  site.replaceWith(...copies);
+  (window.__cyvoreStories ||= {})[name] = { state: () => ({ static: true, copies: copies.length }) };
+}
+
 /* ---------- boot ---------- */
 
 function boot() {
-  document.querySelectorAll(".story[data-story]").forEach((story) => mountStory(story, story.dataset.story));
-  ScrollTrigger.refresh();
+  const stories = [...document.querySelectorAll(".story[data-story]")];
+  // The phone shows the same site: copy it in before anything mutates it.
+  stories.filter((s) => s.dataset.clone).forEach((story) => {
+    const src = document.querySelector(`.story[data-story="${story.dataset.clone}"] .site`);
+    const copy = src.cloneNode(true);
+    copy.classList.add("is-phone");
+    story.querySelector(".story-pin").append(copy);
+  });
+  stories.forEach((story) => (reduce ? mountStatic : mountStory)(story, story.dataset.story));
+  if (!reduce) ScrollTrigger.refresh();
 }
 
 document.fonts.ready.then(boot);
