@@ -43,9 +43,11 @@ export const SAND_LOOK = {
   drift: 0.012,
   driftFreq: 0.9,
   driftSpeed: 0.05,
-  cursor: 5.0,          // the cursor light's strength (fades with the pointer): ~2x the key on the grains it touches
+  // the cursor on the main sand at a tenth of its first strength (Liam, 2026-10-10: it read as too strong); the grains
+  // drifting off the sand (drift-grains.ts) keep the full strength, as Lusion's do
+  cursor: 0.5,          // the cursor light's strength (fades with the pointer)
   cursorReach: 0.9,     // world units
-  paintScale: 0.1,      // seconds: drift velocity -> grain offset
+  paintScale: 0.01,     // seconds: drift velocity -> grain offset
   frontK: 1.0,          // the drift reaches only grains with little sand between them and the viewer (0 = all grains)
   frontFalloff: 0.25,   // transmittance below which a grain counts as behind
 };

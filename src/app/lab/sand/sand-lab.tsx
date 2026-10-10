@@ -14,6 +14,7 @@ import { attemptAt } from "@/three/sand/attempts";
 import { BakedDesk } from "@/three/sand/baked-desk";
 import { revealAt } from "@/three/sand/screen-reveal";
 import { GlassBall } from "@/three/sand/glass-ball";
+import { DriftGrains } from "@/three/sand/drift-grains";
 import { EXRLoader } from "three/addons/loaders/EXRLoader.js";
 import { SAND_ENCODE, SAND_LAYER, SandComposite } from "@/three/sand/sand-composite";
 import { Pullback } from "@/three/sand/pullback";
@@ -75,6 +76,16 @@ function fall(s: number): number {
   const x = (s - SHIP.contact) / (1 - SHIP.contact) * 6;   // critically damped: the wood takes the last millimetre
   return Math.min(1 - eps * (1 + x) * Math.exp(-x), 1);
 }
+/**
+ * The scene leans with the cursor (Lusion's camera, read from their code 2026-10-10): the camera turns toward it by up to
+ * LEAN radians (their about hero settles at 0.035), closing 10% of the gap each 60 fps frame; the scene moves the way
+ * the cursor goes. A finger leans it while it touches. It eases out where precision matters: the glass landing, the
+ * index taking over the screen.
+ */
+const LEAN = 0.035;
+const LEAN_DAMP = -Math.log(1 - 0.1) * 60;   // their per-frame 0.1 at 60 fps, as a rate
+/** The floating grains' density through the page (Liam: strong in the hero, sparse over the desk, none on the index). */
+const DRIFT = { hero: 1, desk: 0.12 } as const;
 /** smootherstep of t over [a, b] (Blender's ease in lookdev.py). */
 function ease(t: number, [a, b]: readonly [number, number]): number {
   const x = Math.min(Math.max((t - a) / (b - a), 0), 1);
@@ -225,6 +236,12 @@ export function SandLab() {
         stage.scene.add(frost.mesh);
       }
       if (glass) (window as unknown as { __frost?: (l: Parameters<GlassBall["setLook"]>[0]) => void }).__frost = (l) => glass.setLook(l);
+      // grains leaving the sand: the scene's atmosphere (drift-grains.ts)
+      const drift = new DriftGrains(field.material, tier === "low" ? 600 : 1600);
+      drift.points.layers.set(SAND_LAYER);
+      stage.scene.add(drift.points);
+      const lean = new THREE.Vector2();     // the eased lean, -1..1 each way
+      const leanQ = new THREE.Quaternion(), leanE = new THREE.Euler();
       if (pullback) stage.scene.add(pullback.plate);
       let shadow: BallShadow | null = null;
       // the shadow: lamp radius (hero units), strength, and the ball's effective solid size (its edge is sparse sand)
@@ -463,6 +480,23 @@ export function SandLab() {
           field!.setAttempt(ax > 0 ? lo : 1, brk, dep, attUp);
           const v = move.view(f);
           stage!.setView(v.position, v.quaternion, v.lens);
+          // the lean: toward the cursor (or a touching finger), eased; out over the landing and the index takeover
+          {
+            const W = canvas.clientWidth || 1, H = canvas.clientHeight || 1;
+            const want = pointer.active
+              ? new THREE.Vector2(Math.min(Math.max((pointer.x / W) * 2 - 1, -1), 1), Math.min(Math.max(1 - (pointer.y / H) * 2, -1), 1))
+              : new THREE.Vector2();
+            const k = 1 - Math.exp(-LEAN_DAMP * dt);
+            lean.lerp(reduced || calibrating || holdDescend ? new THREE.Vector2() : want, k);
+            const pg = progressRef.current;
+            const landing = ease(pg, [TL.ship[0] + 0.5 * (TL.ship[1] - TL.ship[0]), TL.ship[1]]) * (1 - ease(pg, [TL.ship[1] + 0.01, TL.ship[1] + 0.035]));
+            const w = (1 - landing) * (1 - ease(pg, [TL.takeover[0] - 0.02, TL.takeover[1]]));
+            if (w > 0.0001) {
+              leanE.set(-lean.y * LEAN * w, lean.x * LEAN * w, 0, "YXZ");
+              stage!.camera.quaternion.multiply(leanQ.setFromEuler(leanE));
+              stage!.camera.updateMatrixWorld();
+            }
+          }
           // 3: the live index over the screen's quad, crossfading in where they coincide, then settling into the view
           const ix = indexRef.current;
           if (ix && desk3d && push) {
@@ -626,6 +660,22 @@ export function SandLab() {
         cursorWorld.copy(cam.position).addScaledVector(dir, dist - 0.45);
         cursorI = damp(cursorI, pointer.active ? 1 : 0, pointer.active ? 5 : 2.5, dt);
         field!.setCursor(cursorWorld, cursorI);
+        // the grains leaving the sand: from the chaos's shell, then the ball's; thinning over the desk; none on the index
+        {
+          const cs = field!.material.uniforms.uChaosSize.value as THREE.Vector3;
+          const chaosR = 0.5 * Math.min(cs.x, cs.y, cs.z);
+          const ballR = field!.material.uniforms.uBallR.value as number;
+          const pg = progressRef.current;
+          const density = !hero ? DRIFT.hero
+            : THREE.MathUtils.lerp(DRIFT.hero, DRIFT.desk, ease(pg, TL.pullback)) * (1 - ease(pg, [TL.push[0], TL.push[0] + 0.06]));
+          const r = THREE.MathUtils.lerp(chaosR, ballR * 1.05, state.compact);
+          const um = field!.material.uniforms;
+          // the sand's own grain size (its largest grain x its look's scale x the tier's count scale), typical grain
+          const grainR = (um.uRadMax.value as number) * (um.uCountScale.value as number) * 0.7
+            * THREE.MathUtils.lerp((um.uRadScale.value as THREE.Vector2).x, (um.uRadScale.value as THREE.Vector2).y, state.compact);
+          drift.update(state.time, focus, r, reduced ? density * 0.5 : density, r * 3.5, grainR,
+            new THREE.Vector3(1.0, 0.9, 0.82).multiplyScalar(5.0 * cursorI));
+        }
         if (!reduced) {
           paint!.update(stage!.renderer, dt);
           field!.setPaint(paint!.texture, canvas.clientWidth, canvas.clientHeight);
