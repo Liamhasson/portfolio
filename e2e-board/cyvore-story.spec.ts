@@ -63,3 +63,70 @@ test.describe("markup", () => {
     expect(styles).toEqual({ pin: "sticky", frame: "clip", f: "clip" });
   });
 });
+
+type State = {
+  beat: number; chapter: string; settled: boolean; visible: string[];
+  open: { why: number; risk: number }; fill: Record<string, number>;
+  caption: number; lit: number[]; statText: string | null;
+};
+
+const story = (page: Page, name = "desktop") => ({
+  state: () => page.evaluate((n) => (window as any).__cyvoreStories[n].state(), name) as Promise<State>,
+  go: async (beat: number, within = 0.5) => {
+    await page.evaluate(([n, b, w]) => (window as any).__cyvoreStories[n].scrollToBeat(b, w), [name, beat, within] as const);
+    await page.waitForFunction(([n, b]) => {
+      const s = (window as any).__cyvoreStories[n].state();
+      return s.beat === b && s.settled;
+    }, [name, beat] as const);
+  },
+});
+
+test.describe("beats", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/cyvore-mockups.html", { waitUntil: "load" });
+    await page.waitForFunction(() => (window as any).__cyvoreStories?.desktop);
+  });
+
+  test("the site arrives with every column closed", async ({ page }) => {
+    await story(page).go(0, 0.5);
+    const s = await story(page).state();
+    expect(s.chapter).toBe("why");
+    expect(s.open.why).toBe(-1);
+  });
+
+  test("each beat of Why it matters opens the next column", async ({ page }) => {
+    for (const [beat, col] of [[1, 0], [2, 1], [3, 2], [4, 3]] as const) {
+      await story(page).go(beat);
+      expect((await story(page).state()).open.why).toBe(col);
+    }
+  });
+
+  test("The risk is real opens its statistics in turn and counts each one up to its value", async ({ page }) => {
+    await story(page).go(7);
+    await page.waitForTimeout(1500);
+    const s = await story(page).state();
+    expect(s.chapter).toBe("risk");
+    expect(s.open.risk).toBe(2);
+    expect(s.statText).toBe("967%");
+  });
+
+  test("the bar fills with the story and marks finished chapters", async ({ page }) => {
+    await story(page).go(6, 0.5);
+    const s = await story(page).state();
+    expect(s.fill.why).toBe(1);
+    expect(s.fill.risk).toBeCloseTo(0.375, 2);
+    expect(s.fill.attack).toBe(0);
+    await expect(page.locator('.story[data-story="desktop"] .chap[data-go="why"]')).toHaveAttribute("data-done", "");
+  });
+
+  test("a column the visitor picks gives way to the next beat", async ({ page }) => {
+    await story(page).go(2);
+    // Click where it is on screen, as a mouse does: locator.click() would first scroll the
+    // element into view, and inside a sticky pin that scroll moves the story itself.
+    const box = (await page.locator('.story[data-story="desktop"] [data-chapter="why"] .pan[aria-label="Enables"]').boundingBox())!;
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    expect((await story(page).state()).open.why).toBe(3);
+    await story(page).go(3);
+    expect((await story(page).state()).open.why).toBe(2);
+  });
+});
