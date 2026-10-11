@@ -4,7 +4,6 @@ import { EXRLoader } from "three/addons/loaders/EXRLoader.js";
 import { RectAreaLightUniformsLib } from "three/addons/lights/RectAreaLightUniformsLib.js";
 import { REVEAL, type RevealFrame } from "./screen-reveal";
 import { holdLoop, loopVideo } from "./card-loops";
-import type { GlassLights } from "./glass-ball";
 
 /**
  * The desk as a real 3D object (lookdev.py --scene bakedesk), drawn the way Cycles drew the plates:
@@ -155,9 +154,9 @@ function withExactFresnel(material: THREE.Material, eta: number): void {
 const BLACK = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1);
 BLACK.needsUpdate = true;
 
-const LUT_N = 64;
 const LUT_MIN = -12.47393; // log2(2^-10 * 0.18)
 const LUT_MAX = 4.026069; // log2(2^6.5 * 0.18)
+const LUT_N = 64;
 
 /** Shared by every desk material: the lighting state (0..1 each) as the lid opens and the screen wakes. */
 const STATE = { uOpen: { value: 0 }, uLit: { value: 0 } };
@@ -496,35 +495,10 @@ export class BakedDesk {
   readonly group = new THREE.Group();
   readonly materials: THREE.MeshPhysicalMaterial[] = [];
   readonly lights: { name: string; light: THREE.SpotLight | THREE.RectAreaLight | THREE.PointLight; base: number; follows?: string; watts: number; radius: number }[] = [];
-  /** For the glass: the room unfiltered (equirectangular, scene-linear), the view transform and its grey-axis inverse. */
-  env: THREE.DataTexture | null = null;
+  /** The view transform (Blender's AgX Punchy) as a 3D LUT. */
   lut: THREE.Data3DTexture | null = null;
-  invLut: THREE.DataTexture | null = null;
   /** Hero units per metre. */
   heroPerMetre = 10;
-
-  /** The lights as the glass sees them (it shows them in reflection and through it): the lamp as its sphere, the
-   *  panels as rectangles, each at its radiance now. */
-  glassLights(): GlassLights {
-    this.group.updateMatrixWorld(true);
-    const lamp = this.lights.find((l) => l.name === "lamp")!;
-    const r = lamp.radius;                                        // metres
-    const lampRad = new THREE.Vector3(lamp.light.color.r, lamp.light.color.g, lamp.light.color.b)
-      .multiplyScalar(lamp.watts / (4 * Math.PI * Math.PI * r * r));   // a sphere light's radiance
-    const q = new THREE.Quaternion();
-    const rects = this.lights.filter((l) => l.light instanceof THREE.RectAreaLight).map((l) => {
-      const light = l.light as THREE.RectAreaLight;
-      light.getWorldQuaternion(q);
-      return {
-        center: light.getWorldPosition(new THREE.Vector3()),
-        halfU: new THREE.Vector3(1, 0, 0).applyQuaternion(q).multiplyScalar(light.width / 2),
-        halfV: new THREE.Vector3(0, 1, 0).applyQuaternion(q).multiplyScalar(light.height / 2),
-        dir: new THREE.Vector3(0, 0, -1).applyQuaternion(q),
-        radiance: new THREE.Vector3(light.color.r, light.color.g, light.color.b).multiplyScalar(light.intensity),
-      };
-    });
-    return { lamp: { pos: lamp.light.getWorldPosition(new THREE.Vector3()), radius: r * this.heroPerMetre, radiance: lampRad }, rects };
-  }
   screen: { material: THREE.MeshPhysicalMaterial; emission: number; reveal: Record<string, THREE.IUniform> } | null = null;
   /** The cards' loops on the screen (played while it is awake). */
   media: string[] = [];
@@ -653,37 +627,19 @@ export class BakedDesk {
     lut.minFilter = lut.magFilter = THREE.LinearFilter;
     lut.wrapS = lut.wrapT = lut.wrapR = THREE.ClampToEdgeWrapping;
     lut.needsUpdate = true;
-    // its grey axis inverted (display -> scene-linear), for the glass reading what the desk drew
-    const grey: number[] = [];
-    for (let i = 0; i < LUT_N; i++) {
-      const o = ((i * LUT_N + i) * LUT_N + i) * 3;
-      grey.push((rgb[o] + rgb[o + 1] + rgb[o + 2]) / (3 * 255));
-    }
-    const inv = new Float32Array(256);
-    for (let j = 0; j < 256; j++) {
-      const dv = j / 255;
-      let i = 0;
-      while (i < LUT_N - 2 && grey[i + 1] < dv) i++;
-      const f = Math.min(Math.max((dv - grey[i]) / Math.max(grey[i + 1] - grey[i], 1e-6), 0), 1);
-      const x = (i + f) / (LUT_N - 1);
-      inv[j] = 2 ** (LUT_MIN + x * (LUT_MAX - LUT_MIN));
-    }
-    const invLut = new THREE.DataTexture(inv, 256, 1, THREE.RedFormat, THREE.FloatType);
-    invLut.minFilter = invLut.magFilter = THREE.LinearFilter;
-    invLut.needsUpdate = true;
-
     const pmrem = new THREE.PMREMGenerator(renderer);
     const prefilter = (t: THREE.DataTexture) => {
       t.mapping = THREE.EquirectangularReflectionMapping;
-      return pmrem.fromEquirectangular(t).texture;   // the source stays: the glass reflects the room sharp
+      return pmrem.fromEquirectangular(t).texture;
     };
     const envMap = prefilter(probe);
     pmrem.dispose();
+    probe.dispose();   // (only its prefiltered levels are used)
 
     const sanitize = (n: string) => THREE.PropertyBinding.sanitizeNodeName(n);
     const metaByNode = new Map(Object.entries(meta.materials).map(([k, v]) => [sanitize(k), v]));
     const d = new BakedDesk();
-    d.env = probe; d.lut = lut; d.invLut = invLut; d.heroPerMetre = 1 / meta.chaos_scale;
+    d.lut = lut; d.heroPerMetre = 1 / meta.chaos_scale;
     const pending: Promise<void>[] = [];
     gltf.scene.traverse((o) => {
       const mesh = o as THREE.Mesh;

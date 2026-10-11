@@ -122,18 +122,8 @@ export class SandField {
         uBallVolC: { value: new THREE.Vector3(...meta.ball.center) },
         uBallVolS: { value: 1 },
         uBallGrain: { value: 1 },
-        uAttUp: { value: new THREE.Vector3(0, 1, 0) },
-        uAttLo: { value: 1 },
-        uAttBreak: { value: 0 },
-        uAttDepth: { value: 0 },
-        uAttFull: { value: 0 },
-        uMelt: { value: 0 },
-        uMeltUp: { value: new THREE.Vector3(0, 0, 1) },
-        uDrain: { value: 0 },
-        uSinkClear: { value: 0.9 },
         uBufH: { value: 1 },
         uShutter: { value: 1 / 60 },   // motion blur: the grain's travel over this long, on screen
-        uClearAlb: { value: new THREE.Vector3(0.58, 0.44, 0.36) },   // calibrated with the frost skin (frost-skin.ts)
         uBallRot: { value: this.ballRot },
         uChaosC: { value: this.chaosCentre() },
         uChaosRot: { value: this.chaosRot },
@@ -306,27 +296,9 @@ export class SandField {
     (u.uUpView.value as THREE.Vector3).set(0, 1, 0).transformDirection(camera.matrixWorldInverse);
   }
 
-  /** 2.2: the current attempt (lo 1 = none; lower = a bigger patch), how broken, how clear; `up` faces the patch. */
-  /** 2.3 build: how far the held attempt's clearing has swept over the whole ball (0..1), how far the grains have
-   *  drained into the frost (0..1, gone at 1), and how far the frost has cleared into glass (0..1, a wave). */
-  setBuild(full: number, drain: number, melt: number): void {
-    const u = this.material.uniforms;
-    u.uAttFull.value = full;
-    u.uDrain.value = drain;
-    u.uMelt.value = melt;
-  }
-
   /** The ball's turn now (object -> world). */
   get ballRotation(): THREE.Matrix3 {
     return this.material.uniforms.uBallRot.value as THREE.Matrix3;
-  }
-
-  setAttempt(lo: number, breakup: number, depth: number, up?: THREE.Vector3): void {
-    const u = this.material.uniforms;
-    u.uAttLo.value = lo;
-    u.uAttBreak.value = breakup;
-    u.uAttDepth.value = depth;
-    if (up) (u.uAttUp.value as THREE.Vector3).copy(up);
   }
 
   /** The cursor as a light: world position and intensity 0..1 (fades with the pointer). */

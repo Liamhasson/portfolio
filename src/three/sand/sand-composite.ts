@@ -1,5 +1,4 @@
 import * as THREE from "three";
-import { GLASS_LAYER, type GlassBall } from "./glass-ball";
 
 /**
  * The sand as Cycles sees it: drawn into its own multisampled layer in linear light (no tone mapping yet), softened by
@@ -47,15 +46,6 @@ void main() {
 }
 `;
 
-const COPY_FRAGMENT = /* glsl */ `
-precision highp float;
-out highp vec4 pc_fragColor;
-#define gl_FragColor pc_fragColor
-in vec2 vUv;
-uniform sampler2D uTex;
-void main() { gl_FragColor = vec4(texture(uTex, vUv).rgb, 1.0); }
-`;
-
 const DISC_FRAGMENT = /* glsl */ `
 precision highp float;
 out highp vec4 pc_fragColor;
@@ -89,14 +79,8 @@ void main() { gl_FragColor = texture(uTex, vUv); }
 export class SandComposite {
   private readonly rt: THREE.WebGLRenderTarget;
   private readonly blurRt: THREE.WebGLRenderTarget;
-  /** 2.3: the glass, drawn between the desk and the sand; it looks through the desk as drawn into `bg`. */
-  glass: GlassBall | null = null;
   private bg: THREE.WebGLRenderTarget | null = null;
-  private readonly copyScene = new THREE.Scene();
-  private readonly copy = new THREE.ShaderMaterial({
-    glslVersion: THREE.GLSL3, vertexShader: VERTEX, fragmentShader: COPY_FRAGMENT,
-    depthTest: false, depthWrite: false, toneMapped: false, uniforms: { uTex: { value: null } },
-  });
+
   /** The desk out of focus onto the screen. */
   private readonly discScene = new THREE.Scene();
   private readonly disc = new THREE.ShaderMaterial({
@@ -109,14 +93,6 @@ export class SandComposite {
   private readonly raw = new THREE.ShaderMaterial({
     glslVersion: THREE.GLSL3, vertexShader: VERTEX, fragmentShader: OVER_FRAGMENT,
     depthTest: false, depthWrite: false, toneMapped: false, blending: THREE.NoBlending, uniforms: { uTex: { value: null } },
-  });
-  /** The glass drawn smaller (where it fills the view), laid over the screen: premultiplied (its target clears to none). */
-  private glassRt: THREE.WebGLRenderTarget | null = null;
-  private readonly overScene = new THREE.Scene();
-  private readonly over = new THREE.ShaderMaterial({
-    glslVersion: THREE.GLSL3, vertexShader: VERTEX, fragmentShader: OVER_FRAGMENT,
-    transparent: true, blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
-    depthTest: false, depthWrite: false, toneMapped: false, uniforms: { uTex: { value: null } },
   });
   private readonly quad: THREE.Mesh;
   private readonly material: THREE.ShaderMaterial;
@@ -152,57 +128,38 @@ export class SandComposite {
     this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.material);
     this.quad.frustumCulled = false;
     this.scene.add(this.quad);
-    const copyQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.copy);
-    copyQuad.frustumCulled = false;
-    this.copyScene.add(copyQuad);
     const discQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.disc);
     discQuad.frustumCulled = false;
     this.discScene.add(discQuad);
     const rawQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.raw);
     rawQuad.frustumCulled = false;
     this.rawScene.add(rawQuad);
-    const overQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.over);
-    overQuad.frustumCulled = false;
-    this.overScene.add(overQuad);
   }
 
-  /** The desk drawn into a target with its depth (display values, as drawn), for the glass to look through. */
+  /** The desk drawn into a target (display values, as drawn), for the passage's defocus. */
   private background(size: THREE.Vector2): THREE.WebGLRenderTarget {
     if (!this.bg || this.bg.width !== size.x || this.bg.height !== size.y) {
       this.bg?.dispose();
-      const depth = new THREE.DepthTexture(size.x, size.y);
-      depth.type = THREE.FloatType;
-      this.bg = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.UnsignedByteType, samples: 4, depthBuffer: true, depthTexture: depth });
+      this.bg = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.UnsignedByteType, samples: 4, depthBuffer: true });
       this.bg.texture.colorSpace = THREE.NoColorSpace;   // the desk writes display values already: stored as they are
-      this.bg.texture.generateMipmaps = true;              // frosted glass reads it blurred, by mip level
-      this.bg.texture.minFilter = THREE.LinearMipmapLinearFilter;
+      this.bg.texture.generateMipmaps = false;
+      this.bg.texture.minFilter = THREE.LinearFilter;
     }
     return this.bg;
-  }
-
-  /** The glass at 0.7 of the size. */
-  private glassTarget(size: THREE.Vector2): THREE.WebGLRenderTarget {
-    const w = Math.round(size.x * 0.7), h = Math.round(size.y * 0.7);
-    if (!this.glassRt || this.glassRt.width !== w || this.glassRt.height !== h) {
-      this.glassRt?.dispose();
-      this.glassRt = new THREE.WebGLRenderTarget(w, h, { type: THREE.UnsignedByteType, depthBuffer: false });
-      this.glassRt.texture.colorSpace = THREE.NoColorSpace;
-    }
-    return this.glassRt;
   }
 
   /** Compiles its own passes' shaders and makes its targets now, not on the frame each is first needed (stalls of up
    *  to 200 ms mid-scroll). */
   async warm(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): Promise<void> {
-    await Promise.all([this.scene, this.copyScene, this.overScene, this.rawScene, this.discScene].map((sc) => renderer.compileAsync(sc, this.ortho)));
+    await Promise.all([this.scene, this.rawScene, this.discScene].map((sc) => renderer.compileAsync(sc, this.ortho)));
     // and drawn once each way (the GPU builds its pipelines on a shader's first draw into each kind of target)
-    for (const mode of ["full", "small"] as const) {
-      this.force = mode;
+    const d = this.defocus;
+    for (const v of [0, 4]) {
+      this.defocus = v;
       this.render(renderer, scene, camera);
     }
-    this.force = null;
+    this.defocus = d;
   }
-  private force: "full" | "small" | null = null;
 
   /** Renders the frame: the sand layer into its target, the rest to the screen, then the filtered sand over it. */
   render(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): void {
@@ -222,45 +179,8 @@ export class SandComposite {
     renderer.setClearColor(clear, clearA);
     camera.layers.mask = mask;
     camera.layers.disable(SAND_LAYER);
-    camera.layers.disable(GLASS_LAYER);
     const autoClear = renderer.autoClear;
-    if (this.glass && (this.force || (this.glass.visible && this.glass.inView(camera as THREE.PerspectiveCamera)))) {
-      // the desk into its target (with depth), onto the screen as is, then the glass looking through it
-      const bg = this.background(size);
-      // the blurred reads (frost) need the desk's mip chain; clear glass reads it sharp (no mips: a full-size pass saved)
-      if (bg.texture.generateMipmaps !== this.glass.blurred) {
-        bg.texture.generateMipmaps = this.glass.blurred;
-        bg.texture.minFilter = this.glass.blurred ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter;
-        bg.texture.needsUpdate = true;
-      }
-      renderer.setRenderTarget(bg);
-      renderer.render(scene, camera);
-      renderer.setRenderTarget(null);
-      this.copy.uniforms.uTex.value = bg.texture;
-      renderer.render(this.copyScene, this.ortho);
-      this.glass.setBackground(bg.texture, bg.depthTexture!, size.x, size.y, camera as THREE.PerspectiveCamera);
-      camera.layers.set(GLASS_LAYER);
-      renderer.autoClear = false;
-      // where the glass fills most of the view (rushing at the lens, passing through it) every pixel traces the desk
-      // twice: it is drawn at 0.7 of the size (half the pixels) and laid over the screen (Liam, 2026-10-10: the frames
-      // there ran 10-17 ms at 120 Hz, and dropped frames read as jitter); it is all refraction there, no sharp edge
-      const cover = this.force ? (this.force === "small" ? 1 : 0) : this.glass.coverage(camera as THREE.PerspectiveCamera);
-      if (cover > 0.45) {
-        const grt = this.glassTarget(size);
-        this.glass.setTarget(grt.width, grt.height);
-        renderer.setRenderTarget(grt);
-        renderer.setClearColor(0x000000, 0);
-        renderer.clear();
-        renderer.render(scene, camera);
-        renderer.setRenderTarget(null);
-        renderer.setClearColor(clear, clearA);
-        this.over.uniforms.uTex.value = grt.texture;
-        renderer.render(this.overScene, this.ortho);
-      } else {
-        this.glass.setTarget(size.x, size.y);
-        renderer.render(scene, camera);
-      }
-    } else if (this.defocus > 0.5) {
+    if (this.defocus > 0.5) {
       // the desk into its target, a quarter-size copy, then onto the screen through the disc
       const bg = this.background(size);
       renderer.setRenderTarget(bg);
@@ -288,12 +208,9 @@ export class SandComposite {
   dispose(): void {
     this.rt.dispose();
     this.bg?.dispose();
-    this.glassRt?.dispose();
     this.blurRt.dispose();
     this.raw.dispose();
     this.disc.dispose();
-    this.copy.dispose();
-    this.over.dispose();
     this.material.dispose();
     this.quad.geometry.dispose();
   }
