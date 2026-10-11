@@ -70,6 +70,16 @@ if os.environ.get("SET_LIGHTS") == "hero":
         cam.data.dof.aperture_fstop = float(os.environ["SET_FSTOP"])
         print("CINE focus", round(cam.data.dof.focus_distance, 3), "m at f/", cam.data.dof.aperture_fstop)
 
+# SET_LAMP "watts,cone deg,blend,aim height" (Liam, 2026-10-11: the lamp brighter and tighter on the cloud, so the cloud
+# keeps the hero's pop while the desk stays in the same light): aimed at the cloud, its beam carries on to the desk
+if os.environ.get("SET_LAMP") and "lamp" in bpy.data.objects:
+    from mathutils import Vector
+    watts, cone, blend, aim_z = (float(v) for v in os.environ["SET_LAMP"].split(","))
+    lamp = bpy.data.objects["lamp"]
+    lamp.data.energy = watts; lamp.data.spot_size = math.radians(cone); lamp.data.spot_blend = blend
+    lamp.rotation_euler = (Vector((0.0, 0.03, aim_z)) - lamp.location).to_track_quat("-Z", "Y").to_euler()
+    print("CINE lamp", watts, "W", cone, "deg, blend", blend, "aimed at height", aim_z)
+
 if look == "new":
     for m in bpy.data.materials:
         if not m.use_nodes or not m.name.startswith("sand"):
@@ -91,6 +101,7 @@ if look == "new":
         bsdf.inputs["Subsurface Weight"].default_value = 0.6
         bsdf.inputs["Subsurface Radius"].default_value = (1.0, 0.45, 0.45)
         bsdf.inputs["Subsurface Scale"].default_value = 0.004 * float(os.environ.get("SET_GRAIN_SCALE", "0.07"))   # the desk's grains are ~1/14 the hero's
+        m["cine"] = 1
         print("CINE material", m.name)
     if os.environ.get("SET_WORLD") == "sand":
         import numpy as np
@@ -129,9 +140,31 @@ if look == "new":
         print("CINE spill on papers", int((zz > 0).sum()))
         pts = np.vstack([p1, p2]).astype(np.float32)
         r1, r2 = r1, r2
-        hh_spill = hh[hh > 0.3] if (hh > 0.3).any() else hh   # (the palette above its dark plum end)
+        # the ball's own sand tones: the bone, champagne and rose-gold end of the palette (lower read as a red puddle)
+        hh_spill = hh[hh > 0.45] if (hh > 0.45).any() else hh
         grains("spill", pts, rng.choice(hh_spill, len(pts)).astype(np.float32), np.concatenate([r1, r2]).astype(np.float32))
         print("CINE spilled sand", len(pts))
+        # its material made after the sand's was set: the cinematic palette and gloss too (it had the look-dev one: the
+        # red puddle), without the subsurface (through a dense pile it glows red)
+        for m in bpy.data.materials:
+            if m.use_nodes and m.name.startswith("sand") and m.get("cine") is None:
+                nt = m.node_tree
+                ramp = next((n for n in nt.nodes if n.type == "VALTORGB"), None)
+                b = nt.nodes.get("Principled BSDF")
+                if ramp is None or b is None:
+                    continue
+                els = ramp.color_ramp.elements
+                while len(els) > 2:
+                    els.remove(els[-1])
+                els[0].position, els[0].color = RAMP[0][0], srgb(RAMP[0][1])
+                els[1].position, els[1].color = RAMP[1][0], srgb(RAMP[1][1])
+                for pos, col in RAMP[2:]:
+                    e = els.new(pos); e.color = srgb(col)
+                b.inputs["Roughness"].default_value = 0.22
+                b.inputs["Specular IOR Level"].default_value = 0.5
+                b.inputs["Subsurface Weight"].default_value = 0.0
+                m["cine"] = 1
+                print("CINE spill material", m.name)
         # the set graded into the palette
         def tint(name, rgb):
             m = bpy.data.materials.get(name)
