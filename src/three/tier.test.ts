@@ -42,6 +42,14 @@ describe("settingsFor", () => {
     expect(settingsFor("low", 3).pixelRatio).toBe(1);
     expect(settingsFor("high", 1).pixelRatio).toBe(1);
   });
+  test("each tier's grain range: a floor, a start and the most it loads (the governor moves between them)", () => {
+    for (const t of ["high", "mid", "low"] as const) {
+      const s = settingsFor(t, 2);
+      expect(s.grainsMin).toBeLessThan(s.grainsStart);
+      expect(s.grainsStart).toBeLessThanOrEqual(s.grains);
+    }
+    expect(settingsFor("high", 2).grainsMin).toBeGreaterThanOrEqual(150_000);   // the sand never thins to the blocky look
+  });
   test("shadow march steps shrink with the tier; low has no antialiasing", () => {
     expect(settingsFor("high", 2).shadowSteps).toBeGreaterThan(settingsFor("mid", 2).shadowSteps);
     expect(settingsFor("mid", 2).shadowSteps).toBeGreaterThan(settingsFor("low", 2).shadowSteps);

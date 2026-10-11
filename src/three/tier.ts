@@ -12,8 +12,11 @@ export interface TierSignals {
 
 export interface TierSettings {
   tier: QualityTier;
-  /** How many sand grains to draw (a prefix of the shuffled data). */
+  /** How many sand grains to load: the most it may draw (a prefix of the shuffled data). */
   grains: number;
+  /** The grain governor's range (quality.ts GrainGovernor): never fewer than this, and where it starts. */
+  grainsMin: number;
+  grainsStart: number;
   pixelRatio: number;
   /** Steps of the light march through the density volume (self-shadowing inside the sand). */
   shadowSteps: number;
@@ -33,6 +36,9 @@ export function pickTier(s: TierSignals, override?: QualityTier): QualityTier {
 }
 
 const GRAINS: Record<QualityTier, number> = { high: 400_000, mid: 160_000, low: 60_000 };
+// (an M1 Pro holds ~200k at 60 fps at full Retina sharpness; the count follows the frame time from here)
+const GRAINS_MIN: Record<QualityTier, number> = { high: 160_000, mid: 100_000, low: 40_000 };
+const GRAINS_START: Record<QualityTier, number> = { high: 220_000, mid: 140_000, low: 60_000 };
 const MAX_PIXEL_RATIO: Record<QualityTier, number> = { high: 2, mid: 1.5, low: 1 };
 const SHADOW_STEPS: Record<QualityTier, number> = { high: 16, mid: 8, low: 4 };
 
@@ -40,6 +46,8 @@ export function settingsFor(tier: QualityTier, dpr: number): TierSettings {
   return {
     tier,
     grains: GRAINS[tier],
+    grainsMin: GRAINS_MIN[tier],
+    grainsStart: GRAINS_START[tier],
     pixelRatio: Math.min(dpr, MAX_PIXEL_RATIO[tier]),
     shadowSteps: SHADOW_STEPS[tier],
     antialias: tier !== "low",

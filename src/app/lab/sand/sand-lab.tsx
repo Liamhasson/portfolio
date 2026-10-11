@@ -11,11 +11,11 @@ import { WorkIndex, type WorkIndexHandle } from "./work-index";
 import { BakedDesk } from "@/three/sand/baked-desk";
 import { revealAt } from "@/three/sand/screen-reveal";
 import { DriftGrains, type StreamCurve } from "@/three/sand/drift-grains";
-import { FilmGrade } from "./film-grade";
 import { SAND_ENCODE, SAND_LAYER, SandComposite } from "@/three/sand/sand-composite";
 import { Pullback } from "@/three/sand/pullback";
 import { BEATS, STORY_SCREENS, ease, pAtFrame, reducedStory, shotFrame, span, type ShotMeta } from "@/three/sand/story-timeline";
 import { RisingSand } from "@/three/sand/rising-sand";
+import { FilmGradePass } from "@/three/sand/film-grade-pass";
 import * as THREE from "three";
 import { parseTierOverride, pickTier, readSignals, settingsFor } from "@/three/tier";
 
@@ -136,6 +136,14 @@ export function SandLab() {
         field.material.uniforms.uOutScale.value = 1 / SAND_ENCODE;
         stage.camera.layers.enable(SAND_LAYER);
         stage.renderFrame = (r, sc, cam) => comp.render(r, sc, cam);
+        // the film grade, in WebGL (film-grade-pass.ts; ?grade=0: the raw frame)
+        if (gradeOn) {
+          new THREE.TextureLoader().loadAsync("/lab/grain.png").then((t) => {
+            if (disposed) return;
+            comp.grade = new FilmGradePass(t);
+            comp.gradeStill = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+          }).catch(() => {});
+        }
         (window as unknown as { __sandFilter?: (s: number) => void }).__sandFilter = (s) => { comp.sigma = s; };
         // the hero's haze: its key lighting the air (blender/lookdev/cinematic_variants.py CINE_PLATE=1); ?haze=0: none
         if (hazeOn) {
@@ -654,7 +662,7 @@ export function SandLab() {
         field!.update(state);
       });
       stage.start();
-      (window as unknown as { __sand?: unknown }).__sand = { stage, field, state, drift, rising };   // lab debugging
+      (window as unknown as { __sand?: unknown }).__sand = { stage, field, state, drift, rising, composite };   // lab debugging
     })().catch((err) => {
       setStatus(String(err));
       setFallback(true);
@@ -671,7 +679,7 @@ export function SandLab() {
       field?.dispose();
       stage?.dispose();
     };
-  }, [compare, hero]);
+  }, [compare, hero, gradeOn]);
 
   useEffect(() => {
     if (!fallback) return;
@@ -736,7 +744,6 @@ export function SandLab() {
     <>
     <div ref={pageRef} className="relative bg-black" style={{ height: hero ? `${PAGE_VH}vh` : "400vh" }}>
       <canvas ref={canvasRef} className="fixed inset-0 h-screen w-screen" data-testid="sand-canvas" />
-      {gradeOn && <FilmGrade />}
       {hero && <div ref={veilRef} aria-hidden className="pointer-events-none fixed inset-0 bg-black opacity-0" style={{ zIndex: 5 }} />}
       {/* the nav's Projects (/#projects) lands where the index has settled (once this page is the home) */}
       {hero && <div id="projects" aria-hidden className="pointer-events-none absolute left-0 w-px" style={{ top: `${PAGE_VH - 100}vh`, height: 1 }} />}

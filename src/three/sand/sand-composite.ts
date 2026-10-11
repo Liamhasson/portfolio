@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import type { FilmGradePass } from "./film-grade-pass";
 
 /**
  * The sand as Cycles sees it: drawn into its own multisampled layer in linear light (no tone mapping yet), softened by
@@ -65,22 +66,32 @@ void main() {
  * overlaps into a soft mass as Cycles' does, which a per-grain disc can't (a see-through grain hides those behind it).
  * Half size, 48 taps on a golden-angle spiral turned per pixel; the filter pass keeps the full-size sand in focus.
  */
+// (each pixel's blur radius, once, at full size: the gather's 48 taps then read it instead of working it out from the
+// colour and the depth at every tap: 2 reads a tap, not 3; the same picture, read for read)
+const DOF_PREP_FRAGMENT = /* glsl */ `
+precision highp float;
+out highp vec4 pc_fragColor;
+in vec2 vUv;
+uniform sampler2D uSand;
+uniform sampler2D uDepth;
+uniform vec4 uDofP;
+uniform float uDofMax;
+void main() {
+  // where there's no grain the depth is the desk's occluding depth, or nothing: read as far, as an empty pixel always was
+  float d = texture(uSand, vUv).a > 0.0 ? texture(uDepth, vUv).r : 1.0;
+  float z = uDofP.z * uDofP.w / (uDofP.w - d * (uDofP.w - uDofP.z));
+  pc_fragColor = vec4(min(uDofP.x * abs(z - uDofP.y) / z, uDofMax), 0.0, 0.0, 1.0);
+}
+`;
 const DOF_FRAGMENT = /* glsl */ `
 precision highp float;
 out highp vec4 pc_fragColor;
 #define gl_FragColor pc_fragColor
 in vec2 vUv;
 uniform sampler2D uSand;
-uniform sampler2D uDepth;
+uniform sampler2D uPrepCoc;
 uniform vec2 uTexel;     // one full-size pixel
-uniform vec4 uDofP;
 uniform float uDofMax;
-float cocAt(vec2 uv) {
-  // (where there's no grain the depth is the desk's occluding depth, or nothing: read as far, as an empty pixel always was)
-  float d = texture(uSand, uv).a > 0.0 ? texture(uDepth, uv).r : 1.0;
-  float z = uDofP.z * uDofP.w / (uDofP.w - d * (uDofP.w - uDofP.z));
-  return min(uDofP.x * abs(z - uDofP.y) / z, uDofMax);
-}
 void main() {
   vec4 sum = vec4(0.0);
   float wsum = 0.0;
@@ -89,7 +100,7 @@ void main() {
     float r = sqrt((float(i) + 0.5) / 48.0) * uDofMax * 0.5;   // radius, full-size px
     float a = float(i) * 2.39996 + turn;
     vec2 uv = vUv + vec2(cos(a), sin(a)) * r * uTexel;
-    float c = max(cocAt(uv) * 0.5, 0.5);                       // that sample's disc radius
+    float c = max(texture(uPrepCoc, uv).r * 0.5, 0.5);        // that sample's disc radius
     float w = clamp(c - r + 1.0, 0.0, 1.0) / (c * c);          // it reaches here; its light spread over its disc
     sum += texture(uSand, uv) * w;
     wsum += w;
@@ -207,11 +218,18 @@ export class SandComposite {
     uniforms: { uTex: { value: null }, uBlur: { value: null }, uDepth: { value: null }, uDofP: { value: new THREE.Vector4() }, uDofMax: { value: 48 }, uDim: { value: 0 } },
   });
   private readonly dofRt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
+  private readonly prepRt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, format: THREE.RedFormat, depthBuffer: false, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+  private readonly prepScene = new THREE.Scene();
+  private readonly prepMat = new THREE.ShaderMaterial({
+    glslVersion: THREE.GLSL3, vertexShader: VERTEX, fragmentShader: DOF_PREP_FRAGMENT,
+    depthTest: false, depthWrite: false, toneMapped: false, blending: THREE.NoBlending,
+    uniforms: { uSand: { value: null }, uDepth: { value: null }, uDofP: { value: new THREE.Vector4() }, uDofMax: { value: 48 } },
+  });
   private readonly dofScene = new THREE.Scene();
   private readonly dofMat = new THREE.ShaderMaterial({
     glslVersion: THREE.GLSL3, vertexShader: VERTEX, fragmentShader: DOF_FRAGMENT,
     depthTest: false, depthWrite: false, toneMapped: false, blending: THREE.NoBlending,
-    uniforms: { uSand: { value: null }, uDepth: { value: null }, uTexel: { value: new THREE.Vector2() }, uDofP: { value: new THREE.Vector4() }, uDofMax: { value: 48 } },
+    uniforms: { uSand: { value: null }, uPrepCoc: { value: null }, uTexel: { value: new THREE.Vector2() }, uDofMax: { value: 48 } },
   });
   /** The hero's haze (texture, decode scale) and how much of it shows (0..1; it belongs to the hero's light). */
   haze: { texture: THREE.Texture; scale: number } | null = null;
@@ -223,6 +241,9 @@ export class SandComposite {
   private occFrom: THREE.Object3D | null = null;
   private readonly depthOnly = new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide });
   hazeAmount = 0;
+  /** The film grade, drawn last onto the screen (film-grade-pass.ts); null: none. `gradeStill` holds its grain. */
+  grade: FilmGradePass | null = null;
+  gradeStill = false;
   private readonly hazeScene = new THREE.Scene();
   /** The desk in shadow without its blur (the lamp still off: the cloud keeps the hero's light). */
   private readonly dimScene = new THREE.Scene();
@@ -271,6 +292,7 @@ export class SandComposite {
     rawQuad.frustumCulled = false;
     this.rawScene.add(rawQuad);
     const dofQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.dofMat);
+    this.prepScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.prepMat));
     dofQuad.frustumCulled = false;
     this.dofScene.add(dofQuad);
     const deskLensQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.deskLensMat);
@@ -300,7 +322,7 @@ export class SandComposite {
   /** Compiles its own passes' shaders and makes its targets now, not on the frame each is first needed (stalls of up
    *  to 200 ms mid-scroll). */
   async warm(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): Promise<void> {
-    await Promise.all([this.scene, this.rawScene, this.discScene, this.hazeScene, this.dimScene, this.dofScene, this.deskLensScene].map((sc) => renderer.compileAsync(sc, this.ortho)));
+    await Promise.all([this.scene, this.rawScene, this.discScene, this.hazeScene, this.dimScene, this.dofScene, this.prepScene, this.deskLensScene].map((sc) => renderer.compileAsync(sc, this.ortho)));
     // and drawn once each way (the GPU builds its pipelines on a shader's first draw into each kind of target)
     const d = this.defocus;
     for (const v of [0, 4]) {
@@ -339,12 +361,7 @@ export class SandComposite {
       dofP.set(pointScale * ((f / lens.fstop) / Math.max(lens.focus - f, 1e-3)) * lens.amount, lens.focus, cam.near, cam.far);
       const hw = Math.max(1, Math.round(size.x / 2)), hh = Math.max(1, Math.round(size.y / 2));
       if (this.dofRt.width !== hw || this.dofRt.height !== hh) this.dofRt.setSize(hw, hh);
-      const du = this.dofMat.uniforms;
-      du.uSand.value = this.rt.texture; du.uDepth.value = this.rt.depthTexture;
-      (du.uTexel.value as THREE.Vector2).set(1 / size.x, 1 / size.y);
-      (du.uDofP.value as THREE.Vector4).copy(dofP);
-      renderer.setRenderTarget(this.dofRt);
-      renderer.render(this.dofScene, this.ortho);
+      this.gather(renderer, this.rt.texture, this.rt.depthTexture!, dofP, this.dofRt, size);
     } else dofP.set(0, 0, 0, 0);
     renderer.setRenderTarget(null);
     renderer.setClearColor(clear, clearA);
@@ -374,13 +391,9 @@ export class SandComposite {
       renderer.render(scene, camera);
       const hw = Math.max(1, Math.round(size.x / 2)), hh = Math.max(1, Math.round(size.y / 2));
       if (this.dofBgRt.width !== hw || this.dofBgRt.height !== hh) this.dofBgRt.setSize(hw, hh);
-      const du = this.dofMat.uniforms;
-      du.uSand.value = bg.texture; du.uDepth.value = bg.depthTexture;
-      (du.uTexel.value as THREE.Vector2).set(1 / size.x, 1 / size.y);
-      const deskP = (du.uDofP.value as THREE.Vector4).copy(dofP);
+      const deskP = this.deskP.copy(dofP);
       deskP.x *= lens.desk / Math.max(lens.amount, 1e-3);   // (dofP carries the sand's amount)
-      renderer.setRenderTarget(this.dofBgRt);
-      renderer.render(this.dofScene, this.ortho);
+      this.gather(renderer, bg.texture, bg.depthTexture!, deskP, this.dofBgRt, size);
       renderer.setRenderTarget(null);
       const lu = this.deskLensMat.uniforms;
       lu.uTex.value = bg.texture; lu.uBlur.value = this.dofBgRt.texture; lu.uDepth.value = bg.depthTexture;
@@ -404,7 +417,25 @@ export class SandComposite {
       hu.uTex.value = this.haze.texture; hu.uScale.value = this.haze.scale; hu.uAmount.value = this.hazeAmount;
       renderer.render(this.hazeScene, this.ortho);
     }
+    this.grade?.render(renderer, performance.now() / 1000, renderer.getPixelRatio(), this.gradeStill);
     renderer.autoClear = autoClear;
+  }
+
+  private readonly deskP = new THREE.Vector4();
+  /** The lens's gather into `out` (half size): the blur radii (full size, never interpolated: between a far and a near
+   *  pixel a mean is a radius neither has), then the 48 taps. */
+  private gather(renderer: THREE.WebGLRenderer, color: THREE.Texture, depth: THREE.Texture, dofP: THREE.Vector4, out: THREE.WebGLRenderTarget, size: THREE.Vector2): void {
+    if (this.prepRt.width !== size.x || this.prepRt.height !== size.y) this.prepRt.setSize(size.x, size.y);
+    const pu = this.prepMat.uniforms;
+    pu.uSand.value = color; pu.uDepth.value = depth;
+    (pu.uDofP.value as THREE.Vector4).copy(dofP);
+    renderer.setRenderTarget(this.prepRt);
+    renderer.render(this.prepScene, this.ortho);
+    const du = this.dofMat.uniforms;
+    du.uSand.value = color; du.uPrepCoc.value = this.prepRt.texture;
+    (du.uTexel.value as THREE.Vector2).set(1 / size.x, 1 / size.y);
+    renderer.setRenderTarget(out);
+    renderer.render(this.dofScene, this.ortho);
   }
 
   /** The occluder's meshes, depth only (proxies sharing their geometry, following their world matrices: the lid turns). */
@@ -447,6 +478,8 @@ export class SandComposite {
     this.hazeMat.dispose();
     this.dimMat.dispose();
     this.dofMat.dispose();
+    this.prepMat.dispose();
+    this.prepRt.dispose();
     this.dofRt.dispose();
     this.dofBgRt.dispose();
     this.deskLensMat.dispose();
