@@ -298,3 +298,12 @@
 }
 /* the walkthrough's captions are Liam's words in the product's label style: floored like every label */
 [data-world="eventread"] .w-shot figcaption.app-label { font-size: max(11px, calc(var(--u) * 11)); }
+/* 02 and 03 share their rows, so the two screenshots start on one line whatever their text runs to */
+@container (min-width: 1100px) {
+  [data-world="eventread"] .w-duo { grid-template-rows: auto auto auto; }
+  [data-world="eventread"] .w-col { grid-row: span 3; grid-template-rows: subgrid; }
+  [data-world="eventread"] .w-col .w-num { grid-row: 1; }
+  [data-world="eventread"] .w-col .w-title { grid-row: 1; }
+  [data-world="eventread"] .w-col .w-body { grid-row: 2; }
+  [data-world="eventread"] .w-col .w-tray { grid-row: 3; align-self: start; }
+}

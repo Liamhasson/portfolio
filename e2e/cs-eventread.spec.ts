@@ -43,3 +43,30 @@ test("Eventread at 390: the band runs edge to edge with the phone calculator, no
   await expect(band.getByText("Cap", { exact: true }).first()).toBeVisible(); // the phone variant's short labels
   await expectNoSeriousA11y(page);
 });
+
+test("the walkthrough's recordings fill their crops as on the board (the site's base styles don't cap them)", async ({ page }) => {
+  await page.goto("/eventread");
+  const crops = await page.evaluate(() => [...document.querySelectorAll(".crop")].map((c) => {
+    const v = c.querySelector("video")!;
+    return { video: v.getBoundingClientRect().width, want: c.getBoundingClientRect().width * 1728 / Number(getComputedStyle(c).getPropertyValue("--w")) };
+  }));
+  expect(crops).toHaveLength(2);
+  for (const c of crops) expect(Math.abs(c.video - c.want)).toBeLessThan(2);
+});
+
+test("followed dates and the tour line up: both screenshots start on the same line", async ({ page }) => {
+  await page.goto("/eventread");
+  const tops = await page.evaluate(() => [...document.querySelectorAll(".w-col .w-tray")].map((t) => t.getBoundingClientRect().top));
+  expect(tops).toHaveLength(2);
+  expect(Math.abs(tops[0] - tops[1])).toBeLessThan(1);
+});
+
+test("on a phone the hero shows the board's crop of the day tiles, not the whole month shrunk", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/eventread");
+  const w = await page.evaluate(() => {
+    const tray = document.querySelector("header .tray")!.getBoundingClientRect(), img = document.querySelector("header .tray img")!.getBoundingClientRect();
+    return img.width / tray.width;
+  });
+  expect(w).toBeGreaterThan(1.5); // 720 units of image in a 358-unit tray, as the board's phone frame
+});

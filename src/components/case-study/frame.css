@@ -29,3 +29,7 @@
 /* A board shows some pieces in one layout only (Eventread's phone calculator): .only-d at ≥ 1100px, .only-m below. */
 @container (min-width: 1100px) { .cs .only-m { display: none !important; } }
 @container (max-width: 1099px) { .cs .only-d { display: none !important; } }
+
+/* The boards size and crop their pictures freely (a recording wider than its frame, slid into place); the site's base
+   styles cap images and videos at their box. Lift the cap inside case studies (unlayered, so it beats Tailwind's base). */
+:where(.cs .f) :is(img, video) { max-width: none; }
