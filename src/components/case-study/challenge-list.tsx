@@ -1,20 +1,37 @@
-import { useId } from "react";
+import { useId, type ComponentType } from "react";
 import type { Challenge } from "@/lib/case-studies/types";
 
-export function ChallengeList({ challenges }: { challenges: readonly Challenge[] }) {
+/** Board frame 06 · Challenges: numbered, each with its chips (and final screen) from the study, then what happened,
+    what I did and what it changed. */
+export function ChallengeList({ challenges, Extras }: { challenges: readonly Challenge[]; Extras?: ComponentType<{ index: number }> }) {
   const headingId = useId();
   return (
-    <section aria-labelledby={headingId} className="f px-[5vw] py-[12vh]">
-      <h2 id={headingId} className="text-[clamp(2rem,4vw,3.6rem)] font-normal leading-[1.15]">
-        Challenges
-      </h2>
-      <ol role="list" className="mt-10 grid gap-10 md:grid-cols-3">
-        {challenges.map((c) => (
-          <li key={c.title}>
-            <h3 className="text-xl">{c.title}</h3>
-            <p className="mt-3 text-ink-3">{c.happened}</p>
-            <p className="mt-3">{c.did}</p>
-            <p className="mt-3 italic">{c.changed}</p>
+    <section aria-labelledby={headingId} className="f chal">
+      <div className="g12">
+        <h2 id={headingId} className="title" style={{ gridColumn: "1 / 10", marginLeft: "calc(var(--u) * -3)" }}>
+          Challenges
+        </h2>
+      </div>
+      <ol role="list" className="chs">
+        {challenges.map((c, i) => (
+          <li key={c.title} className="ch">
+            <div className="ch-head">
+              <span className="ch-num">{String(i + 1).padStart(2, "0")}</span>
+              <h3 className="ch-title">{c.title}</h3>
+            </div>
+            {Extras && <Extras index={i} />}
+            <div className="step">
+              <div className="k">What happened</div>
+              <p>{c.happened}</p>
+            </div>
+            <div className="step">
+              <div className="k">What I did</div>
+              <p>{c.did}</p>
+            </div>
+            <div className="step res">
+              <div className="k">What it changed</div>
+              <p>{c.changed}</p>
+            </div>
           </li>
         ))}
       </ol>

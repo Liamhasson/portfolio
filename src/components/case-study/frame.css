@@ -7,19 +7,21 @@
   .cs .f { --u: min(calc(100cqw / 390), 1.6px);
     padding-inline: max(0px, calc((100cqw - var(--u) * 390) / 2)); }
 }
-.cs .f p { margin: 0; }
-.cs .f :is(h1, h2, h3) { margin: 0; font-weight: 400; }
-.cs .f a { color: inherit; text-decoration: none; }
+/* resets at zero specificity, so every board rule wins over them */
+:where(.cs .f) p { margin: 0; }
+:where(.cs .f) :is(h1, h2, h3) { margin: 0; font-weight: 400; }
+:where(.cs .f) a { color: inherit; text-decoration: none; }
 
-/* Liam's type, with the floors (Part C plan, Global Constraints). Board sizes in --u, never under the floor. */
-.cs .label { font: 400 max(11px, calc(var(--u) * 12))/1.15 var(--font-geist-mono), ui-monospace, monospace; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
-.cs .title { font-size: max(40px, calc(var(--u) * 72)); line-height: .95; letter-spacing: -.025em; }
-.cs .display { font-size: max(26px, calc(var(--u) * 48)); line-height: 1.16; letter-spacing: -.018em; }
-.cs .display em { font-style: italic; }
-.cs .body { font-size: max(15px, calc(var(--u) * 18)); line-height: 1.55; color: var(--ink-2); max-width: 46ch; }
-.cs .quiet { color: var(--ink-3); }
-.cs .g12 { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: calc(var(--u) * 24); padding: 0 calc(var(--u) * 72); }
-@container (max-width: 1099px) {
-  .cs .g12 { grid-template-columns: minmax(0, 1fr); padding: 0 calc(var(--u) * 16); }
-  .cs .g12 > * { grid-column: 1 / -1 !important; }
-}
+/* The boards' type stacks, on the site's own Geist (src/app/fonts.ts). */
+.cs { --sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif; --mono: var(--font-geist-mono), ui-monospace, monospace; }
+.cs .f { font-family: var(--sans); font-weight: 400; }
+:where(.cs .f) :is(dl, dd, ol, ul) { margin: 0; padding: 0; }
+:where(.cs .f) :is(ol, ul) { list-style: none; }
+:where(.cs .f) :is(figure, blockquote) { margin: 0; }
+
+/* A middle section not yet built from its board (MiddleBlock): the board's grid, Liam's words beside the title. */
+:where(.cs) .mid { padding: calc(var(--u) * 112) 0; }
+:where(.cs) .mid-body { grid-column: 7 / 13; max-width: none; }
+:where(.cs) .mid-body > * + * { margin-top: 1em; }
+:where(.cs) .mid-body ul { list-style: disc; padding-left: 1.2em; }
+@container (max-width: 1099px) { :where(.cs) .mid { padding: calc(var(--u) * 56) 0; } :where(.cs) .mid-body { margin-top: calc(var(--u) * 20); } }

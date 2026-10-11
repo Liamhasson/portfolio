@@ -36,6 +36,15 @@ export interface AtAGlance {
   type?: string;
 }
 
+/** An image or video from the board, served from public/case-studies/<slug>/. */
+export interface Media {
+  src: string;
+  alt: string;
+  width: number;
+  height: number;
+  poster?: string;
+}
+
 export interface Quote {
   text: string;
   name: string;
@@ -58,6 +67,8 @@ export interface CaseStudy {
   atAGlance: AtAGlance;
   challenges: readonly Challenge[];
   outcome: Outcome;
+  /** What the previous study shows of this one when it "peeks in" (Part C: next-project block). */
+  peek: Media;
   /** Screens per block at 1440×900 (spec §2). */
   budget: Readonly<Record<BlockId, number>>;
 }
@@ -65,4 +76,8 @@ export interface CaseStudy {
 export interface CaseStudyEntry {
   study: CaseStudy;
   Middle: ComponentType;
+  /** The hero's product visual, from the board. */
+  HeroVisual: ComponentType;
+  /** Each challenge's chips (and final screen, where the board shows one), from the board. */
+  ChallengeExtras: ComponentType<{ index: number }>;
 }

@@ -8,7 +8,8 @@ test("at a glance: four fields in order, plus type when given", () => {
   render(<AtAGlance data={cyvore.atAGlance} />);
   const terms = screen.getAllByRole("term").map((t) => t.textContent);
   expect(terms).toEqual(["Role", "Timeline", "Team", "Tools", "Type"]);
-  expect(screen.getByText("Figma · Figma MCP · Claude Code")).toBeInTheDocument();
+  // The board runs the tools as a list (dots drawn by CSS), one item each.
+  expect(screen.getAllByRole("listitem").map((li) => li.textContent)).toEqual(["Figma", "Figma MCP", "Claude Code"]);
 });
 
 test("at a glance: no Type term when the study has none, and each value sits under its own term", () => {
@@ -22,11 +23,11 @@ test("at a glance: no Type term when the study has none, and each value sits und
     Role: role,
     Timeline: timeline,
     Team: team,
-    Tools: tools.join(" · "),
+    Tools: tools.join(""),
   };
   for (const [term, value] of Object.entries(expected)) {
     const dt = screen.getByText(term, { selector: "dt" });
-    const group = dt.parentElement as HTMLElement;
-    expect(group.querySelector("dd")).toHaveTextContent(value);
+    expect(dt.nextElementSibling?.tagName).toBe("DD");
+    expect(dt.nextElementSibling).toHaveTextContent(value);
   }
 });

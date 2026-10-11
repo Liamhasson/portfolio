@@ -5,7 +5,9 @@ import { CaseStudyPage } from "./case-study-page";
 
 test("the frame in order: hero, at a glance, middle, challenges, impact, next", () => {
   const Middle = () => <section aria-label="Middle">middle</section>;
-  render(<CaseStudyPage study={pulse} Middle={Middle} />);
+  const HeroVisual = () => <div>visual</div>;
+  const ChallengeExtras = ({ index }: { index: number }) => <div>extras {index}</div>;
+  render(<CaseStudyPage study={pulse} Middle={Middle} HeroVisual={HeroVisual} ChallengeExtras={ChallengeExtras} />);
   const landmarks = screen
     .getAllByRole("region")
     .map((r) => r.getAttribute("aria-label") ?? r.querySelector("h2")?.textContent);
@@ -14,4 +16,8 @@ test("the frame in order: hero, at a glance, middle, challenges, impact, next", 
   expect(screen.getByRole("link", { name: "Back to projects" })).toHaveAttribute("href", "/#pulse");
   expect(screen.getByRole("link", { name: /Next project: Eventread/ })).toBeInTheDocument();
   expect(document.querySelector("article")).toHaveAttribute("data-world", "pulse");
+  expect(screen.getByText("visual")).toBeInTheDocument();
+  expect(screen.getByText("extras 2")).toBeInTheDocument();
+  expect(screen.getAllByText("What happened")).toHaveLength(pulse.challenges.length);
+  expect(screen.getByRole("img", { name: "Eventread month view for Berlin, November 2026" })).toBeInTheDocument(); // the next study peeks in
 });

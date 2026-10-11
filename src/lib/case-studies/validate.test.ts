@@ -14,6 +14,7 @@ const base: CaseStudy = {
   atAGlance: { role: "r", timeline: "t", team: "s", tools: ["Figma"] },
   challenges: [design, engineering],
   outcome: { lines: ["A tested prototype."] },
+  peek: { src: "/case-studies/pulse/peek.jpg", alt: "a peek", width: 1, height: 1 },
   budget: STANDARD_BUDGET,
 };
 

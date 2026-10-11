@@ -29,6 +29,13 @@ describe("case-study content", () => {
     );
   });
 
+  test.each(studies)("$slug has a peek image for the next-project block", (study) => {
+    expect(study.peek.src).toMatch(new RegExp(`^/case-studies/${study.slug}/`));
+    expect(study.peek.alt.length).toBeGreaterThan(10);
+    expect(study.peek.width).toBeGreaterThan(0);
+    expect(study.peek.height).toBeGreaterThan(0);
+  });
+
   test("Pulse reports counts, not percentages", () => {
     const text = [...pulse.challenges.map((c) => c.happened), ...pulse.outcome.lines].join(" ");
     expect(text).toContain("4 of 6");

@@ -10,8 +10,10 @@ test("outcome with a quote", () => {
   expect(screen.getByRole("region", { name: "Impact" })).toBeInTheDocument();
   const quote = screen.getByRole("blockquote");
   expect(quote).toHaveTextContent("we closed our first funding round");
-  expect(quote.textContent).not.toMatch(/[“”]/);
+  // Board copy (Part C appendix A): the quote in curly marks, name and title on their own lines.
+  expect(quote.textContent).toBe(`\u201c${cyvore.outcome.quote!.text}\u201d`);
   expect(screen.getByText("Yoav Rotem")).toBeInTheDocument();
+  expect(screen.getByText("CTO, Cyvore")).toBeInTheDocument();
 });
 
 test("outcome with a link", () => {
@@ -21,6 +23,8 @@ test("outcome with a link", () => {
   expect(link).toHaveAttribute("target", "_blank");
   expect(link).toHaveAttribute("rel", "noreferrer");
   expect(link).toHaveAccessibleName(/^Try it\s*\(opens in a new tab\)$/);
+  // and the address in the first line is a link too, as on the board
+  expect(screen.getByRole("link", { name: /^eventread\.vercel\.app/ })).toHaveAttribute("href", "https://eventread.vercel.app");
 });
 
 test("outcome with neither quote nor link renders just its lines", () => {

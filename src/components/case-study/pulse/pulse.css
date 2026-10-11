@@ -1,0 +1,212 @@
+/* pulse: the board's CSS (docs/prototypes/pulse-mockups.html), scoped to the pulse case study (Part C port):
+   board chrome and mock shell dropped, selectors under [data-world="pulse"], Liam's text floored (Part C plan). */
+/* ------------------------------ Liam's type (Geist 400) ------------------------------ */
+[data-world="pulse"] .label { font: 400 max(11px, calc(var(--u) * 12))/1.15 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
+[data-world="pulse"] .title { font-size: calc(var(--u) * 72); line-height: .95; letter-spacing: -.025em; }
+[data-world="pulse"] .display { font-size: calc(var(--u) * 48); line-height: 1.16; letter-spacing: -.018em; }
+[data-world="pulse"] .display em { font-style: italic; }
+[data-world="pulse"] .quiet { color: var(--ink-3); }
+[data-world="pulse"] .body { font-size: max(15px, calc(var(--u) * 18)); line-height: 1.55; color: var(--ink-2); max-width: 46ch; }
+[data-world="pulse"] .body .lead { color: var(--ink); }
+[data-world="pulse"] .g12 { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: calc(var(--u) * 24); padding: 0 calc(var(--u) * 72); }
+[data-world="pulse"] .ic { width: calc(var(--u) * 16); height: calc(var(--u) * 16); fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+/* ------------------------------ shell ------------------------------ */
+/* The site's own shell (not Eventread's 6px rule): fully round pills + a 44px circle.
+   Motion idea: "light finding the material" — the pointer is a soft light that the
+   pill's surface and rim catch. Only transform / opacity / background animate. */
+[data-world="pulse"] .f { --settle: cubic-bezier(0.22, 1, 0.36, 1); }
+/* the light (fill) and the rim catching it (border only, via mask exclude) */
+/* active page: one ink pill that slides (two caps + a scaled bar, so the round ends never squash) */
+/* the same shell on a dark surface */
+/* entrance: back button first, then the pills, 60ms apart */
+/* ------------------------------ the slim phone (one frame everywhere) ------------------------------ */
+[data-world="pulse"] .phone { --w: calc(var(--u) * 300); position: relative; width: var(--w); aspect-ratio: 1179 / 2556; border-radius: calc(var(--w) * .15); padding: calc(var(--w) * .022); background: #0a0f19; box-shadow: inset 0 0 0 calc(var(--u) * 1) rgba(220,232,250,.16), 0 calc(var(--u) * 30) calc(var(--u) * 80) calc(var(--u) * -30) rgba(0,0,0,.8); flex: none; }
+[data-world="pulse"] .phone-screen { position: relative; width: 100%; height: 100%; border-radius: calc(var(--w) * .13); overflow: hidden; background: #060b14; }
+[data-world="pulse"] .phone-screen > img, [data-world="pulse"] .phone-screen > video { display: block; width: 100%; height: 100%; object-fit: cover; }
+[data-world="pulse"] .glow { position: absolute; pointer-events: none; border-radius: 50%; background: radial-gradient(closest-side, rgba(31,128,238,.32), rgba(31,128,238,0)); }
+/* ------------------------------ 1 hero ------------------------------ */
+[data-world="pulse"] .hero { height: calc(var(--u) * 900); }
+[data-world="pulse"] .hero-head { position: absolute; left: calc(var(--u) * 72); top: calc(var(--u) * 132); width: calc(var(--u) * 560); }
+[data-world="pulse"] .hero-line { font-size: calc(var(--u) * 28); line-height: 1.2; letter-spacing: -.01em; color: var(--ink-2); margin-top: calc(var(--u) * 32); max-width: 22ch; }
+[data-world="pulse"] .hero-tray { position: absolute; left: calc(var(--u) * 680); right: calc(var(--u) * 72); top: calc(var(--u) * 112); bottom: calc(var(--u) * 48); border-radius: calc(var(--u) * 24); background: var(--panel); box-shadow: inset 0 0 0 calc(var(--u) * 1) var(--hair); overflow: hidden; display: grid; place-items: center; }
+[data-world="pulse"] .hero-tray .glow { width: calc(var(--u) * 760); height: calc(var(--u) * 760); left: 50%; top: 52%; transform: translate(-50%, -50%); }
+[data-world="pulse"] .hero-tray .phone { --w: calc(var(--u) * 320); }
+/* ------------------------------ 2 at a glance ------------------------------ */
+[data-world="pulse"] .glance { height: calc(var(--u) * 270); padding-top: calc(var(--u) * 56); }
+[data-world="pulse"] .strip { margin: 0 calc(var(--u) * 72); display: grid; grid-template-columns: calc(var(--u) * 300) calc(var(--u) * 240) calc(var(--u) * 280) 1fr; border-top: calc(var(--u) * 1) solid var(--hair-2); border-bottom: calc(var(--u) * 1) solid var(--hair-2); }
+[data-world="pulse"] .strip > div { padding: calc(var(--u) * 28) calc(var(--u) * 24) calc(var(--u) * 30); border-left: calc(var(--u) * 1) solid var(--hair); }
+[data-world="pulse"] .strip > div:first-child { padding-left: 0; border-left: 0; }
+[data-world="pulse"] .strip .label { margin-bottom: calc(var(--u) * 14); }
+[data-world="pulse"] .strip p { font-size: max(15px, calc(var(--u) * 17)); line-height: 1.5; max-width: 30ch; }
+[data-world="pulse"] .tools { display: flex; flex-wrap: wrap; gap: 0 calc(var(--u) * 20); font-size: max(15px, calc(var(--u) * 17)); line-height: 1.55; }
+[data-world="pulse"] .tools li { position: relative; white-space: nowrap; }
+[data-world="pulse"] .tools li:not(:last-child)::after { content: ""; position: absolute; right: calc(var(--u) * -12); top: .74em; width: calc(var(--u) * 3); height: calc(var(--u) * 3); border-radius: 50%; background: var(--ink-3); }
+/* ------------------------------ 3 problem: the four milestones ------------------------------ */
+[data-world="pulse"] .problem { padding: calc(var(--u) * 96) 0 calc(var(--u) * 88); }
+[data-world="pulse"] .f .problem-copy a { text-decoration: underline; text-underline-offset: .18em; text-decoration-color: var(--hair-2); }
+[data-world="pulse"] .miles { position: relative; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: calc(var(--u) * 24); margin: calc(var(--u) * 80) calc(var(--u) * 72) 0; padding-top: calc(var(--u) * 40); }
+[data-world="pulse"] .miles::before { content: ""; position: absolute; left: 0; right: 0; top: calc(var(--u) * 8); height: calc(var(--u) * 2); border-radius: 2px; background: linear-gradient(90deg, rgba(31,128,238,.25), #1f80ee 40%, #33d0e7); }
+[data-world="pulse"] .mile { position: relative; }
+[data-world="pulse"] .mile::before { content: ""; position: absolute; left: 0; top: calc(var(--u) * -40); width: calc(var(--u) * 18); height: calc(var(--u) * 18); border-radius: 50%; background: var(--void); box-shadow: inset 0 0 0 calc(var(--u) * 2) #33d0e7, 0 0 calc(var(--u) * 16) rgba(51,208,231,.4); }
+[data-world="pulse"] .mile-day { font-size: calc(var(--u) * 56); line-height: 1; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+[data-world="pulse"] .mile-day small { font-size: .32em; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); font-family: var(--mono); margin-right: calc(var(--u) * 8); vertical-align: .55em; }
+[data-world="pulse"] .mile p { font-size: max(15px, calc(var(--u) * 17)); line-height: 1.5; color: var(--ink-2); margin-top: calc(var(--u) * 16); max-width: 26ch; }
+[data-world="pulse"] .mile p b { font-weight: 400; color: var(--ink); }
+/* ------------------------------ 4 solution: the onboarding story ------------------------------ */
+[data-world="pulse"] .solution { padding: calc(var(--u) * 112) 0 calc(var(--u) * 104); }
+[data-world="pulse"] .sol-glow { width: calc(var(--u) * 1100); height: calc(var(--u) * 900); right: calc(var(--u) * -120); top: calc(var(--u) * 260); }
+[data-world="pulse"] .ob { position: relative; margin: calc(var(--u) * 72) calc(var(--u) * 72) 0; }
+[data-world="pulse"] .ob-track { position: relative; }
+[data-world="pulse"] .ob-pin { position: sticky; top: var(--pin-top, 24px); display: grid; grid-template-columns: minmax(0, calc(var(--u) * 560)) auto; justify-content: center; gap: calc(var(--u) * 120); align-items: center; }
+[data-world="pulse"] .ob-side { display: flex; flex-direction: column; gap: calc(var(--u) * 40); }
+[data-world="pulse"] .ob-count { font: 400 max(11px, calc(var(--u) * 14))/1 var(--mono); letter-spacing: .08em; color: var(--ink-3); }
+[data-world="pulse"] .ob-caps { position: relative; min-height: calc(var(--u) * 140); margin: 0; padding: 0; list-style: none; }
+[data-world="pulse"] .ob-cap { position: absolute; left: 0; top: 0; font-size: calc(var(--u) * 48); line-height: 1.12; letter-spacing: -.018em; max-width: 16ch; opacity: 0; transform: translateY(calc(var(--u) * -8)); transition: opacity 140ms ease-in, transform 140ms ease-in; }
+/* the old caption leaves first, then the new one arrives: two lines are never readable at once */
+[data-world="pulse"] .ob-cap.is-on { opacity: 1; transform: none; transition: opacity 320ms var(--settle) 150ms, transform 420ms var(--settle) 150ms; }
+@media (prefers-reduced-motion: reduce) {
+  [data-world="pulse"] .ob-cap, [data-world="pulse"] .ob-cap.is-on { transition: none; }
+}
+[data-world="pulse"] .ob-stages { display: grid; grid-template-columns: 3fr 6fr 3fr; gap: calc(var(--u) * 10); max-width: calc(var(--u) * 560); }
+[data-world="pulse"] .ob-stage { color: var(--ink-3); transition: color 320ms var(--settle); }
+[data-world="pulse"] .ob-stage.is-on { color: var(--ink); }
+[data-world="pulse"] .ob-stage span { display: block; font: 400 max(11px, calc(var(--u) * 12))/1.3 var(--mono); letter-spacing: .06em; text-transform: uppercase; margin-top: calc(var(--u) * 12); }
+[data-world="pulse"] .ob-stage i { position: relative; display: block; height: calc(var(--u) * 3); border-radius: 3px; background: var(--hair-2); overflow: hidden; }
+[data-world="pulse"] .ob-stage i::after { content: ""; position: absolute; inset: 0; background: var(--grad); transform-origin: 0 50%; transform: scaleX(var(--fill, 0)); }
+[data-world="pulse"] .ob-phone { --w: calc(var(--u) * 340); }
+[data-world="pulse"] .ob-screen { position: absolute; inset: 0; margin: 0; opacity: 0; visibility: hidden; }
+/* each screen is the coded app (onboarding-app.js), display only; one Back / Skip / bar layer sits over them all */
+[data-world="pulse"] .ob-app { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+[data-world="pulse"] .ob-chrome { position: absolute; inset: 0; z-index: 3; overflow: hidden; pointer-events: none; }
+[data-world="pulse"] .ob-screen figcaption { display: none; }
+/* reduced motion: the twelve screens as a still grid, each with its caption */
+[data-world="pulse"] .ob.is-static .ob-track { height: auto !important; }
+[data-world="pulse"] .ob.is-static .ob-pin { position: static; display: block; }
+[data-world="pulse"] .ob.is-static .ob-caps, [data-world="pulse"] .ob.is-static .ob-count, [data-world="pulse"] .ob.is-static .ob-stages { display: none; }
+[data-world="pulse"] .ob.is-static .ob-phone { width: auto; aspect-ratio: auto; padding: 0; background: none; box-shadow: none; border-radius: 0; }
+[data-world="pulse"] .ob.is-static .phone-screen { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: calc(var(--u) * 32) calc(var(--u) * 20); height: auto; overflow: visible; background: none; border-radius: 0; }
+[data-world="pulse"] .ob.is-static .ob-screen { position: static; opacity: 1; visibility: visible; }
+[data-world="pulse"] .ob.is-static .ob-app { position: relative; inset: auto; aspect-ratio: 393 / 852; border-radius: calc(var(--u) * 20); background: #060b14; }
+[data-world="pulse"] .ob.is-static .ob-app::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--hair-2); pointer-events: none; }
+[data-world="pulse"] .ob.is-static .ob-screen figcaption { display: block; margin-top: calc(var(--u) * 12); font-size: max(11px, calc(var(--u) * 14)); line-height: 1.4; color: var(--ink-2); }
+/* ------------------------------ 5 how it works ------------------------------ */
+[data-world="pulse"] .how { padding: calc(var(--u) * 112) 0 calc(var(--u) * 104); }
+[data-world="pulse"] .trio { display: flex; justify-content: center; gap: calc(var(--u) * 72); margin: calc(var(--u) * 72) calc(var(--u) * 72) 0; position: relative; }
+[data-world="pulse"] .trio figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 20); }
+[data-world="pulse"] .trio .phone { --w: calc(var(--u) * 280); }
+[data-world="pulse"] .trio figcaption { text-align: center; }
+[data-world="pulse"] .brand { display: grid; grid-template-columns: calc(var(--u) * 296) calc(var(--u) * 296) 1fr; gap: calc(var(--u) * 24); margin: calc(var(--u) * 72) calc(var(--u) * 72) 0; }
+[data-world="pulse"] .brand > div { border-radius: calc(var(--u) * 20); overflow: hidden; background: var(--panel); box-shadow: inset 0 0 0 calc(var(--u) * 1) var(--hair); height: calc(var(--u) * 240); display: grid; place-items: center; }
+[data-world="pulse"] .brand img { display: block; }
+[data-world="pulse"] .brand .b-logo img { width: calc(var(--u) * 96); }
+/* photos fill their card (a % height inside the card's own grid resolved to auto, so they overflowed) */
+[data-world="pulse"] .brand .b-icon, [data-world="pulse"] .brand .b-board { position: relative; }
+[data-world="pulse"] .brand .b-icon img, [data-world="pulse"] .brand .b-board img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* the phone fills the square: anchored right and zoomed past the photo's white left margin */
+[data-world="pulse"] .brand .b-icon img { object-position: 100% 50%; transform: scale(1.42); transform-origin: 100% 46%; }
+/* the sign, not the building: centred on it and brought up to most of the card's width */
+[data-world="pulse"] .brand .b-board img { object-position: 50% 52%; transform: scale(1.3); transform-origin: 50.5% 50%; }
+/* ------------------------------ 6 challenges ------------------------------ */
+[data-world="pulse"] .chal { padding: calc(var(--u) * 112) 0 calc(var(--u) * 104); }
+[data-world="pulse"] .chs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(6, auto); column-gap: calc(var(--u) * 48); margin: calc(var(--u) * 64) calc(var(--u) * 72) 0; }
+[data-world="pulse"] .ch { display: grid; grid-row: span 6; grid-template-rows: subgrid; border-top: calc(var(--u) * 1) solid var(--ink); padding-top: calc(var(--u) * 20); }
+[data-world="pulse"] .ch-head { display: flex; flex-direction: column; gap: calc(var(--u) * 18); }
+[data-world="pulse"] .ch-num { font: 400 max(11px, calc(var(--u) * 12))/1 var(--mono); letter-spacing: .08em; color: var(--ink-3); }
+[data-world="pulse"] .ch-title { font-size: calc(var(--u) * 26); line-height: 1.2; letter-spacing: -.012em; padding-right: calc(var(--u) * 24); }
+[data-world="pulse"] .ch-chips { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--u) * 8); padding: calc(var(--u) * 20) 0 calc(var(--u) * 4); }
+[data-world="pulse"] .chip { display: inline-flex; align-items: center; gap: calc(var(--u) * 7); height: calc(var(--u) * 26); padding: 0 calc(var(--u) * 10); border-radius: calc(var(--u) * 999); border: calc(var(--u) * 1) solid var(--hair-2); font: 500 max(11px, calc(var(--u) * 11))/1 var(--mono); letter-spacing: .07em; text-transform: uppercase; white-space: nowrap; color: var(--ink-2); }
+[data-world="pulse"] .chip b { font-weight: 500; color: var(--ink); }
+[data-world="pulse"] .ch-shot { margin-top: calc(var(--u) * 20); height: calc(var(--u) * 220); border-radius: calc(var(--u) * 16); overflow: hidden; background: var(--panel); box-shadow: inset 0 0 0 calc(var(--u) * 1) var(--hair); position: relative; }
+[data-world="pulse"] .ch-shot img { position: absolute; left: 50%; top: calc(var(--u) * 18); width: calc(var(--u) * 240); transform: translateX(-50%); border-radius: calc(var(--u) * 22) calc(var(--u) * 22) 0 0; box-shadow: inset 0 0 0 1px var(--hair-2); }
+[data-world="pulse"] .step { padding-top: calc(var(--u) * 18); }
+[data-world="pulse"] .step .k { font: 400 max(11px, calc(var(--u) * 11))/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+[data-world="pulse"] .step p { font-size: max(15px, calc(var(--u) * 16)); line-height: 1.55; color: var(--ink-2); margin-top: calc(var(--u) * 10); }
+[data-world="pulse"] .step.res { margin-top: calc(var(--u) * 22); padding-top: calc(var(--u) * 16); border-top: calc(var(--u) * 1) solid var(--hair-2); }
+[data-world="pulse"] .step.res .k { color: var(--ink); }
+[data-world="pulse"] .step.res p { font-size: max(15px, calc(var(--u) * 20)); line-height: 1.34; color: var(--ink); letter-spacing: -.008em; }
+/* ------------------------------ 7 impact ------------------------------ */
+[data-world="pulse"] .outcome { padding: calc(var(--u) * 96) 0 calc(var(--u) * 96); }
+[data-world="pulse"] .f .out-lines { margin-top: calc(var(--u) * 32); font-size: calc(var(--u) * 52); line-height: 1.12; letter-spacing: -.02em; max-width: 24ch; }
+[data-world="pulse"] .out-lines span { display: block; }
+[data-world="pulse"] .out-lines span + span { color: var(--ink-3); margin-top: calc(var(--u) * 12); }
+/* ------------------------------ 8 next: Eventread closes the loop ------------------------------ */
+[data-world="pulse"] .next { height: calc(var(--u) * 630); }
+[data-world="pulse"] .er { position: absolute; left: 0; right: 0; top: calc(var(--u) * 64); bottom: calc(var(--u) * -40); background: #f8f8f6; color: #1a1a2e; border-radius: calc(var(--u) * 32) calc(var(--u) * 32) 0 0; overflow: hidden; }
+[data-world="pulse"] .er-text { position: absolute; left: calc(var(--u) * 72); top: calc(var(--u) * 72); width: calc(var(--u) * 520); }
+[data-world="pulse"] .er-next { display: flex; align-items: center; gap: calc(var(--u) * 14); font: 400 max(11px, calc(var(--u) * 13))/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #6b6b80; }
+[data-world="pulse"] .er-next i { display: block; width: calc(var(--u) * 80); height: calc(var(--u) * 1); background: #d6d3cb; }
+[data-world="pulse"] .er-title { font-size: calc(var(--u) * 72); line-height: .95; letter-spacing: -.025em; color: rgba(26,26,46,.55); margin-top: calc(var(--u) * 150); }
+[data-world="pulse"] .f .er-line { font-size: max(15px, calc(var(--u) * 19)); line-height: 1.5; color: #4a4a5c; margin-top: calc(var(--u) * 40); max-width: 32ch; }
+[data-world="pulse"] .er-frame { position: absolute; left: calc(var(--u) * 640); top: calc(var(--u) * 72); width: calc(var(--u) * 728); height: calc(var(--u) * 560); border-radius: calc(var(--u) * 20); overflow: hidden; background: #f2f1ec; box-shadow: 0 0 0 calc(var(--u) * 1) #e6e4de; }
+[data-world="pulse"] .er-frame img { width: 100%; height: 100%; object-fit: cover; object-position: 0 0; display: block; }
+/* ------------------------------ the button that opens the clickable prototype ------------------------------ */
+[data-world="pulse"] .ob-try { align-self: flex-start; display: inline-flex; align-items: center; gap: calc(var(--u) * 10); height: calc(var(--u) * 48); padding: 0 calc(var(--u) * 22); border: 0; border-radius: 999px; cursor: pointer; font: 500 max(15px, calc(var(--u) * 15))/1 var(--sans); color: var(--ink); background: linear-gradient(var(--void), var(--void)) padding-box, var(--grad) border-box; border: calc(var(--u) * 1.5) solid transparent; transition: transform 160ms var(--settle), box-shadow 320ms var(--settle); }
+[data-world="pulse"] .ob-try:hover { box-shadow: 0 0 calc(var(--u) * 28) rgba(51,208,231,.25); }
+[data-world="pulse"] .ob-try:active { transform: scale(.97); }
+[data-world="pulse"] .ob-try:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
+[data-world="pulse"] .ob-try .ic { width: calc(var(--u) * 16); height: calc(var(--u) * 16); }
+/* ------------------------------ the prototype overlay (real px: it sits over the whole page) ------------------------------ */
+[data-world="pulse"] .proto { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; font-family: var(--sans); color: var(--ink); }
+[data-world="pulse"] .proto[hidden] { display: none; }
+[data-world="pulse"] .proto-backdrop { position: absolute; inset: 0; background: rgba(3,6,12,.84); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+[data-world="pulse"] .proto-body { --ph: min(84vh, 780px); position: relative; display: flex; align-items: center; gap: 64px; padding: 24px; }
+[data-world="pulse"] .proto-side { width: 300px; display: flex; flex-direction: column; gap: 18px; }
+[data-world="pulse"] .proto-eyebrow { margin: 0; font: 400 12px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+[data-world="pulse"] .proto-count { margin: 0; font: 400 14px/1 var(--mono); letter-spacing: .08em; color: var(--ink-3); }
+[data-world="pulse"] .proto-caps { position: relative; min-height: 96px; margin: 0; padding: 0; list-style: none; }
+[data-world="pulse"] .proto-cap { position: absolute; inset: 0 0 auto; font-size: 30px; line-height: 1.15; letter-spacing: -.015em; opacity: 0; transition: opacity 140ms ease-in; }
+[data-world="pulse"] .proto-cap.is-on { opacity: 1; transition: opacity 300ms var(--settle) 140ms; }
+[data-world="pulse"] .proto-note { margin: 0; font-size: 14px; line-height: 1.55; color: var(--ink-2); }
+[data-world="pulse"] .proto-actions { display: flex; gap: 10px; }
+[data-world="pulse"] .proto-btn { height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid var(--hair-2); background: transparent; color: var(--ink); font: 500 14px/1 var(--sans); cursor: pointer; }
+[data-world="pulse"] .proto-btn:hover { background: rgba(238,243,250,.06); }
+[data-world="pulse"] .proto-btn:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
+[data-world="pulse"] .proto-phone { height: var(--ph); flex: none; display: flex; border-radius: calc(var(--ph) * .07); padding: calc(var(--ph) * .01); background: #0a0f19; box-shadow: inset 0 0 0 1px rgba(220,232,250,.18), 0 30px 90px -20px rgba(31,128,238,.35); }
+/* the coded app (onboarding-app.css) is laid out at 393 × 852 and scaled to this screen, which keeps the frame's ratio */
+[data-world="pulse"] .proto-screen { position: relative; height: 100%; aspect-ratio: 393 / 852; border-radius: calc(var(--ph) * .06); overflow: hidden; background: #060b14; isolation: isolate; }
+@media (max-width: 760px) {
+  [data-world="pulse"] .proto-body { --ph: min(70vh, 640px); flex-direction: column-reverse; gap: 16px; }
+  [data-world="pulse"] .proto-side { width: min(90vw, 360px); gap: 10px; }
+  [data-world="pulse"] .proto-caps { min-height: 60px; }
+  [data-world="pulse"] .proto-cap { font-size: 20px; }
+  [data-world="pulse"] .proto-note { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-world="pulse"] .proto-cap, [data-world="pulse"] .proto-cap.is-on { transition: none; }
+}
+/* ------------------------------ mobile frame ------------------------------ */
+
+/* ------------------------------ phones and tablets (< 1100px): the board's phone frames ------------------------------ */
+@container (max-width: 1099px) {
+  [data-world="pulse"] .g12 { grid-template-columns: minmax(0, 1fr); padding: 0 calc(var(--u) * 16); }
+  [data-world="pulse"] .g12 > * { grid-column: 1 / -1 !important; }
+  [data-world="pulse"] .title { font-size: calc(var(--u) * 44); }
+  [data-world="pulse"] .hero { height: auto; padding: calc(var(--u) * 108) calc(var(--u) * 16) calc(var(--u) * 32); }
+  [data-world="pulse"] .hero-head { position: static; display: block; width: auto; }
+  [data-world="pulse"] .hero .title { font-size: calc(var(--u) * 48); margin-top: calc(var(--u) * 14) !important; }
+  [data-world="pulse"] .hero-right { display: block; padding: 0; }
+  [data-world="pulse"] .hero-line { font-size: max(15px, calc(var(--u) * 22)); margin-top: calc(var(--u) * 14); max-width: none; text-align: left; padding: 0; }
+  [data-world="pulse"] .hero-right .btn { margin-top: calc(var(--u) * 22); }
+  /* the hero's product visual, as in the board's phone frame */
+  [data-world="pulse"] .hero-tray { position: relative; left: auto; right: auto; top: auto; bottom: auto; margin-top: calc(var(--u) * 28); padding: calc(var(--u) * 8) 0; background: none; box-shadow: none; overflow: visible; }
+  [data-world="pulse"] .hero-tray .phone { --w: calc(var(--u) * 220); }
+  [data-world="pulse"] .glance { height: auto; padding: calc(var(--u) * 24) calc(var(--u) * 16); }
+  [data-world="pulse"] .strip { margin: 0; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  [data-world="pulse"] .strip > div { padding: calc(var(--u) * 18) calc(var(--u) * 12) calc(var(--u) * 18) 0; border-left: 0; border-top: calc(var(--u) * 1) solid var(--hair); }
+  [data-world="pulse"] .strip > div:nth-child(-n + 2) { border-top: 0; }
+  [data-world="pulse"] .strip > div:last-child { grid-column: 1 / -1; }
+  [data-world="pulse"] .strip p, [data-world="pulse"] .tools { font-size: max(15px, calc(var(--u) * 15)); }
+  [data-world="pulse"] .chal { padding: calc(var(--u) * 64) 0 calc(var(--u) * 56); }
+  [data-world="pulse"] .chs { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; row-gap: calc(var(--u) * 48); margin: calc(var(--u) * 32) calc(var(--u) * 16) 0; }
+  [data-world="pulse"] .ch { grid-row: auto; grid-template-rows: none; }
+  [data-world="pulse"] .ch-title { font-size: calc(var(--u) * 24); }
+  [data-world="pulse"] .outcome { padding: calc(var(--u) * 64) 0; }
+  [data-world="pulse"] .out-lines, [data-world="pulse"] .outcome .display, [data-world="pulse"] .quote p { font-size: calc(var(--u) * 30); }
+  [data-world="pulse"] .next { height: auto; padding-bottom: calc(var(--u) * 40); }
+  [data-world="pulse"] :is(.er, .cy, .pu) { position: relative; inset: auto; display: block; padding: calc(var(--u) * 40) calc(var(--u) * 16) calc(var(--u) * 24); margin-top: calc(var(--u) * 24); }
+  [data-world="pulse"] :is(.er-text, .cy-text, .pu-text) { position: static; width: auto; }
+  [data-world="pulse"] :is(.er-title, .cy-title, .pu-title) { font-size: calc(var(--u) * 48); margin-top: calc(var(--u) * 24); }
+  [data-world="pulse"] :is(.er-line, .cy-line, .pu-line) { margin-top: calc(var(--u) * 16); }
+  [data-world="pulse"] :is(.er-frame, .cy-frame) { position: relative; left: auto; top: auto; width: 100%; height: calc(var(--u) * 240); margin-top: calc(var(--u) * 28); }
+  [data-world="pulse"] .pu-phone { position: relative; left: auto; top: auto; width: calc(var(--u) * 200); margin: calc(var(--u) * 28) auto 0; }
+}
