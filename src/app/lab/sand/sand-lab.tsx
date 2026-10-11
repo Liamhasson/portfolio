@@ -223,6 +223,7 @@ export function SandLab() {
       // grains leaving the sand: the scene's atmosphere (drift-grains.ts)
       const drift = new DriftGrains(field.material, tier === "low" ? 600 : 1600);
       if (new URLSearchParams(window.location.search).get("streams") === "0") drift.streams = 0;   // compare: all loose
+      if (new URLSearchParams(window.location.search).get("grainshadow") === "0") drift.material.uniforms.uGrainShadow.value = 0;   // compare: unshadowed
       drift.mesh.layers.set(SAND_LAYER);
       stage.scene.add(drift.mesh);
       // once the ball has formed nothing hangs around it: under the cursor its own grains come out and go back in

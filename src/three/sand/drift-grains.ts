@@ -13,7 +13,8 @@ import * as THREE from "three";
  * that fans out into a plume as it goes; each stream its own size, pace, length and depth), held together as a flock
  * (separation + cohesion, from the C4D particles tutorial); the rest stay loose, a spray.
  *
- * Solid, never see-through: a grain with no light on it simply isn't there (it shrinks to nothing), so none shows as a
+ * In the sand's own shadows (the same density volumes it is shaded with). Solid, never see-through: a grain with no
+ * light on it simply isn't there (it shrinks to nothing), so none shows as a
  * dark speck over the lit desk. Motion blur: each grain is stretched behind itself along its motion by how far it moves
  * in a shutter of 1/60 s (a flicked grain streaks, a drifting one stays sharp). Drawn in the sand's layer.
  */
@@ -36,6 +37,23 @@ uniform vec3 uCursorCol;
 uniform float uCursorReach;
 uniform float uExposure;
 uniform float uShutter;    // seconds the blur spans
+// the sand's own shadows (shaders.ts: the same density volumes, frames and march), so a grain behind the cloud is in
+// its shadow as the cloud's own grains are
+uniform vec3 uLo;
+uniform vec3 uSize;
+uniform sampler3D uVolA;
+uniform sampler3D uVolB;
+uniform float uVolMix;
+uniform float uSigmaMax;
+uniform vec2 uShadowK;
+uniform float uCompact;
+uniform float uGrainShadow;   // 1 = in the sand's shadows, 0 = as before (lab compare)
+uniform vec3 uChaosC;
+uniform mat3 uChaosRot;
+uniform vec3 uBallC;
+uniform vec3 uBallVolC;
+uniform float uBallVolS;
+uniform mat3 uBallRot;
 out vec3 vNormal;          // view space
 out vec3 vView;
 out vec3 vAlbedo;
@@ -49,11 +67,31 @@ vec3 ramp(float h) {
   return c;
 }
 vec3 qrot(vec4 q, vec3 v) { return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v); }
+float density(vec3 p) {
+  vec3 uvw = (p - uLo) / uSize;
+  if (any(lessThan(uvw, vec3(0.0))) || any(greaterThan(uvw, vec3(1.0)))) return 0.0;
+  float v = mix(texture(uVolA, uvw).r, texture(uVolB, uvw).r, uVolMix);
+  return v * v * uSigmaMax;   // sqrt encoding
+}
+// light reaching p from a light through the sand (fewer steps than the sand's own: these grains are few and small)
+float transmittance(vec3 p, vec3 lightPos, float dist, float k) {
+  vec3 dir = normalize(lightPos - p);
+  float ds = dist / 6.0, tau = 0.0;
+  for (int i = 0; i < 6; i++) tau += density(p + dir * ds * (float(i) + 0.5)) * ds;
+  return exp(-tau * k);
+}
 void main() {
+  // the sand's frame for its volumes, at the sand's compaction (as the sand's own grains are shaded)
+  float t = smoothstep(0.0, 1.0, uCompact);
+  mat3 chaosInv = transpose(uChaosRot), ballInv = transpose(uBallRot);
+  vec3 pv = mix(uChaosC + chaosInv * (iPos - uChaosC), uBallVolC + ballInv * (iPos - uBallC) * uBallVolS, t);
+  float shadowK = mix(uShadowK.x, uShadowK.y, t) * uGrainShadow;
   vec3 E[3];
   for (int i = 0; i < 3; i++) {
     vec3 Lv = uLightPos[i] - iPos;
-    E[i] = uLightCol[i] / (dot(Lv, Lv) + uLightR2[i]);
+    vec3 lp = mix(uChaosC + chaosInv * (uLightPos[i] - uChaosC), uBallVolC + ballInv * (uLightPos[i] - uBallC) * uBallVolS, t);
+    float T = transmittance(pv, lp, min(length(Lv) * mix(1.0, uBallVolS, t), mix(8.5, 3.0, t)), shadowK);
+    E[i] = uLightCol[i] * T / (dot(Lv, Lv) + uLightR2[i]);
   }
   E[0] *= smoothstep(uSpotCos.x, uSpotCos.y, dot(normalize(iPos - uLightPos[0]), uSpotDir));
   float dc = distance(iPos, uCursorPos) / uCursorReach;
@@ -225,6 +263,10 @@ export class DriftGrains {
         uSpec: su.uSpec, uLampSat: su.uLampSat,   // the sand's calibrated sheen and lamp colour
         uGain: { value: 1 },
         uShutter: { value: 1 / 60 },
+        // the sand's shadows: its own uniforms, shared (its volumes swap as it compacts)
+        uLo: su.uLo, uSize: su.uSize, uVolA: su.uVolA, uVolB: su.uVolB, uVolMix: su.uVolMix, uSigmaMax: su.uSigmaMax,
+        uShadowK: su.uShadowK, uCompact: su.uCompact, uChaosC: su.uChaosC, uChaosRot: su.uChaosRot, uBallC: su.uBallC,
+        uBallVolC: su.uBallVolC, uBallVolS: su.uBallVolS, uBallRot: su.uBallRot, uGrainShadow: { value: 1 },
       },
     });
     this.mesh = new THREE.InstancedMesh(geo, this.material, max);
