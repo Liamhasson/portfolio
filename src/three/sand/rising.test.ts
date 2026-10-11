@@ -29,13 +29,13 @@ describe("rising sand", () => {
     }
   });
 
-  test("never all at once, never a snowfall: between 8% and 30% of the desk is in the air at any moment", () => {
+  test("a few at a time, like the rocks on Lusion's floor (Liam): between 3% and 15% in the air at any moment", () => {
     const S = seeds(3000);
     for (const t of [0, 7.3, 31, 120, 999]) {
       let up = 0;
       S.forEach((s, i) => { if (grainAt([((i * 37) % 120) / 10 - 6, -4.6, ((i * 53) % 60) / 10 - 3], s, t).lift > 0) up++; });
-      expect(up / S.length).toBeGreaterThan(0.08);
-      expect(up / S.length).toBeLessThan(0.3);
+      expect(up / S.length).toBeGreaterThan(0.03);
+      expect(up / S.length).toBeLessThan(0.15);
     }
   });
 
@@ -46,7 +46,7 @@ describe("rising sand", () => {
     expect(near).toBeLessThan(0.05);
     expect(far).toBeGreaterThan(near);
     // two grains 0.1 apart start lifting within a few seconds of each other
-    const startOf = (x: number) => { for (let t = 0; t < 40; t += 0.02) if (grainAt([x, -4.6, 0], s, t).lift > 0) return t; return 40; };
+    const startOf = (x: number) => { for (let t = 0; t < 400; t += 0.05) if (grainAt([x, -4.6, 0], s, t).lift > 0) return t; return 400; };
     expect(Math.abs(startOf(2.0) - startOf(2.1))).toBeLessThan(3);
   });
 

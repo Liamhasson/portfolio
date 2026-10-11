@@ -16,6 +16,9 @@ from pallet import spill_points  # noqa: E402
 rng = np.random.default_rng(23)
 hh = rng.uniform(0.45, 0.9, 10000).astype(np.float32)   # (no sand object in this scene: the spill's own hue range)
 pts, hue, _r = spill_points(np, rng, hh, True)
+# (Liam, 2026-10-11: a few light single grains, as the rocks on Lusion's floor, never a puddle: the scatter only, without
+# the mound under the ball's place, its first 22 000 points)
+pts, hue = pts[22000:], hue[22000:]
 # the note the camera passes ("Who is this product for?", lookdev.py sticky_hero: 7.6 cm, at (0.075, -0.095), turned -0.21)
 # stays clear, so its handwriting reads (Liam, 2026-10-11)
 ca, sa = np.cos(0.21), np.sin(0.21)

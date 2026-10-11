@@ -128,8 +128,11 @@ def build():
     frames[-1].update(position=list(j_pos), quaternion=list(j_q), lens_mm=j_lens, lid_open_deg=tp[JOIN]["lid_open_deg"])
     for k in range(JOIN + 1, th["frames"]):
         e = tp[k]
+        # (the focus on the screen as the camera closes in: a fixed 0.5 m blew the grains near the lens into burrs)
+        sc = e.get("screen_corners")
+        focus = math.sqrt(dot(sub(mul(add(add(sc[0], sc[1]), add(sc[2], sc[3])), 0.25), e["position"]), sub(mul(add(add(sc[0], sc[1]), add(sc[2], sc[3])), 0.25), e["position"]))) if sc else frames[-1]["focus_m"]
         frames.append({"frame": len(frames) + 1, "position": e["position"], "quaternion": e["quaternion"], "lens_mm": e["lens_mm"],
-                       "sensor_mm": 36, "lid_open_deg": e["lid_open_deg"], "focus_m": frames[-1]["focus_m"]})
+                       "sensor_mm": 36, "lid_open_deg": e["lid_open_deg"], "focus_m": focus})
     g0, g1 = BEATS["glide"]
     at_k = lambda k: g0 + (g1 - g0) * (LID[0] + (LID[1] - LID[0]) * (k - 136) / (JOIN - 136))   # tail index -> glide frame
     return {

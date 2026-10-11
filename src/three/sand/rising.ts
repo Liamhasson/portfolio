@@ -9,9 +9,10 @@
  * nears the ball's height; the next life grows in from nothing a little way from the last spot (cracks: along the crack).
  */
 export const RISE = {
-  periodMin: 10, periodMax: 20,   // seconds per life, by region
-  restMin: 0.72, restMax: 0.9,    // the share of a life at rest (8-30% in the air at once: never a snowfall; Liam's waves)
-  growIn: 0.1,                    // the share of a life growing in (1-2 s)
+  periodMin: 90, periodMax: 160,  // seconds per life, by region (long: each grain rests most of it, then floats up slowly,
+                                  // 4-19 s, as the rocks on Lusion's floor: Liam, 2026-10-11)
+  restMin: 0.88, restMax: 0.96,   // the share of a life at rest (3-15% in the air at once: a few at a time, never a snowfall)
+  growIn: 0.04,                   // the share of a life growing in (4-6 s, from nothing)
   fadeFrom: 0.8,                  // the lift past which it fades
   height: 6.0,                    // hero units it rises (the desk is 4.6 below the ball)
   sway: 0.25,                     // hero units of sideways drift at the top
@@ -32,30 +33,35 @@ float rNoise(vec2 p) {
   float d = rHash(dot(i + vec2(1.0, 1.0), vec2(127.1, 311.7)));
   return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
 }
-// x: which life, y: how far through it (0..1)
-vec2 risePhase(vec4 rest, vec4 seed, float t) {
+// x: which life, y: how far through it (0..1), z: its length (s)
+vec3 risePhase(vec4 rest, vec4 seed, float t) {
   float n1 = rNoise(rest.xz * ${f(RISE.waveScale)});
   float n2 = rNoise(rest.xz * ${f(RISE.offsetScale)} + vec2(17.3, -4.1));
   float period = mix(${f(RISE.periodMin)}, ${f(RISE.periodMax)}, n1) * (1.0 + 0.08 * (seed.x * 2.0 - 1.0));
   float ph = t / period + 2.0 * n2 + 0.15 * seed.y;
-  return vec2(floor(ph), fract(ph));
+  return vec3(floor(ph), fract(ph), period);
 }
+float riseRestShare(vec4 seed) { return mix(${f(RISE.restMin)}, ${f(RISE.restMax)}, seed.z); }
 float riseLift(vec4 seed, float u) {
-  float restShare = mix(${f(RISE.restMin)}, ${f(RISE.restMax)}, seed.z);
-  float a = clamp((u - restShare) / (1.0 - restShare), 0.0, 1.0);
-  return pow(a, 1.8 + seed.w);
+  float rs = riseRestShare(seed);
+  return pow(clamp((u - rs) / (1.0 - rs), 0.0, 1.0), 1.8 + seed.w);
 }
-float riseAlpha(vec4 rest, vec4 seed, float t) {
-  vec2 ph = risePhase(rest, seed, t);
-  return smoothstep(0.0, ${f(RISE.growIn)}, ph.y) * (1.0 - smoothstep(${f(RISE.fadeFrom)}, 1.0, riseLift(seed, ph.y)));
+// (all from one phase: each grain works it out once a frame)
+float riseAlpha(vec3 ph, float lift) {
+  return smoothstep(0.0, ${f(RISE.growIn)}, ph.y) * (1.0 - smoothstep(${f(RISE.fadeFrom)}, 1.0, lift));
 }
-vec3 risePos(vec4 rest, vec4 seed, float t, float deskY) {
-  vec2 ph = risePhase(rest, seed, t);
-  float lift = riseLift(seed, ph.y);
+vec3 risePos(vec4 rest, vec4 seed, vec3 ph, float lift, float t, float deskY) {
   vec2 j = (vec2(rHash(seed.x * 91.7 + ph.x * 13.13), rHash(seed.y * 53.3 + ph.x * 7.77)) - 0.5) * ${f(RISE.jitter)};
   if (rest.y < deskY - 1e-4) j.y = 0.0;   // in a plank's crack: only along it
   float sway = lift * ${f(RISE.sway)};
   return vec3(rest.x + j.x + sin(t * 0.7 + seed.x * 6.2831) * sway, rest.y + lift * ${f(RISE.height)}, rest.z + j.y + cos(t * 0.6 + seed.y * 6.2831) * sway);
+}
+// its velocity (the motion blur's input): the climb's own, d(lift)/dt x height
+vec3 riseVel(vec4 seed, vec3 ph) {
+  float rs = riseRestShare(seed);
+  float a = clamp((ph.y - rs) / (1.0 - rs), 0.0, 1.0);
+  float e = 1.8 + seed.w;
+  return vec3(0.0, a > 0.0 ? e * pow(a, e - 1.0) / ((1.0 - rs) * ph.z) * ${f(RISE.height)} : 0.0, 0.0);
 }
 `;
 

@@ -2,7 +2,7 @@
 import { describe, expect, test } from "vitest";
 import { BEATS, STORY_SCREENS, ease, pAtFrame, reducedStory, shotFrame, span, type ShotBeats } from "./story-timeline";
 
-const SHOT: ShotBeats = { ease: [0, 39], tilt: [39, 79], glide: [79, 149], tail: [149, 208] };
+const SHOT: ShotBeats = { ease: [0, 39], tilt: [39, 79], glide: [79, 149], tail: [149, 188] };   // public/lab/shot/camera.json
 
 describe("story timeline", () => {
   test("the beats run in order, in screens, and end with the story", () => {
@@ -36,8 +36,8 @@ describe("story timeline", () => {
     expect(shotFrame(BEATS.compact[1], SHOT)).toBe(39);
     expect(shotFrame((BEATS.hold[0] + BEATS.hold[1]) / 2, SHOT)).toBe(39);
     expect(shotFrame(BEATS.tilt[1], SHOT)).toBe(79);
-    expect(shotFrame(BEATS.tail[1], SHOT)).toBe(208);
-    expect(shotFrame(99, SHOT)).toBe(208);
+    expect(shotFrame(BEATS.tail[1], SHOT)).toBe(188);
+    expect(shotFrame(99, SHOT)).toBe(188);
   });
 
   test("the shot's frame never runs backwards", () => {
@@ -50,7 +50,7 @@ describe("story timeline", () => {
   });
 
   test("pAtFrame inverts shotFrame", () => {
-    for (const f of [0, 20, 39, 60, 79, 120, 149, 180, 208]) expect(shotFrame(pAtFrame(f, SHOT), SHOT)).toBeCloseTo(f, 5);
+    for (const f of [0, 20, 39, 60, 79, 120, 149, 170, 188]) expect(shotFrame(pAtFrame(f, SHOT), SHOT)).toBeCloseTo(f, 5);
   });
 
   test("reduced motion: held states (cloud, ball, desk, index) joined by crossfades through black", () => {

@@ -38,12 +38,13 @@ export function pickTier(s: TierSignals, override?: QualityTier): QualityTier {
 }
 
 const GRAINS: Record<QualityTier, number> = { high: 400_000, mid: 160_000, low: 60_000 };
-// (an M1 Pro holds ~200k at 60 fps at full Retina sharpness; the count follows the frame time from here)
+// the approved look is what Liam's M1 Pro showed this morning (the old governor had settled it at mid: 160k grains, 8
+// shadow steps): high starts there, at full sharpness, and only climbs where the frame time allows
 const GRAINS_MIN: Record<QualityTier, number> = { high: 160_000, mid: 100_000, low: 40_000 };
-const GRAINS_START: Record<QualityTier, number> = { high: 220_000, mid: 140_000, low: 60_000 };
+const GRAINS_START: Record<QualityTier, number> = { high: 160_000, mid: 140_000, low: 60_000 };
 const MAX_PIXEL_RATIO: Record<QualityTier, number> = { high: 2, mid: 1.5, low: 1 };
 const MIN_PIXEL_RATIO: Record<QualityTier, number> = { high: 1.5, mid: 1, low: 1 };
-const SHADOW_STEPS: Record<QualityTier, number> = { high: 16, mid: 8, low: 4 };
+const SHADOW_STEPS: Record<QualityTier, number> = { high: 8, mid: 6, low: 4 };
 
 export function settingsFor(tier: QualityTier, dpr: number): TierSettings {
   return {

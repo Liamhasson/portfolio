@@ -45,10 +45,17 @@ describe("settingsFor", () => {
   test("each tier's grain range: a floor, a start and the most it loads (the governor moves between them)", () => {
     for (const t of ["high", "mid", "low"] as const) {
       const s = settingsFor(t, 2);
-      expect(s.grainsMin).toBeLessThan(s.grainsStart);
+      expect(s.grainsMin).toBeLessThanOrEqual(s.grainsStart);
       expect(s.grainsStart).toBeLessThanOrEqual(s.grains);
     }
     expect(settingsFor("high", 2).grainsMin).toBeGreaterThanOrEqual(150_000);   // the sand never thins to the blocky look
+  });
+  test("high starts on the approved look (Liam's Mac this morning: 160k grains, 8 shadow steps), sharper", () => {
+    const h = settingsFor("high", 2);
+    expect(h.grainsStart).toBe(160_000);
+    expect(h.grainsMin).toBe(160_000);
+    expect(h.shadowSteps).toBe(8);
+    expect(h.pixelRatio).toBe(2);
   });
   test("sharpness has a floor: a laptop at 2x never drops below 1.5x (never pixelated); the floor never tops the cap", () => {
     expect(settingsFor("high", 2).pixelRatioMin).toBe(1.5);

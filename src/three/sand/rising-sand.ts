@@ -12,11 +12,13 @@ uniform float uDeskY;
 uniform float uGrainR;
 ${RISE_GLSL}`;
 const LOCALS = `
-  vec3 iPos = risePos(aRest, aSeed, uRiseTime, uDeskY);
-  vec3 iVel = (iPos - risePos(aRest, aSeed, uRiseTime - 1.0 / 60.0, uDeskY)) * 60.0;
+  vec3 ph = risePhase(aRest, aSeed, uRiseTime);
+  float lift = riseLift(aSeed, ph.y);
+  vec3 iPos = risePos(aRest, aSeed, ph, lift, uRiseTime, uDeskY);
+  vec3 iVel = riseVel(aSeed, ph);
   // (shrinking away within ~15 cm of the lens: the camera comes down among them, none swells into a blot over the laptop)
   float nearK = smoothstep(1.0, 2.5, distance(iPos, cameraPosition));
-  vec2 iSizeHue = vec2(uGrainR * mix(0.7, 1.3, aSeed.w) * riseAlpha(aRest, aSeed, uRiseTime) * uRiseOn * nearK, aRest.w);
+  vec2 iSizeHue = vec2(uGrainR * mix(0.7, 1.3, aSeed.w) * riseAlpha(ph, lift) * uRiseOn * nearK, aRest.w);
   float iSeed = aSeed.x;`;
 
 /**

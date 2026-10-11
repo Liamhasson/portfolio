@@ -33,6 +33,8 @@ const PAGE_VH = STORY_SCREENS * 100 + 100;
 /** The frame the screen wakes on (0-based; the shot's camera.json). */
 let WAKE_FRAME = 136;
 const SHOT_BASE = "/lab/shot";
+/** (the removed cloud passage and front key, held off) */
+const NO_AXIS = new THREE.Vector3(0, 0, 1), NO_KEY = new THREE.Vector3();
 /** The open laptop's fill (lookdev.py: area light, 0.9 m, 38 W, rising with the lid), lighting the sand too. */
 const SIDE_FILL = { pos: [1.35, -0.95, 0.45], watts: 38, color: [1.0, 0.86, 0.72], radius: 4.5 };
 /**
@@ -75,6 +77,7 @@ export function SandLab() {
   const indexRef = useRef<WorkIndexHandle | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const veilRef = useRef<HTMLDivElement>(null);
+  const projectsRef = useRef<HTMLDivElement>(null);
   const spacerRef = useRef<HTMLDivElement>(null);
   const bindIndex = useCallback((h: WorkIndexHandle) => { indexRef.current = h; }, []);
   const [status, setStatus] = useState("loading sand");
@@ -186,6 +189,7 @@ export function SandLab() {
       stage.scene.add(drift.mesh);
       const lean = new THREE.Vector2();     // the eased lean, -1..1 each way
       let spacerTick = 0;
+      let riseClock = 0;
       // the desk's top as a rectangle in the hero's units (x, z) and its height, for keeping the top view inside it
       let deskTop: { min: THREE.Vector2; max: THREE.Vector2; y: number } | null = null;
       // the desk, then the rising sand: textures uploaded and shaders compiled before they join the scene (no hitch as
@@ -214,7 +218,7 @@ export function SandLab() {
         (window as unknown as { __desk3d?: unknown }).__desk3d = d;
         const spots = await RisingSand.loadSpots(`${SAND_BASE}/desk-spill.bin`, shot.data.chaos_center, shot.data.chaos_scale).catch(() => null);
         if (disposed || !spots) return;
-        const r = new RisingSand(field!.material, spots, tier === "low" ? 6000 : 20000);
+        const r = new RisingSand(field!.material, spots, { high: 900, mid: 700, low: 400 }[tier]);   // a few single grains (Liam: Lusion's floor)
         r.mesh.layers.set(SAND_LAYER);
         await st.renderer.compileAsync(r.mesh, st.camera, st.scene).catch(() => {});
         if (disposed) return;
@@ -243,7 +247,7 @@ export function SandLab() {
       const BALL_LOOK = { shadowK: 0.571, cavity: 0.3, cavityDepth: 0.071, wrap: 0.15, bounce: 0.06, spec: 0.15, radScale: 1.0 };
       (window as unknown as { __ballLook?: (l: Partial<typeof BALL_LOOK>) => void }).__ballLook = (l) => Object.assign(BALL_LOOK, l);   // calibration
       const deskBall = shot?.deskLights(g.wattsToIrradiance, [0.305, 1.0, 0], { radii: [0.573, 1.2, 3.0], spotDeg: 116, blend: 1.0 });
-      // lab calibration: ?pbframe=N holds the camera on a path frame; __pbGains sets the desk lights' gains
+      // lab calibration: __pbGains sets the desk lights' gains
       let lampSat = 0.2;
       const groundCol = new THREE.Vector3(1.0, 0.7, 0.406).multiplyScalar(0.444);
       (window as unknown as { __pbGround?: (g: number, c: number) => void }).__pbGround = (g, c) => { groundCol.set(1.0, c, c * 0.58).multiplyScalar(g); };
@@ -416,7 +420,10 @@ export function SandLab() {
         // (the story's own length: past it, the page runs on through the index's projects)
         const max = Math.max(1, (pageRef.current?.offsetHeight ?? document.documentElement.scrollHeight) - window.innerHeight);
         const progress = Math.min(window.scrollY / max, 1);
-        const rawP = hero ? (progress * (PAGE_VH - 100)) / 100 : progress;
+        // the story's end is where the index's anchor is (#projects), measured, not assumed: on phones vh is the large
+        // viewport while innerHeight shrinks under the URL bar, so a jump to the anchor must still land on the end
+        const storyEnd = hero && projectsRef.current ? Math.max(1, projectsRef.current.getBoundingClientRect().top + window.scrollY) : max;
+        const rawP = hero ? STORY_SCREENS * Math.min(window.scrollY / storyEnd, 1) : progress;
         if (hero && reduced) {
           // reduced motion (spec §8): held states joined by crossfades through black, no shot
           const r = reducedStory(rawP);
@@ -538,10 +545,14 @@ export function SandLab() {
                 ix.list(0);
                 ix.interactive(sett > 0.999 ? "wide" : "none");
               }
-              ix.scroll(Math.max(window.scrollY - max, 0));
+              ix.scroll(Math.max(window.scrollY - storyEnd, 0));
               if (++spacerTick % 20 === 0 && spacerRef.current) {
                 const need = `${Math.round(ix.overflow())}px`;
-                if (spacerRef.current.style.height !== need) spacerRef.current.style.height = need;
+                if (spacerRef.current.style.height !== need) {
+                  spacerRef.current.style.height = need;
+                  // (the anchor covers the index and its projects, so the nav's Projects is lit while they're in view)
+                  if (projectsRef.current) projectsRef.current.style.height = `calc(100vh + ${need})`;
+                }
               }
             } else {
               ix.show(0); ix.panel(null); ix.list(0); ix.interactive("none");
@@ -559,12 +570,12 @@ export function SandLab() {
                 ix.place([[x0, y0], [x0 + cw, y0], [x0 + cw, y0 + ch], [x0, y0 + ch]]);
                 ix.show(1); ix.panel({ x: 0, y: 0, w: W, h: H }, 1); ix.list(0); ix.interactive("wide");
               }
-              ix.scroll(Math.max(window.scrollY - max, 0));
+              ix.scroll(Math.max(window.scrollY - storyEnd, 0));
             } else { ix.show(0); ix.panel(null); ix.list(0); ix.interactive("none"); }
           }
           // no cloud passage any more: the cloud's parting off, no defocus; the desk's dim lifts as the lamp finds it
-          field!.setCloud(0, 0, new THREE.Vector3(0, 0, 1), 0, 0, 0, 1e9, 1e9, 1, 0, 1);
-          field!.setFrontKey(new THREE.Vector3());
+          field!.setCloud(0, 0, NO_AXIS, 0, 0, 0, 1e9, 1e9, 1, 0, 1);
+          field!.setFrontKey(NO_KEY);
           if (composite) { composite.defocus = 0; composite.deskDim = 0.6 * (1 - ease(p, [BEATS.tilt[0] + 0.1, BEATS.tilt[1] + 0.1])); }
           // the ball above, out of frame: its shadow on the desk and the hero light's spill around it (spec §8)
           if (desk3d) {
@@ -602,8 +613,11 @@ export function SandLab() {
           // under reduced motion)
           const um = field!.material.uniforms;
           const grainR = (um.uRadMax.value as number) * (um.uCountScale.value as number) * 0.7 * (um.uRadScale.value as THREE.Vector2).y;
-          rising?.update(state.time, ease(p, [BEATS.tilt[0], BEATS.tilt[0] + 0.3]) * (1 - ease(p, [BEATS.tail[1] - 0.15, BEATS.tail[1]])),
-            deskTop ? deskTop.y : -4.6, grainR);
+          // (gone before the screen fills the frame: grains between the lens and the screen read as burrs over the index)
+          const riseOn = ease(p, [BEATS.tilt[0], BEATS.tilt[0] + 0.3]) * (1 - ease(p, [BEATS.tail[0] + 0.3, BEATS.tail[0] + 0.6]));
+          // its own clock, restarted whenever it's out of sight: a float32 time grows coarse over hours on the page
+          riseClock = riseOn > 0.001 ? riseClock + (reduced || still ? 0 : dt) : 0;
+          rising?.update(riseClock, riseOn, deskTop ? deskTop.y : -4.6, grainR);
           // the desk hides the sand only where sand can be under or behind it: while the rising sand is drawn
           if (composite) composite.occluder = rising?.mesh.visible ? desk3d!.group : null;
         }
@@ -640,7 +654,7 @@ export function SandLab() {
             // the ball forms (the idea becomes clear); the shot's own focus over the desk; off for the push into the screen
             const clear = hero ? ease(state.compact, [0.0, 0.6]) : 0;
             const fstop = Math.exp(THREE.MathUtils.lerp(Math.log(SAND_LOOK.dofFstop), Math.log(2.0), clear));
-            const lensK = dofOn ? (hero ? 1 - ease(pg, [BEATS.tail[0] + 0.4, BEATS.tail[1]]) : 1) : 0;
+            const lensK = dofOn ? (hero ? 1 - ease(pg, [BEATS.tail[0] + 0.2, BEATS.tail[0] + 0.6]) : 1) : 0;
             // the focus follows the subject: the cloud's lit front (its centre less a third of its radius), then the ball
             const cs0 = field!.material.uniforms.uChaosSize.value as THREE.Vector3;
             const r0 = THREE.MathUtils.lerp(0.5 * Math.min(cs0.x, cs0.y, cs0.z), (field!.material.uniforms.uBallR.value as number) * 1.05, state.compact);
@@ -699,6 +713,15 @@ export function SandLab() {
       stage.start();
       (window as unknown as { __sand?: unknown }).__sand = { stage, field, state, drift, rising: null, composite };   // lab debugging
       loadDesk().catch(() => {});
+      // arriving with a section's hash (the nav from a case study, a shared link): the anchor didn't exist when the browser
+      // looked for it (the story is client-only), so go there now
+      const hash = window.location.hash.slice(1);
+      if (hero && ["projects", "about", "contact"].includes(hash)) {
+        requestAnimationFrame(() => {
+          const el = document.getElementById(hash);
+          if (el) window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY);
+        });
+      }
     })().catch((err) => {
       setStatus(String(err));
       setFallback(true);
@@ -780,9 +803,9 @@ export function SandLab() {
     <>
     <div ref={pageRef} className="relative bg-black" style={{ height: hero ? `${PAGE_VH}vh` : "400vh" }}>
       <canvas ref={canvasRef} className="fixed inset-0 h-screen w-screen" data-testid="sand-canvas" />
-      {hero && <div ref={veilRef} aria-hidden className="pointer-events-none fixed inset-0 bg-black opacity-0" style={{ zIndex: 5 }} />}
+      {hero && <div ref={veilRef} aria-hidden className="pointer-events-none fixed inset-0 bg-black opacity-0" style={{ zIndex: 30 }} />}
       {/* the nav's Projects (/#projects) lands where the index has settled (once this page is the home) */}
-      {hero && <div id="projects" aria-hidden className="pointer-events-none absolute left-0 w-px" style={{ top: `${PAGE_VH - 100}vh`, height: 1 }} />}
+      {hero && <div ref={projectsRef} id="projects" aria-hidden className="pointer-events-none absolute left-0 w-px" style={{ top: `${PAGE_VH - 100}vh`, height: "100vh" }} />}
       {hero && <WorkIndex bind={bindIndex} />}
       {hero ? (
         <HeroOverlay
