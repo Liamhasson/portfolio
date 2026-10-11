@@ -178,6 +178,7 @@ const VIEW = {
   uShR: { value: 0 },    // how dark the ball reads in a reflection (the glass mirrors the bright room: little)
   uShL: { value: 0 },    // how much of the panels' light it blocks (sand: as the lamp; glass: little, it focuses them through)
   uLidDebug: { value: 0 },   // lab: 1 draws what the lid blocks (red)
+  uSpillC: { value: new THREE.Vector3() }, uSpillR: { value: 1 }, uSpillK: { value: new THREE.Vector3() },   // the hero light from above (spec 2026-10-11 §8)
 };
 
 /**
@@ -328,6 +329,7 @@ function withBallShadow(material: THREE.Material): void {
     Object.assign(shader.uniforms, VIEW);
     shader.fragmentShader =
       "uniform vec3 uShBall;\nuniform float uShBallR;\nuniform vec3 uShLamp;\nuniform float uShLampR;\nuniform float uShK;\nuniform float uShAO;\nuniform float uShR;\nuniform float uShL;\n" +
+      "uniform vec3 uSpillC;\nuniform float uSpillR;\nuniform vec3 uSpillK;\n" +
       DISC_COVER +
       shader.fragmentShader
         .replace("void main() {", OCC_PASS + "void main() {")
@@ -362,6 +364,11 @@ function withBallShadow(material: THREE.Material): void {
           float dC = max(length(toC), uShBallR);
           float occ = (uShBallR * uShBallR) / (dC * dC) * clamp(dot(normal, toC / dC), 0.0, 1.0);
           totalEmissiveRadiance *= 1.0 - uShAO * occ;
+        }
+        {
+          // the hero light, still on the ball above, spilling down onto the desk: a soft warm pool (the baked light, brighter)
+          float ds = length(-vViewPosition - uSpillC) / max(uSpillR, 1e-4);
+          totalEmissiveRadiance *= vec3(1.0) + uSpillK * exp(-ds * ds);
         }
         #include <lights_physical_fragment>`,
       );
@@ -508,6 +515,7 @@ export class BakedDesk {
   private readonly tmp = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
   /** The ball's shadow, in the hero's units (world): ball, its radius, the lamp, its radius, strength. */
   private readonly shadow = { ball: new THREE.Vector3(), ballR: 1, lamp: new THREE.Vector3(), lampR: 1, k: 0 };
+  private readonly spill = { centre: new THREE.Vector3() };
   private viewStamp = -1;
 
   /** Carries the lid, the screen, the ball and the lamp into the camera's view space (as the desk renders, with the
@@ -535,6 +543,7 @@ export class BakedDesk {
     }
     VIEW.uShBall.value.copy(this.shadow.ball).applyMatrix4(v);
     VIEW.uShLamp.value.copy(this.shadow.lamp).applyMatrix4(v);
+    VIEW.uSpillC.value.copy(this.spill.centre).applyMatrix4(v);
   };
 
   /** The screen's corners in the world (hero units): top-left, top-right, bottom-right, bottom-left of the index. */
@@ -555,6 +564,14 @@ export class BakedDesk {
     const sh = this.shadow;
     sh.ball.copy(ball); sh.lamp.copy(lamp); sh.ballR = ballR; sh.lampR = lampR; sh.k = k;
     VIEW.uShBallR.value = ballR; VIEW.uShLampR.value = lampR; VIEW.uShK.value = k; VIEW.uShAO.value = ao;
+    this.viewStamp = -1;
+  }
+
+  /** The hero light's pool on the desk: `centre` (world, hero units), `radius` (hero units), `gain` per channel (0 = off). */
+  setSpill(centre: THREE.Vector3, radius: number, gain: THREE.Vector3): void {
+    this.spill.centre.copy(centre);
+    VIEW.uSpillR.value = radius;
+    VIEW.uSpillK.value.copy(gain);
     this.viewStamp = -1;
   }
 
