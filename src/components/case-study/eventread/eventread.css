@@ -256,3 +256,45 @@
   [data-world="eventread"] :is(.er-frame, .cy-frame) { position: relative; left: auto; top: auto; width: 100%; height: calc(var(--u) * 240); margin-top: calc(var(--u) * 28); }
   [data-world="eventread"] .pu-phone { position: relative; left: auto; top: auto; width: calc(var(--u) * 200); margin: calc(var(--u) * 28) auto 0; }
 }
+
+/* ------------------------------ middle on phones (board frame "Mobile · 390") ------------------------------ */
+/* the phone calculator (class m-calc), shown only below 1100px */
+[data-world="eventread"] .m-calc { margin-top: calc(var(--u) * 36); }
+[data-world="eventread"] .m-calc .calc-top { height: auto; padding: calc(var(--u) * 18); }
+[data-world="eventread"] .m-calc .calc-date { font-size: max(15px, calc(var(--u) * 16)); }
+[data-world="eventread"] .m-calc .yours { padding: calc(var(--u) * 20) calc(var(--u) * 18) calc(var(--u) * 24); gap: calc(var(--u) * 22); border-right: 0; border-bottom: calc(var(--u) * 1) solid var(--hair); }
+[data-world="eventread"] .m-calc .row { padding: calc(var(--u) * 20) calc(var(--u) * 18) calc(var(--u) * 22); }
+[data-world="eventread"] .m-calc .ev { font-size: max(15px, calc(var(--u) * 15)); }
+[data-world="eventread"] .m-calc .meta { font-size: max(11px, calc(var(--u) * 12)); }
+[data-world="eventread"] .m-calc .row-f { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(var(--u) * 14) calc(var(--u) * 18); margin-top: calc(var(--u) * 16); }
+[data-world="eventread"] .m-calc .fac-top { font-size: max(11px, calc(var(--u) * 12)); }
+[data-world="eventread"] .m-calc .prod { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline; text-align: left; border-left: 0; padding: calc(var(--u) * 12) 0 0; border-top: calc(var(--u) * 1) solid var(--hair); }
+[data-world="eventread"] .m-calc .prod .eqn { font-size: max(15px, calc(var(--u) * 16)); }
+@container (max-width: 1099px) {
+  [data-world="eventread"] .problem { padding: calc(var(--u) * 64) 0 calc(var(--u) * 56); }
+  [data-world="eventread"] .problem .display { font-size: calc(var(--u) * 28); margin-top: calc(var(--u) * 24) !important; }
+  [data-world="eventread"] .problem-cols { margin-top: calc(var(--u) * 32) !important; row-gap: calc(var(--u) * 20); }
+  [data-world="eventread"] .fig { padding-left: 0 !important; margin-top: calc(var(--u) * 12); }
+  [data-world="eventread"] .fig-num { font-size: calc(var(--u) * 120); }
+  [data-world="eventread"] .navy { padding: calc(var(--u) * 72) 0 calc(var(--u) * 80); }
+  [data-world="eventread"] .navy .body { font-size: max(15px, calc(var(--u) * 16)); margin-top: calc(var(--u) * 20); }
+  [data-world="eventread"] .m-calc { margin: calc(var(--u) * 36) calc(var(--u) * 16) 0; }
+  [data-world="eventread"] .navy-foot { margin-top: calc(var(--u) * 48); }
+  [data-world="eventread"] .navy-foot .display { font-size: calc(var(--u) * 34); margin-top: calc(var(--u) * 24); }
+  [data-world="eventread"] .walk { padding: calc(var(--u) * 64) 0 calc(var(--u) * 56); }
+  [data-world="eventread"] .walk > .g12:first-child .body { margin-top: calc(var(--u) * 20); }
+  [data-world="eventread"] .w-step { margin-top: calc(var(--u) * 40); }
+  [data-world="eventread"] .w-title { font-size: calc(var(--u) * 24); }
+  [data-world="eventread"] .w-head .w-body { margin-top: calc(var(--u) * 12); }
+  [data-world="eventread"] .w-step .w-tray { margin: calc(var(--u) * 20) calc(var(--u) * 16) 0; padding: calc(var(--u) * 12); }
+  [data-world="eventread"] .w-pair { flex-direction: column; gap: calc(var(--u) * 20); }
+  [data-world="eventread"] .w-shot { width: 100%; }
+  [data-world="eventread"] .w-duo { margin-top: calc(var(--u) * 48); row-gap: calc(var(--u) * 48); }
+  [data-world="eventread"] .w-col { grid-template-columns: minmax(0, 1fr); }
+  [data-world="eventread"] .w-col :is(.w-num, .w-title, .w-body, .w-tray) { grid-column: 1; }
+  [data-world="eventread"] .w-col .w-title { margin-top: calc(var(--u) * 8); }
+  [data-world="eventread"] .w-col .w-tray { padding: calc(var(--u) * 12); margin-top: calc(var(--u) * 20); }
+  [data-world="eventread"] .walk .hood { margin-top: calc(var(--u) * 40); }
+}
+/* the walkthrough's captions are Liam's words in the product's label style: floored like every label */
+[data-world="eventread"] .w-shot figcaption.app-label { font-size: max(11px, calc(var(--u) * 11)); }

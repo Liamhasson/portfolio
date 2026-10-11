@@ -25,3 +25,7 @@
 :where(.cs) .mid-body > * + * { margin-top: 1em; }
 :where(.cs) .mid-body ul { list-style: disc; padding-left: 1.2em; }
 @container (max-width: 1099px) { :where(.cs) .mid { padding: calc(var(--u) * 56) 0; } :where(.cs) .mid-body { margin-top: calc(var(--u) * 20); } }
+
+/* A board shows some pieces in one layout only (Eventread's phone calculator): .only-d at ≥ 1100px, .only-m below. */
+@container (min-width: 1100px) { .cs .only-m { display: none !important; } }
+@container (max-width: 1099px) { .cs .only-d { display: none !important; } }
