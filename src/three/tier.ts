@@ -17,7 +17,9 @@ export interface TierSettings {
   /** The grain governor's range (quality.ts GrainGovernor): never fewer than this, and where it starts. */
   grainsMin: number;
   grainsStart: number;
+  /** The sharpest it draws, and the least (the governor moves between them; quality.ts GrainGovernor). */
   pixelRatio: number;
+  pixelRatioMin: number;
   /** Steps of the light march through the density volume (self-shadowing inside the sand). */
   shadowSteps: number;
   antialias: boolean;
@@ -40,6 +42,7 @@ const GRAINS: Record<QualityTier, number> = { high: 400_000, mid: 160_000, low: 
 const GRAINS_MIN: Record<QualityTier, number> = { high: 160_000, mid: 100_000, low: 40_000 };
 const GRAINS_START: Record<QualityTier, number> = { high: 220_000, mid: 140_000, low: 60_000 };
 const MAX_PIXEL_RATIO: Record<QualityTier, number> = { high: 2, mid: 1.5, low: 1 };
+const MIN_PIXEL_RATIO: Record<QualityTier, number> = { high: 1.5, mid: 1, low: 1 };
 const SHADOW_STEPS: Record<QualityTier, number> = { high: 16, mid: 8, low: 4 };
 
 export function settingsFor(tier: QualityTier, dpr: number): TierSettings {
@@ -49,6 +52,7 @@ export function settingsFor(tier: QualityTier, dpr: number): TierSettings {
     grainsMin: GRAINS_MIN[tier],
     grainsStart: GRAINS_START[tier],
     pixelRatio: Math.min(dpr, MAX_PIXEL_RATIO[tier]),
+    pixelRatioMin: Math.min(dpr, MIN_PIXEL_RATIO[tier]),
     shadowSteps: SHADOW_STEPS[tier],
     antialias: tier !== "low",
   };

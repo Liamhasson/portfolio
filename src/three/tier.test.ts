@@ -50,6 +50,11 @@ describe("settingsFor", () => {
     }
     expect(settingsFor("high", 2).grainsMin).toBeGreaterThanOrEqual(150_000);   // the sand never thins to the blocky look
   });
+  test("sharpness has a floor: a laptop at 2x never drops below 1.5x (never pixelated); the floor never tops the cap", () => {
+    expect(settingsFor("high", 2).pixelRatioMin).toBe(1.5);
+    expect(settingsFor("high", 1).pixelRatioMin).toBe(1);
+    for (const t of ["high", "mid", "low"] as const) expect(settingsFor(t, 3).pixelRatioMin).toBeLessThanOrEqual(settingsFor(t, 3).pixelRatio);
+  });
   test("shadow march steps shrink with the tier; low has no antialiasing", () => {
     expect(settingsFor("high", 2).shadowSteps).toBeGreaterThan(settingsFor("mid", 2).shadowSteps);
     expect(settingsFor("mid", 2).shadowSteps).toBeGreaterThan(settingsFor("low", 2).shadowSteps);

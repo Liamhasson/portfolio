@@ -448,15 +448,19 @@ export class SandComposite {
         if (!mesh.isMesh) return;
         const proxy = new THREE.Mesh(mesh.geometry, this.depthOnly);
         proxy.matrixAutoUpdate = false;
-        proxy.frustumCulled = false;
         this.occScene.add(proxy);
         this.occPairs.push([proxy, mesh]);
       });
       this.occFrom = this.occluder;
     }
+    // (this frame's matrices: the lid turns; and hidden if any ancestor is)
+    this.occluder!.updateMatrixWorld();
     for (const [proxy, src] of this.occPairs) {
-      proxy.visible = src.visible;
+      let shown = true;
+      for (let o: THREE.Object3D | null = src; o && shown; o = o.parent) shown = o.visible;
+      proxy.visible = shown;
       proxy.matrix.copy(src.matrixWorld);
+      proxy.matrixWorldNeedsUpdate = true;
     }
     const mask = camera.layers.mask;
     const ac = renderer.autoClear;

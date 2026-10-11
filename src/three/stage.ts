@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { GrainGovernor, QualityGovernor } from "./quality";
+import { GrainGovernor } from "./quality";
 import { settingsFor, type QualityTier, type TierSettings } from "./tier";
 
 export interface StageCamera {
@@ -26,11 +26,9 @@ export class Stage {
   /** Replaces the plain render (layered compositing, e.g. the sand's pixel filter). */
   renderFrame: ((renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) => void) | null = null;
   private readonly tierChanges = new Set<(s: TierSettings) => void>();
-  private governor: QualityGovernor;
-  /** The grain count follows the frame time (the picture stays sharp); the tier steps down only once it can't help. */
-  private grainGov: GrainGovernor;
-  private readonly mobile = typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-  /** ?governor=0 holds the starting tier (diagnostics: measure a tier's real cost). */
+  /** The grains, then the sharpness, follow the frame time, both ways (quality.ts GrainGovernor). */
+  private readonly grainGov: GrainGovernor;
+  /** ?governor=0 holds the starting grains and sharpness (diagnostics: measure their real cost). */
   private readonly governorOn = typeof window === "undefined" || new URLSearchParams(window.location.search).get("governor") !== "0";
   private raf = 0;
   private last = 0;
@@ -47,7 +45,10 @@ export class Stage {
     private readonly exactFraming = false,
   ) {
     const base = settingsFor(tier, window.devicePixelRatio || 1);
-    this.grainGov = new GrainGovernor(base.grainsMin, base.grains, base.grainsStart);
+    this.grainGov = new GrainGovernor(
+      { min: base.grainsMin, max: base.grains, start: base.grainsStart },
+      { min: base.pixelRatioMin, max: base.pixelRatio, start: base.pixelRatio },
+    );
     this.settings = { ...base, grains: this.grainGov.grains };
     this.renderer = new THREE.WebGLRenderer({
       canvas,
@@ -64,7 +65,6 @@ export class Stage {
     this.sensorMm = cam.sensorMm;
     this.hfov = 2 * Math.atan(cam.sensorMm / 2 / cam.lensMm);
     this.renderAspect = cam.renderAspect;
-    this.governor = new QualityGovernor(tier);
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(canvas);
     document.addEventListener("visibilitychange", this.onVisibility);
@@ -131,21 +131,14 @@ export class Stage {
       this.last = now;
       this.frames.forEach((cb) => cb(dt, now / 1000));
       this.draw();
-      const grains = this.governorOn ? this.grainGov.sample(frameMs) : null;
-      if (grains !== null) {
-        this.settings = { ...this.settings, grains };
-        this.tierChanges.forEach((cb) => cb(this.settings));
-      } else if (this.governorOn && this.grainGov.starved && (this.mobile || this.settings.tier === "high")) {
-        // the last resort, at the grain floor and still slow: a tier down (its resolution); a laptop never below mid
-        const next = this.governor.sample(frameMs);
-        if (next) {
-          const base = settingsFor(next, window.devicePixelRatio || 1);
-          const loaded = this.settings.grains;
-          this.grainGov = new GrainGovernor(Math.min(base.grainsMin, loaded), Math.min(base.grains, Math.max(loaded, base.grainsMin)), Math.min(base.grainsStart, loaded), { warmupMs: 0 });
-          this.settings = { ...base, grains: this.grainGov.grains };
-          this.renderer.setPixelRatio(this.settings.pixelRatio);
+      const next = this.governorOn ? this.grainGov.sample(frameMs) : null;
+      if (next) {
+        const sharper = next.pixelRatio !== this.settings.pixelRatio;
+        this.settings = { ...this.settings, grains: next.grains, pixelRatio: next.pixelRatio };
+        if (sharper) {
+          this.renderer.setPixelRatio(next.pixelRatio);
           this.resize();
-        }
+        } else this.tierChanges.forEach((cb) => cb(this.settings));
       }
       this.raf = requestAnimationFrame(loop);
     };

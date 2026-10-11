@@ -161,17 +161,9 @@ export function SandLab() {
       const shotMeta = shot?.data as unknown as ShotMeta | undefined;
       if (shotMeta) WAKE_FRAME = shotMeta.wake_frame - 1;
       if (disposed) return;
-      const desk3d = shot ? await BakedDesk.load(stage.renderer) : null;
-      if (disposed) return;
-      if (desk3d) stage.scene.add(desk3d.group);
-      if (desk3d && composite) composite.occluder = desk3d.group;   // the sand hidden under and behind the desk's objects
-      // the sand on the desk, rising toward the ball above (spec §5)
-      const spots = desk3d && shot
-        ? await RisingSand.loadSpots(`${SAND_BASE}/desk-spill.bin`, shot.data.chaos_center, shot.data.chaos_scale).catch(() => null)
-        : null;
-      if (disposed) return;
-      const rising = spots ? new RisingSand(field.material, spots, tier === "low" ? 6000 : 20000) : null;
-      if (rising) { rising.mesh.layers.set(SAND_LAYER); stage.scene.add(rising.mesh); }
+      // the desk and the sand rising off it load behind the hero (it isn't seen until the tilt): loadDesk, below
+      let deskLoaded: BakedDesk | null = null;
+      let risingLoaded: RisingSand | null = null;
       // the screen's reveal: seconds since it woke; and how far it has gone back to sleep (scrolling back up)
       let revealT = 0, sleep = 1;
       const indexMix = Number(new URLSearchParams(window.location.search).get("indexmix") || NaN);   // calibration: the index's opacity
@@ -180,7 +172,6 @@ export function SandLab() {
       const revealHold = Number(new URLSearchParams(window.location.search).get("reveal") || NaN);
       let fillGain = 1;
       (window as unknown as { __fill?: (g: number) => void }).__fill = (g) => { fillGain = g; };
-      (window as unknown as { __desk3d?: unknown }).__desk3d = desk3d;
       // grains leaving the sand: the scene's atmosphere (drift-grains.ts)
       const drift = new DriftGrains(field.material, tier === "low" ? 600 : 1600);
       if (new URLSearchParams(window.location.search).get("streams") === "0") drift.streams = 0;   // compare: all loose
@@ -197,14 +188,40 @@ export function SandLab() {
       let spacerTick = 0;
       // the desk's top as a rectangle in the hero's units (x, z) and its height, for keeping the top view inside it
       let deskTop: { min: THREE.Vector2; max: THREE.Vector2; y: number } | null = null;
-      if (desk3d) {
-        desk3d.group.updateMatrixWorld(true);
-        const top = desk3d.group.getObjectByName("bake_desk_top");
+      // the desk, then the rising sand: textures uploaded and shaders compiled before they join the scene (no hitch as
+      // the camera tilts onto them); started once the hero is running
+      const loadDesk = async () => {
+        if (!shot) return;
+        const st = stage!;
+        const d = await BakedDesk.load(st.renderer);
+        if (disposed) return;
+        d.group.traverse((o) => {
+          const mats = (o as THREE.Mesh).material;
+          for (const m of Array.isArray(mats) ? mats : mats ? [mats] : []) {
+            for (const v of Object.values(m as unknown as Record<string, unknown>)) if (v instanceof THREE.Texture) st.renderer.initTexture(v);
+          }
+        });
+        await st.renderer.compileAsync(d.group, st.camera, st.scene).catch(() => {});
+        if (disposed) return;
+        st.scene.add(d.group);
+        d.group.updateMatrixWorld(true);
+        const top = d.group.getObjectByName("bake_desk_top");
         if (top) {
           const b = new THREE.Box3().setFromObject(top);
           deskTop = { min: new THREE.Vector2(b.min.x, b.min.z), max: new THREE.Vector2(b.max.x, b.max.z), y: b.max.y };
         }
-      }
+        deskLoaded = d;
+        (window as unknown as { __desk3d?: unknown }).__desk3d = d;
+        const spots = await RisingSand.loadSpots(`${SAND_BASE}/desk-spill.bin`, shot.data.chaos_center, shot.data.chaos_scale).catch(() => null);
+        if (disposed || !spots) return;
+        const r = new RisingSand(field!.material, spots, tier === "low" ? 6000 : 20000);
+        r.mesh.layers.set(SAND_LAYER);
+        await st.renderer.compileAsync(r.mesh, st.camera, st.scene).catch(() => {});
+        if (disposed) return;
+        st.scene.add(r.mesh);
+        risingLoaded = r;
+        (window as unknown as { __sand?: { rising?: RisingSand } }).__sand!.rising = r;
+      };
       const leanQ = new THREE.Quaternion(), leanE = new THREE.Euler();
       // the shadow: lamp radius (hero units), strength, and the ball's effective solid size (its edge is sparse sand)
       const shadowK = [1.2, 0.9, 0.7];   // chosen by eye against the settle target (2026-10-09)
@@ -395,6 +412,7 @@ export function SandLab() {
       const ballC = field.material.uniforms.uBallC.value as THREE.Vector3;
 
       stage.onFrame((dt) => {
+        const desk3d = deskLoaded, rising = risingLoaded;
         // (the story's own length: past it, the page runs on through the index's projects)
         const max = Math.max(1, (pageRef.current?.offsetHeight ?? document.documentElement.scrollHeight) - window.innerHeight);
         const progress = Math.min(window.scrollY / max, 1);
@@ -528,6 +546,21 @@ export function SandLab() {
             } else {
               ix.show(0); ix.panel(null); ix.list(0); ix.interactive("none");
             }
+          } else if (ix) {
+            // the desk not in yet (a jump straight to the projects): the index on its own, settled
+            if (p >= BEATS.takeover[0]) {
+              if (W / H < 1) {
+                ix.place([[0, 0], [W, 0], [W, H], [0, H]]);
+                ix.panel({ x: 0, y: 0, w: W, h: H });
+                ix.show(0); ix.list(1); ix.interactive("list");
+              } else {
+                const { w, h: ih } = ix.size();
+                const k = Math.min(W / w, H / ih), cw = w * k, ch = ih * k, x0 = (W - cw) / 2, y0 = (H - ch) / 2;
+                ix.place([[x0, y0], [x0 + cw, y0], [x0 + cw, y0 + ch], [x0, y0 + ch]]);
+                ix.show(1); ix.panel({ x: 0, y: 0, w: W, h: H }, 1); ix.list(0); ix.interactive("wide");
+              }
+              ix.scroll(Math.max(window.scrollY - max, 0));
+            } else { ix.show(0); ix.panel(null); ix.list(0); ix.interactive("none"); }
           }
           // no cloud passage any more: the cloud's parting off, no defocus; the desk's dim lifts as the lamp finds it
           field!.setCloud(0, 0, new THREE.Vector3(0, 0, 1), 0, 0, 0, 1e9, 1e9, 1, 0, 1);
@@ -571,6 +604,8 @@ export function SandLab() {
           const grainR = (um.uRadMax.value as number) * (um.uCountScale.value as number) * 0.7 * (um.uRadScale.value as THREE.Vector2).y;
           rising?.update(state.time, ease(p, [BEATS.tilt[0], BEATS.tilt[0] + 0.3]) * (1 - ease(p, [BEATS.tail[1] - 0.15, BEATS.tail[1]])),
             deskTop ? deskTop.y : -4.6, grainR);
+          // the desk hides the sand only where sand can be under or behind it: while the rising sand is drawn
+          if (composite) composite.occluder = rising?.mesh.visible ? desk3d!.group : null;
         }
         // scroll turns the ball; when scrolling stops it keeps a slow idle spin
         const scrolled = window.scrollY - lastScroll;
@@ -662,7 +697,8 @@ export function SandLab() {
         field!.update(state);
       });
       stage.start();
-      (window as unknown as { __sand?: unknown }).__sand = { stage, field, state, drift, rising, composite };   // lab debugging
+      (window as unknown as { __sand?: unknown }).__sand = { stage, field, state, drift, rising: null, composite };   // lab debugging
+      loadDesk().catch(() => {});
     })().catch((err) => {
       setStatus(String(err));
       setFallback(true);
