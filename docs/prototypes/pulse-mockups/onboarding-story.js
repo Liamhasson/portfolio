@@ -1,10 +1,11 @@
 /* Pulse onboarding story on the mockup board.
    The phone pins; scroll picks the screen; each change plays itself (a slide, like the app's own
    navigation, forward or back) so nothing rests half-transitioned. Same pattern as the Cyvore story.
-   The screens are the coded app (onboarding-app.js), played by a scripted user: within a screen's
-   scroll its taps are scrubbed, each at its own point, and scrolling back undoes them. */
+   The screens are the coded app (onboarding-app.js), played by a scripted user on a clock, not the scroll: each
+   screen arrives untouched, rests, then is tapped through at a person's pace, however fast the page is scrolled.
+   Coming back to a screen plays it again; nothing plays while the phone is out of view. */
 
-import { mountStoryScreens } from "./onboarding-app.js?v=2";
+import { mountStoryScreens } from "./onboarding-app.js?v=3";
 
 const { gsap, ScrollTrigger } = window;
 gsap.registerPlugin(ScrollTrigger);
@@ -19,7 +20,7 @@ export const STAGES = [
 ];
 /** Pinned scroll per unit of weight, as a share of the viewport height. */
 const UNIT_VH = 0.55;
-/** Each screen's share of the scroll: room for its taps (02 and 03 have three, 07 two, 08 the slide). */
+/** Each screen's share of the scroll: a little more where the play runs longer (02 and 03, 07, 08). */
 const WEIGHTS = [1, 1.6, 1.6, 1, 1, 1, 1.4, 1.4, 1, 1, 1, 1];
 const STARTS = WEIGHTS.map((_, i) => WEIGHTS.slice(0, i).reduce((a, b) => a + b, 0));
 const TOTAL = STARTS[SCREENS - 1] + WEIGHTS[SCREENS - 1];
@@ -49,6 +50,19 @@ function mountStory(root, name) {
   let settled = true;
   let tl = null;
   let lastFills = stageFills(0, 0);
+  // The scripted user's clock for the screen on show; it runs only while the phone is in view.
+  const clock = { t: 0 };
+  let play = null;
+  let inView = false;
+  const stop = () => { play?.kill(); play = null; };
+  const start = (n) => {
+    stop();
+    clock.t = 0;
+    app.step(n, 0);
+    if (!inView) return;
+    const length = app.length(n);
+    if (length) play = gsap.to(clock, { t: length, duration: length, ease: "none", onUpdate: () => app.step(n, clock.t), onComplete: () => { app.step(n, Infinity); play = null; } });
+  };
 
   const pinTop = () => Math.max(16, (innerHeight - pin.offsetHeight) / 2);
   const layout = () => {
@@ -99,10 +113,11 @@ function mountStory(root, name) {
     const within = Math.min((u - STARTS[b]) / WEIGHTS[b], 1);
     if (b !== beat) {
       // the screen it leaves rests as the user left it: all done going on, untouched going back
-      if (beat >= 0) app.step(beat + 1, b > beat ? 1 : 0);
+      stop();
+      if (beat >= 0) app.step(beat + 1, b > beat ? Infinity : 0);
       goTo(b, dir || (b > beat ? 1 : -1));
+      start(b + 1);
     }
-    app.step(b + 1, within);
     lastFills = stageFills(b, within);
     fills.forEach((f, i) => f.style.setProperty("--fill", lastFills[i].toFixed(3)));
   };
@@ -120,11 +135,18 @@ function mountStory(root, name) {
   const span = st.end - st.start;
   update(span > 0 ? (window.scrollY - st.start) / span : 0, 1);
 
+  // The play starts when the phone comes into view, and starts over if it leaves and comes back.
+  new IntersectionObserver(([e]) => {
+    if (e.isIntersecting === inView) return;
+    inView = e.isIntersecting;
+    start(beat + 1);
+  }, { threshold: 0.35 }).observe(pin);
+
   (window.__pulseStories ||= {})[name] = {
     state: () => ({
       beat, settled, caption: caps.findIndex((c) => c.classList.contains("is-on")), stage: stageOf(beat), fills: lastFills,
       visible: screens.flatMap((s, i) => (opacity(s) > 0.01 ? [i] : [])),
-      step: app.info(beat + 1),
+      step: { ...app.info(beat + 1), playing: !!play },
     }),
     scrollToBeat: (b, within = 0.5) => window.scrollTo(0, st.start + ((STARTS[b] + within * WEIGHTS[b]) / TOTAL) * (st.end - st.start)),
   };

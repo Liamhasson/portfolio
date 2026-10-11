@@ -3,7 +3,7 @@
    The shell owns opening and closing, focus, the screen history (Back), the iOS push between screens and the
    misclick hint: a tap that hits no control shows where the controls are, as Figma's own prototype view does. */
 
-import { createApp } from "./onboarding-app.js?v=2";
+import { createApp } from "./onboarding-app.js?v=3";
 
 const { gsap } = window;
 const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;

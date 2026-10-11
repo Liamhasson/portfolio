@@ -459,33 +459,34 @@ export function createApp(root, shell) {
 }
 
 /* ------------------------------ the scroll story: the same screens, played by a scripted user ------------------------------ */
-/* What the user does on each screen (the Figma file's own picks) and where in that screen's scroll each tap lands:
-   0 is the screen just slid in, 1 the next about to. `pick` changes the state; a tap without one is on a control that
-   moves on (Continue and the like), which the slide to the next screen answers. 08's slide runs from `at` to `to`. */
+/* What the user does on each screen (the Figma file's own picks) and when, in seconds from the screen's arrival: the
+   screen slides in (~0.55s), rests untouched, then the finger taps at a person's pace. Scroll only picks the screen; this
+   clock keeps the rhythm, so a fast scroll never skips the untouched state. `pick` changes the state; a tap without one
+   is on a control that moves on (Continue and the like). 08's slide runs from `at` to `to`. */
 const tap = (name, at, el, pick) => ({ name, at, el, pick });
 const SCRIPT = {
-  1: [tap("Get Started", 0.8, ".pa-cta")],
+  1: [tap("Get Started", 1.7, ".pa-cta")],
   2: [
-    tap("Get stronger", 0.34, '[data-goal="Get stronger"]', (s) => s.goals.push("Get stronger")),
-    tap("Stay active", 0.58, '[data-goal="Stay active"]', (s) => s.goals.push("Stay active")),
-    tap("Continue", 0.84, ".pa-cta"),
+    tap("Get stronger", 1.7, '[data-goal="Get stronger"]', (s) => s.goals.push("Get stronger")),
+    tap("Stay active", 2.35, '[data-goal="Stay active"]', (s) => s.goals.push("Stay active")),
+    tap("Continue", 3.05, ".pa-cta"),
   ],
   3: [
-    tap("HIIT", 0.34, '[data-chip="HIIT"]', (s) => s.activities.push("HIIT")),
-    tap("Hyrox", 0.58, '[data-chip="Hyrox"]', (s) => s.activities.push("Hyrox")),
-    tap("Continue", 0.84, ".pa-cta"),
+    tap("HIIT", 1.7, '[data-chip="HIIT"]', (s) => s.activities.push("HIIT")),
+    tap("Hyrox", 2.35, '[data-chip="Hyrox"]', (s) => s.activities.push("Hyrox")),
+    tap("Continue", 3.05, ".pa-cta"),
   ],
-  4: [tap("Continue", 0.8, ".pa-cta")],
-  5: [tap("HIIT", 0.6, '[data-workout="HIIT"]', (s) => { s.workout = "HIIT"; })],
-  6: [tap("Burn Club", 0.7, '[data-studio="Burn Club"]', (s) => { s.studio = "Burn Club"; })],
+  4: [tap("Continue", 1.7, ".pa-cta")],
+  5: [tap("HIIT", 1.7, '[data-workout="HIIT"]', (s) => { s.workout = "HIIT"; })],
+  6: [tap("Burn Club", 1.7, '[data-studio="Burn Club"]', (s) => { s.studio = "Burn Club"; })],
   7: [
-    tap("Mon 1st", 0.4, '[data-day="Mon, Dec 1"]', (s) => { s.day = "Mon, Dec 1"; }),
-    tap("Maya Thompson", 0.78, '[data-slot="3"]', (s) => { s.slot = 3; }),
+    tap("Mon 1st", 1.7, '[data-day="Mon, Dec 1"]', (s) => { s.day = "Mon, Dec 1"; }),
+    tap("Maya Thompson", 2.45, '[data-slot="3"]', (s) => { s.slot = 3; }),
   ],
-  8: [{ name: "Book now", at: 0.3, to: 0.8, el: ".pa-slider", slide: true }],
-  9: [tap("Done", 0.8, ".pa-cta")],
-  10: [tap("Continue", 0.8, ".pa-cta")],
-  11: [tap("Enable notifications", 0.8, ".pa-cta")],
+  8: [{ name: "Book now", at: 1.7, to: 2.45, el: ".pa-slider", slide: true }],
+  9: [tap("Done", 1.7, ".pa-cta")],
+  10: [tap("Continue", 1.7, ".pa-cta")],
+  11: [tap("Enable notifications", 1.7, ".pa-cta")],
   12: [],
 };
 const stepEnd = (st) => st.to ?? st.at;
@@ -496,9 +497,9 @@ const stateAt = (n, k) => {
   return s;
 };
 
-/* The finger: it arrives (fades in, settles), presses, the control changes, it lifts and fades. Shares of the screen's
-   scroll before and after the step's point. */
-const ARRIVE = 0.13, PRESS = 0.05, LIFT = 0.09;
+/* The finger: it arrives (fades in, settles), presses, the control changes, it lifts and fades. Seconds before and
+   after the step's time. */
+const ARRIVE = 0.4, PRESS = 0.12, LIFT = 0.3, HOLD = 0.08;
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const smooth = (t) => t * t * (3 - 2 * t);
 /** The finger's opacity and scale at w for a step, and whether the control is held down; null when it's away. */
@@ -511,7 +512,7 @@ function finger(st, w) {
   }
   if (w < b) return { o: 1, sc: 0.8, down: true }; // held while the knob slides
   const up = smooth(clamp01((w - b) / LIFT));
-  return { o: 1 - up, sc: 0.8 + 0.2 * up, down: w < b + 0.03 };
+  return { o: 1 - up, sc: 0.8 + 0.2 * up, down: w < b + HOLD };
 }
 
 let storyUid = 0;
@@ -565,7 +566,8 @@ export function mountStoryScreens(phone, { gsap, still }) {
   document.fonts.addEventListener("loadingdone", () => requestAnimationFrame(measure));
 
   const within = new Array(figs.length).fill(0);
-  /** Poses screen n at w (0–1 of its scroll): its picks so far, the held control, the finger, 08's knob. */
+  /** Poses screen n at w seconds into its play (Infinity: finished): its picks so far, the held control, the finger,
+      08's knob. */
   const step = (n, w) => {
     const f = figs[n - 1];
     within[n - 1] = w;
@@ -604,11 +606,13 @@ export function mountStoryScreens(phone, { gsap, still }) {
     step,
     /** Back, Skip and the bar for screen n; animate when the screens slide. */
     chrome: (n, animate) => setChrome(n, animate),
+    /** How long screen n's play runs, in seconds: its last step and the finger lifting. */
+    length: (n) => Math.max(0, ...figs[n - 1].steps.map((st) => stepEnd(st) + LIFT)),
     /** The story's test hook for screen n. */
     info: (n) => {
       const f = figs[n - 1], w = within[n - 1];
       return {
-        screen: n, within: w,
+        screen: n, t: w,
         done: f.steps.filter((st) => w >= stepEnd(st)).map((st) => st.name),
         tap: f.on, taps: f.steps.map((st) => st.at),
       };

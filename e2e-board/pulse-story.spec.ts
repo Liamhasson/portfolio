@@ -1,8 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
 /** The Pulse board's test hook (docs/prototypes/pulse-mockups/onboarding-story.js). */
-/** Where the scripted user is on the screen on show: how far into its scroll, the steps done, the tap points. */
-type Step = { screen: number; within: number; done: string[]; tap: boolean; taps: number[] };
+/** Where the scripted user is on the screen on show: seconds into its play, the steps done, the tap times. */
+type Step = { screen: number; t: number; done: string[]; tap: boolean; taps: number[]; playing: boolean };
 type PulseState = {
   beat: number; settled: boolean; visible: number[]; caption: number; stage: number;
   fills: number[]; step: Step; static?: boolean; screens?: number;
@@ -31,15 +31,18 @@ const story = (page: Page, name = "desktop") => ({
   state: () => page.evaluate((n) => window.__pulseStories[n].state(), name),
   go: async (beat: number, within = 0.5) => {
     await page.evaluate(([n, b, w]) => window.__pulseStories[n].scrollToBeat(b, w), [name, beat, within] as const);
-    await page.waitForFunction(([n, b, w]) => {
+    await page.waitForFunction(([n, b]) => {
       const s = window.__pulseStories[n].state();
-      return s.beat === b && s.settled && Math.abs(s.step.within - w) < 0.03;
-    }, [name, beat, within] as const);
+      return s.beat === b && s.settled;
+    }, [name, beat] as const);
   },
 });
 /** The coded screen in a story's figure n (1-based). */
 const fig = (page: Page, n: number, name = "desktop") => page.locator(`.ob[data-story="${name}"] .ob-screen`).nth(n - 1);
 const pressed = (page: Page, n: number, sel: string) => fig(page, n).locator(sel);
+/** Waits for the scripted user to have done a step on the screen on show (it plays on its own clock). */
+const doneWith = (page: Page, name: string, story = "desktop") =>
+  page.waitForFunction(([s, n]) => window.__pulseStories[s].state().step.done.includes(n), [story, name] as const, { timeout: 8000 });
 const opacityOf = (l: ReturnType<Page["locator"]>) => l.evaluate((e) => parseFloat(getComputedStyle(e).opacity));
 
 test.describe("pulse board", () => {
@@ -118,7 +121,9 @@ test.describe("pulse board", () => {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
-    for (let b = 0; b < 12; b++) for (const w of [0.1, 0.5, 0.9]) await story(page).go(b, w);
+    for (let b = 0; b < 12; b++) { await story(page).go(b); await page.waitForTimeout(400); }
+    await story(page).go(7);
+    await doneWith(page, "Book now");
     expect(errors).toEqual([]);
   });
 
@@ -132,75 +137,96 @@ test.describe("pulse board", () => {
     await expect(ob.getByRole("button", { name: "Tap through it yourself" })).toBeVisible();
   });
 
-  test("screen 2: the goals are ticked as the scroll goes on, and untick when it goes back", async ({ page }) => {
+  test("screen 2 rests untouched first, then the goals are ticked at a person's pace", async ({ page }) => {
     const goal = (g: string) => pressed(page, 2, `[data-goal="${g}"]`);
     const cont = pressed(page, 2, ".pa-cta");
-    await story(page).go(1, 0.02);
-    expect((await story(page).state()).step).toMatchObject({ screen: 2, done: [], tap: false });
+    await story(page).go(1);
+    const arrived = Date.now();
+    expect((await story(page).state()).step).toMatchObject({ screen: 2, done: [], playing: true });
     await expect(goal("Get stronger")).toHaveAttribute("aria-pressed", "false");
     await expect(goal("Stay active")).toHaveAttribute("aria-pressed", "false");
     await expect(cont).toHaveAttribute("aria-disabled", "true");
-    await story(page).go(1, 0.8);
+    await doneWith(page, "Get stronger");
+    expect(Date.now() - arrived).toBeGreaterThan(1000); // it rests, untouched, before the first tap
+    await doneWith(page, "Continue");
     await expect(goal("Get stronger")).toHaveAttribute("aria-pressed", "true");
     await expect(goal("Stay active")).toHaveAttribute("aria-pressed", "true");
     await expect(cont).not.toHaveAttribute("aria-disabled", "true");
-    expect((await story(page).state()).step.done).toEqual(["Get stronger", "Stay active"]);
-    await story(page).go(1, 0.02); // the scrub runs backwards too
-    await expect(goal("Get stronger")).toHaveAttribute("aria-pressed", "false");
-    await expect(goal("Stay active")).toHaveAttribute("aria-pressed", "false");
-    await expect(cont).toHaveAttribute("aria-disabled", "true");
+  });
+
+  test("the rhythm is the clock's, not the scroll's: arriving deep in a screen's scroll still starts it untouched", async ({ page }) => {
+    await story(page).go(1, 0.97);
+    expect((await story(page).state()).step.done).toEqual([]);
+    await expect(pressed(page, 2, '[data-goal="Get stronger"]')).toHaveAttribute("aria-pressed", "false");
+  });
+
+  test("scrolling back to a screen plays it again from untouched", async ({ page }) => {
+    await story(page).go(1);
+    await doneWith(page, "Continue");
+    await story(page).go(2);
+    await story(page).go(1);
+    expect((await story(page).state()).step.done).toEqual([]);
+    await expect(pressed(page, 2, '[data-goal="Get stronger"]')).toHaveAttribute("aria-pressed", "false");
+    await doneWith(page, "Stay active");
+  });
+
+  test("nothing plays while the story is off screen; it starts when the phone comes into view", async ({ page }) => {
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(2500);
+    expect((await story(page).state()).step).toMatchObject({ screen: 1, done: [], playing: false });
+    await story(page).go(0);
+    await doneWith(page, "Get Started");
   });
 
   test("screen 3: Strength is open; HIIT, then Hyrox, are ticked", async ({ page }) => {
-    await story(page).go(2, 0.02);
+    await story(page).go(2);
     await expect(pressed(page, 3, ".pa-cat-head").first()).toHaveAttribute("aria-expanded", "true");
     for (const c of ["HIIT", "Hyrox"]) await expect(pressed(page, 3, `[data-chip="${c}"]`)).toHaveAttribute("aria-pressed", "false");
     await expect(pressed(page, 3, ".pa-cta")).toHaveAttribute("aria-disabled", "true");
-    await story(page).go(2, 0.8);
+    await doneWith(page, "Continue");
     for (const c of ["HIIT", "Hyrox"]) await expect(pressed(page, 3, `[data-chip="${c}"]`)).toHaveAttribute("aria-pressed", "true");
     await expect(pressed(page, 3, ".pa-cta")).not.toHaveAttribute("aria-disabled", "true");
   });
 
   test("the tap mark presses on the control just before it changes, and is gone at rest", async ({ page }) => {
-    await story(page).go(1, 0.02);
+    await story(page).go(1);
     const mark = fig(page, 2).locator(".pa-tap");
     expect(await opacityOf(mark)).toBe(0);
-    const [first] = (await story(page).state()).step.taps;
-    await story(page).go(1, first - 0.03);
-    expect((await story(page).state()).step.tap).toBe(true);
-    expect(await opacityOf(mark)).toBeGreaterThan(0.3);
+    await page.waitForFunction(() => {
+      const st = window.__pulseStories.desktop.state().step;
+      return st.tap && st.done.length === 0 && parseFloat(getComputedStyle(document.querySelectorAll('.ob[data-story="desktop"] .ob-screen')[1].querySelector(".pa-tap")!).opacity) > 0.5;
+    });
     const m = (await mark.boundingBox())!, t = (await pressed(page, 2, '[data-goal="Get stronger"]').boundingBox())!;
     const cx = m.x + m.width / 2, cy = m.y + m.height / 2;
     expect(cx > t.x && cx < t.x + t.width && cy > t.y && cy < t.y + t.height).toBe(true);
-    await story(page).go(1, 0.98);
-    expect((await story(page).state()).step.tap).toBe(false);
+    await page.waitForFunction(() => { const st = window.__pulseStories.desktop.state().step; return !st.playing && !st.tap; }, undefined, { timeout: 8000 });
     expect(await opacityOf(mark)).toBe(0);
   });
 
   test("screen 7: the slots wait, dimmed, until Mon 1st is tapped, then light up", async ({ page }) => {
     const maya = pressed(page, 7, '[data-slot="3"]');
-    await story(page).go(6, 0.03);
+    await story(page).go(6);
     await expect(pressed(page, 7, '[data-day="Mon, Dec 1"]')).toHaveAttribute("aria-pressed", "false");
     await expect(maya).toHaveAttribute("aria-disabled", "true");
     await expect.poll(() => opacityOf(maya)).toBeLessThan(0.7);
-    await story(page).go(6, 0.6);
+    await doneWith(page, "Mon 1st");
     await expect(pressed(page, 7, '[data-day="Mon, Dec 1"]')).toHaveAttribute("aria-pressed", "true");
     await expect(maya).not.toHaveAttribute("aria-disabled", "true");
     await expect.poll(() => opacityOf(maya)).toBeGreaterThan(0.95);
     await expect(pressed(page, 7, '[data-slot="0"]')).toHaveAttribute("aria-disabled", "true"); // fully booked stays off
   });
 
-  test("screen 8: the Book now knob slides with the scroll", async ({ page }) => {
-    const knobX = () => pressed(page, 8, ".pa-knob").evaluate((k) => new DOMMatrix(getComputedStyle(k).transform).m41);
+  test("screen 8: the Book now knob slides on its own, the finger riding it", async ({ page }) => {
     const MAX = 345 - 52 - 2;
-    await story(page).go(7, 0.03);
+    await story(page).go(7);
+    const knobX = () => pressed(page, 8, ".pa-knob").evaluate((k) => new DOMMatrix(getComputedStyle(k).transform).m41);
     expect(await knobX()).toBeLessThan(1);
-    await story(page).go(7, 0.55);
-    const mid = await knobX();
-    expect(mid).toBeGreaterThan(MAX * 0.2);
-    expect(mid).toBeLessThan(MAX * 0.8);
-    expect((await story(page).state()).step.tap).toBe(true); // the finger rides with the knob
-    await story(page).go(7, 0.97);
+    await page.waitForFunction((max) => {
+      const k = document.querySelectorAll('.ob[data-story="desktop"] .ob-screen')[7].querySelector(".pa-knob")!;
+      const x = new DOMMatrix(getComputedStyle(k).transform).m41;
+      return x > max * 0.2 && x < max * 0.8 && window.__pulseStories.desktop.state().step.tap;
+    }, MAX);
+    await doneWith(page, "Book now");
     expect(await knobX()).toBeGreaterThan(MAX - 1);
   });
 
@@ -251,6 +277,7 @@ test.describe("pulse board", () => {
     expect(s.visible).toEqual([6]);
     expect(s.caption).toBe(6);
     await expect(page.locator('.ob[data-story="phone"] .ob-screen .pa-screen')).toHaveCount(12);
+    await doneWith(page, "Mon 1st", "phone");
     await expect(fig(page, 7, "phone").locator('[data-day="Mon, Dec 1"]')).toHaveAttribute("aria-pressed", "true");
   });
 });
