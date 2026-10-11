@@ -112,3 +112,22 @@ test("re-subscribes and resets when resetKey changes (route change)", () => {
   expect(observe).toHaveBeenCalledTimes(9);
   expect(screen.getByRole("status")).toHaveTextContent("none");
 });
+
+test("sections that appear after it mounts are watched too (the story renders client-side, after the nav)", async () => {
+  function Late({ show }: { show: boolean }) {
+    const active = useActiveSection(["projects", "about", "contact"]);
+    return (
+      <>
+        {show && <section id="projects" />}
+        <output>{active ?? "none"}</output>
+      </>
+    );
+  }
+  const { rerender } = render(<Late show={false} />);
+  expect(observe).not.toHaveBeenCalled();
+  rerender(<Late show />);
+  await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+  expect(observe).toHaveBeenCalledTimes(1);
+  fire("projects");
+  expect(screen.getByRole("status")).toHaveTextContent("projects");
+});

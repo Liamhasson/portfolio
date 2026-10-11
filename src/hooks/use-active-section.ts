@@ -13,11 +13,6 @@ export function useActiveSection(ids: readonly string[], resetKey?: string): str
 
   useEffect(() => {
     const order = key.split("|");
-    const elements = order
-      .map((id) => document.getElementById(id))
-      .filter((el): el is HTMLElement => el !== null);
-    if (elements.length === 0) return;
-
     const visible = new Set<string>();
     const io = new IntersectionObserver(
       (entries) => {
@@ -29,8 +24,19 @@ export function useActiveSection(ids: readonly string[], resetKey?: string): str
       },
       { rootMargin: "-45% 0px -45% 0px" },
     );
-    elements.forEach((el) => io.observe(el));
+    // each section as it exists, and any that appear later (a page rendered client-side, after the nav)
+    const watched = new Set<Element>();
+    const watch = () => {
+      for (const id of order) {
+        const el = document.getElementById(id);
+        if (el && !watched.has(el)) { watched.add(el); io.observe(el); }
+      }
+    };
+    watch();
+    const mo = typeof MutationObserver === "function" ? new MutationObserver(watch) : null;
+    mo?.observe(document.body, { childList: true, subtree: true });
     return () => {
+      mo?.disconnect();
       io.disconnect();
       setActive(null);
     };
