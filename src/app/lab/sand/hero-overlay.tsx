@@ -10,8 +10,8 @@ import { useEffect, useRef } from "react";
 const RISE = "hero-rise";
 
 /**
- * The copy holds through the hero, then travels out to the left, line by line, as the pull-back begins; the next
- * chapter's line enters from the right (Lusion's horizontal travel; Liam, 2026-10-09).
+ * The copy is on screen from the first frame and drifts up and out, line by line, as the cloud becomes the ball; the
+ * desk's headline enters from the right as the desk is revealed and leaves before the laptop (Liam, 2026-10-11).
  */
 const STAGGER = 0.15;
 
@@ -25,9 +25,16 @@ function Line({ children, delay, className = "" }: { children: React.ReactNode; 
   );
 }
 
-function exitT(e: number, i: number): number {
-  const t = Math.min(Math.max((e - i * STAGGER) / (1 - 2 * STAGGER), 0), 1);
-  return t * t * (3 - 2 * t);
+/** The hero copy leaving as the cloud becomes the ball (Liam, 2026-10-11): line by line, a slow upward drift and fade. */
+export function driftOut(e: number, i: number): { y: number; opacity: number } {
+  const t0 = Math.min(Math.max((e - i * STAGGER) / (1 - 2 * STAGGER), 0), 1);
+  const t = t0 * t0 * (3 - 2 * t0);
+  return { y: t === 0 ? 0 : -t * 9, opacity: 1 - t };
+}
+
+/** A line of the hero copy: on screen from the first frame (no rise; Liam, 2026-10-11). */
+function Still({ children }: { children: React.ReactNode }) {
+  return <span className="block pb-[0.12em]">{children}</span>;
 }
 
 /**
@@ -50,9 +57,9 @@ export function HeroOverlay({
       const el = root.current;
       if (el) {
         el.querySelectorAll<HTMLElement>("[data-exit]").forEach((line) => {
-          const t = exitT(e, Number(line.dataset.exit));
-          line.style.transform = t > 0 ? `translate3d(${-t * 55}vw,0,0)` : "";
-          line.style.opacity = String(1 - t);
+          const { y, opacity } = driftOut(e, Number(line.dataset.exit));
+          line.style.transform = y !== 0 ? `translate3d(0,${y}vh,0)` : "";
+          line.style.opacity = String(opacity);
         });
         const cue = el.querySelector<HTMLElement>("[data-cue]");
         if (cue) cue.style.opacity = String(1 - Math.min(scrolled() / 0.03, 1));   // its job is done once scrolling starts
@@ -85,7 +92,7 @@ export function HeroOverlay({
       `}</style>
       {/* desktop: top left, as Lusion's logo position (on phones it sits above the name, the menu needs the top) */}
       <div data-exit="0" className="absolute left-[4.9vw] top-[clamp(20px,4.4vw,64px)] hidden font-mono text-[12px] uppercase tracking-[0.08em] text-white/60 md:block">
-        <Line delay={200}>Product Designer</Line>
+        <Still>Product Designer</Still>
       </div>
       {/* the front name and the line, lower left over the void's edge */}
       <div className="absolute bottom-[96px] left-[4.9vw] max-w-[min(92vw,44rem)] md:bottom-[clamp(96px,11vw,150px)]">
@@ -98,23 +105,21 @@ export function HeroOverlay({
           style={{ background: "radial-gradient(ellipse 60% 55% at 35% 55%, rgba(11,9,8,0.72), rgba(11,9,8,0.45) 45%, transparent 75%)" }}
         />
         <div data-exit="0" className="mb-4 font-mono text-[11px] uppercase tracking-[0.08em] text-white/60 md:hidden">
-          <Line delay={200}>Product Designer</Line>
+          <Still>Product Designer</Still>
         </div>
         <h1 data-exit="0" className="text-[clamp(40px,7.2vw,104px)] font-normal leading-[1.02] tracking-[-0.02em]">
-          <Line delay={350}>Hi, I&rsquo;m Liam.</Line>
+          <Still>Hi, I&rsquo;m Liam.</Still>
         </h1>
         <p className="mt-[0.9em] text-[clamp(17px,1.75vw,25px)] font-normal leading-[1.3] text-white/80">
           <span data-exit="1" className="block">
-            <Line delay={520}>
-              I build ambiguous ideas into products
-            </Line>
+            <Still>I build ambiguous ideas into products</Still>
           </span>
           <span data-exit="2" className="block">
-            <Line delay={620}>where design and user needs meet.</Line>
+            <Still>where design and user needs meet.</Still>
           </span>
         </p>
       </div>
-      {/* 2.1: the next chapter's line, entering from the right over the dark room above the desk */}
+      {/* the desk's headline, entering from the right as the desk is revealed */}
       {/* chapter lines sit lower left over the desk: a soft fade from the bottom edge keeps them legible */}
       {enter && (
         <div
@@ -132,10 +137,7 @@ export function HeroOverlay({
           className="absolute bottom-[clamp(40px,6vh,64px)] left-[4.9vw] right-[4.9vw] opacity-0 md:bottom-[clamp(36px,4.4vw,64px)] md:right-auto md:max-w-[34rem]"
           style={{ textShadow: "0 1px 24px rgba(0,0,0,0.55)" }}
         >
-          <h2 className="whitespace-nowrap text-[clamp(28px,3.5vw,54px)] font-normal leading-[1.08] tracking-[-0.015em]">From chaos to product.</h2>
-          <p className="mt-[0.7em] text-[clamp(15px,1.3vw,19px)] font-normal leading-[1.4] text-white/80">
-            I find the problem nobody pointed at, test what could solve it, and build what works.
-          </p>
+          <h2 className="text-[clamp(28px,3.5vw,54px)] font-normal leading-[1.08] tracking-[-0.015em]">Tested until people believe in it.</h2>
         </div>
       )}
       {/* the scroll cue: bottom right on desktop, centred on phones */}
