@@ -5,18 +5,21 @@
  * and time, so the vertex shader computes it (RISE_GLSL) and these TS mirrors test it. The two agree in form, not to
  * the last bit (JS doubles, GLSL floats).
  *
- * A grain's life: rest (its share of the cycle, 72-90%), then lift (slow, then faster: pow(a, 1.8..2.8)), fading as it
- * nears the ball's height; the next life grows in from nothing a little way from the last spot (cracks: along the crack).
+ * A grain's life: unseen at rest (its share of the cycle; Liam, 2026-10-11: no still sand on the table), then it appears
+ * out of nothing as it starts to lift (slow, then faster: pow(a, 1.8..2.8)), fading as it nears the ball's height; each
+ * life at its own random time and pace, and somewhere new (cracks: along the crack).
  */
 export const RISE = {
   periodMin: 90, periodMax: 160,  // seconds per life, by region (long: each grain rests most of it, then floats up slowly,
                                   // 4-19 s, as the rocks on Lusion's floor: Liam, 2026-10-11)
   restMin: 0.88, restMax: 0.96,   // the share of a life at rest (3-15% in the air at once: a few at a time, never a snowfall)
-  growIn: 0.04,                   // the share of a life growing in (4-6 s, from nothing)
+  appear: 0.12,                   // the share of its climb it takes to appear, from nothing (it is still slow then)
   fadeFrom: 0.8,                  // the lift past which it fades
   height: 6.0,                    // hero units it rises (the desk is 4.6 below the ball)
   sway: 0.25,                     // hero units of sideways drift at the top
-  jitter: 0.2,                    // hero units between one life's spot and the next
+  jitter: 0.5,                    // hero units between one life's spot and the next (each life somewhere new)
+  phaseSpread: 1.0,               // each grain's own time in its region's cycle (1: wholly its own: random, no wave fronts)
+  paceSpread: 0.25,               // each grain's own pace (+-25% on its region's)
   waveScale: 0.35,                // the timing field's scale (per hero unit): a few regions across the desk
   offsetScale: 0.6,
 } as const;
@@ -37,8 +40,8 @@ float rNoise(vec2 p) {
 vec3 risePhase(vec4 rest, vec4 seed, float t) {
   float n1 = rNoise(rest.xz * ${f(RISE.waveScale)});
   float n2 = rNoise(rest.xz * ${f(RISE.offsetScale)} + vec2(17.3, -4.1));
-  float period = mix(${f(RISE.periodMin)}, ${f(RISE.periodMax)}, n1) * (1.0 + 0.08 * (seed.x * 2.0 - 1.0));
-  float ph = t / period + 2.0 * n2 + 0.15 * seed.y;
+  float period = mix(${f(RISE.periodMin)}, ${f(RISE.periodMax)}, n1) * (1.0 + ${f(RISE.paceSpread)} * (seed.x * 2.0 - 1.0));
+  float ph = t / period + 2.0 * n2 + ${f(RISE.phaseSpread)} * seed.y;
   return vec3(floor(ph), fract(ph), period);
 }
 float riseRestShare(vec4 seed) { return mix(${f(RISE.restMin)}, ${f(RISE.restMax)}, seed.z); }
@@ -47,8 +50,9 @@ float riseLift(vec4 seed, float u) {
   return pow(clamp((u - rs) / (1.0 - rs), 0.0, 1.0), 1.8 + seed.w);
 }
 // (all from one phase: each grain works it out once a frame)
-float riseAlpha(vec3 ph, float lift) {
-  return smoothstep(0.0, ${f(RISE.growIn)}, ph.y) * (1.0 - smoothstep(${f(RISE.fadeFrom)}, 1.0, lift));
+float riseAlpha(vec4 seed, vec3 ph, float lift) {
+  float rs = riseRestShare(seed);
+  return smoothstep(0.0, ${f(RISE.appear)}, (ph.y - rs) / (1.0 - rs)) * (1.0 - smoothstep(${f(RISE.fadeFrom)}, 1.0, lift));
 }
 vec3 risePos(vec4 rest, vec4 seed, vec3 ph, float lift, float t, float deskY) {
   vec2 j = (vec2(rHash(seed.x * 91.7 + ph.x * 13.13), rHash(seed.y * 53.3 + ph.x * 7.77)) - 0.5) * ${f(RISE.jitter)};
@@ -80,13 +84,13 @@ export function rNoise(x: number, z: number): number {
 export function grainAt(rest: [number, number, number], seed: [number, number, number, number], t: number, deskY = rest[1]) {
   const n1 = rNoise(rest[0] * RISE.waveScale, rest[2] * RISE.waveScale);
   const n2 = rNoise(rest[0] * RISE.offsetScale + 17.3, rest[2] * RISE.offsetScale - 4.1);
-  const period = (RISE.periodMin + (RISE.periodMax - RISE.periodMin) * n1) * (1 + 0.08 * (seed[0] * 2 - 1));
-  const ph = t / period + 2.0 * n2 + 0.15 * seed[1];
+  const period = (RISE.periodMin + (RISE.periodMax - RISE.periodMin) * n1) * (1 + RISE.paceSpread * (seed[0] * 2 - 1));
+  const ph = t / period + 2.0 * n2 + RISE.phaseSpread * seed[1];
   const cycle = Math.floor(ph), u = ph - cycle;
   const restShare = RISE.restMin + (RISE.restMax - RISE.restMin) * seed[2];
   const a = Math.min(Math.max((u - restShare) / (1 - restShare), 0), 1);
   const lift = Math.pow(a, 1.8 + seed[3]);
-  const alpha = smoothstep(0, RISE.growIn, u) * (1 - smoothstep(RISE.fadeFrom, 1, lift));
+  const alpha = smoothstep(0, RISE.appear, (u - restShare) / (1 - restShare)) * (1 - smoothstep(RISE.fadeFrom, 1, lift));
   const jx = (rHash(seed[0] * 91.7 + cycle * 13.13) - 0.5) * RISE.jitter;
   const jz = rest[1] < deskY - 1e-4 ? 0 : (rHash(seed[1] * 53.3 + cycle * 7.77) - 0.5) * RISE.jitter;
   const sway = lift * RISE.sway;

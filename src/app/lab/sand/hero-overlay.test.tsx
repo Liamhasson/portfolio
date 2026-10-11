@@ -4,15 +4,16 @@ import { HeroOverlay, driftOut } from "./hero-overlay";
 
 describe("HeroOverlay", () => {
   test("the hero copy is there from the first frame: no delayed rise", () => {
-    render(<HeroOverlay exit={() => 0} scrolled={() => 0} enter={() => 0} leave={() => 0} />);
+    render(<HeroOverlay exit={() => 0} scrolled={() => 0} />);
     const name = screen.getByText("Hi, I’m Liam.");
     expect(name.closest(".hero-rise")).toBeNull();
     expect(screen.getByText("I build ambiguous ideas into products").closest(".hero-rise")).toBeNull();
   });
 
-  test("the desk's headline only, in Liam's words", () => {
-    render(<HeroOverlay exit={() => 0} scrolled={() => 0} enter={() => 0} leave={() => 0} />);
-    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Tested until people believe in it.");
+  test("no text over the desk (Liam, 2026-10-11: the desk speaks for itself)", () => {
+    render(<HeroOverlay exit={() => 0} scrolled={() => 0} />);
+    expect(screen.queryByRole("heading", { level: 2 })).toBeNull();
+    expect(screen.queryByText("Tested until people believe in it.")).toBeNull();
     expect(screen.queryByText("From chaos to product.")).toBeNull();
     expect(screen.queryByText(/I find the problem nobody pointed at/)).toBeNull();
   });

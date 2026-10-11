@@ -749,6 +749,10 @@ export class BakedDesk {
       d.materials.push(mat);
       (mesh.material as THREE.Material).dispose();
       mesh.material = mat;
+      // the deck's keyboard well lies in the keys' own plate: the two fought for the gaps between the keys and the gaps
+      // flickered in stripes with every move of the camera (Liam, 2026-10-11: "the keyboard is flickering"). The deck is
+      // drawn a hair behind, so where they meet the keys win
+      if (mesh.name === "bake_base") { mat.polygonOffset = true; mat.polygonOffsetFactor = 1; mat.polygonOffsetUnits = 4; }
       mesh.renderOrder = -100;
       mesh.onBeforeRender = (_r, _s, camera) => d.trackView(camera);
     });

@@ -12,9 +12,11 @@ import { BakedDesk } from "@/three/sand/baked-desk";
 import { revealAt } from "@/three/sand/screen-reveal";
 import { DriftGrains } from "@/three/sand/drift-grains";
 import { heroShift } from "@/three/sand/hero-layout";
+import { ballKeyPos } from "@/three/sand/ball-light";
 import { SAND_ENCODE, SAND_LAYER, SandComposite } from "@/three/sand/sand-composite";
 import { Pullback } from "@/three/sand/pullback";
-import { BEATS, STORY_SCREENS, ease, pAtFrame, reducedStory, shotFrame, span, type ShotMeta } from "@/three/sand/story-timeline";
+import { BEATS, SCREEN_HOLD, STORY_SCREENS, ease, pAtFrame, reducedStory, shotFrame, snapIn, span, storyProgress, type ShotMeta } from "@/three/sand/story-timeline";
+import { glideTo } from "@/lib/smooth-scroll";
 import { RisingSand } from "@/three/sand/rising-sand";
 import { vortexStreams } from "@/three/sand/vortex-streams";
 import { FilmGradePass } from "@/three/sand/film-grade-pass";
@@ -30,8 +32,9 @@ function compactFor(progress: number): number {
   return t * t * (3 - 2 * t);
 }
 
-/** The story's length (spec 2026-10-11 §3): the index settles at STORY_SCREENS, then the page runs on through it. */
-const PAGE_VH = STORY_SCREENS * 100 + 100;
+/** The story's length (spec 2026-10-11 §3): the index settles at STORY_SCREENS, holds for SCREEN_HOLD screens (the long
+ *  way back out), then the page runs on through it. */
+const PAGE_VH = (STORY_SCREENS + SCREEN_HOLD) * 100 + 100;
 /** The frame the screen wakes on (0-based; the shot's camera.json). */
 let WAKE_FRAME = 136;
 const SHOT_BASE = "/lab/shot";
@@ -76,8 +79,6 @@ export function SandLab() {
     [hero],
   );
   const readScrolled = useCallback(() => progressRef.current, []);
-  const readEnter = useCallback(() => span(progressRef.current, BEATS.headlineIn), []);
-  const readLeave = useCallback(() => span(progressRef.current, BEATS.headlineOut), []);
   const indexRef = useRef<WorkIndexHandle | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const veilRef = useRef<HTMLDivElement>(null);
@@ -377,6 +378,8 @@ export function SandLab() {
       // ?still: no ambient motion (drift, spin), so a test isolates what the cursor does
       const still = new URLSearchParams(window.location.search).has("still");
       let lastScroll = window.scrollY;
+      // the snap into the screen: carrying the page in (Liam, 2026-10-11), and the progress a frame ago (its direction)
+      let snapping = false, lastRawP = 0;
       let spinVel = 0;
 
       // the cursor: a light (Lusion model) and, unless motion is reduced, a soft drift
@@ -438,7 +441,16 @@ export function SandLab() {
         // the story's end is where the index's anchor is (#projects), measured, not assumed: on phones vh is the large
         // viewport while innerHeight shrinks under the URL bar, so a jump to the anchor must still land on the end
         const storyEnd = hero && projectsRef.current ? Math.max(1, projectsRef.current.getBoundingClientRect().top + window.scrollY) : max;
-        const rawP = hero ? STORY_SCREENS * Math.min(window.scrollY / storyEnd, 1) : progress;
+        const rawP = hero ? storyProgress(window.scrollY, storyEnd) : progress;
+        // very close to the screen, scrolling down: the page carries the user in, onto the projects (none of them can be
+        // clicked on the laptop's screen); the way back out is long (story-timeline.ts SCREEN_HOLD)
+        if (hero && !snapping && snapIn(rawP, lastRawP)) {
+          snapping = true;
+          const left = Math.max(storyEnd - window.scrollY, 0) / window.innerHeight;
+          glideTo(storyEnd, Math.min(Math.max(0.5 + left * 0.45, 0.6), 1.3), () => { snapping = false; }, reduced);
+        }
+        if (snapping && (rawP >= STORY_SCREENS || window.scrollY >= storyEnd - 2)) snapping = false;   // (no smooth scroller: landed)
+        lastRawP = rawP;
         if (hero && reduced) {
           // reduced motion (spec §8): held states joined by crossfades through black, no shot
           const r = reducedStory(rawP);
@@ -615,9 +627,11 @@ export function SandLab() {
                   .multiplyScalar((SIDE_FILL.watts / (shot.data.chaos_scale ** 2)) * g.wattsToIrradiance * fillGain * openF);
                 d.r = SIDE_FILL.radius;
               }
-              const pos = l.pos.clone().lerp(d.pos, h);
+              // the key swings to the ball's left side as it forms (ball-light.ts: the ball read flat; the vortex keeps its light)
+              const lp = i === 0 ? new THREE.Vector3(...ballKeyPos([l.pos.x, l.pos.y, l.pos.z], [ballC.x, ballC.y, ballC.z], state.compact)) : l.pos;
+              const pos = lp.clone().lerp(d.pos, h);
               const r2 = (vv: THREE.Vector3) => Math.max(vv.distanceToSquared(chaosC), 1e-3);
-              const col = l.col.clone().divideScalar(r2(l.pos)).lerp(d.col.clone().divideScalar(r2(d.pos)), h).multiplyScalar(r2(pos));
+              const col = l.col.clone().divideScalar(r2(lp)).lerp(d.col.clone().divideScalar(r2(d.pos)), h).multiplyScalar(r2(pos));
               return { pos, col, r: (d.r ?? 0) * h };
             }),
             { dir: deskNow.spot.dir, cos: new THREE.Vector2(-3, -2).lerp(deskNow.spot.cos, h) },
@@ -829,10 +843,7 @@ export function SandLab() {
       {hero && <div ref={projectsRef} id="projects" aria-hidden className="pointer-events-none absolute left-0 w-px" style={{ top: `${PAGE_VH - 100}vh`, height: "100vh" }} />}
       {hero && <WorkIndex bind={bindIndex} />}
       {hero ? (
-        <HeroOverlay
-          exit={readExit} scrolled={readScrolled}
-          enter={readEnter} leave={readLeave}
-        />
+        <HeroOverlay exit={readExit} scrolled={readScrolled} />
       ) : (
         <div className="pointer-events-none fixed left-3 top-3 font-mono text-[11px] uppercase tracking-wider text-white/60">
           sand lab · {status}

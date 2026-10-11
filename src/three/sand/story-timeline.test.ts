@@ -1,6 +1,6 @@
 // src/three/sand/story-timeline.test.ts
 import { describe, expect, test } from "vitest";
-import { BEATS, STORY_SCREENS, ease, pAtFrame, reducedStory, shotFrame, span, type ShotBeats } from "./story-timeline";
+import { BEATS, SCREEN_HOLD, SNAP_FROM, STORY_SCREENS, ease, pAtFrame, reducedStory, shotFrame, snapIn, span, storyProgress, type ShotBeats } from "./story-timeline";
 
 const SHOT: ShotBeats = { ease: [0, 39], tilt: [39, 79], glide: [79, 149], tail: [149, 188] };   // public/lab/shot/camera.json
 
@@ -19,9 +19,29 @@ describe("story timeline", () => {
     expect(BEATS.copyOut[0]).toBeGreaterThanOrEqual(BEATS.compact[0]);
   });
 
-  test("the desk headline arrives with the desk and leaves before the laptop", () => {
-    expect(BEATS.headlineIn[0]).toBeGreaterThanOrEqual(BEATS.tilt[1] - 0.1);
-    expect(BEATS.headlineOut[1]).toBeLessThanOrEqual(BEATS.tail[0]);
+  test("the desk in full view: after the tilt, before the laptop", () => {
+    expect(BEATS.deskView[0]).toBeGreaterThanOrEqual(BEATS.tilt[1]);
+    expect(BEATS.deskView[1]).toBeLessThanOrEqual(BEATS.tail[0]);
+  });
+
+  test("the way out of the screen is long (Liam, 2026-10-11): the last SCREEN_HOLD screens before the index hold in it", () => {
+    const vh = 800, end = (STORY_SCREENS + SCREEN_HOLD) * vh;   // the index's anchor
+    expect(SCREEN_HOLD).toBeGreaterThanOrEqual(0.6);
+    expect(storyProgress(0, end)).toBe(0);
+    expect(storyProgress(vh, end)).toBeCloseTo(1, 6);                      // a screen of scroll is a screen of story
+    expect(storyProgress(end, end)).toBe(STORY_SCREENS);
+    expect(storyProgress(end - SCREEN_HOLD * vh * 0.98, end)).toBe(STORY_SCREENS);   // scrolling back up: still in the screen
+    expect(storyProgress(end - SCREEN_HOLD * vh * 1.2, end)).toBeLessThan(STORY_SCREENS);   // then out
+    expect(storyProgress(end * 2, end)).toBe(STORY_SCREENS);
+  });
+
+  test("the snap into the screen: very close, scrolling down, not yet in; never on the way back out", () => {
+    expect(SNAP_FROM).toBeGreaterThan(BEATS.tail[0] + 0.4);
+    expect(SNAP_FROM).toBeLessThan(BEATS.tail[1]);
+    expect(snapIn(SNAP_FROM + 0.01, SNAP_FROM - 0.01)).toBe(true);
+    expect(snapIn(SNAP_FROM - 0.05, SNAP_FROM - 0.1)).toBe(false);           // not close enough
+    expect(snapIn(SNAP_FROM + 0.1, SNAP_FROM + 0.15)).toBe(false);           // scrolling up, out of the screen
+    expect(snapIn(STORY_SCREENS, SNAP_FROM)).toBe(false);                    // already in
   });
 
   test("span and ease clamp to 0..1", () => {
@@ -57,8 +77,8 @@ describe("story timeline", () => {
     expect(reducedStory(0)).toEqual({ p: 0, veil: 0 });
     const ball = reducedStory(1.5), desk = reducedStory(2.9), index = reducedStory(STORY_SCREENS);
     expect(ball.p).toBe(BEATS.hold[0]);
-    expect(desk.p).toBeGreaterThanOrEqual(BEATS.headlineIn[1]);
-    expect(desk.p).toBeLessThanOrEqual(BEATS.headlineOut[0]);
+    expect(desk.p).toBeGreaterThanOrEqual(BEATS.deskView[0]);
+    expect(desk.p).toBeLessThanOrEqual(BEATS.deskView[1]);
     expect(index.p).toBe(STORY_SCREENS);
     expect(ball.veil + desk.veil + index.veil).toBe(0);
     for (const cut of [0.9, 2.2, 3.5]) expect(reducedStory(cut).veil).toBeCloseTo(1);

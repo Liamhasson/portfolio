@@ -66,7 +66,8 @@ export class Stage {
     this.sensorMm = cam.sensorMm;
     this.hfov = 2 * Math.atan(cam.sensorMm / 2 / cam.lensMm);
     this.renderAspect = cam.renderAspect;
-    this.resizeObserver = new ResizeObserver(() => this.resize());
+    // (a resize clears the canvas after the frame was drawn: draw again, so it never shows a black frame)
+    this.resizeObserver = new ResizeObserver(() => { this.resize(); if (this.running) this.draw(); });
     this.resizeObserver.observe(canvas);
     document.addEventListener("visibilitychange", this.onVisibility);
     this.resize();
@@ -131,8 +132,8 @@ export class Stage {
       const dt = Math.min((now - this.last) / 1000, 0.1);
       const frameMs = now - this.last;
       this.last = now;
-      this.frames.forEach((cb) => cb(dt, now / 1000));
-      this.draw();
+      // the governor's step first, then the frame: a resize clears the canvas, so one made after the draw showed a black
+      // frame (Liam, 2026-10-11: "random blackout frames" over the desk, where the governor steps)
       const next = this.governorOn ? this.grainGov.sample(frameMs) : null;
       if (next) {
         const sharper = next.pixelRatio !== this.settings.pixelRatio;
@@ -142,6 +143,8 @@ export class Stage {
           this.resize();
         } else this.tierChanges.forEach((cb) => cb(this.settings));
       }
+      this.frames.forEach((cb) => cb(dt, now / 1000));
+      this.draw();
       this.raf = requestAnimationFrame(loop);
     };
     this.raf = requestAnimationFrame(loop);

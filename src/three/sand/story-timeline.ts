@@ -10,8 +10,7 @@ export const BEATS = {
   hold: [1.6, 1.8],
   tilt: [1.8, 2.4],
   glide: [2.4, 3.2],
-  headlineIn: [2.35, 2.65],
-  headlineOut: [2.95, 3.2],
+  deskView: [2.65, 2.95],   // the desk in full view (held there under reduced motion)
   tail: [3.2, 4.2],
   takeover: [4.12, 4.2],
   indexIn: [4.2, 4.3],
@@ -19,6 +18,23 @@ export const BEATS = {
 
 /** Where the story ends and the index's own scrolling begins (screens). */
 export const STORY_SCREENS = 4.3;
+
+/** The way back out of the screen is long (Liam, 2026-10-11): after the story, this many screens of scroll stay in the
+ *  screen before the index's anchor, so scrolling up from the projects holds there a while before the camera pulls out. */
+export const SCREEN_HOLD = 0.8;
+
+/** Scrolled px -> the story's progress (screens), `end` the index's anchor (px): a screen of scroll is a screen of story,
+ *  held in the screen for the last SCREEN_HOLD screens. */
+export function storyProgress(scrollY: number, end: number): number {
+  return Math.min((STORY_SCREENS + SCREEN_HOLD) * Math.min(Math.max(scrollY / end, 0), 1), STORY_SCREENS);
+}
+
+/** Very close to the screen, scrolling down, the page carries the user in (Liam, 2026-10-11: snap into the screen, so
+ *  nobody tries to click the projects while they're still on the laptop's screen). Never on the way back out. */
+export const SNAP_FROM = 3.8;
+export function snapIn(p: number, prevP: number): boolean {
+  return p >= SNAP_FROM && p > prevP && p < STORY_SCREENS;
+}
 
 export const span = (p: number, [a, b]: readonly [number, number]) => Math.min(Math.max((p - a) / (b - a), 0), 1);
 
@@ -53,9 +69,9 @@ export function pAtFrame(f: number, b: ShotBeats): number {
   return BEATS.tail[1];
 }
 
-/** Reduced motion (spec §8): held states (the cloud, the ball, the desk with its headline, the index), each cut a
+/** Reduced motion (spec §8): held states (the cloud, the ball, the desk, the index), each cut a
  *  short crossfade through black (veil 0..1..0 over 0.2 screens), the scene switching at the veil's peak. */
-const HELD = [0, BEATS.hold[0], (BEATS.headlineIn[1] + BEATS.headlineOut[0]) / 2, STORY_SCREENS];
+const HELD = [0, BEATS.hold[0], (BEATS.deskView[0] + BEATS.deskView[1]) / 2, STORY_SCREENS];
 const CUTS = [0.9, 2.2, 3.5];
 export function reducedStory(p: number): { p: number; veil: number } {
   let state = 0, veil = 0;

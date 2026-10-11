@@ -18,13 +18,13 @@ const LOCALS = `
   vec3 iVel = riseVel(aSeed, ph);
   // (shrinking away within ~15 cm of the lens: the camera comes down among them, none swells into a blot over the laptop)
   float nearK = smoothstep(1.0, 2.5, distance(iPos, cameraPosition));
-  vec2 iSizeHue = vec2(uGrainR * mix(0.7, 1.3, aSeed.w) * riseAlpha(ph, lift) * uRiseOn * nearK, aRest.w);
+  vec2 iSizeHue = vec2(uGrainR * mix(0.7, 1.3, aSeed.w) * riseAlpha(aSeed, ph, lift) * uRiseOn * nearK, aRest.w);
   float iSeed = aSeed.x;`;
 
 /**
  * The sand on the desk, pulled upward toward the ball above (spec 2026-10-11 §5): the look-dev spill's spots
- * (public/lab/sand/desk-spill.bin), each grain resting, lifting, fading near the ball's height and growing back in at
- * rest, on its own clock (rising.ts). Drawn and lit as the sand's own grains (loose-grain.ts, SAND_FRAGMENT), in its
+ * (public/lab/sand/desk-spill.bin), each grain unseen at rest, appearing out of nothing as it lifts, fading near the
+ * ball's height, then somewhere new at its own random time (rising.ts; Liam, 2026-10-11: no still sand on the table). Drawn and lit as the sand's own grains (loose-grain.ts, SAND_FRAGMENT), in its
  * layer (the lens, the shadows). Nothing on the CPU per frame but four uniforms.
  */
 export class RisingSand {

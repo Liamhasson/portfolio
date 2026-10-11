@@ -10,8 +10,8 @@ import { useEffect, useRef } from "react";
 const RISE = "hero-rise";
 
 /**
- * The copy is on screen from the first frame and drifts up and out, line by line, as the cloud becomes the ball; the
- * desk's headline enters from the right as the desk is revealed and leaves before the laptop (Liam, 2026-10-11).
+ * The copy is on screen from the first frame and drifts up and out, line by line, as the cloud becomes the ball. No text
+ * over the desk (Liam, 2026-10-11: the headline there is gone).
  */
 const STAGGER = 0.15;
 
@@ -39,16 +39,8 @@ function Still({ children }: { children: React.ReactNode }) {
 
 /**
  * `exit`: 0 holding .. 1 gone (staggered per line). `scrolled`: 0 at the top .. (the scroll cue fades once it moves).
- * `enter`: the next chapter's line, 0 off to the right .. 1 in place. `leave`: it travels out left as the next arrives.
- * Chapter lines: 2.1 (enter, leave), 2.2 (enter2, leave2), 2.3 (enter3), one at a time.
  */
-export function HeroOverlay({
-  exit, scrolled, enter, leave, enter2, leave2, enter3, leave3,
-}: {
-  exit: () => number; scrolled: () => number;
-  enter?: () => number; leave?: () => number; enter2?: () => number; leave2?: () => number; enter3?: () => number;
-  leave3?: () => number;
-}) {
+export function HeroOverlay({ exit, scrolled }: { exit: () => number; scrolled: () => number }) {
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
     let raf = 0;
@@ -63,25 +55,12 @@ export function HeroOverlay({
         });
         const cue = el.querySelector<HTMLElement>("[data-cue]");
         if (cue) cue.style.opacity = String(1 - Math.min(scrolled() / 0.03, 1));   // its job is done once scrolling starts
-        // chapter lines: each enters from the right, holds, and travels out left as the next arrives
-        const travel = (node: HTMLElement | null, inT: number, outT: number) => {
-          if (!node) return;
-          const a = Math.min(Math.max(inT, 0), 1), b = Math.min(Math.max(outT, 0), 1);
-          const ti = 1 - Math.pow(1 - a, 3), to = b * b * (3 - 2 * b);
-          node.style.transform = `translate3d(${(1 - ti) * 55 - to * 55}vw,0,0)`;
-          node.style.opacity = String(a * (1 - to));
-        };
-        if (enter) travel(el.querySelector<HTMLElement>("[data-enter]"), enter(), leave ? leave() : 0);
-        if (enter2) travel(el.querySelector<HTMLElement>("[data-enter2]"), enter2(), leave2 ? leave2() : 0);
-        if (enter3) travel(el.querySelector<HTMLElement>("[data-enter3]"), enter3(), leave3 ? leave3() : 0);
-        const scrim = el.querySelector<HTMLElement>("[data-scrim]");
-        if (scrim && enter) scrim.style.opacity = String(Math.min(Math.max(enter(), 0), 1));
       }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [exit, scrolled, enter, leave, enter2, leave2, enter3, leave3]);
+  }, [exit, scrolled]);
 
   return (
     <div ref={root} className="pointer-events-none fixed inset-0 z-10 text-[#f4efe9]" data-testid="hero-overlay">
@@ -119,27 +98,6 @@ export function HeroOverlay({
           </span>
         </p>
       </div>
-      {/* the desk's headline, entering from the right as the desk is revealed */}
-      {/* chapter lines sit lower left over the desk: a soft fade from the bottom edge keeps them legible */}
-      {enter && (
-        <div
-          aria-hidden
-          data-scrim
-          className="absolute inset-x-0 bottom-0 h-[34vh] opacity-0"
-          style={{ background: "linear-gradient(to top, rgba(11,9,8,0.62), rgba(11,9,8,0.3) 45%, transparent)" }}
-        />
-      )}
-      {enter && (
-        // one text moment for the whole story (Liam, 2026-10-11: one transition, not three; Lusion's form: a short
-        // headline and one plain line under it). Lower left over the desk, the scrim and a soft shadow for legibility
-        <div
-          data-enter
-          className="absolute bottom-[clamp(40px,6vh,64px)] left-[4.9vw] right-[4.9vw] opacity-0 md:bottom-[clamp(36px,4.4vw,64px)] md:right-auto md:max-w-[34rem]"
-          style={{ textShadow: "0 1px 24px rgba(0,0,0,0.55)" }}
-        >
-          <h2 className="text-[clamp(28px,3.5vw,54px)] font-normal leading-[1.08] tracking-[-0.015em]">Tested until people believe in it.</h2>
-        </div>
-      )}
       {/* the scroll cue: bottom right on desktop, centred on phones */}
       <div data-cue className="absolute bottom-[clamp(20px,3vw,44px)] left-0 right-0 text-center text-[clamp(13px,4vw,16px)] uppercase md:left-auto md:right-[4.9vw] md:text-right md:text-[clamp(14px,1.75vw,25px)]">
         <Line delay={800}>Scroll to explore</Line>

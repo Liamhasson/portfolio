@@ -4,7 +4,18 @@ import { RISE, grainAt, rNoise, spillToHero } from "./rising";
 const seeds = (n: number) => Array.from({ length: n }, (_, i) => [((i * 0.6180339) % 1), ((i * 0.4142135) % 1), ((i * 0.7320508) % 1), ((i * 0.2360679) % 1)] as [number, number, number, number]);
 
 describe("rising sand", () => {
-  test("a grain fades out at the top and grows back in at rest: never a pop at the cycle's turn", () => {
+  test("no still sand on the table (Liam, 2026-10-11): a grain at rest is not there; it appears out of nothing as it lifts", () => {
+    const S = seeds(400);
+    for (const t of [0, 13.7, 88, 401]) {
+      S.forEach((s, i) => {
+        const g = grainAt([((i * 37) % 120) / 10 - 6, -4.6, ((i * 53) % 60) / 10 - 3], s, t);
+        if (g.lift === 0) expect(g.alpha).toBe(0);
+        if (g.lift > 0.02 && g.lift < RISE.fadeFrom) expect(g.alpha).toBeGreaterThan(0.5);
+      });
+    }
+  });
+
+  test("a grain fades out at the top and grows back in from nothing: never a pop at the cycle's turn", () => {
     const rest: [number, number, number] = [1.2, -4.6, -0.8], seed: [number, number, number, number] = [0.3, 0.7, 0.4, 0.5];
     for (let t = 0; t < 200; t += 0.01) {
       const a = grainAt(rest, seed, t), b = grainAt(rest, seed, t + 0.01);
@@ -39,15 +50,18 @@ describe("rising sand", () => {
     }
   });
 
-  test("waves: grains close together lift close together, far apart they don't", () => {
-    const s: [number, number, number, number] = [0.5, 0.5, 0.5, 0.5];
-    const near = Math.abs(rNoise(1.0, 1.0) - rNoise(1.02, 1.0));
-    const far = Math.abs(rNoise(1.0, 1.0) - rNoise(4.0, -2.0));
-    expect(near).toBeLessThan(0.05);
-    expect(far).toBeGreaterThan(near);
-    // two grains 0.1 apart start lifting within a few seconds of each other
-    const startOf = (x: number) => { for (let t = 0; t < 400; t += 0.05) if (grainAt([x, -4.6, 0], s, t).lift > 0) return t; return 400; };
-    expect(Math.abs(startOf(2.0) - startOf(2.1))).toBeLessThan(3);
+  test("random pace and places (Liam, 2026-10-11): side by side, grains appear at unrelated times, and each life somewhere new", () => {
+    const S = seeds(40);
+    const startOf = (x: number, s: [number, number, number, number]) => { for (let t = 0; t < 400; t += 0.1) if (grainAt([x, -4.6, 0], s, t).lift > 0) return t; return 400; };
+    // forty grains on one spot: their first lifts spread over many seconds (no lockstep, no wave front)
+    const starts = S.map((s) => startOf(2.0, s)).sort((a, b) => a - b);
+    expect(starts[starts.length - 1] - starts[0]).toBeGreaterThan(20);
+    // one grain's lives start in different places
+    const s = S[3], spots: number[][] = [];
+    for (let t = 0, last = -1; t < 2000; t += 0.5) { const g = grainAt([2.0, -4.6, 0], s, t); if (g.cycle !== last && g.lift === 0) { spots.push([g.pos[0], g.pos[2]]); last = g.cycle; } }
+    const spread = Math.max(...spots.map((p) => Math.hypot(p[0] - spots[0][0], p[1] - spots[0][1])));
+    expect(spread).toBeGreaterThan(0.25);
+    expect(rNoise(1.0, 1.0)).toBeGreaterThanOrEqual(0);
   });
 
   test("hours in: still smooth, no jumps in view", () => {
