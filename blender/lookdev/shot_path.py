@@ -21,8 +21,8 @@ OUT = os.path.join(ROOT, "public", "lab", "shot", "camera.json")
 
 HERO_POS = (0.0, -0.92, 0.52)        # the hero camera (public/lab/sand/sand.json camera (0, 0.6, 9.5)) in desk metres
 HERO_AT = (0.0, 0.03, 0.47)          # its target (0, 0.1, 0)
-BALL = (0.0, 0.03, 0.46)             # the ball stays here, above the desk (the hero's centre)
-BALL_R = 0.07
+BALL = (0.0, 0.03, 0.47)             # the ball stays here, above the desk (public/lab/sand/sand.json ball centre (0, 0.1, 0))
+BALL_R = 0.11                        # (its radius 1.1: 47% of the hero's height)
 EASE_IN = 0.04                       # the ease-in: 4% of the way to the ball
 TILT_AT = (0.0, -0.06, 0.0)          # where the tilt ends looking: the desk's front middle (about 32 degrees down)
 JOIN = 150                           # the tail's index joined (its frame 151: below the hero's height, the lid at 101)
