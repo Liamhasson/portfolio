@@ -170,7 +170,33 @@ test.describe("pulse board", () => {
     await doneWith(page, "Stay active");
   });
 
-  test("nothing plays while the story is off screen; it starts when the phone comes into view", async ({ page }) => {
+  test("left alone, a screen's last tap moves the story on, as the tap would in the app", async ({ page }) => {
+    await story(page).go(1);
+    const y0 = await page.evaluate(() => scrollY);
+    await page.waitForFunction(() => window.__pulseStories.desktop.state().beat === 2, undefined, { timeout: 8000 });
+    const s = await story(page).state();
+    expect(s.caption).toBe(2);
+    expect(await page.evaluate(() => scrollY)).toBeGreaterThan(y0); // the scroll keeps up, so a scroll after carries on from here
+    await expect(fig(page, 2).locator('[data-goal="Stay active"]')).toHaveAttribute("aria-pressed", "true"); // left as the user left it
+    await page.waitForFunction(() => window.__pulseStories.desktop.state().beat === 3, undefined, { timeout: 8000 });
+  });
+
+  test("the story doesn't move the page while the tap-through prototype is open", async ({ page }) => {
+    await story(page).go(1);
+    await page.locator('.ob[data-story="desktop"] [data-proto-open]').click();
+    const y = await page.evaluate(() => scrollY);
+    await page.waitForTimeout(4500);
+    expect(await page.evaluate(() => scrollY)).toBe(y);
+    expect((await story(page).state()).beat).toBe(1);
+  });
+
+  test("the last screen stays: nothing moves on after 12", async ({ page }) => {
+    await story(page).go(11);
+    await page.waitForTimeout(3000);
+    expect((await story(page).state()).beat).toBe(11);
+  });
+
+  test("nothing plays while the story is off screen; it starts when the phone pins", async ({ page }) => {
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.waitForTimeout(2500);
     expect((await story(page).state()).step).toMatchObject({ screen: 1, done: [], playing: false });
@@ -199,7 +225,7 @@ test.describe("pulse board", () => {
     const m = (await mark.boundingBox())!, t = (await pressed(page, 2, '[data-goal="Get stronger"]').boundingBox())!;
     const cx = m.x + m.width / 2, cy = m.y + m.height / 2;
     expect(cx > t.x && cx < t.x + t.width && cy > t.y && cy < t.y + t.height).toBe(true);
-    await page.waitForFunction(() => { const st = window.__pulseStories.desktop.state().step; return !st.playing && !st.tap; }, undefined, { timeout: 8000 });
+    await page.waitForFunction(() => window.__pulseStories.desktop.state().beat === 2, undefined, { timeout: 8000 }); // it moved on
     expect(await opacityOf(mark)).toBe(0);
   });
 

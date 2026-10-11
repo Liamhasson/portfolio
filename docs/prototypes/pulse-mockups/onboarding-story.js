@@ -3,9 +3,11 @@
    navigation, forward or back) so nothing rests half-transitioned. Same pattern as the Cyvore story.
    The screens are the coded app (onboarding-app.js), played by a scripted user on a clock, not the scroll: each
    screen arrives untouched, rests, then is tapped through at a person's pace, however fast the page is scrolled.
-   Coming back to a screen plays it again; nothing plays while the phone is out of view. */
+   Coming back to a screen plays it again. Left alone, a screen's last tap moves the story on, as the tap would in the
+   app: the scroll is set to the next screen (invisible while pinned), so a scroll after carries on from there. Nothing
+   plays unless the phone is pinned. */
 
-import { mountStoryScreens } from "./onboarding-app.js?v=3";
+import { mountStoryScreens } from "./onboarding-app.js?v=4";
 
 const { gsap, ScrollTrigger } = window;
 gsap.registerPlugin(ScrollTrigger);
@@ -50,10 +52,11 @@ function mountStory(root, name) {
   let settled = true;
   let tl = null;
   let lastFills = stageFills(0, 0);
-  // The scripted user's clock for the screen on show; it runs only while the phone is in view.
+  // The scripted user's clock for the screen on show; it runs only while the phone is pinned.
   const clock = { t: 0 };
   let play = null;
   let inView = false;
+  let st = null;
   const stop = () => { play?.kill(); play = null; };
   const start = (n) => {
     stop();
@@ -61,7 +64,19 @@ function mountStory(root, name) {
     app.step(n, 0);
     if (!inView) return;
     const length = app.length(n);
-    if (length) play = gsap.to(clock, { t: length, duration: length, ease: "none", onUpdate: () => app.step(n, clock.t), onComplete: () => { app.step(n, Infinity); play = null; } });
+    if (!length) return;
+    play = gsap.to(clock, {
+      t: length, duration: length, ease: "none",
+      onUpdate: () => app.step(n, clock.t),
+      onComplete: () => {
+        app.step(n, Infinity);
+        play = null;
+        // the last tap was the step forward: the next screen follows it, unless the user has already moved on
+        // (and never behind the open prototype, which would leave the page somewhere else on close)
+        const protoOpen = document.querySelector("[data-proto]")?.hidden === false;
+        if (inView && !protoOpen && beat === n - 1 && n < SCREENS) scrollTo(n, 0.02);
+      },
+    });
   };
 
   const pinTop = () => Math.max(16, (innerHeight - pin.offsetHeight) / 2);
@@ -122,25 +137,25 @@ function mountStory(root, name) {
     fills.forEach((f, i) => f.style.setProperty("--fill", lastFills[i].toFixed(3)));
   };
 
-  const st = ScrollTrigger.create({
+  const scrollTo = (b, within) =>
+    window.scrollTo({ top: st.start + ((STARTS[b] + within * WEIGHTS[b]) / TOTAL) * (st.end - st.start), behavior: "instant" });
+  // Pinned is "in view": the play starts there, and starts over if the story is left and come back to.
+  const setInView = (on) => { if (on === inView) return; inView = on; start(beat + 1); };
+
+  st = ScrollTrigger.create({
     trigger: track,
     start: () => `top ${pinTop()}px`,
     end: () => `bottom ${pinTop() + pin.offsetHeight}px`,
     invalidateOnRefresh: true,
     onRefreshInit: layout,
     onUpdate: (self) => update(self.progress, self.direction),
+    onToggle: (self) => setInView(self.isActive),
   });
 
   // Land on wherever the page already is.
   const span = st.end - st.start;
   update(span > 0 ? (window.scrollY - st.start) / span : 0, 1);
-
-  // The play starts when the phone comes into view, and starts over if it leaves and comes back.
-  new IntersectionObserver(([e]) => {
-    if (e.isIntersecting === inView) return;
-    inView = e.isIntersecting;
-    start(beat + 1);
-  }, { threshold: 0.35 }).observe(pin);
+  setInView(st.isActive);
 
   (window.__pulseStories ||= {})[name] = {
     state: () => ({
@@ -148,7 +163,7 @@ function mountStory(root, name) {
       visible: screens.flatMap((s, i) => (opacity(s) > 0.01 ? [i] : [])),
       step: { ...app.info(beat + 1), playing: !!play },
     }),
-    scrollToBeat: (b, within = 0.5) => window.scrollTo(0, st.start + ((STARTS[b] + within * WEIGHTS[b]) / TOTAL) * (st.end - st.start)),
+    scrollToBeat: (b, within = 0.5) => scrollTo(b, within),
   };
 }
 
