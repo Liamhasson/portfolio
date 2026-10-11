@@ -131,7 +131,7 @@ export function HeroOverlay({
           className="absolute bottom-[clamp(40px,6vh,64px)] left-[4.9vw] right-[4.9vw] opacity-0 md:bottom-[clamp(36px,4.4vw,64px)] md:right-auto md:max-w-[34rem]"
           style={{ textShadow: "0 1px 24px rgba(0,0,0,0.55)" }}
         >
-          <h2 className="text-[clamp(28px,3.5vw,54px)] font-normal leading-[1.08] tracking-[-0.015em]">From chaos to product.</h2>
+          <h2 className="whitespace-nowrap text-[clamp(28px,3.5vw,54px)] font-normal leading-[1.08] tracking-[-0.015em]">From chaos to product.</h2>
           <p className="mt-[0.7em] text-[clamp(15px,1.3vw,19px)] font-normal leading-[1.4] text-white/80">
             I find the problem nobody pointed at, test what could solve it, and build what works.
           </p>
