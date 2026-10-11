@@ -32,7 +32,8 @@ uniform sampler2D uDepth;
 uniform vec4 uDofP;          // the lens: blur scale (device px), focus distance, near, far (0 scale = no lens)
 uniform float uDofMax;
 float cocAt(vec2 uv) {
-  float d = texture(uDepth, uv).r;
+  // (where there's no grain the depth is the desk's occluding depth, or nothing: read as far, as an empty pixel always was)
+  float d = texture(uSand, uv).a > 0.0 ? texture(uDepth, uv).r : 1.0;
   float z = uDofP.z * uDofP.w / (uDofP.w - d * (uDofP.w - uDofP.z));
   return min(uDofP.x * abs(z - uDofP.y) / z, uDofMax);
 }
@@ -75,7 +76,8 @@ uniform vec2 uTexel;     // one full-size pixel
 uniform vec4 uDofP;
 uniform float uDofMax;
 float cocAt(vec2 uv) {
-  float d = texture(uDepth, uv).r;
+  // (where there's no grain the depth is the desk's occluding depth, or nothing: read as far, as an empty pixel always was)
+  float d = texture(uSand, uv).a > 0.0 ? texture(uDepth, uv).r : 1.0;
   float z = uDofP.z * uDofP.w / (uDofP.w - d * (uDofP.w - uDofP.z));
   return min(uDofP.x * abs(z - uDofP.y) / z, uDofMax);
 }
@@ -213,6 +215,13 @@ export class SandComposite {
   });
   /** The hero's haze (texture, decode scale) and how much of it shows (0..1; it belongs to the hero's light). */
   haze: { texture: THREE.Texture; scale: number } | null = null;
+  /** What hides the sand (the 3D desk): its depth is drawn into the sand's target first, so a grain under or behind it
+   *  (the rising sand passes under the laptop and behind its lid) is hidden. Null: the sand is drawn over everything. */
+  occluder: THREE.Object3D | null = null;
+  private readonly occScene = new THREE.Scene();
+  private readonly occPairs: [THREE.Mesh, THREE.Object3D][] = [];
+  private occFrom: THREE.Object3D | null = null;
+  private readonly depthOnly = new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide });
   hazeAmount = 0;
   private readonly hazeScene = new THREE.Scene();
   /** The desk in shadow without its blur (the lamp still off: the cloud keeps the hero's light). */
@@ -313,8 +322,14 @@ export class SandComposite {
     renderer.setRenderTarget(this.rt);
     renderer.setClearColor(0x000000, 0);
     renderer.clear();
+    if (this.occluder) this.drawOccluders(renderer, camera);
     camera.layers.set(SAND_LAYER);
-    renderer.render(scene, camera);
+    {
+      const ac = renderer.autoClear;
+      renderer.autoClear = false;   // (cleared above: the occluders' depth must survive into the sand's pass)
+      renderer.render(scene, camera);
+      renderer.autoClear = ac;
+    }
     // the lens, from the sand's colour and depth (half size)
     const lens = this.lens;
     const dofP = this.material.uniforms.uDofP.value as THREE.Vector4;
@@ -392,7 +407,37 @@ export class SandComposite {
     renderer.autoClear = autoClear;
   }
 
+  /** The occluder's meshes, depth only (proxies sharing their geometry, following their world matrices: the lid turns). */
+  private drawOccluders(renderer: THREE.WebGLRenderer, camera: THREE.Camera): void {
+    if (this.occFrom !== this.occluder) {
+      for (const [m] of this.occPairs) this.occScene.remove(m);
+      this.occPairs.length = 0;
+      this.occluder!.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        const proxy = new THREE.Mesh(mesh.geometry, this.depthOnly);
+        proxy.matrixAutoUpdate = false;
+        proxy.frustumCulled = false;
+        this.occScene.add(proxy);
+        this.occPairs.push([proxy, mesh]);
+      });
+      this.occFrom = this.occluder;
+    }
+    for (const [proxy, src] of this.occPairs) {
+      proxy.visible = src.visible;
+      proxy.matrix.copy(src.matrixWorld);
+    }
+    const mask = camera.layers.mask;
+    const ac = renderer.autoClear;
+    renderer.autoClear = false;
+    camera.layers.enableAll();
+    renderer.render(this.occScene, camera);
+    camera.layers.mask = mask;
+    renderer.autoClear = ac;
+  }
+
   dispose(): void {
+    this.depthOnly.dispose();
     this.rt.dispose();
     this.bg?.dispose();
     this.blurRt.dispose();

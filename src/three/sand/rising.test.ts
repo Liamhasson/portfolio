@@ -29,13 +29,13 @@ describe("rising sand", () => {
     }
   });
 
-  test("never all at once: between a fifth and a half of the desk is in the air at any moment", () => {
+  test("never all at once, never a snowfall: between 8% and 30% of the desk is in the air at any moment", () => {
     const S = seeds(3000);
     for (const t of [0, 7.3, 31, 120, 999]) {
       let up = 0;
       S.forEach((s, i) => { if (grainAt([((i * 37) % 120) / 10 - 6, -4.6, ((i * 53) % 60) / 10 - 3], s, t).lift > 0) up++; });
-      expect(up / S.length).toBeGreaterThan(0.2);
-      expect(up / S.length).toBeLessThan(0.5);
+      expect(up / S.length).toBeGreaterThan(0.08);
+      expect(up / S.length).toBeLessThan(0.3);
     }
   });
 

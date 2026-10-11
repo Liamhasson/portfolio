@@ -5,12 +5,12 @@
  * and time, so the vertex shader computes it (RISE_GLSL) and these TS mirrors test it. The two agree in form, not to
  * the last bit (JS doubles, GLSL floats).
  *
- * A grain's life: rest (its share of the cycle, 50-75%), then lift (slow, then faster: pow(a, 1.8..2.8)), fading as it
+ * A grain's life: rest (its share of the cycle, 72-90%), then lift (slow, then faster: pow(a, 1.8..2.8)), fading as it
  * nears the ball's height; the next life grows in from nothing a little way from the last spot (cracks: along the crack).
  */
 export const RISE = {
   periodMin: 10, periodMax: 20,   // seconds per life, by region
-  restMin: 0.5, restMax: 0.75,    // the share of a life at rest
+  restMin: 0.72, restMax: 0.9,    // the share of a life at rest (8-30% in the air at once: never a snowfall; Liam's waves)
   growIn: 0.1,                    // the share of a life growing in (1-2 s)
   fadeFrom: 0.8,                  // the lift past which it fades
   height: 6.0,                    // hero units it rises (the desk is 4.6 below the ball)
@@ -37,7 +37,7 @@ vec2 risePhase(vec4 rest, vec4 seed, float t) {
   float n1 = rNoise(rest.xz * ${f(RISE.waveScale)});
   float n2 = rNoise(rest.xz * ${f(RISE.offsetScale)} + vec2(17.3, -4.1));
   float period = mix(${f(RISE.periodMin)}, ${f(RISE.periodMax)}, n1) * (1.0 + 0.08 * (seed.x * 2.0 - 1.0));
-  float ph = t / period + 0.9 * n2 + 0.15 * seed.y;
+  float ph = t / period + 2.0 * n2 + 0.15 * seed.y;
   return vec2(floor(ph), fract(ph));
 }
 float riseLift(vec4 seed, float u) {
@@ -75,7 +75,7 @@ export function grainAt(rest: [number, number, number], seed: [number, number, n
   const n1 = rNoise(rest[0] * RISE.waveScale, rest[2] * RISE.waveScale);
   const n2 = rNoise(rest[0] * RISE.offsetScale + 17.3, rest[2] * RISE.offsetScale - 4.1);
   const period = (RISE.periodMin + (RISE.periodMax - RISE.periodMin) * n1) * (1 + 0.08 * (seed[0] * 2 - 1));
-  const ph = t / period + 0.9 * n2 + 0.15 * seed[1];
+  const ph = t / period + 2.0 * n2 + 0.15 * seed[1];
   const cycle = Math.floor(ph), u = ph - cycle;
   const restShare = RISE.restMin + (RISE.restMax - RISE.restMin) * seed[2];
   const a = Math.min(Math.max((u - restShare) / (1 - restShare), 0), 1);
