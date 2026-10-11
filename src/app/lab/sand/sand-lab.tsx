@@ -251,9 +251,6 @@ export function SandLab() {
       if (new URLSearchParams(window.location.search).get("grainshadow") === "0") drift.material.uniforms.uGrainShadow.value = 0;   // compare: unshadowed
       drift.mesh.layers.set(SAND_LAYER);
       stage.scene.add(drift.mesh);
-      // once the ball has formed nothing hangs around it: under the cursor its own grains come out and go back in
-      let hover = 0, hoverPx = -1, hoverPy = -1;   // (the cursor's last place: the ball answers its moves, not its rest)
-      const hoverRay = new THREE.Vector3(), hoverDir = new THREE.Vector3(0, 0, 1);
       const lean = new THREE.Vector2();     // the eased lean, -1..1 each way
       let spacerTick = 0;
       let leanRoom = 1;                     // how much of the lean the desk's edge allows (top view)
@@ -856,23 +853,8 @@ export function SandLab() {
           drift.update(state.time, reduced || still ? 0 : dt, focus, r, reduced ? density * 0.5 : density, r * 3.5, grainR,
             pointer.active && !reduced ? cursorWorld : null, dir, 0.45,
             new THREE.Vector3(...CURSOR_WARM).multiplyScalar(5.0 * cursorI), cam);
-          // the formed ball under the cursor: where the cursor's line of sight meets it, its own grains come out and go
-          // back in (the sand shader; only while it is sand: from the ball forming until 2.3's build begins)
-          const sandBall = formed > 0.5 && hero && pg < TL.build[0];
-          hoverRay.subVectors(ballC, cam.position);
-          const along = hoverRay.dot(dir);
-          const miss = Math.sqrt(Math.max(hoverRay.lengthSq() - along * along, 0));
-          const over = sandBall && pointer.active && !reduced && along > 0 && miss < ballR * 1.08;
-          // moving over the ball sets it off; at rest it answers once, then settles back (Liam: don't lock on the hover)
-          const moved = Math.hypot(pointer.x - hoverPx, pointer.y - hoverPy) > 0.5;
-          hoverPx = pointer.x; hoverPy = pointer.y;
-          hover = over && moved ? damp(hover, 1, 10, dt) : damp(hover, 0, 2.2, dt);
-          if (over) {
-            // the near side's point under the cursor, as a direction from the ball's centre
-            const into = Math.sqrt(Math.max(ballR * ballR - miss * miss, 0));
-            hoverDir.copy(cam.position).addScaledVector(dir, along - into).sub(ballC).normalize();
-          }
-          field!.setHover(hover, hoverDir);
+          // (the formed ball no longer sprays its grains under the cursor: Liam, 2026-10-11, "the normal hover reaction is
+          // enough"; its light and drift stay)
         }
         if (!reduced) {
           paint!.update(stage!.renderer, dt);
