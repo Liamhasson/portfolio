@@ -7,6 +7,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:ital,wght@0,400;0,500;1,400&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!-- the app's own type (Pulse v2 · Design System): Space Grotesk + Manrope, used only inside the coded prototype -->
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
+<link href="pulse-mockups/onboarding-app.css?v=4" rel="stylesheet">
 <style>
 /* ------------------------------------------------------------------
    Board chrome (real px). Frames use --u = 1/1440 of the frame width.
@@ -181,7 +184,9 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
 .ob-stage i::after { content: ""; position: absolute; inset: 0; background: var(--grad); transform-origin: 0 50%; transform: scaleX(var(--fill, 0)); }
 .ob-phone { --w: calc(var(--u) * 340); }
 .ob-screen { position: absolute; inset: 0; margin: 0; opacity: 0; visibility: hidden; }
-.ob-screen img { display: block; width: 100%; height: 100%; object-fit: cover; }
+/* each screen is the coded app (onboarding-app.js), display only; one Back / Skip / bar layer sits over them all */
+.ob-app { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.ob-chrome { position: absolute; inset: 0; z-index: 3; overflow: hidden; pointer-events: none; }
 .ob-screen figcaption { display: none; }
 /* reduced motion: the twelve screens as a still grid, each with its caption */
 .ob.is-static .ob-track { height: auto !important; }
@@ -190,7 +195,8 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
 .ob.is-static .ob-phone { width: auto; aspect-ratio: auto; padding: 0; background: none; box-shadow: none; border-radius: 0; }
 .ob.is-static .phone-screen { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: calc(var(--u) * 32) calc(var(--u) * 20); height: auto; overflow: visible; background: none; border-radius: 0; }
 .ob.is-static .ob-screen { position: static; opacity: 1; visibility: visible; }
-.ob.is-static .ob-screen img { border-radius: calc(var(--u) * 20); box-shadow: inset 0 0 0 1px var(--hair-2); aspect-ratio: 1179 / 2556; height: auto; }
+.ob.is-static .ob-app { position: relative; inset: auto; aspect-ratio: 393 / 852; border-radius: calc(var(--u) * 20); background: #060b14; }
+.ob.is-static .ob-app::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--hair-2); pointer-events: none; }
 .ob.is-static .ob-screen figcaption { display: block; margin-top: calc(var(--u) * 12); font-size: calc(var(--u) * 14); line-height: 1.4; color: var(--ink-2); }
 
 /* ------------------------------ 5 how it works ------------------------------ */
@@ -203,8 +209,13 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
 .brand > div { border-radius: calc(var(--u) * 20); overflow: hidden; background: var(--panel); box-shadow: inset 0 0 0 calc(var(--u) * 1) var(--hair); height: calc(var(--u) * 240); display: grid; place-items: center; }
 .brand img { display: block; }
 .brand .b-logo img { width: calc(var(--u) * 96); }
-.brand .b-icon img { width: 100%; height: 100%; object-fit: cover; }
-.brand .b-board img { width: 100%; height: 100%; object-fit: cover; }
+/* photos fill their card (a % height inside the card's own grid resolved to auto, so they overflowed) */
+.brand .b-icon, .brand .b-board { position: relative; }
+.brand .b-icon img, .brand .b-board img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* the phone fills the square: anchored right and zoomed past the photo's white left margin */
+.brand .b-icon img { object-position: 100% 50%; transform: scale(1.42); transform-origin: 100% 46%; }
+/* the sign, not the building: centred on it and brought up to most of the card's width */
+.brand .b-board img { object-position: 50% 52%; transform: scale(1.3); transform-origin: 50.5% 50%; }
 
 /* ------------------------------ 6 challenges ------------------------------ */
 .chal { padding: calc(var(--u) * 112) 0 calc(var(--u) * 104); }
@@ -267,17 +278,9 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
 .proto-btn { height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid var(--hair-2); background: transparent; color: var(--ink); font: 500 14px/1 var(--sans); cursor: pointer; }
 .proto-btn:hover { background: rgba(238,243,250,.06); }
 .proto-btn:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
-.proto-phone { height: var(--ph); aspect-ratio: 393 / 852; border-radius: calc(var(--ph) * .07); padding: calc(var(--ph) * .01); background: #0a0f19; box-shadow: inset 0 0 0 1px rgba(220,232,250,.18), 0 30px 90px -20px rgba(31,128,238,.35); }
-.proto-screen { position: relative; width: 100%; height: 100%; border-radius: calc(var(--ph) * .06); overflow: hidden; background: #060b14; cursor: pointer; }
-.proto-shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; visibility: hidden; }
-.proto-hots { position: absolute; inset: 0; z-index: 5; }
-.hot { position: absolute; padding: 0; margin: 0; border: 0; border-radius: 14px; background: transparent; cursor: pointer; transition: background-color 200ms ease, box-shadow 200ms ease; -webkit-tap-highlight-color: transparent; }
-.hot:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
-.proto-screen.is-hinting .hot { background: rgba(51,208,231,.16); box-shadow: inset 0 0 0 2px rgba(51,208,231,.85); }
-/* the slide-to-book control, re-drawn only while it slides */
-.proto-track { position: absolute; left: calc(24 / 393 * 100%); top: calc(716 / 852 * 100%); width: calc(345 / 393 * 100%); height: calc(56 / 852 * 100%); z-index: 4; pointer-events: none; }
-.proto-knob { position: absolute; left: 3%; top: 8%; height: 84%; aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(135deg, #1f80ee, #33d0e7); box-shadow: 0 0 18px rgba(51,208,231,.55); opacity: 0; visibility: hidden; }
-.proto-knob svg { width: 44%; height: 44%; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.proto-phone { height: var(--ph); flex: none; display: flex; border-radius: calc(var(--ph) * .07); padding: calc(var(--ph) * .01); background: #0a0f19; box-shadow: inset 0 0 0 1px rgba(220,232,250,.18), 0 30px 90px -20px rgba(31,128,238,.35); }
+/* the coded app (onboarding-app.css) is laid out at 393 × 852 and scaled to this screen, which keeps the frame's ratio */
+.proto-screen { position: relative; height: 100%; aspect-ratio: 393 / 852; border-radius: calc(var(--ph) * .06); overflow: hidden; background: #060b14; isolation: isolate; }
 @media (max-width: 760px) {
   .proto-body { --ph: min(70vh, 640px); flex-direction: column-reverse; gap: 16px; }
   .proto-side { width: min(90vw, 360px); gap: 10px; }
@@ -285,7 +288,7 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
   .proto-cap { font-size: 20px; }
   .proto-note { display: none; }
 }
-@media (prefers-reduced-motion: reduce) { .proto-cap, .proto-cap.is-on, .hot { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .proto-cap, .proto-cap.is-on { transition: none; } }
 
 /* ------------------------------ mobile frame ------------------------------ */
 .phone-row { display: grid; grid-template-columns: 390px minmax(0, 1fr); gap: 56px; max-width: 1440px; margin: 0 auto; align-items: start; }
@@ -419,18 +422,18 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
             <button type="button" class="ob-try" data-proto-open>Tap through it yourself<svg class="ic" aria-hidden="true"><use href="#i-arrow-right"/></svg></button>
           </div>
           <div class="phone ob-phone"><div class="phone-screen">
-            <figure class="ob-screen"><img src="pulse-mockups/onb-01.jpg" alt="Onboarding screen 1: Welcome"><figcaption>01 · What Pulse is for, in three lines.</figcaption></figure>
-            <figure class="ob-screen"><img src="pulse-mockups/onb-02.jpg" alt="Onboarding screen 2: What brings you here?"><figcaption>02 · Pick the goals that matter to you.</figcaption></figure>
-            <figure class="ob-screen"><img src="pulse-mockups/onb-03.jpg" alt="Onboarding screen 3: What do you love?" loading="lazy"><figcaption>03 · Choose the activities; the plan follows.</figcaption></figure>
-            <figure class="ob-screen"><img src="pulse-mockups/onb-04.jpg" alt="Onboarding screen 4: Book your first workout" loading="lazy"><figcaption>04 · Your first booking, free to cancel.</figcaption></figure>
-            <figure class="ob-screen"><img src="pulse-mockups/onb-05.jpg" alt="Onboarding screen 5: Choose a workout" loading="lazy"><figcaption>05 · The best matches for your activities.</figcaption></figure>
-            <figure class="ob-screen"><img src="pulse-mockups/onb-06.jpg" alt="Onboarding screen 6: Choose a studio" loading="lazy"><figcaption>06 · Studios near you, with ratings.</figcaption></figure>
-            <figure class="ob-screen"><img src="pulse-mockups/onb-07.jpg" alt="Onboarding screen 7: Pick a time" loading="lazy"><figcaption>07 · A slot that fits, with what's still free.</figcaption></figure>
-            <figure class="ob-screen"><img src="pulse-mockups/onb-08.jpg" alt="Onboarding screen 8: Confirm booking" loading="lazy"><figcaption>08 · Everything in one place before you book.</figcaption></figure>
-            <figure class="ob-screen"><img src="pulse-mockups/onb-09.jpg" alt="Onboarding screen 9: You're booked!" loading="lazy"><figcaption>09 · Booked, and one tap to your calendar.</figcaption></figure>
-            <figure class="ob-screen"><img src="pulse-mockups/onb-10.jpg" alt="Onboarding screen 10: You're all set" loading="lazy"><figcaption>10 · What else Pulse does, in four lines.</figcaption></figure>
-            <figure class="ob-screen"><img src="pulse-mockups/onb-11.jpg" alt="Onboarding screen 11: Stay in the loop" loading="lazy"><figcaption>11 · Notifications, asked for with a reason.</figcaption></figure>
-            <figure class="ob-screen"><img src="pulse-mockups/onb-12.jpg" alt="Onboarding screen 12: Welcome to Pulse" loading="lazy"><figcaption>12 · In.</figcaption></figure>
+            <figure class="ob-screen"><div class="ob-app" role="img" aria-label="Onboarding screen 1: Welcome"></div><figcaption>01 · What Pulse is for, in three lines.</figcaption></figure>
+            <figure class="ob-screen"><div class="ob-app" role="img" aria-label="Onboarding screen 2: What brings you here?"></div><figcaption>02 · Pick the goals that matter to you.</figcaption></figure>
+            <figure class="ob-screen"><div class="ob-app" role="img" aria-label="Onboarding screen 3: What do you love?"></div><figcaption>03 · Choose the activities; the plan follows.</figcaption></figure>
+            <figure class="ob-screen"><div class="ob-app" role="img" aria-label="Onboarding screen 4: Book your first workout"></div><figcaption>04 · Your first booking, free to cancel.</figcaption></figure>
+            <figure class="ob-screen"><div class="ob-app" role="img" aria-label="Onboarding screen 5: Choose a workout"></div><figcaption>05 · The best matches for your activities.</figcaption></figure>
+            <figure class="ob-screen"><div class="ob-app" role="img" aria-label="Onboarding screen 6: Choose a studio"></div><figcaption>06 · Studios near you, with ratings.</figcaption></figure>
+            <figure class="ob-screen"><div class="ob-app" role="img" aria-label="Onboarding screen 7: Pick a time"></div><figcaption>07 · A slot that fits, with what's still free.</figcaption></figure>
+            <figure class="ob-screen"><div class="ob-app" role="img" aria-label="Onboarding screen 8: Confirm booking"></div><figcaption>08 · Everything in one place before you book.</figcaption></figure>
+            <figure class="ob-screen"><div class="ob-app" role="img" aria-label="Onboarding screen 9: You're booked!"></div><figcaption>09 · Booked, and one tap to your calendar.</figcaption></figure>
+            <figure class="ob-screen"><div class="ob-app" role="img" aria-label="Onboarding screen 10: You're all set"></div><figcaption>10 · What else Pulse does, in four lines.</figcaption></figure>
+            <figure class="ob-screen"><div class="ob-app" role="img" aria-label="Onboarding screen 11: Stay in the loop"></div><figcaption>11 · Notifications, asked for with a reason.</figcaption></figure>
+            <figure class="ob-screen"><div class="ob-app" role="img" aria-label="Onboarding screen 12: Welcome to Pulse"></div><figcaption>12 · In.</figcaption></figure>
           </div></div>
         </div>
       </div>
@@ -570,9 +573,7 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
       <div class="proto-actions"><button type="button" class="proto-btn" data-proto-restart>Restart</button><button type="button" class="proto-btn" data-proto-close>Close</button></div>
     </div>
     <div class="proto-phone"><div class="proto-screen">
-      <img class="proto-shot" src="pulse-mockups/proto/p-01.jpg" alt="Screen 1: Welcome"><img class="proto-shot" src="pulse-mockups/proto/p-02.jpg" alt="Screen 2: What brings you here?" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-03.jpg" alt="Screen 3: What do you love?" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-04.jpg" alt="Screen 4: Book your first workout" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-05.jpg" alt="Screen 5: Choose a workout" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-06.jpg" alt="Screen 6: Choose a studio" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-07.jpg" alt="Screen 7: Pick a time" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-08.jpg" alt="Screen 8: Confirm booking" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-09.jpg" alt="Screen 9: You're booked!" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-10.jpg" alt="Screen 10: You're all set" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-11.jpg" alt="Screen 11: Stay in the loop" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-12.jpg" alt="Screen 12: Welcome to Pulse" loading="lazy">
-      <div class="proto-track" aria-hidden="true"><span class="proto-knob"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></span></div>
-      <div class="proto-hots"></div>
+      <div class="pa" data-pa></div>
     </div></div>
   </div>
 </div>
@@ -652,7 +653,7 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
-<script type="module" src="pulse-mockups/onboarding-story.js"></script>
-<script type="module" src="pulse-mockups/onboarding-proto.js"></script>
+<script type="module" src="pulse-mockups/onboarding-story.js?v=4"></script>
+<script type="module" src="pulse-mockups/onboarding-proto.js?v=4"></script>
 </body>
 </html>

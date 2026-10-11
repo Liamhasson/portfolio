@@ -1,0 +1,250 @@
+/* Pulse onboarding, coded from the Figma file (0W2igIjHC2Qx9qVBVA1lFX, frames 01_Welcome … 12_NotificationsConfirmed).
+   Everything inside .pa is laid out in the frames' own units (393 × 852, 1 unit = 1px at scale 1) and the whole
+   app is scaled to the phone by --pa-s (set from the screen's width in onboarding-proto.js).
+   Tokens are the file's variables (Pulse v2 · Design System). */
+
+.pa {
+  --t1: #f7fafc; --t2: #8a93a6; --acc: #5e9dff;
+  --gb: rgba(255,255,255,.12); --gbs: rgba(255,255,255,.16);
+  --gf: rgba(255,255,255,.06); --gfs: rgba(255,255,255,.03);
+  --inset: #131826;
+  --ok: #43e08a; --warn: #ffc04d; --danger: #ff6b7d;
+  --grad: linear-gradient(90deg, #1e7af0, #34d5e6);
+  --glass-shadow: 0 10px 26px -8px rgba(0,0,0,.28), inset 0 1px 1px rgba(255,255,255,.12);
+  --glow: 0 8px 28px -6px rgba(30,122,240,.45);
+  --glow-strong: 0 10px 44px -4px rgba(30,122,240,.55);
+  --sg: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --mr: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  position: absolute; left: 0; top: 0; width: 393px; height: 852px;
+  transform: scale(var(--pa-s, 1)); transform-origin: 0 0;
+  font-family: var(--mr); color: var(--t1); text-align: left;
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
+}
+.pa *, .pa *::before, .pa *::after { box-sizing: border-box; }
+:where(.pa) :is(p, h1, h2, ul, ol, li) { margin: 0; padding: 0; list-style: none; font-weight: inherit; font-size: inherit; }
+:where(.pa) button { margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+:where(.pa) img { display: block; max-width: none; }
+.pa :focus-visible { outline: 2px solid #33d0e7; outline-offset: 3px; }
+.pa-screen:focus { outline: none; }
+
+/* ---------- the frame ---------- */
+.pa-screen { position: absolute; inset: 0; overflow: hidden; visibility: hidden; opacity: 0;
+  background: linear-gradient(114.76deg, #0a0f1c 0%, #0a0d16 35.714%, #06080f 71.429%); }
+.pa-bg { position: absolute; inset: 0; width: 393px; height: 852px; pointer-events: none; }
+.pa-screen[data-screen="12"] { background: #06080e; }
+.pa-screen[data-screen="12"] .pa-bg { opacity: .3; } /* the instance's own opacity in 12_NotificationsConfirmed */
+.pa-glow { position: absolute; left: -110px; top: -330px; width: 680px; height: 600px; pointer-events: none; }
+.pa-shade { position: absolute; inset: 0; z-index: 20; background: #000; opacity: 0; pointer-events: none; }
+.pa-time { position: absolute; left: 28px; top: 18px; font: 700 15px/20px var(--mr); letter-spacing: .1px; white-space: nowrap; }
+.pa-batt { position: absolute; left: 341px; top: 20px; width: 24px; height: 12px; border-radius: 3px; background: rgba(255,255,255,.9); }
+.pa-batt.is-solid { border-radius: 2px; background: var(--t1); }
+.pa-home { position: absolute; left: 130px; top: 834px; width: 134px; height: 5px; border-radius: 999px; background: rgba(255,255,255,.5); z-index: 6; }
+.pa-home.is-dim { background: rgba(255,255,255,.24); }
+.pa-home.is-low { top: 836px; }
+
+/* ---------- shared pieces ---------- */
+.pa-glass { position: relative; --ring: var(--gbs); background: var(--gfs); box-shadow: inset 0 0 0 1px var(--ring), var(--glass-shadow);
+  -webkit-backdrop-filter: blur(9px); backdrop-filter: blur(9px); }
+.pa-back { position: absolute; left: 24px; top: 58px; width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center; }
+.pa-back img { width: 20px; height: 20px; }
+.pa-skip { position: absolute; left: 312px; top: 60px; padding: 10px 14px; border-radius: 999px; font: 600 14px/18px var(--mr); letter-spacing: .1px; color: var(--t2); white-space: nowrap; }
+.pa-skip::before { content: ""; position: absolute; inset: -3px 0; } /* 44px tall to the finger */
+.pa-head { position: absolute; left: 24px; top: 128px; display: flex; flex-direction: column; gap: 8px; }
+.pa-display { font: 700 30px/38px var(--sg); letter-spacing: -.5px; white-space: nowrap; color: var(--t1); }
+.pa-body { font: 400 15px/22px var(--mr); color: var(--t2); }
+.pa-card-title { font: 700 16px/22px var(--sg); color: var(--t1); }
+.pa-small { font: 400 14px/20px var(--mr); color: var(--t2); }
+.pa-cta { position: absolute; left: 24px; width: 345px; height: 56px; top: 716px; border-radius: 999px; display: flex; align-items: center; justify-content: center;
+  background: var(--grad); font: 700 16px/20px var(--mr); letter-spacing: .2px; color: var(--t1); white-space: nowrap;
+  filter: drop-shadow(0 8px 14px rgba(30,122,240,.45)); transition: opacity 240ms ease, transform 160ms ease; }
+.pa-cta.is-glow { filter: none; box-shadow: var(--glow); overflow: hidden; }
+.pa-cta:active:not([aria-disabled="true"]) { transform: scale(.98); }
+.pa-cta[aria-disabled="true"] { opacity: .4; cursor: default; } /* Button · Primary · Disabled */
+.pa-pill { position: absolute; left: 24px; width: 345px; height: 56px; border-radius: 999px; display: flex; align-items: center; justify-content: center;
+  font: 700 16px/20px var(--mr); letter-spacing: .2px; white-space: nowrap; }
+/* the fixed layer over the screens (Back, Skip, the bar): it holds still while the screens slide beneath it */
+.pa-chrome { position: absolute; inset: 0; z-index: 10; pointer-events: none; }
+.pa-chrome > * { pointer-events: auto; visibility: hidden; opacity: 0; }
+.pa-progress { position: absolute; left: 86.5px; top: 810px; width: 220px; height: 6px; border-radius: 999px; background: var(--inset); overflow: hidden; }
+.pa-progress i { position: absolute; left: 0; top: 0; width: 220px; height: 6px; border-radius: 999px; background: var(--grad); will-change: transform; }
+.pa-iconbox { flex: none; width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; box-shadow: inset 0 0 0 1px var(--gbs); background: var(--gf);
+  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
+.pa-tile { flex: none; border-radius: 14px; display: grid; place-items: center; background: var(--grad); }
+
+/* ---------- 01 Welcome ---------- */
+.pa-brand { position: absolute; left: 0; top: 150px; width: 393px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.pa-logo { position: relative; width: 64px; height: 64px; }
+.pa-logo img { position: absolute; left: -40px; top: -30px; width: 144px; height: 144px; }
+.pa-features { position: absolute; left: 24px; top: 360px; width: 345px; display: flex; flex-direction: column; gap: 14px; }
+.pa-feature { display: flex; align-items: center; gap: 16px; padding: 16px; border-radius: 18px; }
+.pa-feature > div:last-child, .pa-perk > div:last-child { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.pa-login { position: absolute; left: 91px; top: 784px; display: flex; gap: 4px; align-items: center; line-height: 20px; white-space: nowrap; }
+.pa-login span:first-child { font: 400 14px/20px var(--mr); color: var(--t2); }
+.pa-login span:last-child { font: 700 15px/20px var(--mr); letter-spacing: .1px; color: var(--acc); }
+
+/* ---------- 02 Goals ---------- */
+.pa-list { position: absolute; left: 24px; top: 232px; width: 345px; display: flex; flex-direction: column; gap: 12px; }
+.pa-goal { position: relative; display: flex; align-items: center; justify-content: space-between; width: 345px; padding: 18px 20px; border-radius: 16px;
+  background: var(--gfs); box-shadow: inset 0 0 0 1px var(--gb), var(--glass-shadow); -webkit-backdrop-filter: blur(9px); backdrop-filter: blur(9px);
+  font: 400 15px/22px var(--mr); color: var(--t2); transition: background-color 200ms ease, box-shadow 200ms ease, color 200ms ease; }
+.pa-goal[aria-pressed="true"] { background: var(--gf); box-shadow: inset 0 0 0 2px var(--gbs); font: 700 16px/20px var(--mr); letter-spacing: .2px; color: var(--t1); }
+.pa-tick { flex: none; position: relative; width: 24px; height: 24px; border-radius: 999px; border: 1.5px solid var(--gbs); display: grid; place-items: center; }
+.pa-tick img { width: 14px; height: 14px; opacity: 0; transform: scale(.6); transition: opacity 160ms ease, transform 220ms cubic-bezier(.22,1,.36,1); }
+[aria-pressed="true"] > .pa-tick { border: 0; background: var(--grad); }
+[aria-pressed="true"] > .pa-tick img { opacity: 1; transform: none; }
+
+/* ---------- 03 Activities ---------- */
+.pa-cat { position: relative; width: 345px; border-radius: 18px; transition: background-color 220ms ease; }
+.pa-cat.is-open { background: var(--gf); box-shadow: inset 0 0 0 2px var(--gbs); border-radius: 16px; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.pa-cat-head { display: flex; width: 100%; align-items: center; justify-content: space-between; padding: 20px; border-radius: inherit; }
+.pa-cat.is-open .pa-cat-head { padding: 18px 20px 0; }
+.pa-cat-head > span:first-child { display: flex; flex-direction: column; gap: 4px; }
+.pa-cat-name { font: 700 16px/22px var(--sg); color: var(--t2); white-space: nowrap; transition: color 200ms ease; }
+.pa-cat.is-open .pa-cat-name { color: var(--t1); }
+.pa-cat-sub { display: none; font: 400 12px/16px var(--mr); color: var(--t2); white-space: nowrap; }
+.pa-cat.is-open .pa-cat-sub { display: block; }
+.pa-cat-sign { font: 700 20px/26px var(--sg); letter-spacing: -.2px; color: var(--t2); }
+.pa-cat.is-open .pa-cat-sign { color: var(--acc); }
+.pa-cat-panel { overflow: hidden; }
+.pa-chips { display: flex; flex-wrap: wrap; gap: 8px; width: 305px; margin: 24px 20px 18px; }
+.pa-chip { position: relative; padding: 8px 14px; border-radius: 999px; background: var(--gf); box-shadow: inset 0 0 0 1px var(--gb), var(--glass-shadow);
+  -webkit-backdrop-filter: blur(9px); backdrop-filter: blur(9px); font: 600 12px/16px var(--mr); letter-spacing: .2px; color: var(--t2); white-space: nowrap;
+  transition: color 160ms ease; }
+.pa-chip::before { content: ""; position: absolute; inset: -6px -2px; } /* a finger-sized target around a small chip */
+.pa-chip::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--grad); opacity: 0; transition: opacity 180ms ease; }
+.pa-chip span { position: relative; z-index: 1; }
+.pa-chip[aria-pressed="true"] { color: var(--t1); box-shadow: none; }
+.pa-chip[aria-pressed="true"]::after { opacity: 1; }
+
+/* ---------- 04 Book your first workout ---------- */
+.pa-hero { position: absolute; left: 148.5px; top: 150px; width: 96px; height: 96px; border-radius: 28px; box-shadow: var(--glow-strong); }
+.pa-hero img { width: 46px; height: 46px; }
+.pa-center { position: absolute; left: 0; width: 393px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.pa-perks { position: absolute; left: 24px; top: 386px; width: 345px; display: flex; flex-direction: column; gap: 12px; }
+.pa-perk { display: flex; align-items: center; gap: 16px; padding: 16px; border-radius: 16px; }
+.pa-skipnow { position: absolute; left: 24px; top: 744px; width: 345px; height: 52px; border-radius: 999px; display: flex; align-items: center; justify-content: center;
+  font: 700 15px/20px var(--mr); letter-spacing: .1px; color: var(--t2); }
+
+/* ---------- 05 Choose a workout ---------- */
+.pa-grid { position: absolute; left: 24px; top: 232px; width: 345px; height: 446px; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(3, 1fr); gap: 13px; }
+.pa-workout { position: relative; display: flex; flex-direction: column; justify-content: flex-end; padding: 14px; border-radius: 18px; overflow: hidden;
+  box-shadow: inset 0 0 0 1px var(--gb); isolation: isolate; transition: transform 200ms cubic-bezier(.22,1,.36,1); }
+.pa-workout::before { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--gb); pointer-events: none; }
+.pa-workout:active { transform: scale(.97); }
+.pa-workout .ph { position: absolute; inset: 0; z-index: -1; background: linear-gradient(147.69deg, #2980f2 0%, #0a0f1f 71.429%); }
+.pa-workout .ph img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.pa-workout .ph::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, #000, rgba(94,157,255,0)); mix-blend-mode: multiply; }
+.pa-workout > span:not(.pa-tick) { font: 700 18px/24px var(--sg); letter-spacing: -.1px; white-space: nowrap; }
+/* selected: Figma has no selected state for this grid; the ring and tick are the file's own (gradient, Check or V) */
+.pa-workout::after { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 2px; background: var(--grad);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; opacity: 0; transition: opacity 200ms ease; }
+.pa-workout .pa-tick { position: absolute; right: 12px; top: 12px; border-color: rgba(255,255,255,.5); background: rgba(6,8,15,.35); opacity: 0; transform: scale(.8); transition: opacity 200ms ease, transform 260ms cubic-bezier(.22,1,.36,1); }
+.pa-workout[aria-pressed="true"] { box-shadow: var(--glow); }
+.pa-workout[aria-pressed="true"]::before { opacity: 0; }
+.pa-workout[aria-pressed="true"]::after, .pa-workout[aria-pressed="true"] .pa-tick { opacity: 1; transform: none; }
+
+/* ---------- 06 Choose a studio ---------- */
+.pa-studios { position: absolute; left: 24px; top: 232px; width: 345px; display: flex; flex-direction: column; gap: 16px; }
+.pa-studio { display: flex; align-items: center; gap: 16px; width: 345px; padding: 16px; border-radius: 16px; transition: transform 200ms cubic-bezier(.22,1,.36,1); }
+.pa-studio:active { transform: scale(.98); }
+.pa-studio .logo { flex: none; position: relative; width: 56px; height: 56px; border-radius: 14px; overflow: hidden; background: linear-gradient(143.13deg, #2980f2 0%, #0a0f1f 71.429%); }
+.pa-studio .logo img { width: 100%; height: 100%; object-fit: cover; }
+.pa-studio .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; white-space: nowrap; }
+.pa-studio .where { font: 400 12px/16px var(--mr); color: var(--t2); }
+.pa-studio .rating { font: 600 12px/16px var(--mr); letter-spacing: .2px; color: var(--acc); }
+.pa-studio .go { flex: none; position: relative; width: 28px; height: 28px; }
+.pa-studio .go img { position: absolute; left: -18px; top: -8px; width: 64px; height: 64px; }
+
+/* ---------- 07 Pick a time ---------- */
+.pa-days { position: absolute; left: 24px; top: 210px; width: 345px; display: flex; gap: 10px; align-items: stretch; }
+.pa-day { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 16px; border-radius: 14px;
+  background: var(--gf); box-shadow: inset 0 0 0 1px var(--gb), var(--glass-shadow); -webkit-backdrop-filter: blur(9px); backdrop-filter: blur(9px);
+  letter-spacing: .2px; white-space: nowrap; }
+.pa-day .d { font: 600 12px/16px var(--mr); color: var(--t2); }
+.pa-day .n { font: 700 13px/16px var(--mr); color: var(--t1); }
+.pa-day::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--grad); opacity: 0; transition: opacity 180ms ease; }
+.pa-day span { position: relative; z-index: 1; }
+.pa-day[aria-pressed="true"] { box-shadow: none; }
+.pa-day[aria-pressed="true"]::after { opacity: 1; }
+.pa-day[aria-pressed="true"] .d { color: var(--t1); }
+/* a tap on a class time before a day is picked: the day row lights up, twice, briefly */
+.pa-days-ring { position: absolute; inset: -6px; border-radius: 20px; pointer-events: none; opacity: 0;
+  box-shadow: 0 0 0 2px rgba(51,208,231,.9), 0 0 22px rgba(51,208,231,.35); }
+.pa-days.is-nudge .pa-days-ring { animation: pa-nudge 1.05s ease-out both; }
+@keyframes pa-nudge { 0% { opacity: 0; transform: scale(1.03); } 18% { opacity: 1; transform: none; } 42% { opacity: .3; } 64% { opacity: 1; } 100% { opacity: 0; } }
+.pa-slots { position: absolute; left: 0; top: 280px; width: 393px; bottom: 0; padding: 0 24px 96px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none;
+  display: flex; flex-direction: column; gap: 16px; }
+.pa-slots::-webkit-scrollbar { display: none; }
+.pa-slot { flex: none; display: flex; align-items: center; justify-content: space-between; width: 345px; padding: 16px; border-radius: 18px; transition: transform 200ms cubic-bezier(.22,1,.36,1); }
+.pa-slot:active:not([aria-disabled="true"]) { transform: scale(.98); }
+.pa-slot[aria-disabled="true"] { cursor: not-allowed; }
+.pa-slot.pa-hit { transition: transform 200ms cubic-bezier(.22,1,.36,1), opacity 260ms ease, outline-color 200ms ease; }
+/* no day yet: the times are there to read, dimmed, and wait for one */
+.pa-slots[data-wait] .pa-slot { opacity: .5; cursor: default; }
+.pa-slot .who { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; white-space: nowrap; }
+.pa-slot .who b { font: 700 15px/20px var(--mr); letter-spacing: .1px; color: var(--t1); }
+.pa-slot .who span { font: 400 14px/20px var(--mr); color: var(--t2); }
+.pa-slot .state { flex: 1; min-width: 0; }
+.pa-badge { position: relative; display: flex; justify-content: center; width: 100%; padding: 6px 12px; border-radius: 999px; background: var(--gf);
+  box-shadow: inset 0 0 0 1px var(--gb), var(--glass-shadow); font: 600 12px/16px var(--mr); letter-spacing: .2px; white-space: nowrap; }
+.pa-badge.full { color: var(--danger); } .pa-badge.spots { color: var(--warn); } .pa-badge.open { color: var(--ok); }
+
+/* ---------- 08 Confirm booking ---------- */
+.pa-confirm { position: absolute; left: 24px; top: 128px; width: 345px; display: flex; flex-direction: column; gap: 24px; }
+.pa-summary { display: flex; flex-direction: column; padding: 4px 0; border-radius: 20px; overflow: hidden; }
+.pa-summary .top { display: flex; align-items: center; gap: 14px; padding: 18px 20px; }
+.pa-summary .top .pa-tile { width: 54px; height: 54px; }
+.pa-summary .top .pa-tile img { width: 24px; height: 24px; }
+.pa-summary .top b { display: block; font: 700 20px/26px var(--sg); letter-spacing: -.2px; }
+.pa-summary hr { width: 305px; height: 1px; margin: 0; border: 0; background: var(--gb); }
+.pa-summary .row { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; line-height: 20px; white-space: nowrap; }
+.pa-summary .row span { font: 400 14px/20px var(--mr); color: var(--t2); }
+.pa-summary .row b { font: 700 15px/20px var(--mr); letter-spacing: .1px; color: var(--t1); }
+.pa-note { padding: 14px 16px; border-radius: 14px; box-shadow: inset 0 0 0 1px var(--gbs); background: var(--gfs); font: 600 12px/16px var(--mr); letter-spacing: .2px; color: var(--acc); }
+
+/* the slide-to-book control (Button slider: Default / Pressed / Slide) */
+.pa-slider { position: absolute; left: 24px; top: 716px; width: 345px; height: 56px; border-radius: 999px; overflow: hidden; touch-action: none;
+  display: flex; align-items: center; justify-content: center; transition: box-shadow 260ms ease; }
+.pa-slider.is-pressed { box-shadow: inset 0 0 0 1px var(--gbs), var(--glow); }
+.pa-slider.is-done { box-shadow: inset 0 0 0 1px var(--gbs), var(--glow-strong); }
+.pa-fill { position: absolute; left: 0; top: 0; width: 345px; height: 56px; background: var(--grad); opacity: 0; will-change: transform, opacity; pointer-events: none; }
+.pa-slide-label { position: relative; font: 700 16px/20px var(--mr); letter-spacing: .2px; color: var(--t1); white-space: nowrap; will-change: opacity; pointer-events: none; }
+.pa-knob { position: absolute; left: 0; top: 0; width: 52px; height: 52px; margin: 1px 0 0 1px; border-radius: 999px; display: grid; place-items: center;
+  background: var(--grad); box-shadow: var(--glow); will-change: transform; pointer-events: none; }
+.pa-knob img { width: 24px; height: 24px; }
+
+/* ---------- 09 You're booked · 10 You're all set · 11 Stay in the loop · 12 Welcome ---------- */
+.pa-booked { position: relative; width: 48px; height: 48px; }
+.pa-booked img { position: absolute; left: -40px; top: -30px; width: 128px; height: 128px; }
+.pa-feats { position: absolute; left: 24px; top: 216px; width: 345px; display: flex; flex-direction: column; gap: 14px; }
+.pa-feat { display: flex; align-items: center; gap: 16px; padding: 18px; border-radius: 18px; }
+.pa-feat .pa-tile { width: 48px; height: 48px; }
+.pa-feat .pa-tile img { width: 24px; height: 24px; }
+.pa-feat > div:last-child { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pa-bell { width: 104px; height: 104px; border-radius: 28px; box-shadow: var(--glow-strong); }
+.pa-bell img { width: 48px; height: 48px; }
+.pa-hello { position: absolute; left: 0; top: 50%; width: 393px; transform: translateY(-50%); display: flex; justify-content: center; }
+.pa-hello h2 { width: 231px; font: 400 28px/normal var(--sg); letter-spacing: -.5px; white-space: nowrap; }
+.pa-hello span:first-child { text-shadow: 0 10px 44px rgba(30,122,240,.55); }
+/* the file fills the whole text box with the gradient, so the word sits at its cyan end */
+.pa-hello span:last-child { background: var(--grad) right / 231px 100% no-repeat; -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 10px 22px rgba(30,122,240,.55)); }
+
+/* ---------- a tap that misses: where the controls are ---------- */
+.pa-hit { transition: outline-color 200ms ease; }
+.proto-screen.is-hinting :is(.pa-screen.is-current, .pa-chrome) .pa-hit:not([aria-disabled="true"]) { outline: 2px solid rgba(51,208,231,.9); outline-offset: 2px; }
+
+/* ---------- the scroll story: the same screens, display only, played by a scripted user ---------- */
+.pa.is-story .pa-screen { visibility: visible; opacity: 1; }
+.pa.is-story .pa-slots { overflow: hidden; } /* never a scroller under the page's own scroll */
+.pa.is-story .pa-hit { transition: transform 180ms cubic-bezier(.22,1,.36,1), background-color 200ms ease, box-shadow 200ms ease, color 200ms ease, opacity 260ms ease; }
+.pa.is-story .pa-hit[data-press] { transform: scale(.97); }
+/* the finger: a soft mark that lands on a control and presses just before it changes (placed and scaled by script) */
+.pa-tap { position: absolute; left: 0; top: 0; z-index: 30; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 999px; pointer-events: none;
+  background: radial-gradient(circle, rgba(255,255,255,.55) 0%, rgba(255,255,255,.3) 62%, rgba(255,255,255,.18) 100%);
+  box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.6), 0 6px 18px rgba(0,0,0,.32); opacity: 0; will-change: transform, opacity; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pa *, .pa *::before, .pa *::after { transition: none !important; }
+  .pa-days.is-nudge .pa-days-ring { animation: none; opacity: 1; }
+}

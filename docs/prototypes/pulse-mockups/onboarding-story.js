@@ -1,6 +1,13 @@
 /* Pulse onboarding story on the mockup board.
    The phone pins; scroll picks the screen; each change plays itself (a slide, like the app's own
-   navigation, forward or back) so nothing rests half-transitioned. Same pattern as the Cyvore story. */
+   navigation, forward or back) so nothing rests half-transitioned. Same pattern as the Cyvore story.
+   The screens are the coded app (onboarding-app.js), played by a scripted user on a clock, not the scroll: each
+   screen arrives untouched, rests, then is tapped through at a person's pace, however fast the page is scrolled.
+   Coming back to a screen plays it again. Left alone, a screen's last tap moves the story on, as the tap would in the
+   app: the scroll is set to the next screen (invisible while pinned), so a scroll after carries on from there. Nothing
+   plays unless the phone is pinned. */
+
+import { mountStoryScreens } from "./onboarding-app.js?v=4";
 
 const { gsap, ScrollTrigger } = window;
 gsap.registerPlugin(ScrollTrigger);
@@ -13,8 +20,12 @@ export const STAGES = [
   { from: 3, to: 8 },  // the first booking
   { from: 9, to: 11 }, // tour, permissions, close
 ];
-/** Pinned scroll per screen, as a share of the viewport height. */
-const UNIT_VH = 0.33;
+/** Pinned scroll per unit of weight, as a share of the viewport height. */
+const UNIT_VH = 0.55;
+/** Each screen's share of the scroll: a little more where the play runs longer (02 and 03, 07, 08). */
+const WEIGHTS = [1, 1.6, 1.6, 1, 1, 1, 1.4, 1.4, 1, 1, 1, 1];
+const STARTS = WEIGHTS.map((_, i) => WEIGHTS.slice(0, i).reduce((a, b) => a + b, 0));
+const TOTAL = STARTS[SCREENS - 1] + WEIGHTS[SCREENS - 1];
 
 export const stageOf = (beat) => STAGES.findIndex((s) => beat >= s.from && beat <= s.to);
 
@@ -35,16 +46,43 @@ function mountStory(root, name) {
   const fills = [...root.querySelectorAll(".ob-stage i")];
   const stages = [...root.querySelectorAll(".ob-stage")];
   const count = root.querySelector("[data-count]");
+  const app = mountStoryScreens(root.querySelector(".phone-screen"), { gsap, still: false });
 
   let beat = -1;
   let settled = true;
   let tl = null;
   let lastFills = stageFills(0, 0);
+  // The scripted user's clock for the screen on show; it runs only while the phone is pinned.
+  const clock = { t: 0 };
+  let play = null;
+  let inView = false;
+  let st = null;
+  const stop = () => { play?.kill(); play = null; };
+  const start = (n) => {
+    stop();
+    clock.t = 0;
+    app.step(n, 0);
+    if (!inView) return;
+    const length = app.length(n);
+    if (!length) return;
+    play = gsap.to(clock, {
+      t: length, duration: length, ease: "none",
+      onUpdate: () => app.step(n, clock.t),
+      onComplete: () => {
+        app.step(n, Infinity);
+        play = null;
+        // the last tap was the step forward: the next screen follows it, unless the user has already moved on
+        // (and never behind the open prototype, which would leave the page somewhere else on close)
+        const protoOpen = document.querySelector("[data-proto]")?.hidden === false;
+        if (inView && !protoOpen && beat === n - 1 && n < SCREENS) scrollTo(n, 0.02);
+      },
+    });
+  };
 
   const pinTop = () => Math.max(16, (innerHeight - pin.offsetHeight) / 2);
   const layout = () => {
     root.style.setProperty("--pin-top", `${pinTop()}px`);
-    track.style.height = `${pin.offsetHeight + SCREENS * UNIT_VH * innerHeight}px`;
+    track.style.height = `${pin.offsetHeight + TOTAL * UNIT_VH * innerHeight}px`;
   };
   layout();
 
@@ -60,6 +98,7 @@ function mountStory(root, name) {
     // A new change takes over from whatever is on screen: nothing snaps to full, nothing stacks.
     if (tl) { tl.kill(); tl = null; }
     setCaption(b);
+    app.chrome(b + 1, !(instant || reduce || beat < 0)); // Back, Skip and the bar hold still; the bar eases to its fill
     const inn = screens[b];
     if (instant || reduce || beat < 0) {
       screens.forEach((s, i) => gsap.set(s, { autoAlpha: i === b ? 1 : 0, xPercent: 0 }));
@@ -83,39 +122,55 @@ function mountStory(root, name) {
   };
 
   const update = (progress, dir) => {
-    const p = Math.min(Math.max(progress, 0), 1) * SCREENS;
-    const b = Math.min(SCREENS - 1, Math.floor(p));
-    const within = Math.min(p - b, 1);
-    if (b !== beat) goTo(b, dir || (b > beat ? 1 : -1));
+    const u = Math.min(Math.max(progress, 0), 1) * TOTAL;
+    let b = SCREENS - 1;
+    while (b > 0 && u < STARTS[b]) b--;
+    const within = Math.min((u - STARTS[b]) / WEIGHTS[b], 1);
+    if (b !== beat) {
+      // the screen it leaves rests as the user left it: all done going on, untouched going back
+      stop();
+      if (beat >= 0) app.step(beat + 1, b > beat ? Infinity : 0);
+      goTo(b, dir || (b > beat ? 1 : -1));
+      start(b + 1);
+    }
     lastFills = stageFills(b, within);
     fills.forEach((f, i) => f.style.setProperty("--fill", lastFills[i].toFixed(3)));
   };
 
-  const st = ScrollTrigger.create({
+  const scrollTo = (b, within) =>
+    window.scrollTo({ top: st.start + ((STARTS[b] + within * WEIGHTS[b]) / TOTAL) * (st.end - st.start), behavior: "instant" });
+  // Pinned is "in view": the play starts there, and starts over if the story is left and come back to.
+  const setInView = (on) => { if (on === inView) return; inView = on; start(beat + 1); };
+
+  st = ScrollTrigger.create({
     trigger: track,
     start: () => `top ${pinTop()}px`,
     end: () => `bottom ${pinTop() + pin.offsetHeight}px`,
     invalidateOnRefresh: true,
     onRefreshInit: layout,
     onUpdate: (self) => update(self.progress, self.direction),
+    onToggle: (self) => setInView(self.isActive),
   });
 
   // Land on wherever the page already is.
   const span = st.end - st.start;
   update(span > 0 ? (window.scrollY - st.start) / span : 0, 1);
+  setInView(st.isActive);
 
   (window.__pulseStories ||= {})[name] = {
     state: () => ({
       beat, settled, caption: caps.findIndex((c) => c.classList.contains("is-on")), stage: stageOf(beat), fills: lastFills,
       visible: screens.flatMap((s, i) => (opacity(s) > 0.01 ? [i] : [])),
+      step: { ...app.info(beat + 1), playing: !!play },
     }),
-    scrollToBeat: (b, within = 0.5) => window.scrollTo(0, st.start + ((b + within) / SCREENS) * (st.end - st.start)),
+    scrollToBeat: (b, within = 0.5) => scrollTo(b, within),
   };
 }
 
 /** Reduced motion: no pin; the twelve screens as a still grid, each with its caption. */
 function mountStatic(root, name) {
   root.classList.add("is-static");
+  mountStoryScreens(root.querySelector(".phone-screen"), { gsap, still: true }); // each screen as it ends
   root.querySelectorAll(".ob-screen").forEach((s) => gsap.set(s, { autoAlpha: 1, xPercent: 0 }));
   (window.__pulseStories ||= {})[name] = { state: () => ({ static: true, screens: root.querySelectorAll(".ob-screen").length }) };
 }
