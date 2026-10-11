@@ -5,7 +5,7 @@ laptop's screen, in desk metres (Blender z-up). Pure Python (no bpy): run with a
           39-79   tilt   in place, down until the ball has left the frame above and the desk fills it
           79-149  glide  down and forward, low past the note "Who is this product for?" (it reads: Liam, 2026-10-11), the lid
                          opening and the screen waking on the way, to the approved tail's frame 171
-         149-188  tail   public/lab/through/camera.json frames 171-210, verbatim (the push into the screen)
+         149-188  tail   shot-src/through-camera.json (the old flight's, public/lab/through) frames 171-210, verbatim (the push into the screen)
 
   python3 blender/lookdev/shot_path.py            # writes public/lab/shot/camera.json
   python3 blender/lookdev/shot_path.py --check    # and asserts the joins, the direction and the ball leaving the frame
@@ -16,8 +16,8 @@ import os
 import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-THROUGH = os.path.join(ROOT, "public", "lab", "through", "camera.json")
-PULLBACK = os.path.join(ROOT, "public", "lab", "pullback", "camera.json")
+THROUGH = os.path.join(ROOT, "blender", "lookdev", "shot-src", "through-camera.json")
+PULLBACK = os.path.join(ROOT, "blender", "lookdev", "shot-src", "pullback-camera.json")
 OUT = os.path.join(ROOT, "public", "lab", "shot", "camera.json")
 
 HERO_POS = (0.0, -0.92, 0.52)        # the hero camera (public/lab/sand/sand.json camera (0, 0.6, 9.5)) in desk metres

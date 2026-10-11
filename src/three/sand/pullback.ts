@@ -23,7 +23,6 @@ export interface PullbackPath {
   };
 }
 
-export const PULLBACK_BASE = "/lab/pullback";
 const Z_UP_TO_Y_UP = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
 
 const PLATE_VERTEX = /* glsl */ `
@@ -159,7 +158,7 @@ export class Pullback {
     }
   }
 
-  static async load(base = PULLBACK_BASE, frames = true): Promise<Pullback> {
+  static async load(base: string, frames = true): Promise<Pullback> {
     const data = (await (await fetch(`${base}/camera.json`)).json()) as PullbackPath;
     const pb = new Pullback(data, frames ? (i) => `${base}/f_${String(i).padStart(4, "0")}.jpg` : null);
     if (frames && data.depth) {
