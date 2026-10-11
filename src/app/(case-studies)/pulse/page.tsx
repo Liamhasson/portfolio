@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { CaseStudyPage } from "@/components/case-study/case-study-page";
-import { caseStudies } from "@/content/case-studies";
+import { pulseEntry } from "@/content/case-studies/pulse.entry";
 
-const entry = caseStudies.pulse;
+const entry = pulseEntry;
 const { study } = entry;
 
 export const metadata: Metadata = { title: `${study.title} case study`, description: study.line };

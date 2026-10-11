@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { CaseStudyPage } from "@/components/case-study/case-study-page";
-import { caseStudies } from "@/content/case-studies";
+import { cyvoreEntry } from "@/content/case-studies/cyvore.entry";
 
-const entry = caseStudies.cyvore;
+const entry = cyvoreEntry;
 const { study } = entry;
 
 export const metadata: Metadata = { title: `${study.title} case study`, description: study.line };

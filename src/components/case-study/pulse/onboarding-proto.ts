@@ -118,8 +118,12 @@ export function mountPulseProto(dialog: HTMLElement, scope: ParentNode = documen
     if (screen === 1) return;
     go(1, -1);
   };
+  // checkVisibility is Safari 17.4+; older browsers get the same test by hand
+  const visible = (el: HTMLElement) => typeof el.checkVisibility === "function"
+    ? el.checkVisibility({ visibilityProperty: true })
+    : el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
   const focusables = () => [...dialog.querySelectorAll<HTMLElement>("button, [href], [tabindex]")]
-    .filter((el) => el.tabIndex >= 0 && !(el as HTMLButtonElement).disabled && !el.closest("[inert]") && el.checkVisibility({ visibilityProperty: true }));
+    .filter((el) => el.tabIndex >= 0 && !(el as HTMLButtonElement).disabled && !el.closest("[inert]") && visible(el));
 
   const open = (from: HTMLElement) => {
     opener = from;
@@ -142,7 +146,10 @@ export function mountPulseProto(dialog: HTMLElement, scope: ParentNode = documen
   on(dialog.querySelector("[data-proto-close]") as HTMLElement, "click", close);
   on(dialog.querySelector("[data-proto-restart]") as HTMLElement, "click", restart);
   on(dialog.querySelector(".proto-backdrop") as HTMLElement, "click", close);
-  on(dialog, "keydown", (e) => {
+  // On the document, not the dialog: a click on the overlay's plain text moves focus to <body>, and Escape and Tab
+  // must still work while the dialog is open.
+  on(document, "keydown", (e) => {
+    if (dialog.hidden) return;
     if (e.key === "Escape") { e.preventDefault(); close(); return; }
     if (e.key !== "Tab") return;
     const f = focusables();

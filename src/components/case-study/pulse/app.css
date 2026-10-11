@@ -24,9 +24,9 @@
   -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
 }
 [data-world="pulse"] .pa *, [data-world="pulse"] .pa *::before, [data-world="pulse"] .pa *::after { box-sizing: border-box; }
-[data-world="pulse"] :where(.pa) :is(p, [data-world="pulse"] h1, [data-world="pulse"] h2, [data-world="pulse"] ul, [data-world="pulse"] ol, [data-world="pulse"] li) { margin: 0; padding: 0; list-style: none; font-weight: inherit; font-size: inherit; }
-[data-world="pulse"] :where(.pa) button { margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-[data-world="pulse"] :where(.pa) img { display: block; max-width: none; }
+:where([data-world="pulse"] .pa) :is(p, h1, h2, ul, ol, li) { margin: 0; padding: 0; list-style: none; font-weight: inherit; font-size: inherit; }
+:where([data-world="pulse"] .pa) button { margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+:where([data-world="pulse"] .pa) img { display: block; max-width: none; }
 [data-world="pulse"] .pa :focus-visible { outline: 2px solid #33d0e7; outline-offset: 3px; }
 [data-world="pulse"] .pa-screen:focus { outline: none; }
 
@@ -236,7 +236,7 @@
 
 /* ---------- a tap that misses: where the controls are ---------- */
 [data-world="pulse"] .pa-hit { transition: outline-color 200ms ease; }
-[data-world="pulse"] .proto-screen.is-hinting :is(.pa-screen.is-current, [data-world="pulse"] .pa-chrome) .pa-hit:not([aria-disabled="true"]) { outline: 2px solid rgba(51,208,231,.9); outline-offset: 2px; }
+[data-world="pulse"] .proto-screen.is-hinting :is(.pa-screen.is-current, .pa-chrome) .pa-hit:not([aria-disabled="true"]) { outline: 2px solid rgba(51,208,231,.9); outline-offset: 2px; }
 
 /* ---------- the scroll story: the same screens, display only, played by a scripted user ---------- */
 [data-world="pulse"] .pa.is-story .pa-screen { visibility: visible; opacity: 1; }

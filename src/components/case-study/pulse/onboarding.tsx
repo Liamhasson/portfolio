@@ -16,6 +16,17 @@ export function PulseOnboarding({ kind, title }: { kind: "signature"; title: str
   const id = useId();
   const storyRef = useRef<HTMLDivElement>(null);
   const protoRef = useRef<HTMLDivElement>(null);
+  // The screens are drawn in the frame's 393 units: fit them to the phone at once, before fonts and the engine arrive,
+  // so the first screen never shows at the wrong scale while the page loads.
+  useEffect(() => {
+    const phone = storyRef.current?.querySelector<HTMLElement>(".phone-screen");
+    if (!phone) return;
+    const fit = () => { const w = phone.clientWidth; if (w) phone.style.setProperty("--pa-s", String(w / 393)); };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(phone);
+    return () => ro.disconnect();
+  }, []);
   useEffect(() => {
     let stop: (() => void) | null = null;
     let alive = true;
