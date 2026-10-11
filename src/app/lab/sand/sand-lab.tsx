@@ -60,15 +60,14 @@ function damp(current: number, target: number, lambda: number, dt: number): numb
   return current + (target - current) * (1 - Math.exp(-lambda * dt));
 }
 
-export function SandLab() {
+export function SandLab({ hero }: { hero: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [compare] = useState<CompareTarget | null>(() => {
     const v = new URLSearchParams(window.location.search).get("compare");
     return v === "chaos" || v === "mid" || v === "ball" ? v : null;
   });
   const [split, setSplit] = useState(50);
-  // ?hero: the hero's front layer over the sand (the lab's status line hidden)
-  const [hero] = useState(() => new URLSearchParams(window.location.search).has("hero"));
+  // ?hero (the story): from the page's request, never window.location (stale during a client-side navigation)
   // the final grade over the scene (film-grade.tsx); ?grade=0: the raw frame
   const [gradeOn] = useState(() => new URLSearchParams(window.location.search).get("grade") !== "0");
   const compactRef = useRef(0);
