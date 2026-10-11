@@ -46,14 +46,33 @@ const TL = {
   // rush/out/lid/push name stretches of that one shot (the frames they span: 40-110, 110-130, 130-160, 160-210)
   leave22: [0.975, 1.0], enter23: [1.0, 1.04], build: [0.99, 1.24], leave23: [1.23, 1.27],
   rush: [1.24, 1.388], out: [1.388, 1.431], lid: [1.431, 1.494], push: [1.494, 1.6],
-  takeover: [1.57, 1.6], indexIn: [1.6, 1.64],                                 // the live index takes over, settles
+  takeover: [1.57, 1.6], indexIn: [1.6, 1.64],
+  caption: [0.36, 0.46], captionOut: [1.17, 1.24],                              // the one line (Liam, 2026-10-11)                                 // the live index takes over, settles
 } as const;
 /**
- * The page's length. Progress is measured in units of the first 1600vh of scroll (the timeline above was laid out on
- * a 1700vh page), so each chapter added after it keeps the earlier ones' pace.
+ * The page's length, and how the scroll walks the timeline above (Liam, 2026-10-11: the projects were 27 screens away;
+ * recruiters won't scroll that far). About nine screens now: each stretch of the story gets its own share of scroll
+ * (in vh scrolled -> timeline progress), the beats that carry the story the most, the ones that carry nothing (the old
+ * caption holds, the frost build that is gone) almost none.
  */
-const PAGE_VH = 2800;
-const PROGRESS_SCALE = (PAGE_VH - 100) / 1600;
+const SCROLL_KEYS: [number, number][] = [
+  [0, 0], [40, 0.035],        // the hero holds a moment
+  [200, 0.31],                // its copy leaves, the camera pulls back to the desk
+  [350, 0.52],                // the ball forms; the one line arrives
+  [450, 0.71],                // the rise to the top view
+  [600, 0.97],                // the three attempts
+  [640, 1.24],                // (what was 2.3's frost build: nothing to see now)
+  [890, 1.6],                 // through the cloud, onto the laptop, into the screen
+  [930, 1.66],                // the index settles
+];
+const PAGE_VH = SCROLL_KEYS[SCROLL_KEYS.length - 1][0] + 100;
+function progressAt(vh: number): number {
+  for (let i = 1; i < SCROLL_KEYS.length; i++) {
+    const [a, pa] = SCROLL_KEYS[i - 1], [b, pb] = SCROLL_KEYS[i];
+    if (vh <= b) return pa + (pb - pa) * Math.min(Math.max((vh - a) / (b - a), 0), 1);
+  }
+  return SCROLL_KEYS[SCROLL_KEYS.length - 1][1];
+}
 /** Progress -> the through move's frame (0-based): each beat gets its own share of the scroll. */
 const THROUGH_KEYS: [keyof typeof TL, number][] = [["build", 39], ["push", 209]];
 function throughFrame(p: number): number {
@@ -113,12 +132,8 @@ export function SandLab() {
     [hero],
   );
   const readScrolled = useCallback(() => progressRef.current, []);
-  const readEnter = useCallback(() => span(progressRef.current, TL.enter), []);
-  const readLeave21 = useCallback(() => span(progressRef.current, TL.leave21), []);
-  const readEnter22 = useCallback(() => span(progressRef.current, TL.enter22), []);
-  const readLeave22 = useCallback(() => span(progressRef.current, TL.leave22), []);
-  const readEnter23 = useCallback(() => span(progressRef.current, TL.enter23), []);
-  const readLeave23 = useCallback(() => span(progressRef.current, TL.leave23), []);
+  const readEnter = useCallback(() => span(progressRef.current, TL.caption), []);
+  const readLeave = useCallback(() => span(progressRef.current, TL.captionOut), []);
   const indexRef = useRef<WorkIndexHandle | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const spacerRef = useRef<HTMLDivElement>(null);
@@ -455,7 +470,7 @@ export function SandLab() {
         // (the story's own length: past it, the page runs on through the index's projects)
         const max = Math.max(1, (pageRef.current?.offsetHeight ?? document.documentElement.scrollHeight) - window.innerHeight);
         const progress = Math.min(window.scrollY / max, 1);
-        progressRef.current = damp(progressRef.current, hero ? progress * PROGRESS_SCALE : progress, 6, dt);
+        progressRef.current = damp(progressRef.current, hero ? progressAt(progress * (PAGE_VH - 100)) : progress, 6, dt);
         // ?build / ?thframe hold a moment of 2.3 (everything before it as the page has it there)
         if (Number.isFinite(buildHold)) progressRef.current = TL.build[0] + (TL.build[1] - TL.build[0]) * buildHold;
         if (holdThrough) {
@@ -935,13 +950,15 @@ export function SandLab() {
 
   return (
     <>
-    <div ref={pageRef} className="bg-black" style={{ height: hero ? `${PAGE_VH}vh` : "400vh" }}>
+    <div ref={pageRef} className="relative bg-black" style={{ height: hero ? `${PAGE_VH}vh` : "400vh" }}>
       <canvas ref={canvasRef} className="fixed inset-0 h-screen w-screen" data-testid="sand-canvas" />
+      {/* the nav's Projects (/#projects) lands where the index has settled (once this page is the home) */}
+      {hero && <div id="projects" aria-hidden className="pointer-events-none absolute left-0 w-px" style={{ top: `${PAGE_VH - 100}vh`, height: 1 }} />}
       {hero && <WorkIndex bind={bindIndex} />}
       {hero ? (
         <HeroOverlay
           exit={readExit} scrolled={readScrolled}
-          enter={readEnter} leave={readLeave21} enter2={readEnter22} leave2={readLeave22} enter3={readEnter23} leave3={readLeave23}
+          enter={readEnter} leave={readLeave}
         />
       ) : (
         <div className="pointer-events-none fixed left-3 top-3 font-mono text-[11px] uppercase tracking-wider text-white/60">

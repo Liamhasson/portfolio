@@ -124,33 +124,18 @@ export function HeroOverlay({
         />
       )}
       {enter && (
-        // over the void strip at the top (the three-quarter view leaves only that much empty): one line on desktop,
-        // two below the menu on phones. A soft text shadow for legibility, never a shape over the desk.
-        <h2
+        // one text moment for the whole story (Liam, 2026-10-11: one transition, not three; Lusion's form: a short
+        // headline and one plain line under it). Lower left over the desk, the scrim and a soft shadow for legibility
+        <div
           data-enter
-          className={`absolute left-[4.9vw] right-[4.9vw] text-[clamp(28px,3.5vw,54px)] font-normal leading-[1.08] tracking-[-0.015em] opacity-0 md:right-auto bottom-[clamp(40px,6vh,64px)] max-w-[15ch] md:bottom-[clamp(36px,4.4vw,64px)]`}
+          className="absolute bottom-[clamp(40px,6vh,64px)] left-[4.9vw] right-[4.9vw] opacity-0 md:bottom-[clamp(36px,4.4vw,64px)] md:right-auto md:max-w-[34rem]"
           style={{ textShadow: "0 1px 24px rgba(0,0,0,0.55)" }}
         >
-          I look for problems nobody pointed at.
-        </h2>
-      )}
-      {enter2 && (
-        <h2
-          data-enter2
-          className={`absolute left-[4.9vw] right-[4.9vw] text-[clamp(28px,3.5vw,54px)] font-normal leading-[1.08] tracking-[-0.015em] opacity-0 md:right-auto bottom-[clamp(40px,6vh,64px)] max-w-[15ch] md:bottom-[clamp(36px,4.4vw,64px)]`}
-          style={{ textShadow: "0 1px 24px rgba(0,0,0,0.55)" }}
-        >
-          Then I test solutions.
-        </h2>
-      )}
-      {enter3 && (
-        <h2
-          data-enter3
-          className={`absolute left-[4.9vw] right-[4.9vw] text-[clamp(28px,3.5vw,54px)] font-normal leading-[1.08] tracking-[-0.015em] opacity-0 md:right-auto bottom-[clamp(40px,6vh,64px)] max-w-[15ch] md:bottom-[clamp(36px,4.4vw,64px)]`}
-          style={{ textShadow: "0 1px 24px rgba(0,0,0,0.55)" }}
-        >
-          And I build it.
-        </h2>
+          <h2 className="text-[clamp(28px,3.5vw,54px)] font-normal leading-[1.08] tracking-[-0.015em]">From chaos to product.</h2>
+          <p className="mt-[0.7em] text-[clamp(15px,1.3vw,19px)] font-normal leading-[1.4] text-white/80">
+            I find the problem nobody pointed at, test what could solve it, and build what works.
+          </p>
+        </div>
       )}
       {/* the scroll cue: bottom right on desktop, centred on phones */}
       <div data-cue className="absolute bottom-[clamp(20px,3vw,44px)] left-0 right-0 text-center text-[clamp(13px,4vw,16px)] uppercase md:left-auto md:right-[4.9vw] md:text-right md:text-[clamp(14px,1.75vw,25px)]">
