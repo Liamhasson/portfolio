@@ -69,3 +69,15 @@ describe("the chaos at rest: Lusion's flow and a strong inward vortex (Liam, 202
     expect(SWIRL.lifeMin).toBeGreaterThanOrEqual(20);
   });
 });
+
+test("never toward the lens: the spiral draws grains in around the axis, never out along it (Liam: no big grains)", () => {
+  const ax = SWIRL.axis, al = Math.hypot(ax[0], ax[1], ax[2]);
+  for (const { p, seed } of rests.slice(0, 400)) {
+    const along0 = (p[0] * ax[0] + p[1] * ax[1] + p[2] * ax[2]) / al;
+    for (const t of [3, 17, 41]) {
+      const q = swirlAt(p, seed, C, R, t).pos;
+      const along = (q[0] * ax[0] + q[1] * ax[1] + q[2] * ax[2]) / al;
+      expect(Math.abs(along)).toBeLessThanOrEqual(Math.abs(along0) + SWIRL.turb * R * 1.8);
+    }
+  }
+});

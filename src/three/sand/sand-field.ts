@@ -95,7 +95,7 @@ export const SAND_LOOK = {
   pebbleMin: 3,
   pebbleMax: 7,
   swirl: 1,   // the chaos at rest: Lusion's flow and the inward vortex (swirl.ts; Liam, 2026-10-11)
-  sizeJitter: 0.35,   // every grain's unevenness (log-normal spread)   // how dense the sand must be for its blurred grains to stay solid (they overlap into a soft mass)
+  sizeJitter: 0.15,   // every grain's unevenness (log-normal spread; Liam, 2026-10-11: similar in size, ~0.86-1.16x)   // how dense the sand must be for its blurred grains to stay solid (they overlap into a soft mass)
   hueJitter: 0.32,   // the formed ball's colours mixed grain by grain (Liam picked the render's mottled ball, 2026-10-11)
   motionBlur: 0.5,
   motionBlurMax: 1.0,
@@ -162,6 +162,7 @@ export class SandField {
         uShutter: { value: 1 / 60 },   // motion blur: the grain's travel over this long, on screen
         uBallRot: { value: this.ballRot },
         uChaosC: { value: this.chaosCentre() },
+        uChaosShift: { value: new THREE.Vector3() },
         uChaosRot: { value: this.chaosRot },
         uTime: { value: 0 },
         uDrift: { value: SAND_LOOK.drift },

@@ -72,9 +72,10 @@ export class Stage {
     this.resize();
   }
 
-  /** Vertical field of view for the current aspect. Exact framing reproduces Blender's horizontal fit. */
-  vfovFor(aspect: number): number {
-    let tanH = Math.tan(this.hfov / 2);
+  /** Vertical field of view for the current aspect (at the current lens, or `lensMm`). Exact framing reproduces Blender's
+   *  horizontal fit. */
+  vfovFor(aspect: number, lensMm?: number): number {
+    let tanH = lensMm ? this.sensorMm / 2 / lensMm : Math.tan(this.hfov / 2);
     // Portrait (phones): narrow the view so the ball keeps ~65% of the width; the chaos overflows the edges.
     // A lab stand-in: the real responsive framing comes with the hero layout.
     if (!this.exactFraming && aspect < 1) tanH *= 1 - 0.58 * Math.min((1 - aspect) / 0.55, 1);

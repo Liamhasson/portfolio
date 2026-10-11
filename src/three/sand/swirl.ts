@@ -14,6 +14,8 @@ export const SWIRL = {
   lifeMin: 20, lifeMax: 60,   // seconds
   born: 1.4,                  // the radius it is born at, x its spot's
   core: 0.45,                 // and drawn in to
+  coreAlong: 0.75,            // along the axis (toward the lens) it starts at its spot and is only drawn in, to this:
+                              // never nearer the lens than its spot (Liam: no big grains)
   field: 1.4,                 // the scale (per cloud radius) of the field that gives each region its life, phase and pace:
                               // neighbours share them (they move in sheets, the filaments hold), regions differ
   turn: 0.126,                // the vortex's angular speed scale (rad/s): ~20 s a turn at the core, ~60 s at the rim
@@ -48,7 +50,8 @@ vec4 swirlAt(vec3 p, vec3 seed, vec3 c, float R, float time) {
   float rn = clamp(length(rad) / R, 0.05, 1.5);
   float ang = ${f(SWIRL.turn)} * (1.0 + 0.15 * n3 + 0.02 * (seed.z - 0.5)) / (0.35 + rn) * ph * life;
   vec3 radR = rad * cos(ang) + cross(ax, rad) * sin(ang);
-  vec3 np = c + (radR + ax * along) * mix(${f(SWIRL.born)}, ${f(SWIRL.core)}, inK);
+  // around the axis: born outside, drawn in; along it (toward the lens) only ever drawn in, never pushed out (no big grains)
+  vec3 np = c + radR * mix(${f(SWIRL.born)}, ${f(SWIRL.core)}, inK) + ax * along * mix(1.0, ${f(SWIRL.coreAlong)}, inK);
   vec3 q = np * (${f(SWIRL.turbFreq)} / R) + vec3(time * ${f(SWIRL.turbSpeed)});
   np += vec3(swNoise(q), swNoise(q + vec3(31.4, 0.0, 0.0)), swNoise(q + vec3(0.0, 47.2, 0.0))) * (${f(SWIRL.turb)} * R);
   return vec4(np, smoothstep(0.0, 0.07, ph) * (1.0 - smoothstep(0.82, 1.0, ph)));
@@ -83,8 +86,8 @@ export function swirlAt(p: [number, number, number], seed: [number, number, numb
   const rn = Math.min(Math.max(Math.hypot(rad[0], rad[1], rad[2]) / R, 0.05), 1.5);
   const ang = SWIRL.turn * (1 + 0.15 * n3 + 0.02 * (seed[2] - 0.5)) / (0.35 + rn) * ph * life;
   const cr = [AX[1] * rad[2] - AX[2] * rad[1], AX[2] * rad[0] - AX[0] * rad[2], AX[0] * rad[1] - AX[1] * rad[0]];
-  const k = mix(SWIRL.born, SWIRL.core, inK);
-  const np = [0, 1, 2].map((i) => c[i] + (rad[i] * Math.cos(ang) + cr[i] * Math.sin(ang) + AX[i] * along) * k);
+  const k = mix(SWIRL.born, SWIRL.core, inK), ka = mix(1, SWIRL.coreAlong, inK);
+  const np = [0, 1, 2].map((i) => c[i] + (rad[i] * Math.cos(ang) + cr[i] * Math.sin(ang)) * k + AX[i] * along * ka);
   const s = SWIRL.turbFreq / R;
   const qx = np[0] * s + time * SWIRL.turbSpeed, qy = np[1] * s + time * SWIRL.turbSpeed, qz = np[2] * s + time * SWIRL.turbSpeed;
   const tk = SWIRL.turb * R;

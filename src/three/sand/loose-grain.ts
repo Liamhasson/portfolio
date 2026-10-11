@@ -43,6 +43,7 @@ uniform vec2 uShadowK;
 uniform float uCompact;
 uniform float uGrainShadow;   // 1 = in the sand's shadows, 0 = as before (lab compare)
 uniform vec3 uChaosC;
+uniform vec3 uChaosShift;
 uniform mat3 uChaosRot;
 uniform vec3 uBallC;
 uniform vec3 uBallVolC;
@@ -88,12 +89,12 @@ const LOOSE_BODY = /* glsl */ `
   // the sand's frame for its volumes, at the sand's compaction (as the sand's own grains are shaded)
   float t = smoothstep(0.0, 1.0, uCompact);
   mat3 chaosInv = transpose(uChaosRot), ballInv = transpose(uBallRot);
-  vec3 pv = mix(uChaosC + chaosInv * (iPos - uChaosC), uBallVolC + ballInv * (iPos - uBallC) * uBallVolS, t);
+  vec3 pv = mix(uChaosC + chaosInv * (iPos - uChaosShift - uChaosC), uBallVolC + ballInv * (iPos - uBallC) * uBallVolS, t);
   float shadowK = mix(uShadowK.x, uShadowK.y, t) * uGrainShadow;
   vec3 E[3];
   for (int i = 0; i < 3; i++) {
     vec3 Lv = uLightPos[i] - iPos;
-    vec3 lp = mix(uChaosC + chaosInv * (uLightPos[i] - uChaosC), uBallVolC + ballInv * (uLightPos[i] - uBallC) * uBallVolS, t);
+    vec3 lp = mix(uChaosC + chaosInv * (uLightPos[i] - uChaosShift - uChaosC), uBallVolC + ballInv * (uLightPos[i] - uBallC) * uBallVolS, t);
     float T = shadowK > 0.0 ? transmittance(pv, lp, min(length(Lv) * mix(1.0, uBallVolS, t), mix(8.5, 3.0, t)), shadowK) : 1.0;   // (no march when unshadowed)
     E[i] = uLightCol[i] * T / (dot(Lv, Lv) + uLightR2[i]);
   }
@@ -181,7 +182,7 @@ export function looseGrainUniforms(sand: THREE.ShaderMaterial): Record<string, T
     uGround: su.uGround, uPaint: su.uPaint, uPaintScale: su.uPaintScale, uViewport: su.uViewport, uBufH: su.uBufH,
     // the sand's shadows: its own uniforms, shared (its volumes swap as it compacts)
     uLo: su.uLo, uSize: su.uSize, uVolA: su.uVolA, uVolB: su.uVolB, uVolMix: su.uVolMix, uSigmaMax: su.uSigmaMax,
-    uShadowK: su.uShadowK, uCompact: su.uCompact, uChaosC: su.uChaosC, uChaosRot: su.uChaosRot, uBallC: su.uBallC,
+    uShadowK: su.uShadowK, uCompact: su.uCompact, uChaosC: su.uChaosC, uChaosShift: su.uChaosShift, uChaosRot: su.uChaosRot, uBallC: su.uBallC,
     uBallVolC: su.uBallVolC, uBallVolS: su.uBallVolS, uBallRot: su.uBallRot, uGrainShadow: { value: 1 },
     uShadeBall: { value: new THREE.Vector4() }, uShadeLamp: { value: new THREE.Vector4() }, uShadeK: { value: 0 },
   };

@@ -11,6 +11,7 @@ import { WorkIndex, type WorkIndexHandle } from "./work-index";
 import { BakedDesk } from "@/three/sand/baked-desk";
 import { revealAt } from "@/three/sand/screen-reveal";
 import { DriftGrains } from "@/three/sand/drift-grains";
+import { heroShift } from "@/three/sand/hero-layout";
 import { SAND_ENCODE, SAND_LAYER, SandComposite } from "@/three/sand/sand-composite";
 import { Pullback } from "@/three/sand/pullback";
 import { BEATS, STORY_SCREENS, ease, pAtFrame, reducedStory, shotFrame, span, type ShotMeta } from "@/three/sand/story-timeline";
@@ -309,6 +310,17 @@ export function SandLab() {
         field!.setPointScale(stage!.bufferHeight, (stage!.camera.fov * Math.PI) / 180);
         setStatus(`${s.tier} · ${s.grains.toLocaleString()} grains · ${s.shadowSteps} shadow steps · dpr ${s.pixelRatio}`);
       });
+      // the vortex to the right of the copy (Liam, 2026-10-11): the hero's cloud moved sideways at the hero's own framing
+      if (hero) {
+        const shiftCloud = () => {
+          const aspect = stage!.camera.aspect;
+          const tanHalfW = Math.tan(stage!.vfovFor(aspect, camera.lens_mm) / 2) * aspect;
+          const c = field!.material.uniforms.uChaosC.value as THREE.Vector3;
+          (field!.material.uniforms.uChaosShift.value as THREE.Vector3).set(...heroShift(camera.position, camera.target, [c.x, c.y, c.z], tanHalfW, aspect));
+        };
+        shiftCloud();
+        stage.onSettings(shiftCloud);
+      }
 
       const state: SandState = { compact: 0, time: 0, ballSpin: 0, chaosSpin: 0 };
       if (compare) {
@@ -412,11 +424,14 @@ export function SandLab() {
       const cursorWorld = new THREE.Vector3();
       const focus = new THREE.Vector3();
       const forward = new THREE.Vector3();
-      const chaosC = field.material.uniforms.uChaosC.value as THREE.Vector3;
+      const chaosC0 = field.material.uniforms.uChaosC.value as THREE.Vector3;
+      const chaosShift = field.material.uniforms.uChaosShift.value as THREE.Vector3;
+      const chaosC = new THREE.Vector3();   // where the cloud stands (moved right of the copy in the hero)
       const ballC = field.material.uniforms.uBallC.value as THREE.Vector3;
 
       stage.onFrame((dt) => {
         const desk3d = deskLoaded, rising = risingLoaded;
+        chaosC.addVectors(chaosC0, chaosShift);
         // (the story's own length: past it, the page runs on through the index's projects)
         const max = Math.max(1, (pageRef.current?.offsetHeight ?? document.documentElement.scrollHeight) - window.innerHeight);
         const progress = Math.min(window.scrollY / max, 1);

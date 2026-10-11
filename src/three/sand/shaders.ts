@@ -79,6 +79,7 @@ uniform float uBallVolS;     // volume units per world unit (hero radius / this 
 uniform float uBallGrain;    // grain size scale for a retargeted ball (its radius / the hero's)
 uniform mat3 uBallRot;       // the ball's spin (object -> world)
 uniform vec3 uChaosC;
+uniform vec3 uChaosShift;   // the cloud moved sideways in the hero (hero-layout.ts): its spots and its vortex, not the ball
 uniform mat3 uChaosRot;      // the chaos moving around itself
 uniform float uTime;
 uniform float uHover;        // the cursor over the formed ball: how much (0..1)
@@ -213,7 +214,7 @@ vec3 flowOffset(vec3 p, float t, float time) {
 // A grain's straight path from its chaos spot A0 to its place in the ball Bo (both unturned), at a compaction, with
 // the ball's centre, its turn and the chaos's. t: its own progress along it
 vec3 pathAt(vec3 A0, vec3 Bo, float compact, vec3 ballC, mat3 ballRot, mat3 chaosRot, out float t) {
-  vec3 A = uChaosC + chaosRot * (A0 - uChaosC);
+  vec3 A = uChaosC + uChaosShift + chaosRot * (A0 - uChaosC);
   vec3 Bw = ballC + ballRot * Bo;
   t = clamp((compact - aAttr.w * uDelaySpan) / uRampLen, 0.0, 1.0);
   t = t * t * (3.0 - 2.0 * t);
@@ -250,7 +251,7 @@ void main() {
   vec3 swirl = vec3(0.0);
   float swSize = 1.0;
   if (swK > 0.001) {
-    vec4 sw = swirlAt(p, swSeed, uChaosC, swR, uTime);
+    vec4 sw = swirlAt(p, swSeed, uChaosC + uChaosShift, swR, uTime);
     swirl = (sw.xyz - p) * swK;
     swSize = mix(1.0, sw.w, swK);
   }
@@ -264,7 +265,7 @@ void main() {
                    tPrev) + drift;
     pPrev += flowOffset(pPrev, tPrev, uTimePrev);
     float swKPrev = (1.0 - tPrev) * uSwirl;
-    if (swKPrev > 0.001) pPrev += (swirlAt(pPrev, swSeed, uChaosC, swR, uTimePrev).xyz - pPrev) * swKPrev;
+    if (swKPrev > 0.001) pPrev += (swirlAt(pPrev, swSeed, uChaosC + uChaosShift, swR, uTimePrev).xyz - pPrev) * swKPrev;
   }
   // 2.2's attempts (Liam, 2026-10-10, sand only): the ball breaks form a little, as if going back to chaos, in a small
   // burst, each attempt a different shape (a patch, a seam, a ring); the ball draws in a touch before and swells a
@@ -336,19 +337,20 @@ void main() {
   // shadows: march in the volumes' own (unturned) frame, so shadows turn with the chaos and with the ball
   mat3 chaosInv = transpose(uChaosRot);
   mat3 ballInv = transpose(uBallRot);
-  vec3 ps = p - flow - swirl;   // the shadows were baked for the straight path: shaded as it would be there (its rest spot)
+  // the shadows were baked for the straight path from the unmoved cloud: shaded as it would be there (its rest spot)
+  vec3 ps = p - flow - swirl - uChaosShift * (1.0 - t);
   vec3 pv = mix(uChaosC + chaosInv * (ps - uChaosC), uBallVolC + ballInv * (ps - uBallC) * uBallVolS, t);
   float j = hash(aPosA);
   vec3 E[3];
   for (int i = 0; i < 3; i++) {
-    vec3 lp = mix(uChaosC + chaosInv * (uLightPos[i] - uChaosC), uBallVolC + ballInv * (uLightPos[i] - uBallC) * uBallVolS, t);
+    vec3 lp = mix(uChaosC + chaosInv * (uLightPos[i] - uChaosShift - uChaosC), uBallVolC + ballInv * (uLightPos[i] - uBallC) * uBallVolS, t);
     float d = distance(p, uLightPos[i]);
     float T = transmittance(pv, lp, min(d * mix(1.0, uBallVolS, t), mix(8.5, 3.0, t)), j, mix(uShadowK.x, uShadowK.y, t));
     E[i] = uLightCol[i] * T / (d * d + uLightR2[i]);
   }
   E[0] *= smoothstep(uSpotCos.x, uSpotCos.y, dot(normalize(p - uLightPos[0]), uSpotDir));
   // how much sand stands between this grain and the viewer: the cursor can only reach the front layer
-  vec3 cv = mix(uChaosC + chaosInv * (cameraPosition - uChaosC), uBallVolC + ballInv * (cameraPosition - uBallC) * uBallVolS, t);
+  vec3 cv = mix(uChaosC + chaosInv * (cameraPosition - uChaosShift - uChaosC), uBallVolC + ballInv * (cameraPosition - uBallC) * uBallVolS, t);
   float toCam = transmittance(pv, cv, mix(8.5, 3.0, t), j, uFront.x);
   float frontness = uFront.x > 0.0 ? smoothstep(uFront.y, 1.0, toCam) : 1.0;
   // grain-scale occlusion on the ball: the deeper below the surface, the darker (too fine for the volume)
@@ -404,13 +406,21 @@ void main() {
   float ang = h3 * 6.2831853;
   rad *= cloudLife;
   // the size range: a log-normal unevenness on every grain, and pebbles in the loose cloud, more of them toward the lens
-  float facing = clamp(dot(p - uChaosC, normalize(cameraPosition - uChaosC)) / (0.5 * max(uChaosSize.x, uChaosSize.z)), 0.0, 1.0);
-  float pebble = step(hash(aPosA + 4.4), uPebble.x + uPebble.y * facing * facing);
+  float facing = clamp(dot(p - uChaosC - uChaosShift, normalize(cameraPosition - uChaosC - uChaosShift)) / (0.5 * max(uChaosSize.x, uChaosSize.z)), 0.0, 1.0);
+  // (strictly under: the hash is 0.0 for ~0.3% of grains, and step(0, 0) is 1: big pebbles at a share of 0)
+  float pebble = hash(aPosA + 4.4) < uPebble.x + uPebble.y * facing * facing ? 1.0 : 0.0;
   rad *= swSize;   // (grown in at its spot, shrunk away at the core)
   rad *= exp(uSizeJitter * (hash(aPosA + 6.1) + hash(aPosA + 7.3) - 1.0))
        * mix(1.0, mix(uPebble.z, uPebble.w, hash(aPosA + 8.2) * hash(aPosA + 8.9)), pebble * (1.0 - t));
   vBig = pebble * (1.0 - t);
-  float px = 2.0 * rad * uRadMax * mix(uRadScale.x, uRadScale.y * uBallGrain, t) * uCountScale * attGrow * uPointScale / -mv.z * max(squash.x, squash.y);   // device pixels
+  // the loose cloud sits behind the copy, so nearness to the lens tells nothing (Liam, 2026-10-11: "everything relatively
+  // small and similar in size"): a grain is never drawn larger than one a little in front of the cloud's middle
+  float sizeDepth = -mv.z;
+  if (t < 1.0) {
+    float cDepth = -(modelViewMatrix * vec4(uChaosC + uChaosShift, 1.0)).z;
+    sizeDepth = mix(max(-mv.z, cDepth - 0.25 * swR), -mv.z, t);
+  }
+  float px = 2.0 * rad * uRadMax * mix(uRadScale.x, uRadScale.y * uBallGrain, t) * uCountScale * attGrow * uPointScale / sizeDepth * max(squash.x, squash.y);   // device pixels
   // and its own motion (the flow, the ball forming, the spin): its travel on screen since the frame before, over the
   // shutter, never longer than a few grains (a jump in the page is not a motion)
   if (uMotionBlur.x > 0.0 && px > 0.0) {
@@ -435,6 +445,7 @@ void main() {
   vEll = vec4(squash, cos(ang), sin(ang));
   // out of focus, a grain spreads into a soft disc of the lens's blur, as faint as it is wider (its light conserved)
   float coc = uDof.x > 0.0 ? min(uPointScale * uDof.x * abs(-mv.z - uDof.y) / -mv.z, 24.0) : 0.0;
+  coc = min(coc, mix(0.6 * px, 24.0, t));   // in the loose cloud a soft grain, never a swollen one (at most 1.17x)
   float dofK = 1.0, dofK0 = 1.0;
   if (coc > 0.3 && px > 0.0) {
     float pd = sqrt(px * px + coc * coc);
