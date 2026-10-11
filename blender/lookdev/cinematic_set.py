@@ -9,6 +9,11 @@ scenes like settle write their camera json there.
 SET_LIGHTS=hero (Liam, 2026-10-11: the desk with the lamp off, before the ball forms): the set's own lights out, the
 hero's key, rim and fill in their true places (desk = chaos centre + 0.1 x hero, power x 0.1^2), the key lighting the air.
 
+SET_WORLD=sand (Liam, 2026-10-11: the desk where the sand belongs, Lusion's lesson that particles live in a world of
+their own material): sand spilled on the desk (a low drift where the ball forms, a scatter across it and the papers),
+the set graded into the palette (walnut toward plum-brown, the papers muted and warmed), denser dust for the beam.
+SET_FOCUS=ball focuses on the ball's place instead of the cloud.
+
 Env: SET_LOOK old (as approved) | new; SET_HAZE density per metre (0.012); SET_KEY the light that lights the air (lamp);
 SET_RES "w,h" (960,600); SET_SAMPLES (64); SET_TAG. Writes blender/lookdev/renders/cinematic-set-<scene>-<look><tag>.png
 """
@@ -60,7 +65,8 @@ if os.environ.get("SET_LIGHTS") == "hero":
         bpy.context.view_layer.update()
         cam = scene.camera
         cam.data.dof.use_dof = True
-        cam.data.dof.focus_distance = (cam.matrix_world.translation - c).length
+        at = Vector((0.0, 0.03, 0.098)) if os.environ.get("SET_FOCUS") == "ball" else c
+        cam.data.dof.focus_distance = (cam.matrix_world.translation - at).length
         cam.data.dof.aperture_fstop = float(os.environ["SET_FSTOP"])
         print("CINE focus", round(cam.data.dof.focus_distance, 3), "m at f/", cam.data.dof.aperture_fstop)
 
@@ -86,7 +92,58 @@ if look == "new":
         bsdf.inputs["Subsurface Radius"].default_value = (1.0, 0.45, 0.45)
         bsdf.inputs["Subsurface Scale"].default_value = 0.004 * float(os.environ.get("SET_GRAIN_SCALE", "0.07"))   # the desk's grains are ~1/14 the hero's
         print("CINE material", m.name)
-    # the air, lit only by the set's motivated light
+    if os.environ.get("SET_WORLD") == "sand":
+        import numpy as np
+        from mathutils import Vector as V3
+        rng = np.random.default_rng(23)
+        src = bpy.data.objects.get("chaos") or bpy.data.objects.get("ball")
+        if src is not None and "hue" in src.data.attributes:
+            hh = np.empty(len(src.data.vertices), dtype=np.float32); src.data.attributes["hue"].data.foreach_get("value", hh)
+        else:
+            hh = rng.uniform(0, 0.9, 10000).astype(np.float32)
+        # a soft drift where the ball forms, and patches thinning fast away from it (as sand that fell gathers): fine
+        # grains, clustered by a noise field, none past the desk's edge (dropped, not clamped)
+        def patchy(xy):
+            x, y = xy[:, 0] * 18.0, xy[:, 1] * 18.0
+            return 0.5 + 0.25 * np.sin(x * 1.3 + np.sin(y * 0.7) * 2.0) * np.cos(y * 1.1 + np.sin(x * 0.9) * 1.7) + 0.25 * np.sin(x * 3.1 + y * 2.3)
+        n1, n2 = 22000, 60000
+        d = rng.normal(0, 0.04, (n1, 2)); r1 = rng.uniform(0.0003, 0.0006, n1)
+        mound = 0.004 * np.exp(-(d ** 2).sum(1) / (2 * 0.035 ** 2)) * rng.uniform(0, 1, n1)
+        p1 = np.stack([d[:, 0], 0.03 + d[:, 1], r1 + mound], 1)
+        q = rng.normal(0, 0.12, (n2, 2)) * rng.choice([1.0, 2.2], (n2, 1), p=[0.75, 0.25])
+        q[:, 1] += 0.03
+        keep = (np.abs(q[:, 0]) < 0.58) & (np.abs(q[:, 1]) < 0.28) & (rng.uniform(0, 1, n2) < patchy(q) ** 2.5)
+        q = q[keep]; r2 = rng.uniform(0.0003, 0.0006, len(q))
+        p2 = np.stack([q[:, 0], q[:, 1], r2 + 0.0014], 1)   # (a paper's height: grains rest on them too)
+        pts = np.vstack([p1, p2]).astype(np.float32)
+        r1, r2 = r1, r2
+        grains("spill", pts, rng.choice(hh, len(pts)).astype(np.float32), np.concatenate([r1, r2]).astype(np.float32))
+        print("CINE spilled sand", len(pts))
+        # the set graded into the palette
+        def tint(name, rgb):
+            m = bpy.data.materials.get(name)
+            if not m or not m.use_nodes:
+                return
+            nt = m.node_tree; b = nt.nodes.get("Principled BSDF")
+            if b is None:
+                return
+            mix = nt.nodes.new("ShaderNodeMix"); mix.data_type = "RGBA"; mix.blend_type = "MULTIPLY"
+            mix.inputs["Factor"].default_value = 1.0
+            mix.inputs[7].default_value = (*rgb, 1.0)    # B
+            inp = b.inputs["Base Color"]
+            if inp.is_linked:
+                nt.links.new(inp.links[0].from_socket, mix.inputs[6])   # A
+            else:
+                mix.inputs[6].default_value = inp.default_value
+            nt.links.new(mix.outputs[2], inp)
+            print("CINE tint", name)
+        tint("walnut", (0.78, 0.66, 0.68))
+        for n in ("blank_m", "card_a_m", "card_b_m"):
+            tint(n, (0.78, 0.72, 0.71))
+        for n in ("sticky_hero_m", "sticky_b_m", "sticky_c_m"):
+            tint(n, (0.8, 0.72, 0.72))
+
+# the air, lit only by the set's motivated light
     density = float(os.environ.get("SET_HAZE", "0.012"))
     if density > 0:
         bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, 0.6))
