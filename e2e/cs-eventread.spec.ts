@@ -70,3 +70,19 @@ test("on a phone the hero shows the board's crop of the day tiles, not the whole
   });
   expect(w).toBeGreaterThan(1.5); // 720 units of image in a 358-unit tray, as the board's phone frame
 });
+
+test("Eventread's design system is its own section: three references, the core components; challenge 03 folded in", async ({ page }) => {
+  await page.goto("/eventread");
+  const ds = page.getByRole("region", { name: "Design system" });
+  await expect(ds).toContainText("One product, one language.");
+  for (const from of ["From Vercel", "From Ramp", "From Cal.com"]) await expect(ds.getByText(from, { exact: true })).toBeVisible();
+  for (const h of ["Type", "Colour", "Month view"]) await expect(ds.getByRole("heading", { level: 3, name: h })).toBeVisible();
+  await expect(ds.getByText("Core components", { exact: true })).toBeVisible();
+  for (const c of ["Save tour", "Edit inputs", "Follow this date"]) await expect(ds.getByText(c, { exact: true })).toBeVisible();
+  await expect(ds).toContainText("and a CI test that fails if an old style comes back.");
+  const challenges = page.getByRole("region", { name: "Challenges" });
+  await expect(challenges.getByRole("heading", { level: 3 })).toHaveCount(2);
+  await expect(challenges).not.toContainText("One product, two visual languages");
+  const order = await page.evaluate(() => [...document.querySelectorAll("article.cs section h2")].map((h) => h.textContent));
+  expect(order.indexOf("Design system")).toBe(order.indexOf("How it works") + 1);
+});

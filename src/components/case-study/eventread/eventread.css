@@ -307,3 +307,41 @@
   [data-world="eventread"] .w-col .w-body { grid-row: 2; }
   [data-world="eventread"] .w-col .w-tray { grid-row: 3; align-self: start; }
 }
+
+/* ------------------------------ 5b design system (board frame 05b, Liam 2026-10-11) ------------------------------ */
+/* ------------------------------ 5b design system (Liam 2026-10-11: its own section; replaces challenge 03) ------------------------------ */
+[data-world="eventread"] .dsys { padding: calc(var(--u) * 112) 0 calc(var(--u) * 104); }
+[data-world="eventread"] .ds-refs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(var(--u) * 24); margin: calc(var(--u) * 64) calc(var(--u) * 72) 0; }
+[data-world="eventread"] .ds-ref { background: var(--surface); border-radius: calc(var(--u) * 20); box-shadow: inset 0 0 0 calc(var(--u) * 1) var(--hair); padding: calc(var(--u) * 28); display: flex; flex-direction: column; gap: calc(var(--u) * 18); }
+[data-world="eventread"] .ds-ref h3 { font-size: calc(var(--u) * 28); line-height: 1.1; letter-spacing: -.015em; }
+[data-world="eventread"] .ds-spec { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: calc(var(--u) * 14); min-height: calc(var(--u) * 190); }
+[data-world="eventread"] .ds-sans { font: 500 calc(var(--u) * 30)/1.1 var(--sans); letter-spacing: -.02em; }
+[data-world="eventread"] .ds-mono { font: 500 max(15px, calc(var(--u) * 20))/1.2 var(--mono); letter-spacing: -.01em; }
+[data-world="eventread"] .ds-note { font-size: max(15px, calc(var(--u) * 15)); line-height: 1.5; color: var(--ink-2); }
+[data-world="eventread"] .ds-badges { display: flex; flex-wrap: wrap; gap: calc(var(--u) * 8); }
+[data-world="eventread"] .ds-swatches { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(var(--u) * 8); }
+[data-world="eventread"] .ds-swatches i { display: block; height: calc(var(--u) * 52); border-radius: calc(var(--u) * 8); }
+[data-world="eventread"] .ds-swatches span { display: block; margin-top: calc(var(--u) * 8); font: 400 max(11px, calc(var(--u) * 11))/1 var(--mono); color: var(--ink-3); letter-spacing: .04em; }
+[data-world="eventread"] .ds-month { position: relative; height: calc(var(--u) * 190); border-radius: calc(var(--u) * 10); overflow: hidden; box-shadow: 0 0 0 calc(var(--u) * 1) var(--hair); background: var(--subtle); }
+[data-world="eventread"] .ds-month img { position: absolute; width: calc(var(--u) * 1100); left: calc(var(--u) * -170); top: calc(var(--u) * -296); max-width: none; }
+[data-world="eventread"] .ds-comps { margin: calc(var(--u) * 24) calc(var(--u) * 72) 0; background: var(--surface); border-radius: calc(var(--u) * 20); box-shadow: inset 0 0 0 calc(var(--u) * 1) var(--hair); padding: calc(var(--u) * 28); }
+[data-world="eventread"] .ds-comps .row-c { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--u) * 16) calc(var(--u) * 20); margin-top: calc(var(--u) * 20); }
+[data-world="eventread"] .ds-comps .time { width: calc(var(--u) * 180); }
+[data-world="eventread"] .ds-foot { margin-top: calc(var(--u) * 72); }
+[data-world="eventread"] .ds-foot .display { grid-column: 1 / 12; font-size: calc(var(--u) * 44); }
+[data-world="eventread"] .dsys .ds-foot .display em { font-style: italic; }
+/* challenges: two columns since 03 became its own section */
+[data-world="eventread"] .f.chal .chs.two { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: calc(var(--u) * 72); }
+@container (max-width: 1099px) {
+  [data-world="eventread"] .dsys { padding: calc(var(--u) * 64) 0 calc(var(--u) * 56); }
+  [data-world="eventread"] .dsys > .g12:first-child .body { margin-top: calc(var(--u) * 18); }
+  [data-world="eventread"] .ds-refs { grid-template-columns: minmax(0, 1fr); margin: calc(var(--u) * 32) calc(var(--u) * 16) 0; gap: calc(var(--u) * 16); }
+  [data-world="eventread"] .ds-ref { padding: calc(var(--u) * 20); }
+  [data-world="eventread"] .ds-spec { min-height: 0; }
+  [data-world="eventread"] .ds-sans { font-size: calc(var(--u) * 24); }
+  [data-world="eventread"] .ds-month { height: calc(var(--u) * 150); }
+  [data-world="eventread"] .ds-comps { margin: calc(var(--u) * 16) calc(var(--u) * 16) 0; padding: calc(var(--u) * 20); }
+  [data-world="eventread"] .ds-foot { margin-top: calc(var(--u) * 40); }
+  [data-world="eventread"] .ds-foot .display { font-size: calc(var(--u) * 28); }
+  [data-world="eventread"] .chs.two { grid-template-columns: minmax(0, 1fr); }
+}

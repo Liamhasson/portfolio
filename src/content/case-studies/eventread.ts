@@ -29,14 +29,6 @@ export const eventread: CaseStudy = {
       did: "I dropped the number and kept three bands, Safe, Threat and Critical, after checking the cut-points on 3,172 real listings.",
       changed: "The formula produced only 27 distinct values, and none fell between 35–45 or 64–80: the bands sit on real gaps.",
     },
-    {
-      kind: "design",
-      title: "One product, two visual languages",
-      happened:
-        "The interface had grown by feature: pill-shaped navigation next to square buttons, colour used for decoration as much as for risk.",
-      did: "I surveyed product design systems and built one from three references: Vercel's type, Ramp's colour discipline, Cal.com's month view. Risk became the only colour, shown as a dot and a word.",
-      changed: "One type family, one set of shapes, three colours that always mean risk, and a CI test that fails if an old style comes back.",
-    },
   ],
   outcome: {
     lines: [

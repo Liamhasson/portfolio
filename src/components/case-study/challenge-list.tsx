@@ -12,7 +12,7 @@ export function ChallengeList({ challenges, Extras }: { challenges: readonly Cha
           Challenges
         </h2>
       </div>
-      <ol role="list" className="chs">
+      <ol role="list" className={challenges.length === 2 ? "chs two" : "chs"}>
         {challenges.map((c, i) => (
           <li key={c.title} className="ch">
             <div className="ch-head">
