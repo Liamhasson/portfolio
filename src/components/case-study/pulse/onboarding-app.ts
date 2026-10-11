@@ -571,7 +571,7 @@ export function mountStoryScreens(phone: HTMLElement, { still }: { still: boolea
   const html = screensHTML(`ob${++storyUid}`);
   const figs: Fig[] = qa(phone, ".ob-screen").map((fig, i) => {
     const n = i + 1, host = q(fig, ".ob-app");
-    host.innerHTML = `<div class="pa is-story" inert>${html[i]}${still ? CHROME_HTML : '<i class="pa-tap" aria-hidden="true"></i>'}</div>`;
+    host.innerHTML = `<div class="pa is-story" inert aria-hidden="true">${html[i]}${still ? CHROME_HTML : '<i class="pa-tap" aria-hidden="true"></i>'}</div>`;
     const root = host.firstElementChild as HTMLElement;
     qa(root, ".pa-cat").forEach((card) => catState(card, card.dataset.cat === "0"));
     const steps = SCRIPT[n];
@@ -594,7 +594,7 @@ export function mountStoryScreens(phone: HTMLElement, { still }: { still: boolea
     return { step() {}, chrome() {}, length: () => 0, info: () => null, destroy: () => ro.disconnect() };
   }
 
-  phone.insertAdjacentHTML("beforeend", `<div class="ob-chrome" aria-hidden="true"><div class="pa is-story" inert>${CHROME_HTML}</div></div>`);
+  phone.insertAdjacentHTML("beforeend", `<div class="ob-chrome" aria-hidden="true"><div class="pa is-story" inert aria-hidden="true">${CHROME_HTML}</div></div>`);
   const setChrome = makeChrome(q(phone, ".ob-chrome .pa-chrome"));
 
   /* Where the finger lands on each step's control, in the frame's units. Read once (and again when the app's fonts

@@ -47,7 +47,7 @@ const opacityOf = (l: ReturnType<Page["locator"]>) => l.evaluate((e) => parseFlo
 
 test.describe("pulse board", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/pulse-mockups.html", { waitUntil: "load" });
+    await page.goto("/pulse", { waitUntil: "load" });
     await page.waitForFunction(() => window.__pulseStories?.desktop);
   });
 
@@ -286,7 +286,7 @@ test.describe("pulse board", () => {
 
   test("what is seen stays within 8 screens (pinned scroll not counted)", async ({ page }) => {
     const screens = await page.evaluate(() => {
-      const frames = [...document.querySelectorAll(".f")].filter((f) => !f.classList.contains("m"));
+      const frames = [...document.querySelectorAll("article.cs .f")];
       const u = frames[0].getBoundingClientRect().width / 1440;
       const track = document.querySelector('.ob[data-story="desktop"] .ob-track') as HTMLElement;
       const pin = document.querySelector('.ob[data-story="desktop"] .ob-pin') as HTMLElement;
@@ -296,15 +296,65 @@ test.describe("pulse board", () => {
     expect(screens).toBeLessThanOrEqual(8);
   });
 
-  test("the phone tells the same onboarding", async ({ page }) => {
-    await page.waitForFunction(() => window.__pulseStories?.phone);
-    await story(page, "phone").go(6);
-    const s = await story(page, "phone").state();
+  test("the phone tells the same onboarding (the page's one story at 390)", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/pulse", { waitUntil: "load" });
+    await page.waitForFunction(() => window.__pulseStories?.desktop);
+    await story(page).go(6);
+    const s = await story(page).state();
     expect(s.visible).toEqual([6]);
     expect(s.caption).toBe(6);
-    await expect(page.locator('.ob[data-story="phone"] .ob-screen .pa-screen')).toHaveCount(12);
-    await doneWith(page, "Mon 1st", "phone");
-    await expect(fig(page, 7, "phone").locator('[data-day="Mon, Dec 1"]')).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator('.ob[data-story="desktop"] .ob-screen .pa-screen')).toHaveCount(12);
+    await doneWith(page, "Mon 1st");
+    await expect(fig(page, 7).locator('[data-day="Mon, Dec 1"]')).toHaveAttribute("aria-pressed", "true");
+  });
+
+  test("after the story moves on by itself, a scroll carries on from there (smooth scrolling included)", async ({ page }) => {
+    await story(page).go(1);
+    await page.waitForFunction(() => window.__pulseStories.desktop.state().beat === 2, undefined, { timeout: 8000 });
+    const y = await page.evaluate(() => scrollY);
+    await page.mouse.move(700, 450);
+    await page.mouse.wheel(0, 120);
+    await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(y);
+    expect((await story(page).state()).beat).toBeGreaterThanOrEqual(2);
+  });
+
+  test("a late font still lands the tap mark on its control", async ({ page }) => {
+    await page.route("**/*.woff2", async (route) => { await new Promise((r) => setTimeout(r, 1500)); await route.continue(); });
+    await page.goto("/pulse", { waitUntil: "load" });
+    await page.waitForFunction(() => window.__pulseStories?.desktop);
+    await story(page).go(1);
+    const mark = fig(page, 2).locator(".pa-tap");
+    await page.waitForFunction(() => {
+      const st = window.__pulseStories.desktop.state().step;
+      return st.tap && st.done.length === 0 && parseFloat(getComputedStyle(document.querySelectorAll('.ob[data-story="desktop"] .ob-screen')[1].querySelector(".pa-tap")!).opacity) > 0.5;
+    });
+    const m = (await mark.boundingBox())!, t = (await pressed(page, 2, '[data-goal="Get stronger"]').boundingBox())!;
+    const cx = m.x + m.width / 2, cy = m.y + m.height / 2;
+    expect(cx > t.x && cx < t.x + t.width && cy > t.y && cy < t.y + t.height).toBe(true);
+  });
+
+  test("resizing across 1100px while pinned keeps one screen and no errors", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+    await story(page).go(4);
+    await page.setViewportSize({ width: 820, height: 900 });
+    await page.waitForTimeout(600);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.waitForTimeout(800);
+    expect((await story(page).state()).visible).toHaveLength(1);
+    expect(errors).toEqual([]);
+  });
+
+  test("without JavaScript the first screen and its caption are there", async ({ browser }) => {
+    const ctx = await browser.newContext({ javaScriptEnabled: false });
+    const p = await ctx.newPage();
+    await p.goto("http://localhost:3101/pulse");
+    const sol = p.getByRole("region", { name: "Solution" });
+    await expect(sol.getByText("What Pulse is for, in three lines.").first()).toBeVisible();
+    await expect(sol.locator(".ob-screen").first().getByText("Get Started")).toBeVisible();
+    await ctx.close();
   });
 });
 
@@ -312,7 +362,7 @@ test.describe("pulse board, reduced motion", () => {
   test.use({ reducedMotion: "reduce" });
 
   test("a still grid of all twelve screens with their captions, nothing pinned", async ({ page }) => {
-    await page.goto("/pulse-mockups.html", { waitUntil: "load" });
+    await page.goto("/pulse", { waitUntil: "load" });
     await page.waitForFunction(() => window.__pulseStories?.desktop);
     const s = await page.evaluate(() => window.__pulseStories.desktop.state());
     expect(s).toMatchObject({ static: true, screens: 12 });

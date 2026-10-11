@@ -210,3 +210,34 @@
   [data-world="pulse"] :is(.er-frame, .cy-frame) { position: relative; left: auto; top: auto; width: 100%; height: calc(var(--u) * 240); margin-top: calc(var(--u) * 28); }
   [data-world="pulse"] .pu-phone { position: relative; left: auto; top: auto; width: calc(var(--u) * 200); margin: calc(var(--u) * 28) auto 0; }
 }
+
+/* the first screen shows before (and without) JavaScript; the story engine sets every screen once it mounts */
+[data-world="pulse"] .ob:not(.is-static) .ob-screen:first-child { opacity: 1; visibility: visible; }
+
+/* ------------------------------ middle on phones (board frame "Phone") ------------------------------ */
+@container (max-width: 1099px) {
+  [data-world="pulse"] .problem { padding: calc(var(--u) * 64) 0 calc(var(--u) * 56); }
+  [data-world="pulse"] .problem .display { font-size: calc(var(--u) * 28); margin-top: calc(var(--u) * 24) !important; }
+  [data-world="pulse"] .problem-copy.g12 { margin-top: calc(var(--u) * 28) !important; row-gap: calc(var(--u) * 16); }
+  [data-world="pulse"] .miles { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); row-gap: calc(var(--u) * 56); margin: calc(var(--u) * 56) calc(var(--u) * 16) 0; }
+  [data-world="pulse"] .miles::before { display: none; }
+  [data-world="pulse"] .mile-day { font-size: calc(var(--u) * 40); }
+  [data-world="pulse"] .solution { padding: calc(var(--u) * 64) 0 calc(var(--u) * 72); }
+  [data-world="pulse"] .solution > .g12 .body { margin-top: calc(var(--u) * 18); font-size: max(15px, calc(var(--u) * 16)); }
+  [data-world="pulse"] .ob { margin: calc(var(--u) * 32) calc(var(--u) * 16) 0; }
+  [data-world="pulse"] .ob-pin { grid-template-columns: 1fr; gap: calc(var(--u) * 20); justify-items: center; }
+  [data-world="pulse"] .ob-side { gap: calc(var(--u) * 14); width: 100%; order: 2; }
+  [data-world="pulse"] .ob-caps { min-height: calc(var(--u) * 64); }
+  [data-world="pulse"] .ob-cap { font-size: max(15px, calc(var(--u) * 22)); }
+  [data-world="pulse"] .ob-stages { max-width: none; }
+  [data-world="pulse"] .ob-phone { --w: calc(var(--u) * 230); }
+  [data-world="pulse"] .ob-try { height: calc(var(--u) * 44); font-size: max(13px, calc(var(--u) * 14)); padding: 0 calc(var(--u) * 18); }
+  [data-world="pulse"] .ob.is-static .phone-screen { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  [data-world="pulse"] .how { padding: calc(var(--u) * 64) 0 calc(var(--u) * 56); }
+  [data-world="pulse"] .how > .g12:first-child .body { margin-top: calc(var(--u) * 18); }
+  [data-world="pulse"] .trio { flex-direction: column; align-items: center; gap: calc(var(--u) * 40); margin: calc(var(--u) * 40) calc(var(--u) * 16) 0; }
+  [data-world="pulse"] .trio .phone { --w: calc(var(--u) * 220); }
+  [data-world="pulse"] .brand { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); margin: calc(var(--u) * 40) calc(var(--u) * 16) 0; gap: calc(var(--u) * 12); }
+  [data-world="pulse"] .brand > div { height: calc(var(--u) * 170); }
+  [data-world="pulse"] .brand .b-board { grid-column: 1 / -1; }
+}

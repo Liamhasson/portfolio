@@ -75,7 +75,7 @@ const dragKnob = async (page: Page, share: number) => {
 
 test.describe("pulse onboarding prototype", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/pulse-mockups.html", { waitUntil: "load" });
+    await page.goto("/pulse", { waitUntil: "load" });
     await page.waitForFunction(() => window.__pulseProto && window.__pulseStories?.desktop);
   });
 
@@ -420,7 +420,7 @@ test.describe("pulse onboarding prototype, reduced motion", () => {
   test.use({ reducedMotion: "reduce" });
 
   test("opens from the still grid, changes screens instantly and books without the slide", async ({ page }) => {
-    await page.goto("/pulse-mockups.html", { waitUntil: "load" });
+    await page.goto("/pulse", { waitUntil: "load" });
     await page.waitForFunction(() => window.__pulseProto && window.__pulseStories?.desktop);
     await page.locator('.ob[data-story="desktop"] [data-proto-open]').click();
     await btn(page, "Get Started").click();
