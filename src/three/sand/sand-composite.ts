@@ -95,7 +95,9 @@ uniform float uDofMax;
 void main() {
   vec4 sum = vec4(0.0);
   float wsum = 0.0;
-  float turn = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) * 6.2831853;
+  // the spiral turned per pixel by interleaved gradient noise (even, so a small blur after removes it; a white-noise turn
+  // left the speckle of an unfinished render: Liam, 2026-10-11)
+  float turn = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) * 6.2831853;
   for (int i = 0; i < 48; i++) {
     float r = sqrt((float(i) + 0.5) / 48.0) * uDofMax * 0.5;   // radius, full-size px
     float a = float(i) * 2.39996 + turn;
@@ -106,6 +108,27 @@ void main() {
     wsum += w;
   }
   gl_FragColor = wsum > 0.0 ? sum / wsum : vec4(0.0);
+}
+`;
+/** The gather's last step: a soft 3x3 over the strongly blurred sand only (its spiral's leftover pattern), the near-sharp
+ *  left as it is (in focus the full-size sand shows anyway). */
+const DOF_SMOOTH_FRAGMENT = /* glsl */ `
+precision highp float;
+out highp vec4 pc_fragColor;
+in vec2 vUv;
+uniform sampler2D uDof;
+uniform sampler2D uPrepCoc;
+uniform vec2 uTexel;     // one half-size pixel
+void main() {
+  float k = clamp((texture(uPrepCoc, vUv).r - 2.0) / 8.0, 0.0, 1.0) * 1.25;   // spread, half-size px
+  vec4 sum = vec4(0.0);
+  float wsum = 0.0;
+  for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+    float w = (2.0 - abs(float(x))) * (2.0 - abs(float(y)));
+    sum += texture(uDof, vUv + vec2(float(x), float(y)) * uTexel * k) * w;
+    wsum += w;
+  }
+  pc_fragColor = sum / wsum;
 }
 `;
 
@@ -218,6 +241,13 @@ export class SandComposite {
     uniforms: { uTex: { value: null }, uBlur: { value: null }, uDepth: { value: null }, uDofP: { value: new THREE.Vector4() }, uDofMax: { value: 48 }, uDim: { value: 0 } },
   });
   private readonly dofRt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
+  private readonly dofSmoothRt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
+  private readonly smoothScene = new THREE.Scene();
+  private readonly smoothMat = new THREE.ShaderMaterial({
+    glslVersion: THREE.GLSL3, vertexShader: VERTEX, fragmentShader: DOF_SMOOTH_FRAGMENT,
+    depthTest: false, depthWrite: false, toneMapped: false, blending: THREE.NoBlending,
+    uniforms: { uDof: { value: null }, uPrepCoc: { value: null }, uTexel: { value: new THREE.Vector2() } },
+  });
   private readonly prepRt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, format: THREE.RedFormat, depthBuffer: false, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
   private readonly prepScene = new THREE.Scene();
   private readonly prepMat = new THREE.ShaderMaterial({
@@ -279,7 +309,7 @@ export class SandComposite {
       toneMapped: true,
       uniforms: {
         uSand: { value: this.rt.texture }, uTexel: { value: new THREE.Vector2() }, uSigma: { value: 1 },
-        uDofTex: { value: this.dofRt.texture }, uDepth: { value: this.rt.depthTexture }, uDofP: { value: new THREE.Vector4() }, uDofMax: { value: 48 },
+        uDofTex: { value: this.dofSmoothRt.texture }, uDepth: { value: this.rt.depthTexture }, uDofP: { value: new THREE.Vector4() }, uDofMax: { value: 48 },
       },
     });
     this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.material);
@@ -293,6 +323,7 @@ export class SandComposite {
     this.rawScene.add(rawQuad);
     const dofQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.dofMat);
     this.prepScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.prepMat));
+    this.smoothScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.smoothMat));
     dofQuad.frustumCulled = false;
     this.dofScene.add(dofQuad);
     const deskLensQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.deskLensMat);
@@ -322,7 +353,7 @@ export class SandComposite {
   /** Compiles its own passes' shaders and makes its targets now, not on the frame each is first needed (stalls of up
    *  to 200 ms mid-scroll). */
   async warm(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): Promise<void> {
-    await Promise.all([this.scene, this.rawScene, this.discScene, this.hazeScene, this.dimScene, this.dofScene, this.prepScene, this.deskLensScene].map((sc) => renderer.compileAsync(sc, this.ortho)));
+    await Promise.all([this.scene, this.rawScene, this.discScene, this.hazeScene, this.dimScene, this.dofScene, this.prepScene, this.smoothScene, this.deskLensScene].map((sc) => renderer.compileAsync(sc, this.ortho)));
     // and drawn once each way (the GPU builds its pipelines on a shader's first draw into each kind of target)
     const d = this.defocus;
     for (const v of [0, 4]) {
@@ -362,6 +393,7 @@ export class SandComposite {
       const hw = Math.max(1, Math.round(size.x / 2)), hh = Math.max(1, Math.round(size.y / 2));
       if (this.dofRt.width !== hw || this.dofRt.height !== hh) this.dofRt.setSize(hw, hh);
       this.gather(renderer, this.rt.texture, this.rt.depthTexture!, dofP, this.dofRt, size);
+      this.smooth(renderer, this.dofRt, this.dofSmoothRt);
     } else dofP.set(0, 0, 0, 0);
     renderer.setRenderTarget(null);
     renderer.setClearColor(clear, clearA);
@@ -438,6 +470,16 @@ export class SandComposite {
     renderer.render(this.dofScene, this.ortho);
   }
 
+  /** The soft pass over the gather (DOF_SMOOTH_FRAGMENT), into `out` (the same size). */
+  private smooth(renderer: THREE.WebGLRenderer, src: THREE.WebGLRenderTarget, out: THREE.WebGLRenderTarget): void {
+    if (out.width !== src.width || out.height !== src.height) out.setSize(src.width, src.height);
+    const u = this.smoothMat.uniforms;
+    u.uDof.value = src.texture; u.uPrepCoc.value = this.prepRt.texture;
+    (u.uTexel.value as THREE.Vector2).set(1 / src.width, 1 / src.height);
+    renderer.setRenderTarget(out);
+    renderer.render(this.smoothScene, this.ortho);
+  }
+
   /** The occluder's meshes, depth only (proxies sharing their geometry, following their world matrices: the lid turns). */
   private drawOccluders(renderer: THREE.WebGLRenderer, camera: THREE.Camera): void {
     if (this.occFrom !== this.occluder) {
@@ -483,6 +525,8 @@ export class SandComposite {
     this.dimMat.dispose();
     this.dofMat.dispose();
     this.prepMat.dispose();
+    this.smoothMat.dispose();
+    this.dofSmoothRt.dispose();
     this.prepRt.dispose();
     this.dofRt.dispose();
     this.dofBgRt.dispose();
