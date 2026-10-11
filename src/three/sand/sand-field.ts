@@ -20,17 +20,40 @@ export interface SandState {
 /** The cursor light's colour: rose-gold (the palette's #b9725c, lifted toward light). */
 export const CURSOR_WARM: [number, number, number] = [1.0, 0.64, 0.46];
 
+/**
+ * The cinematic look (Liam, 2026-10-11: "the rosier B", blender/lookdev/cinematic_variants.py VARIANT=B ROSE=1): the
+ * palette with the same hues, more natural (rose carries the cloud, bone its brightest ~12%, plum the shadows), at the
+ * hue quantiles the render places them (0, 10, 50, 76, 88%); linear colours.
+ */
+export const SAND_RAMP: [number, [number, number, number]][] = [
+  [0.0, [0.01938, 0.00802, 0.01033]],   // #26161a,
+  [0.2277, [0.29614, 0.12214, 0.14996]],   // #94626c,
+  [0.4542, [0.521, 0.25415, 0.18782]],   // #bf8a78,
+  [0.5687, [0.55201, 0.37124, 0.20864]],   // #c4a47e,
+  [0.6381, [0.76815, 0.67244, 0.56471]],   // #e3d6c6
+];
+
+/** The hero's lights for the cinematic look: one raking key from the side (warm, rosier white), the rose rim behind,
+ *  a faint cool slate fill (about an eighth of the key). three.js axes; watts as in Blender. */
+export const HERO_LIGHTS: { name: string; pos: [number, number, number]; size: number; watts: number; color: [number, number, number] }[] = [
+  { name: "key", pos: [-7.5, 2.8, 3.0], size: 3.5, watts: 4200, color: [1.0, 0.71569, 0.62396] },   // #ffdccf
+  { name: "rim", pos: [1.5, 2.5, -6.5], size: 2.0, watts: 1300, color: [0.6105, 0.3613, 0.48515] },
+  { name: "fill", pos: [3.5, -1.0, 4.0], size: 4.0, watts: 45, color: [0.25415, 0.29177, 0.39157] },   // #8a93a8
+];
+
 export const SAND_LOOK = {
   // calibrated 2026-10-09 against the hero renders (chaos, mid, ball) with scripts/lab/sweep.sh: total light per channel
   // within 3-7%, colour balance within 0.02, grain and structure contrast matched on the ball
-  exposure: 1.0,
+  exposure: 1.05,   // the cinematic look (Blender +0.25 stops), fitted live to the render's highlights (p99 0.73)
   wattsToIrradiance: 1 / (4 * Math.PI),
   key: 1.7,
   rim: 1.0,
   fill: 0.25,
   shadowK: 0.8,
   shadowKChaos: 2.2,
-  spec: 0.01,
+  spec: 0.04,       // glossy (Cycles: roughness 0.22, specular IOR level 0.5): F0
+  gloss: 33,        // the highlight's tightness: roughness 0.22, broadened by the key's size (3.5 at ~9 units)
+  sss: 0.35,        // the subsurface glow at the grain's edge (Cycles: weight 0.6, radius 1 / 0.45 / 0.45)
   wrap: 0.1,
   bounce: 0.35,
   localBounce: 1.0,
@@ -61,6 +84,12 @@ export const SAND_LOOK = {
   flowSpeed: 0.04,
   // each grain streaked along its own motion over the shutter: 0.5 = film's 180-degree shutter (1/120 s; Liam's
   // reference has a light blur, a full 1/60 s read as rice), and its streak at most this many grain lengths longer
+  // depth of field (the cinematic look, Blender's hero camera): f/3.2 on the cloud's lit front, the hero's 45 mm lens
+  dofFocus: 8.4,
+  dofFstop: 0.35,   // Liam, 2026-10-11: the dreamy hero (f/0.18 = the desk test's softness at the hero's scale; 0.35 keeps the shape)
+  dofLensMm: 45,
+  dofDense: 0.15,   // how dense the sand must be for its blurred grains to stay solid (they overlap into a soft mass)
+  hueJitter: 0.32,   // the formed ball's colours mixed grain by grain (Liam picked the render's mottled ball, 2026-10-11)
   motionBlur: 0.5,
   motionBlurMax: 1.0,
 };
@@ -96,7 +125,7 @@ export class SandField {
       Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) / 2,
     );
 
-    const ramp = meta.ramp;
+    const ramp = SAND_RAMP;   // the cinematic palette (meta.ramp: the look-dev one)
     this.material = new THREE.ShaderMaterial({
       glslVersion: THREE.GLSL3,
       vertexShader: SAND_VERTEX,
@@ -122,18 +151,8 @@ export class SandField {
         uBallVolC: { value: new THREE.Vector3(...meta.ball.center) },
         uBallVolS: { value: 1 },
         uBallGrain: { value: 1 },
-        uAttUp: { value: new THREE.Vector3(0, 1, 0) },
-        uAttLo: { value: 1 },
-        uAttBreak: { value: 0 },
-        uAttDepth: { value: 0 },
-        uAttFull: { value: 0 },
-        uMelt: { value: 0 },
-        uMeltUp: { value: new THREE.Vector3(0, 0, 1) },
-        uDrain: { value: 0 },
-        uSinkClear: { value: 0.9 },
         uBufH: { value: 1 },
         uShutter: { value: 1 / 60 },   // motion blur: the grain's travel over this long, on screen
-        uClearAlb: { value: new THREE.Vector3(0.58, 0.44, 0.36) },   // calibrated with the frost skin (frost-skin.ts)
         uBallRot: { value: this.ballRot },
         uChaosC: { value: this.chaosCentre() },
         uChaosRot: { value: this.chaosRot },
@@ -158,14 +177,14 @@ export class SandField {
         uSigmaMax: { value: meta.volume.sigma_max },
         uSteps: { value: 16 },
         uShadowK: { value: new THREE.Vector2(SAND_LOOK.shadowKChaos, SAND_LOOK.shadowK) },
-        uLightPos: { value: meta.lights.map((l) => new THREE.Vector3(...l.pos)) },
+        uLightPos: { value: HERO_LIGHTS.map((l) => new THREE.Vector3(...l.pos)) },
         uLightCol: {
-          value: meta.lights.map((l) =>
+          value: HERO_LIGHTS.map((l) =>
             new THREE.Vector3(...l.color).multiplyScalar(l.watts * SAND_LOOK.wattsToIrradiance),
           ),
         },
         uRamp: { value: ramp.map(([, c]) => new THREE.Vector3(...c)) },
-        uRampAt: { value: new THREE.Vector4(ramp[0][0], ramp[1][0], ramp[2][0], ramp[3][0]) },
+        uRampAt: { value: ramp.map(([p]) => p) },
         uExposure: { value: SAND_LOOK.exposure },
         uOutScale: { value: 1 },
         uGroundCol: { value: new THREE.Vector3() },
@@ -173,6 +192,7 @@ export class SandField {
         uHover: { value: 0 },
         uRough: { value: 0.6 },
         uGapFill: { value: 0.12 },
+        uFrontKey: { value: new THREE.Vector3() },
         uCloud: { value: new THREE.Vector4(0, 0, 0, 0) },
         uCloudAxis: { value: new THREE.Vector3(0, 0, 1) },
         uCloudLife: { value: new THREE.Vector4(1e9, 1e9, 1, 0) },
@@ -184,6 +204,8 @@ export class SandField {
         uFillCol: { value: new THREE.Vector3() },
         uUpView: { value: new THREE.Vector3(0, 1, 0) },
         uSpec: { value: SAND_LOOK.spec },
+        uGloss: { value: SAND_LOOK.gloss },
+        uSSS: { value: SAND_LOOK.sss },
         uSpotDir: { value: new THREE.Vector3(0, 0, -1) },
         uSpotCos: { value: new THREE.Vector2(-3, -2) },   // no cone: a plain point light
         uLightR2: { value: new THREE.Vector3(0, 0, 0) },
@@ -204,6 +226,9 @@ export class SandField {
         uBallPosMaxPrev: { value: meta.ball_pos_max },
         uFrameDt: { value: 1 / 60 },
         uMotionBlur: { value: new THREE.Vector2(SAND_LOOK.motionBlur, SAND_LOOK.motionBlurMax) },
+        uDof: { value: new THREE.Vector2(0, SAND_LOOK.dofFocus) },
+        uHueJitter: { value: SAND_LOOK.hueJitter },
+        uDofDense: { value: SAND_LOOK.dofDense },
       },
     });
     this.points = new THREE.Points(geo, this.material);
@@ -237,7 +262,7 @@ export class SandField {
   /** The hero lights in the shader's units (positions and calibrated colour x power), for blending toward another set. */
   heroLights(): { pos: THREE.Vector3; col: THREE.Vector3 }[] {
     const gains = [this.look.key, this.look.rim, this.look.fill];
-    return this.data.meta.lights.map((l, i) => ({
+    return HERO_LIGHTS.map((l, i) => ({
       pos: new THREE.Vector3(...l.pos),
       col: new THREE.Vector3(...l.color).multiplyScalar(l.watts * this.look.wattsToIrradiance * gains[i]),
     }));
@@ -260,6 +285,11 @@ export class SandField {
     u.uBallR.value = radius;
     u.uBallVolS.value = 1 / s;
     u.uBallGrain.value = s;
+  }
+
+  /** 2.3's passage: a key light from the camera onto the grains (colour x strength). */
+  setFrontKey(col: THREE.Vector3): void {
+    (this.material.uniforms.uFrontKey.value as THREE.Vector3).copy(col);
   }
 
   /** 2.3's cloud: how far the ball has parted (0..1) at the move's frame `frame`, around the line `axis` (world); out
@@ -300,27 +330,9 @@ export class SandField {
     (u.uUpView.value as THREE.Vector3).set(0, 1, 0).transformDirection(camera.matrixWorldInverse);
   }
 
-  /** 2.2: the current attempt (lo 1 = none; lower = a bigger patch), how broken, how clear; `up` faces the patch. */
-  /** 2.3 build: how far the held attempt's clearing has swept over the whole ball (0..1), how far the grains have
-   *  drained into the frost (0..1, gone at 1), and how far the frost has cleared into glass (0..1, a wave). */
-  setBuild(full: number, drain: number, melt: number): void {
-    const u = this.material.uniforms;
-    u.uAttFull.value = full;
-    u.uDrain.value = drain;
-    u.uMelt.value = melt;
-  }
-
   /** The ball's turn now (object -> world). */
   get ballRotation(): THREE.Matrix3 {
     return this.material.uniforms.uBallRot.value as THREE.Matrix3;
-  }
-
-  setAttempt(lo: number, breakup: number, depth: number, up?: THREE.Vector3): void {
-    const u = this.material.uniforms;
-    u.uAttLo.value = lo;
-    u.uAttBreak.value = breakup;
-    u.uAttDepth.value = depth;
-    if (up) (u.uAttUp.value as THREE.Vector3).copy(up);
   }
 
   /** The cursor as a light: world position and intensity 0..1 (fades with the pointer). */
@@ -355,6 +367,12 @@ export class SandField {
     const n = Math.min(count, this.data.count);
     this.points.geometry.setDrawRange(0, n);
     this.material.uniforms.uCountScale.value = Math.pow(this.data.meta.count / n, 0.35);
+  }
+
+  /** Depth of field, 0..1 of the look's (it belongs to the hero's camera; 0 = sharp throughout). */
+  setDof(amount: number): void {
+    const l = this.look, f = l.dofLensMm / 1000, s = l.dofFocus;
+    (this.material.uniforms.uDof.value as THREE.Vector2).set(amount > 0 ? ((f / l.dofFstop) / (s - f)) * amount : 0, s);
   }
 
   setShadowSteps(steps: number): void {
@@ -413,6 +431,10 @@ export class SandField {
     u.uExposure.value = l.exposure;
     (u.uShadowK.value as THREE.Vector2).set(l.shadowKChaos, l.shadowK);
     u.uSpec.value = l.spec;
+    u.uGloss.value = l.gloss;
+    u.uHueJitter.value = l.hueJitter;
+    u.uDofDense.value = l.dofDense;
+    u.uSSS.value = l.sss;
     u.uCursorReach.value = l.cursorReach;
     u.uPaintScale.value = l.paintScale;
     (u.uFront.value as THREE.Vector2).set(l.frontK, l.frontFalloff);
@@ -427,7 +449,7 @@ export class SandField {
     (u.uCavity.value as THREE.Vector2).set(l.cavityDepth, l.cavity);
     (u.uLocal.value as THREE.Vector2).set(l.localOcclusion, l.localBounce);
     const gains = [l.key, l.rim, l.fill];
-    this.data.meta.lights.forEach((light, i) => {
+    HERO_LIGHTS.forEach((light, i) => {
       (u.uLightCol.value[i] as THREE.Vector3)
         .set(...light.color)
         .multiplyScalar(light.watts * l.wattsToIrradiance * gains[i]);

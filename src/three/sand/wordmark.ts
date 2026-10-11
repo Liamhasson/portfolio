@@ -2,7 +2,8 @@ import * as THREE from "three";
 import type { SandMeta } from "./data";
 
 /**
- * LIAM HASSON behind the sand: heavy Geist letters as dark outlines in the void, light travelling through their strokes
+ * LIAM HASSON behind the sand: on load filled with light, handing over to the outline as the copy rises (Liam,
+ * 2026-10-11); then heavy Geist letters as dark outlines in the void, light travelling through their strokes
  * (reference: the outlined titles on lusion.co/about). Approved by Liam 2026-10-09: heavy weight, dark fill, light on the
  * stroke paths, the sand's own colours (not Lusion's RGB), and both kinds of light:
  *   - an ambient wave of light that spreads through the strokes from a different spot each time: it comes in, takes
@@ -29,6 +30,10 @@ export const WORDMARK = {
   waveBand: 1.9, // how wide the lit band is (name heights): each letter stays lit ~3s as it passes
   waveGain: 1.1,
   cursorGain: 1.6,
+  /** The letters filled with light (the approved hero render's "light in the haze": emission (1, 0.86, 0.8) x 0.55, at
+   *  the cinematic look's exposure), handed over to the outline as "Hi, I'm Liam." rises (Liam, 2026-10-11). */
+  fillColor: [1.0, 0.86, 0.8] as [number, number, number],
+  fillStrength: 0.65,
 };
 
 const SDF_RANGE = 24; // texels encoded either side of the edge
@@ -145,6 +150,8 @@ uniform float uCursorGain;
 uniform vec3 uRamp[4];
 uniform float uDpr;
 uniform float uFade;         // the camera pulling away (pull-back): the name dims out
+uniform vec3 uFill;          // the letters' fill (colour x strength x how much of it is left)
+uniform float uBlurPx;       // the lens's blur at the name (screen px): its edges spread over it
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float vnoise(vec2 p) {
@@ -168,8 +175,13 @@ void main() {
   float sd = (texture(uSdf, vUv).r - 0.5) * 2.0 * uRange;     // texels, > 0 outside
   float pxPerTexel = 1.0 / max(fwidth(sd), 1e-4);             // screen px per texel
   float dist = abs(sd) * pxPerTexel;                          // screen px from the outline
-  float stroke = 1.0 - smoothstep(uStrokePx, uStrokePx + 1.0, dist);
-  if (stroke <= 0.0) discard;
+  // out of focus, an edge spreads over the lens's blur (its light kept: the stroke dims as it widens)
+  float b = max(uBlurPx * 0.5, 0.5);
+  float stroke = (1.0 - smoothstep(uStrokePx - b + 0.5, uStrokePx + b + 0.5, dist)) * min(1.0, (uStrokePx + 0.5) / b);
+  // inside the letters: the fill, its edge antialiased over a pixel (or the lens's blur)
+  float inLetter = 1.0 - smoothstep(-b, b, sd * pxPerTexel);
+  vec3 fill = uFill * inLetter;
+  if (stroke <= 0.0 && max(fill.r, max(fill.g, fill.b)) <= 0.0) discard;
 
   // the ambient wave: light spreading from a point like water, its edge bent by slowly flowing noise
   vec2 p = vec2(vUv.x * uAspect, vUv.y);
@@ -191,7 +203,7 @@ void main() {
 
   float light = clamp(wave + cursor, 0.0, 1.6);
   vec3 col = glow(min(light, 1.0)) * light * 2.2 + vec3(0.18, 0.1, 0.12) * uBase;
-  gl_FragColor = vec4(col * stroke * uFade, 1.0);
+  gl_FragColor = vec4((col * stroke + fill) * uFade, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }
@@ -239,12 +251,29 @@ export class Wordmark {
         uRamp: { value: meta.ramp.map(([, c]) => new THREE.Vector3(...c)) },
         uDpr: { value: 1 },
         uFade: { value: 1 },
+        uFill: { value: new THREE.Vector3(...WORDMARK.fillColor).multiplyScalar(WORDMARK.fillStrength) },
+        uBlurPx: { value: 0 },
       },
     });
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), material);
     mesh.position.set(...WORDMARK.position);
     mesh.renderOrder = -1;   // before the sand, which then covers it where it passes in front
     return new Wordmark(mesh, material);
+  }
+
+  /** How much of the letters' fill is left (1 filled .. 0 the outline alone). */
+  setFill(f: number): void {
+    (this.material.uniforms.uFill.value as THREE.Vector3).set(...WORDMARK.fillColor).multiplyScalar(WORDMARK.fillStrength * f);
+  }
+
+  /** The lens's blur at the name, screen px (Liam, 2026-10-11: soft while filled, sharp as it becomes the outline). */
+  setBlur(px: number): void {
+    this.material.uniforms.uBlurPx.value = px;
+  }
+
+  /** Its distance from the camera (world units), for the lens. */
+  get distanceFrom(): (p: THREE.Vector3) => number {
+    return (p) => this.mesh.position.distanceTo(p);
   }
 
   setFade(f: number): void {

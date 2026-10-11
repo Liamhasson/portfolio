@@ -13,7 +13,8 @@ import * as THREE from "three";
  * that fans out into a plume as it goes; each stream its own size, pace, length and depth), held together as a flock
  * (separation + cohesion, from the C4D particles tutorial); the rest stay loose, a spray.
  *
- * Solid, never see-through: a grain with no light on it simply isn't there (it shrinks to nothing), so none shows as a
+ * In the sand's own shadows (the same density volumes it is shaded with). Solid, never see-through: a grain with no
+ * light on it simply isn't there (it shrinks to nothing), so none shows as a
  * dark speck over the lit desk. Motion blur: each grain is stretched behind itself along its motion by how far it moves
  * in a shutter of 1/60 s (a flicked grain streaks, a drifting one stays sharp). Drawn in the sand's layer.
  */
@@ -24,8 +25,8 @@ in vec3 iVel;
 in vec4 iRot;
 in vec3 iSquash;
 in vec2 iSizeHue;
-uniform vec3 uRamp[4];
-uniform vec4 uRampAt;
+uniform vec3 uRamp[5];
+uniform float uRampAt[5];
 uniform vec3 uLightPos[3];
 uniform vec3 uLightCol[3];
 uniform vec3 uLightR2;
@@ -36,6 +37,23 @@ uniform vec3 uCursorCol;
 uniform float uCursorReach;
 uniform float uExposure;
 uniform float uShutter;    // seconds the blur spans
+// the sand's own shadows (shaders.ts: the same density volumes, frames and march), so a grain behind the cloud is in
+// its shadow as the cloud's own grains are
+uniform vec3 uLo;
+uniform vec3 uSize;
+uniform sampler3D uVolA;
+uniform sampler3D uVolB;
+uniform float uVolMix;
+uniform float uSigmaMax;
+uniform vec2 uShadowK;
+uniform float uCompact;
+uniform float uGrainShadow;   // 1 = in the sand's shadows, 0 = as before (lab compare)
+uniform vec3 uChaosC;
+uniform mat3 uChaosRot;
+uniform vec3 uBallC;
+uniform vec3 uBallVolC;
+uniform float uBallVolS;
+uniform mat3 uBallRot;
 out vec3 vNormal;          // view space
 out vec3 vView;
 out vec3 vAlbedo;
@@ -43,17 +61,35 @@ out vec3 vL0; out vec3 vL1; out vec3 vL2; out vec3 vL3;
 out vec3 vE0; out vec3 vE1; out vec3 vE2; out vec3 vE3;
 vec3 ramp(float h) {
   vec3 c = uRamp[0];
-  c = mix(c, uRamp[1], clamp((h - uRampAt.x) / (uRampAt.y - uRampAt.x), 0.0, 1.0));
-  c = mix(c, uRamp[2], clamp((h - uRampAt.y) / (uRampAt.z - uRampAt.y), 0.0, 1.0));
-  c = mix(c, uRamp[3], clamp((h - uRampAt.z) / (uRampAt.w - uRampAt.z), 0.0, 1.0));
+  for (int i = 1; i < 5; i++) c = mix(c, uRamp[i], clamp((h - uRampAt[i - 1]) / max(uRampAt[i] - uRampAt[i - 1], 1e-4), 0.0, 1.0));
   return c;
 }
 vec3 qrot(vec4 q, vec3 v) { return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v); }
+float density(vec3 p) {
+  vec3 uvw = (p - uLo) / uSize;
+  if (any(lessThan(uvw, vec3(0.0))) || any(greaterThan(uvw, vec3(1.0)))) return 0.0;
+  float v = mix(texture(uVolA, uvw).r, texture(uVolB, uvw).r, uVolMix);
+  return v * v * uSigmaMax;   // sqrt encoding
+}
+// light reaching p from a light through the sand (fewer steps than the sand's own: these grains are few and small)
+float transmittance(vec3 p, vec3 lightPos, float dist, float k) {
+  vec3 dir = normalize(lightPos - p);
+  float ds = dist / 6.0, tau = 0.0;
+  for (int i = 0; i < 6; i++) tau += density(p + dir * ds * (float(i) + 0.5)) * ds;
+  return exp(-tau * k);
+}
 void main() {
+  // the sand's frame for its volumes, at the sand's compaction (as the sand's own grains are shaded)
+  float t = smoothstep(0.0, 1.0, uCompact);
+  mat3 chaosInv = transpose(uChaosRot), ballInv = transpose(uBallRot);
+  vec3 pv = mix(uChaosC + chaosInv * (iPos - uChaosC), uBallVolC + ballInv * (iPos - uBallC) * uBallVolS, t);
+  float shadowK = mix(uShadowK.x, uShadowK.y, t) * uGrainShadow;
   vec3 E[3];
   for (int i = 0; i < 3; i++) {
     vec3 Lv = uLightPos[i] - iPos;
-    E[i] = uLightCol[i] / (dot(Lv, Lv) + uLightR2[i]);
+    vec3 lp = mix(uChaosC + chaosInv * (uLightPos[i] - uChaosC), uBallVolC + ballInv * (uLightPos[i] - uBallC) * uBallVolS, t);
+    float T = transmittance(pv, lp, min(length(Lv) * mix(1.0, uBallVolS, t), mix(8.5, 3.0, t)), shadowK);
+    E[i] = uLightCol[i] * T / (dot(Lv, Lv) + uLightR2[i]);
   }
   E[0] *= smoothstep(uSpotCos.x, uSpotCos.y, dot(normalize(iPos - uLightPos[0]), uSpotDir));
   float dc = distance(iPos, uCursorPos) / uCursorReach;
@@ -95,6 +131,8 @@ uniform float uExposure;
 uniform float uOutScale;
 uniform float uWrap;
 uniform float uSpec;
+uniform float uGloss;     // the sand's own gloss and subsurface (shaders.ts)
+uniform float uSSS;
 uniform float uLampSat;
 uniform float uGain;
 void main() {
@@ -104,11 +142,13 @@ void main() {
   vec3 col = vec3(0.0);
   for (int i = 0; i < 4; i++) {
     float ndl = max((dot(n, L[i]) + uWrap) / (1.0 + uWrap), 0.0);
+    vec3 wrap3 = vec3(uWrap) + uSSS * vec3(1.0, 0.45, 0.45);
+    vec3 ndl3 = max((vec3(dot(n, L[i])) + wrap3) / (1.0 + wrap3), 0.0);
     // the sand's matte stone (Blender: roughness 0.62): a broad, faint sheen, at the sand's calibrated strength
-    float spec = pow(max(dot(n, normalize(L[i] + v)), 0.0), 12.0) * uSpec;
+    float spec = pow(max(dot(n, normalize(L[i] + v)), 0.0), uGloss) * (uGloss + 8.0) / (8.0 * 3.14159265) * uSpec;
     // as the sand: the lamp's light, filtered through sand, saturates the grain's colour
     vec3 alb = i == 0 ? mix(vAlbedo, vAlbedo * vAlbedo * 2.2, uLampSat) : vAlbedo;
-    col += E[i] * (alb * ndl / 3.14159265 + spec * ndl);
+    col += E[i] * (alb * ndl3 / 3.14159265 + spec * ndl);
   }
   gl_FragColor = vec4(col * uExposure * uOutScale * uGain, 1.0);
 }
@@ -135,12 +175,28 @@ const COHESION = 6;                 // per second squared, toward the neighbours
 const COHESION_R = 7;               // grain radii
 const GRID = 4096;                  // the neighbour grid's hash table size
 
+/** A stream's drawn path (blender/lookdev/stream_curves.py, public/lab/sand/streams.json): points about the cloud's centre
+ *  in cloud radii, in the view's frame (x right, y up, z toward the viewer), evenly spaced along it. */
+export interface StreamCurve {
+  points: [number, number, number][];
+  /** Its length, in cloud radii. */
+  length: number;
+  /** Grain radii across where it leaves the sand. */
+  width: number;
+  /** How much wider it grows per unit it travels. */
+  fan: number;
+  /** A grain's life along it, seconds. */
+  pace: number;
+}
+
 export class DriftGrains {
   readonly mesh: THREE.InstancedMesh;
   readonly material: THREE.ShaderMaterial;
   readonly max: number;
   /** The share of grains that leave in streams (the rest stay loose); 0 = all loose, as before the streams. */
   streams = 1 - LOOSE;
+  /** The streams' drawn paths (one per stream, in turn); none: each stream finds its own way (its emitter wanders). */
+  curves: StreamCurve[] | null = null;
   private readonly pos: Float32Array;
   private readonly vel: Float32Array;
   private readonly rot: Float32Array;
@@ -222,9 +278,13 @@ export class DriftGrains {
         uLightPos: su.uLightPos, uLightCol: su.uLightCol, uLightR2: su.uLightR2, uSpotDir: su.uSpotDir, uSpotCos: su.uSpotCos,
         uCursorPos: su.uCursorPos, uCursorCol: { value: new THREE.Vector3() }, uCursorReach: su.uCursorReach,
         uExposure: su.uExposure, uOutScale: su.uOutScale, uWrap: su.uWrap,
-        uSpec: su.uSpec, uLampSat: su.uLampSat,   // the sand's calibrated sheen and lamp colour
+        uSpec: su.uSpec, uGloss: su.uGloss, uSSS: su.uSSS, uLampSat: su.uLampSat,   // the sand's calibrated sheen and lamp colour
         uGain: { value: 1 },
         uShutter: { value: 1 / 60 },
+        // the sand's shadows: its own uniforms, shared (its volumes swap as it compacts)
+        uLo: su.uLo, uSize: su.uSize, uVolA: su.uVolA, uVolB: su.uVolB, uVolMix: su.uVolMix, uSigmaMax: su.uSigmaMax,
+        uShadowK: su.uShadowK, uCompact: su.uCompact, uChaosC: su.uChaosC, uChaosRot: su.uChaosRot, uBallC: su.uBallC,
+        uBallVolC: su.uBallVolC, uBallVolS: su.uBallVolS, uBallRot: su.uBallRot, uGrainShadow: { value: 1 },
       },
     });
     this.mesh = new THREE.InstancedMesh(geo, this.material, max);
@@ -275,7 +335,8 @@ export class DriftGrains {
       const fill = 0.45 + 0.3 * hk(10);
       const loose = s1 >= this.streams || s1 / this.streams >= fill;
       // and has its own pace (Liam: streams of different sizes, paces, lengths and depths)
-      const L = loose ? 10 * (0.7 + 0.6 * s3) : 10 * (0.55 + 0.9 * hk(0));
+      const curve = !loose && this.curves?.length ? this.curves[k % this.curves.length] : null;
+      const L = loose ? 10 * (0.7 + 0.6 * s3) : curve ? curve.pace * (0.9 + 0.2 * hk(0)) : 10 * (0.55 + 0.9 * hk(0));
       // a stream's grains are let go one after another, evenly through its life (a little jitter: not a metronome)
       const cyc = loose ? time / L + s0 * 7 : time / L + hk(1) * 7 + ((i % PER_STREAM) + 0.4 * s0) / PER_STREAM;
       const life = cyc - Math.floor(cyc), gen = Math.floor(cyc);
@@ -299,6 +360,35 @@ export class DriftGrains {
         const sw = life * (s3 * 1.8 - 0.9), cs = Math.cos(sw), sn = Math.sin(sw);
         const rx = tx - centre.x, rz = tz - centre.z;
         tx = centre.x + rx * cs - rz * sn; tz = centre.z + rx * sn + rz * cs;
+      } else if (curve) {
+        // along its stream's drawn curve (the rocks tutorial's curve guide): each grain a little faster or slower than
+        // its stream, so the stream loosens along its length; tight where it leaves the sand, then each grain drifts
+        // off on its own heading, across the stream and in depth, so it fans out into a plume as it goes
+        const pts = curve.points, last = pts.length - 1;
+        const u = life * (0.85 + 0.3 * h(7));
+        const f = Math.min(u, 1) * last, j = Math.min(Math.floor(f), last - 1), w = f - j;
+        const a0 = pts[j], a1 = pts[j + 1];
+        // its tangent (view frame), and past the curve's end it carries on along it
+        let gx = a1[0] - a0[0], gy = a1[1] - a0[1], gz = a1[2] - a0[2];
+        const gl = Math.hypot(gx, gy, gz) || 1; gx /= gl; gy /= gl; gz /= gl;
+        const over = Math.max(u - 1, 0) * curve.length;
+        const cx = a0[0] + (a1[0] - a0[0]) * w + gx * over;
+        const cy = a0[1] + (a1[1] - a0[1]) * w + gy * over;
+        const cz = a0[2] + (a1[2] - a0[2]) * w + gz * over;
+        // across it: one direction in the screen's plane, one in depth (both perpendicular to its way)
+        let nx = -gy, ny = gx;
+        const nz = 0;
+        const nl = Math.hypot(nx, ny) || 1; nx /= nl; ny /= nl;
+        const bx = gy * nz - gz * ny, by = gz * nx - gx * nz, bz = gx * ny - gy * nx;
+        const travelled = u * curve.length;   // cloud radii
+        const across = (curve.width * grainR / radius + curve.fan * travelled) * Math.sqrt(h(4)), ang = h(5) * Math.PI * 2;
+        const ca = Math.cos(ang) * across, sa = Math.sin(ang) * across;
+        // the stream breathes: its whole path sways a little, slowly, with time
+        const sway = 0.04 * travelled * Math.sin(time * 0.25 + hk(7) * 6.28);
+        const qx = cx + nx * (ca + sway) + bx * sa, qy = cy + ny * (ca + sway) + by * sa, qz = cz + nz * (ca + sway) + bz * sa;
+        tx = centre.x + (vRight.x * qx + vUp.x * qy + vFwd.x * qz) * radius;
+        ty = centre.y + (vRight.y * qx + vUp.y * qy + vFwd.y * qz) * radius;
+        tz = centre.z + (vRight.z * qx + vUp.z * qy + vFwd.z * qz) * radius;
       } else {
         // born where its stream's emitter was when it left. The emitters sit on the sand's side facing the viewer, in
         // a ring around the view, each at its own depth (from the sand's surface to halfway to the lens), spread

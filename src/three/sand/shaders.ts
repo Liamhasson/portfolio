@@ -55,52 +55,6 @@ float snoise(vec3 v) {
 }
 `;
 
-/**
- * 2.2, the attempts (the approved Blender logic, lookdev.py _attempt_on_dense): a patch facing uAttUp, its edge bent by
- * noise, plus break-up noise when an attempt fails. Fixed in world space, so the grains flow through it as the ball
- * turns. rank ~ the share of the surface below this point (d.up is uniform on a sphere).
- */
-/**
- * The attempts and the build, on the ball itself: every direction here is in the ball's own frame (it turns with the
- * ball's spin, the scroll's turn and the roll), so the patches, the frost and the clearing ride the ball.
- * uAttUp: where the current attempt was born (the side that faced the viewer then), in the ball's frame.
- */
-export const ATTEMPT_FIELD = /* glsl */ `
-uniform vec3 uAttUp;
-uniform float uAttLo;        // 1 = no attempt; lower = a bigger patch
-uniform float uAttBreak;     // 0..1: the patch fractures into islands
-uniform float uAttDepth;     // 0..1: how clear its centre gets
-uniform float uAttFull;      // 2.3 build: 0..1, the held attempt's clearing sweeps on over the whole ball
-uniform float uMelt;         // 2.3 build: 0..1, the frost clears into glass, a soft wave
-uniform vec3 uMeltUp;        // where the wave starts (the side that faced the viewer when the build began), ball frame
-float attField(vec3 d) {
-  float f = dot(d, uAttUp) + 0.22 * (0.5 * snoise(d * 1.7 + vec3(3.0, 0.0, 5.0)));
-  f += uAttBreak * 0.55 * (0.5 * snoise(d * 4.2 + vec3(11.0, 2.0, 7.0)));
-  return f;
-}
-float attBand(vec3 d) {
-  float rank = clamp(attField(d) * 0.5 + 0.5, 0.0, 1.0);
-  float band = clamp((rank - uAttLo) / max(1.01 - uAttLo, 1e-3), 0.0, 1.0);
-  // the build: a front leaves the patch and runs down to the far side, everything behind it fully clear
-  float front = mix(uAttLo + 0.05, -0.35, uAttFull);
-  return uAttFull > 0.0 ? max(band, smoothstep(front, front + 0.3, rank)) : band;
-}
-// how far a point of the frost has cleared into glass (0 frost .. 1 glass): a wave that leaves the attempt's centre and
-// runs over the ball, its front uneven (two scales of noise) and soft (no edge, no holes)
-float meltAt(vec3 d) {
-  if (uMelt <= 0.0) return 0.0;
-  if (uMelt >= 1.0) return 1.0;
-  float far = 0.5 - 0.5 * dot(d, uMeltUp);                   // 0 where it starts .. 1 opposite
-  // a gradient broken up by noise in three octaves (the front's outline organic at every scale), then pushed toward
-  // black and white so the two materials meet at a defined front, a narrow soft edge, not a fog
-  float n = far * 0.75 + 0.15 * snoise(d * 1.6 + vec3(1.7, 4.1, 2.9)) + 0.07 * snoise(d * 3.7 + vec3(5.0))
-          + 0.035 * snoise(d * 8.5 + vec3(9.0, 1.0, 3.0));
-  // it starts facing the viewer: the visible side gets most of the scroll, the hidden back clears quickly at the end
-  float front = -0.27 + 1.4 * pow(uMelt, 1.8);
-  return smoothstep(n - 0.05, n + 0.05, front);
-}
-`;
-
 export const SAND_VERTEX = /* glsl */ `
 precision highp float;
 precision highp sampler3D;
@@ -119,8 +73,6 @@ uniform vec2 uGround;        // the desk's top (y) and how far above it its boun
 uniform float uDelaySpan;
 uniform float uRampLen;
 uniform vec3 uBallC;
-uniform float uDrain;        // 2.3 build: 0..1, the cleared grains drain into the skin (gone at 1)
-uniform float uSinkClear;    // 2.2: how far the clearest grains of an attempt have drained into its frost
 uniform vec3 uBallVolC;      // the ball the density volume was baked for (the hero's): retargeted balls map into it
 uniform float uBallVolS;     // volume units per world unit (hero radius / this ball's radius)
 uniform float uBallGrain;    // grain size scale for a retargeted ball (its radius / the hero's)
@@ -163,8 +115,8 @@ uniform vec3 uLightCol[3];   // colour * power, calibrated
 uniform vec3 uSpotDir;       // light 0 as a spot (the desk lamp): its direction, and the cone's cosines (outer, inner)
 uniform vec2 uSpotCos;
 uniform vec3 uLightR2;       // each light's radius squared: a sized light can't blow up at close range (0 = point)
-uniform vec3 uRamp[4];
-uniform vec4 uRampAt;
+uniform vec3 uRamp[5];
+uniform float uRampAt[5];
 uniform vec3 uCursorPos;     // the cursor as a light (Lusion model), on a plane through the sand
 uniform vec3 uCursorCol;     // colour * intensity (fades with the pointer)
 uniform float uCursorReach;  // world units: how far its light carries
@@ -187,6 +139,11 @@ uniform vec3 uBallCPrev;
 uniform float uBallPosMaxPrev;
 uniform float uFrameDt;      // seconds between those two frames
 uniform vec2 uMotionBlur;    // strength (0 = off), longest streak in grain lengths
+// depth of field (the cinematic look: Ducky's lit front sharp, the rest softening): the thin lens's blur per unit of
+// focal length in pixels, A / (s - f) (aperture A = f / N, focus s; 0 = off), and the focus distance s
+uniform vec2 uDof;
+uniform float uHueJitter;
+uniform float uDofDense;   // local density at which a blurred grain stays solid   // the formed ball's per-grain spread of hue
 
 out vec3 vAlbedo;
 out vec3 vL0; out vec3 vL1; out vec3 vL2; out vec3 vL3;   // light directions, view space (3 = cursor)
@@ -198,18 +155,16 @@ out float vCompact;
 out float vBounceW;
 out float vPx;
 out float vEdgePx;
-out float vClear;    // 2.2: how far this grain has turned toward glass
 out float vGround;   // how much of the desk below this grain sees (surface grains of the formed ball)
-out vec4 vEll;      // grain shape: squash x, squash y, cos, sin of its turn (Blender: random squash +-22%, random rotation)
+out vec4 vEll;
+out float vBlur;    // how much of its disc is the lens's blur (0 sharp): a blurred grain is its average colour, spread      // grain shape: squash x, squash y, cos, sin of its turn (Blender: random squash +-22%, random rotation)
 
 ${SIMPLEX}
 
 // Blender's ColorRamp, linear interpolation between the stops
 vec3 ramp(float h) {
   vec3 c = uRamp[0];
-  c = mix(c, uRamp[1], clamp((h - uRampAt.x) / (uRampAt.y - uRampAt.x), 0.0, 1.0));
-  c = mix(c, uRamp[2], clamp((h - uRampAt.y) / (uRampAt.z - uRampAt.y), 0.0, 1.0));
-  c = mix(c, uRamp[3], clamp((h - uRampAt.z) / (uRampAt.w - uRampAt.z), 0.0, 1.0));
+  for (int i = 1; i < 5; i++) c = mix(c, uRamp[i], clamp((h - uRampAt[i - 1]) / max(uRampAt[i] - uRampAt[i - 1], 1e-4), 0.0, 1.0));
   return c;
 }
 
@@ -236,7 +191,6 @@ float transmittance(vec3 p, vec3 lightPos, float dist, float jitter, float k) {
 }
 
 float hash(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
-${ATTEMPT_FIELD}
 
 // The flow's push on a grain at p, t of the way from chaos to ball: one smooth noise field shared by all the grains
 // (neighbours move together: sheets, not static), its domain warped as Blender's distortion warps it
@@ -354,30 +308,7 @@ void main() {
       * capW * shell * leaves * uHover * smoothstep(0.5, 0.9, t);
     p += lift; pMoved += lift; pPrev += lift;
   }
-  // 2.2: inside an attempt the grains pack onto the surface (closing the gaps), then drain toward glass
-  vClear = 0.0;
   float attGrow = 1.0;
-  if (uAttLo < 0.999 && t > 0.5) {
-    vec3 rel = p - uBallC;
-    float rn = length(rel) / uBallR;
-    vec3 dir = rel / max(length(rel), 1e-5);
-    vec3 dObj = transpose(uBallRot) * dir;                   // the ball's own frame: the field turns with the ball
-    float band = attBand(dObj);
-    float clear = pow(band, 1.4) * uAttDepth;
-    float pull = clamp(band * 2.5, 0.0, 1.0); pull = pull * pull * (3.0 - 2.0 * pull);
-    float rr = rn + (0.997 + 0.03 * hash(aPosB + 7.7) - 0.03 * clear - rn) * pull;
-    p = uBallC + dir * rr * uBallR;
-    vClear = clear;
-    attGrow = 1.0 + 0.7 * clear;
-    // the build: the grains sink into the frost one by one (each at its own moment) just ahead of the clearing wave,
-    // so a point is frost when it clears; uDrain carries them under where the wave hasn't reached yet
-    // (and inside an attempt, the clearest grains have already drained into the frost: Blender's attempts clip)
-    float sink = max(max(meltAt(dObj) * 1.6, uDrain), smoothstep(0.45, 1.0, clear) * uSinkClear * (1.0 - uAttFull));   // 2.2 only
-    if (sink > 0.0) {
-      float when = 0.1 + 0.6 * hash(aPosB + 3.1);
-      attGrow *= 1.0 - smoothstep(when - 0.2, when, sink);
-    }
-  }
 
   // shadows: march in the volumes' own (unturned) frame, so shadows turn with the chaos and with the ball
   mat3 chaosInv = transpose(uChaosRot);
@@ -429,7 +360,9 @@ void main() {
   vL3 = normalize((viewMatrix * vec4(uCursorPos, 1.0)).xyz - mv.xyz);
   float dc = distance(p, uCursorPos) / uCursorReach;
   vE3 = uCursorCol / (1.0 + dc * dc * dc * dc) * cavity;
-  vAlbedo = ramp(mix(aAttr.x, aAttr.y, t));
+  // the formed ball's colours mix grain by grain, as the render's (its hue map is smooth: with the bright end of the
+  // cinematic palette it read as blotches)
+  vAlbedo = ramp(mix(aAttr.x, aAttr.y, t) + (hash(aPosB + 2.3) - 0.5) * uHueJitter * t);
 
   gl_Position = projectionMatrix * mv;
   // the cursor's drift: a push in screen space from the paint field, which decays on its own
@@ -470,11 +403,23 @@ void main() {
     px *= k;
   }
   vEll = vec4(squash, cos(ang), sin(ang));
+  // out of focus, a grain spreads into a soft disc of the lens's blur, as faint as it is wider (its light conserved)
+  float coc = uDof.x > 0.0 ? min(uPointScale * uDof.x * abs(-mv.z - uDof.y) / -mv.z, 24.0) : 0.0;
+  float dofK = 1.0, dofK0 = 1.0;
+  if (coc > 0.3 && px > 0.0) {
+    float pd = sqrt(px * px + coc * coc);
+    dofK0 = (px * px) / (pd * pd);
+    // as faint as it is wider where it stands alone; where the sand is dense the discs overlap into one soft mass, so
+    // there it stays solid (a faint disc would hide the grains behind it and leave holes)
+    dofK = mix((px * px) / (pd * pd), 1.0, 1.0 - exp(-rho * uDofDense));
+    px = pd;
+  }
   // below a minimum the grain keeps its area through coverage, so it never shimmers
-  vAlpha = clamp((px * px) / (uMinPx * uMinPx), 0.0, 1.0);
+  vAlpha = clamp((px * px) / (uMinPx * uMinPx), 0.0, 1.0) * dofK;
   gl_PointSize = max(px, uMinPx);
   vPx = gl_PointSize;
-  vEdgePx = mix(uEdge.x, uEdge.y, t);
+  vEdgePx = max(mix(uEdge.x, uEdge.y, t), coc * 0.15);
+  vBlur = coc > 0.3 ? 1.0 - sqrt(dofK0) : 0.0;
 }
 `;
 
@@ -492,14 +437,16 @@ in vec3 vFillE;
 in float vCompact;
 in vec4 vEll;
 in float vGround;
-in float vClear;
 in float vBounceW;
 in float vPx;
 in float vEdgePx;
+in float vBlur;
 
 uniform float uExposure;
 uniform float uOutScale;   // 1 on screen; 1/4 into the filtered sand layer (see sand-composite.ts)
-uniform float uSpec;
+uniform float uSpec;     // the grain's reflectance at normal incidence (Cycles: specular IOR level 0.5 = F0 0.04)
+uniform float uGloss;    // its highlight's tightness (normalised Blinn exponent): roughness 0.22 broadened by the key's size
+uniform float uSSS;      // subsurface (Cycles: weight 0.6, radius 1 / 0.45 / 0.45): red light wraps further past the terminator
 uniform float uWrap;     // light reaching past the terminator: grains are lit by the bounce off their neighbours
 uniform float uGapFill;  // how much of it reaches the grains in the gaps (inter-reflection)
 uniform float uRough;    // Oren-Nayar roughness (radians): a rough grain's edge stays as bright as its middle (Liam,
@@ -507,9 +454,9 @@ uniform float uRough;    // Oren-Nayar roughness (radians): a rough grain's edge
 uniform float uBounce;   // light that has hit two grains (Cycles' multiple scattering): saturates toward the sand's colour
 uniform vec3 uGroundCol;   // the lamp-lit desk below, as a broad light from beneath (colour x strength)
 uniform vec3 uFillCol;     // a soft fill from the viewer's side (colour x strength)
+uniform vec3 uFrontKey;    // 2.3's passage: a key light from the camera onto the grains (colour x strength; unshadowed)
 uniform vec3 uUpView;      // world up, in view space
 uniform float uLampSat;
-uniform vec3 uClearAlb;    // 2.2: the colour clearing grains drain to (pale frost)  // the desk lamp: light that reaches a grain through the sand is filtered by it (warmer, deeper)
 
 void main() {
   vec2 c = gl_PointCoord * 2.0 - 1.0;
@@ -524,14 +471,16 @@ void main() {
   vec3 n = normalize(vec3(mat2(vEll.z, vEll.w, -vEll.w, vEll.z) * ng, sqrt(1.0 - r2)));
   // matte: lambert, plus a faint broad sheen (roughness 0.62, specular 0.3 in the Cycles material)
   vec3 v = vec3(0.0, 0.0, 1.0);
-  // 2.2: clearing grains drain toward the frost's pale colour (no heat, no glow); they stay solid and the pixel
-  // filter blends them into the skin, as in the render
-  vec3 albedo = mix(vAlbedo, uClearAlb, vClear);
+  vec3 albedo = vAlbedo;
   vec3 L[4] = vec3[4](vL0, vL1, vL2, vL3);
   vec3 E[4] = vec3[4](vE0, vE1, vE2, vE3);
   vec3 col = vec3(0.0);
+  float glossNorm = (uGloss + 8.0) / (8.0 * 3.14159265);
+  vec3 wrap3 = vec3(uWrap) + uSSS * vec3(1.0, 0.45, 0.45);
   for (int i = 0; i < 4; i++) {
     float ndl = max((dot(n, L[i]) + uWrap) / (1.0 + uWrap), 0.0);
+    // the subsurface glow: the wrap per channel (a lit grain glows warm at its edge)
+    vec3 ndl3 = max((vec3(dot(n, L[i])) + wrap3) / (1.0 + wrap3), 0.0);
     // Oren-Nayar: the rough surface's retro-reflection lifts the grain's limb where lambert alone darkens it
     float nl = max(dot(n, L[i]), 0.0), nv = max(n.z, 1e-3);
     float s2 = uRough * uRough;
@@ -540,11 +489,16 @@ void main() {
     float cphi = max(dot(lp, vp) / max(length(lp) * length(vp), 1e-4), 0.0);
     float ai = acos(clamp(nl, 0.0, 1.0)), ar = acos(clamp(nv, 0.0, 1.0));
     float on = onA + onB * cphi * sin(max(ai, ar)) * tan(min(min(ai, ar), 1.4));
-    ndl *= mix(1.0, on, step(0.001, uRough));
+    float onK = mix(1.0, on, step(0.001, uRough));
+    ndl *= onK; ndl3 *= onK;
+    // out of focus: the grain's average over its lit face, the same across the disc (not a big shaded sphere)
+    float avgL = 0.6667 * (0.5 + 0.5 * dot(L[i], v));
+    ndl = mix(ndl, avgL, vBlur); ndl3 = mix(ndl3, vec3(avgL), vBlur);
     vec3 h = normalize(L[i] + v);
-    float spec = pow(max(dot(n, h), 0.0), 12.0) * uSpec;
+    // glossy (Liam, 2026-10-11, the cinematic look: Ducky's grains catch a highlight each)
+    float spec = pow(max(dot(n, h), 0.0), uGloss) * glossNorm * uSpec;
     vec3 alb = i == 0 ? mix(albedo, albedo * albedo * 2.2, uLampSat) : albedo;
-    col += E[i] * (alb * ndl / 3.14159265 + spec * ndl + albedo * albedo * uBounce * vBounceW);
+    col += E[i] * (alb * ndl3 / 3.14159265 + spec * ndl + albedo * albedo * uBounce * vBounceW);
   }
   // the desk below: grains facing down see a broad warm surface (no single ray, so the ball doesn't block it)
   float down = clamp(0.5 - 0.5 * dot(n, uUpView), 0.0, 1.0);
@@ -552,7 +506,9 @@ void main() {
   col += albedo * uGroundCol * mix(0.4 + 0.6 * down, down * down, vCompact) * vGround;
   col += albedo * uFillCol * (0.35 + 0.65 * max(n.z, 0.0)) * vAmbient;
   col += albedo * albedo * vFillE * uGapFill / 3.14159265;
-  // 2.2: clearing grains drain toward pale glass (no heat, no glow) and turn see-through, showing the frost skin
+  // (Liam, 2026-10-11: in the cloud the light is on the grains from the front, not on the desk)
+  vec3 albK = mix(albedo, albedo * albedo * 2.2, uLampSat);
+  col += albK * uFrontKey * (0.3 + 0.7 * max(n.z, 0.0)) + uFrontKey * pow(max(n.z, 0.0), uGloss) * glossNorm * uSpec;
   col *= uExposure * uOutScale;
   gl_FragColor = vec4(col, vAlpha * edge);
   #include <tonemapping_fragment>

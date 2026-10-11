@@ -89,12 +89,13 @@ export function HeroOverlay({
       </div>
       {/* the front name and the line, lower left over the void's edge */}
       <div className="absolute bottom-[96px] left-[4.9vw] max-w-[min(92vw,44rem)] md:bottom-[clamp(96px,11vw,150px)]">
-        {/* legibility: the sand thins out behind the copy, a soft falloff, never a box */}
+        {/* legibility: the sand thins out behind the copy, a soft falloff, never a box; in the graded black (#0b0908),
+            never darker than the background (it sits above the grade) */}
         <div
           aria-hidden
           data-exit="0"
           className="absolute -bottom-[30%] -left-[12vw] -right-[18%] -top-[45%] -z-10"
-          style={{ background: "radial-gradient(ellipse 60% 55% at 35% 55%, rgba(0,0,0,0.72), rgba(0,0,0,0.45) 45%, transparent 75%)" }}
+          style={{ background: "radial-gradient(ellipse 60% 55% at 35% 55%, rgba(11,9,8,0.72), rgba(11,9,8,0.45) 45%, transparent 75%)" }}
         />
         <div data-exit="0" className="mb-4 font-mono text-[11px] uppercase tracking-[0.08em] text-white/60 md:hidden">
           <Line delay={200}>Product Designer</Line>
@@ -120,37 +121,22 @@ export function HeroOverlay({
           aria-hidden
           data-scrim
           className="absolute inset-x-0 bottom-0 h-[34vh] opacity-0"
-          style={{ background: "linear-gradient(to top, rgba(0,0,0,0.62), rgba(0,0,0,0.3) 45%, transparent)" }}
+          style={{ background: "linear-gradient(to top, rgba(11,9,8,0.62), rgba(11,9,8,0.3) 45%, transparent)" }}
         />
       )}
       {enter && (
-        // over the void strip at the top (the three-quarter view leaves only that much empty): one line on desktop,
-        // two below the menu on phones. A soft text shadow for legibility, never a shape over the desk.
-        <h2
+        // one text moment for the whole story (Liam, 2026-10-11: one transition, not three; Lusion's form: a short
+        // headline and one plain line under it). Lower left over the desk, the scrim and a soft shadow for legibility
+        <div
           data-enter
-          className={`absolute left-[4.9vw] right-[4.9vw] text-[clamp(28px,3.5vw,54px)] font-normal leading-[1.08] tracking-[-0.015em] opacity-0 md:right-auto bottom-[clamp(40px,6vh,64px)] max-w-[15ch] md:bottom-[clamp(36px,4.4vw,64px)]`}
+          className="absolute bottom-[clamp(40px,6vh,64px)] left-[4.9vw] right-[4.9vw] opacity-0 md:bottom-[clamp(36px,4.4vw,64px)] md:right-auto md:max-w-[34rem]"
           style={{ textShadow: "0 1px 24px rgba(0,0,0,0.55)" }}
         >
-          I look for problems nobody pointed at.
-        </h2>
-      )}
-      {enter2 && (
-        <h2
-          data-enter2
-          className={`absolute left-[4.9vw] right-[4.9vw] text-[clamp(28px,3.5vw,54px)] font-normal leading-[1.08] tracking-[-0.015em] opacity-0 md:right-auto bottom-[clamp(40px,6vh,64px)] max-w-[15ch] md:bottom-[clamp(36px,4.4vw,64px)]`}
-          style={{ textShadow: "0 1px 24px rgba(0,0,0,0.55)" }}
-        >
-          Then I test solutions.
-        </h2>
-      )}
-      {enter3 && (
-        <h2
-          data-enter3
-          className={`absolute left-[4.9vw] right-[4.9vw] text-[clamp(28px,3.5vw,54px)] font-normal leading-[1.08] tracking-[-0.015em] opacity-0 md:right-auto bottom-[clamp(40px,6vh,64px)] max-w-[15ch] md:bottom-[clamp(36px,4.4vw,64px)]`}
-          style={{ textShadow: "0 1px 24px rgba(0,0,0,0.55)" }}
-        >
-          And I build it.
-        </h2>
+          <h2 className="whitespace-nowrap text-[clamp(28px,3.5vw,54px)] font-normal leading-[1.08] tracking-[-0.015em]">From chaos to product.</h2>
+          <p className="mt-[0.7em] text-[clamp(15px,1.3vw,19px)] font-normal leading-[1.4] text-white/80">
+            I find the problem nobody pointed at, test what could solve it, and build what works.
+          </p>
+        </div>
       )}
       {/* the scroll cue: bottom right on desktop, centred on phones */}
       <div data-cue className="absolute bottom-[clamp(20px,3vw,44px)] left-0 right-0 text-center text-[clamp(13px,4vw,16px)] uppercase md:left-auto md:right-[4.9vw] md:text-right md:text-[clamp(14px,1.75vw,25px)]">
