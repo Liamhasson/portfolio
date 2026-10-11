@@ -112,6 +112,12 @@ if V != "A":
     cam.data.dof.use_dof = True
     cam.data.dof.focus_distance = 8.4
     cam.data.dof.aperture_fstop = 1.8 if C else 3.2
+    # CINE_FSTOP / CINE_FOCUS (Liam, 2026-10-11: the dreamy hero): the desk test's softness at the hero's scale is
+    # f/0.18 (the cloud is 10x the desk's; same aperture relative to the scene)
+    if os.environ.get("CINE_FSTOP"):
+        cam.data.dof.aperture_fstop = float(os.environ["CINE_FSTOP"])
+    if os.environ.get("CINE_FOCUS"):
+        cam.data.dof.focus_distance = float(os.environ["CINE_FOCUS"])
     # ---- the exposure: the lit side near white
     scene.view_settings.exposure = float(os.environ.get("CINE_EXPOSURE", "0.2" if C else "0.25"))
     if C:
