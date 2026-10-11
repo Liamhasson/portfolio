@@ -119,9 +119,14 @@ def pallet_wood():
     L.new(mapped((1.6, 110.0, 1.0)), fine.inputs["Vector"])
     grain = op("MAXIMUM", grain, mr(fine.outputs["Fac"], 0.52, 0.7))   # irregular grain lines
     # knots (Liam: stronger): dark oval cores, a ring of darker wood round them
-    vor = N.new("ShaderNodeTexVoronoi"); vor.inputs["Scale"].default_value = 3.2; L.new(mapped((0.55, 1.6, 1.0)), vor.inputs["Vector"])
-    kd = vor.outputs["Distance"]
-    knot = op("MAXIMUM", mr(kd, 0.1, 0.05), op("MULTIPLY", mr(kd, 0.17, 0.1), 0.5))
+    vor = N.new("ShaderNodeTexVoronoi"); vor.voronoi_dimensions = "2D"; vor.inputs["Scale"].default_value = 4.2;   # (2D: in 3D most cells' points sat off the face, and few knots showed)
+    L.new(mapped((0.55, 1.6, 1.0)), vor.inputs["Vector"])
+    # (each knot its own size, from tiny pins to broad ones, and about a third of the places with none: even spots read
+    # as a pattern)
+    kc = N.new("ShaderNodeSeparateColor"); L.new(vor.outputs["Color"], kc.inputs[0])
+    ksize = mr(kc.outputs[0], 0.0, 1.0, 0.35, 1.2, smooth=False)
+    kd = op("ADD", op("DIVIDE", vor.outputs["Distance"], ksize), op("MULTIPLY", op("GREATER_THAN", kc.outputs[1], 0.68), 10.0))
+    knot = op("MAXIMUM", mr(kd, 0.2, 0.1), op("MULTIPLY", mr(kd, 0.32, 0.19), 0.55))   # (Liam: bolder)
     # the ring figure (Liam): each plank cut from a tree whose centre runs a few cm below its face, a little off its
     # middle, wandering along its length; its growth rings cut by the face are the arches and long ovals of flat-sawn
     # pine. They bend round the knots, and noise keeps them from being machine-even
@@ -139,12 +144,19 @@ def pallet_wood():
     rn = N.new("ShaderNodeTexNoise"); rn.inputs["Scale"].default_value = 1.0; rn.inputs["Detail"].default_value = 3.0
     L.new(mapped((3.0, 12.0, 1.0)), rn.inputs["Vector"])
     r = op("ADD", r, op("MULTIPLY", op("SUBTRACT", rn.outputs["Fac"], 0.5), 0.008))
-    r = op("ADD", r, op("MULTIPLY", mr(kd, 0.28, 0.0), 0.016))                     # (bent round the knots)
+    r = op("ADD", r, op("MULTIPLY", mr(kd, 0.36, 0.0), 0.016))                     # (bent round the knots)
     # ~5 mm between rings, closer toward the bark (a log-like spacing), each ring's dark band its own strength
     ring = op("FRACT", op("MULTIPLY", op("POWER", r, 0.85), 1 / 0.0095))
     rs = N.new("ShaderNodeTexNoise"); rs.inputs["Scale"].default_value = 1.0; rs.inputs["Detail"].default_value = 2.0
     L.new(mapped((1.2, 30.0, 1.0)), rs.inputs["Vector"])
-    latewood = op("MULTIPLY", op("MULTIPLY", mr(ring, 0.68, 0.86), mr(ring, 1.0, 0.92)), mr(rs.outputs["Fac"], 0.3, 0.7, 0.35, 1.0))
+    # (Liam: the lines never even in size or colour): each band's width from a slow noise (thin hairlines to broad
+    # dark bands), its darkness from another
+    wv = N.new("ShaderNodeTexNoise"); wv.inputs["Scale"].default_value = 1.0; wv.inputs["Detail"].default_value = 2.0
+    L.new(mapped((0.9, 9.0, 1.0)), wv.inputs["Vector"])
+    width = mr(wv.outputs["Fac"], 0.28, 0.72, 0.94, 0.45)                            # where the band starts
+    soft = op("MULTIPLY", op("SUBTRACT", ring, width), op("DIVIDE", 1.0, op("MAXIMUM", op("SUBTRACT", 0.96, width), 0.01)))
+    band = op("MULTIPLY", op("MINIMUM", op("MAXIMUM", soft, 0.0), 1.0), mr(ring, 1.0, 0.96))
+    latewood = op("MULTIPLY", band, mr(rs.outputs["Fac"], 0.25, 0.75, 0.25, 1.0))
     grain = op("MAXIMUM", op("MULTIPLY", grain, 0.55), latewood)
     # the stain rubbed back along the grain (a notch calmer than the reference), more toward the plank's edges
     wear_n = N.new("ShaderNodeTexNoise"); wear_n.inputs["Scale"].default_value = 1.0; wear_n.inputs["Detail"].default_value = 7.0; wear_n.inputs["Roughness"].default_value = 0.62
@@ -183,18 +195,20 @@ def pallet_wood():
     def deep(hex_, k):
         c = srgb(hex_); return (c[0] * k, c[1] * k, c[2] * k, 1.0)
     # the stain: rose-gold and champagne, deepened to read as wood under the close lamp (the walnut sat at ~8% albedo)
-    rose, champ = deep("#8a5442", 0.21), deep("#986a44", 0.21)
+    rose, champ = deep("#8a5442", 0.34), deep("#986a44", 0.34)
     base = mixc(rose, champ, rnd)
-    col = mixc(base, deep("#3e221f", 0.2), grain, 0.85)       # the grain: plum-brown
-    col = mixc(col, deep("#2e1918", 0.16), knot, 0.95)
-    col = mixc(col, deep("#dcc6a8", 0.62), wear, 0.9)          # rubbed back to pale wood (toward bone)
+    hue_n = N.new("ShaderNodeTexNoise"); hue_n.inputs["Scale"].default_value = 1.0; L.new(mapped((1.1, 4.0, 1.0)), hue_n.inputs["Vector"])
+    line_col = mixc(deep("#2a1512", 0.26), deep("#5e2c22", 0.3), mr(hue_n.outputs["Fac"], 0.3, 0.7))   # (darker plum-brown to a redder brown)
+    col = mixc(base, line_col, grain, 0.85)       # the grain: plum-brown
+    col = mixc(col, deep("#dcc6a8", 0.62), op("MULTIPLY", wear, op("SUBTRACT", 1.0, op("MULTIPLY", knot, 0.8))), 0.9)   # rubbed back to pale wood (toward bone; the knots' hard resin wears less)
+    col = mixc(col, deep("#24130f", 0.14), knot, 1.0)            # (over the wear: the knots stay bold)
     col = mixc(col, deep("#e3d6c6", 0.7), scratch, 0.5)
     col = mixc(col, srgb("#1c1012"), nail, 0.9)
     col = mixc(col, srgb("#160d0e"), gap, 1.0)           # the gaps
     L.new(col, b.inputs["Base Color"])
-    rough = mr(wear, 0.0, 1.0, 0.48, 0.78, smooth=False)
+    rough = mr(wear, 0.0, 1.0, 0.62, 0.86, smooth=False)   # (matte: at the low view a glossier stain mirrored the lamp over the grain)
     L.new(op("MAXIMUM", rough, op("MULTIPLY", gap, 0.92)), b.inputs["Roughness"])
-    b.inputs["Specular IOR Level"].default_value = 0.4
+    b.inputs["Specular IOR Level"].default_value = 0.25
     bump = N.new("ShaderNodeBump"); bump.inputs["Strength"].default_value = 0.35; bump.inputs["Distance"].default_value = 0.002
     L.new(op("SUBTRACT", op("ADD", op("MULTIPLY", grain, 0.25), op("MULTIPLY", scratch, -0.3)), op("MULTIPLY", gap, 1.0)), bump.inputs["Height"])
     L.new(bump.outputs["Normal"], b.inputs["Normal"])
