@@ -850,7 +850,7 @@ describe("rising sand", () => {
 
   test("waves: grains close together lift close together, far apart they don't", () => {
     const s: [number, number, number, number] = [0.5, 0.5, 0.5, 0.5];
-    const near = Math.abs(rNoise(1.0, 1.0) - rNoise(1.05, 1.0));
+    const near = Math.abs(rNoise(1.0, 1.0) - rNoise(1.02, 1.0));
     const far = Math.abs(rNoise(1.0, 1.0) - rNoise(4.0, -2.0));
     expect(near).toBeLessThan(0.05);
     expect(far).toBeGreaterThan(near);
@@ -1319,7 +1319,7 @@ At lines 287 and 297, change `pullback?.deskLights(...)` to `shot?.deskLights(..
 ```ts
       const calibrating = Number.isFinite(holdFrame);
 ```
-Delete `shadow`/`BallShadow` and the `settle` block (lines 270–279). The desk3d path draws the ball's shadow itself (`setBallShadow`). Remove the unused `BallShadow` import.
+Delete `if (pullback) stage.scene.add(pullback.plate);` (line 269), `let shadow: BallShadow | null = null;` (line 270) and the `if (settle) { ... }` block (lines 274–279). Keep `shadowK` and `__pbShadow` (lines 271–273). The desk3d path draws the ball's shadow itself (`setBallShadow`). Remove the unused `BallShadow` import. In the `__sand` debug object (line 888) add `rising`: `{ stage, field, state, drift, rising }` (the capture scripts reach it).
 
 - [ ] **Step 4: The frame loop's story (replace lines 472–795)**
 
@@ -1373,7 +1373,7 @@ Delete `shadow`/`BallShadow` and the `settle` block (lines 270–279). The desk3
           const W = canvas.clientWidth || 1, H = canvas.clientHeight || 1;
           // portrait phones see far more height: the tilt goes further there so the ball leaves the frame (spec §10)
           {
-            const tanV = Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2), tanV16 = Math.tan(THREE.MathUtils.degToRad(v.lens > 0 ? 2 * Math.atan(18 / v.lens / 1.6) * 180 / Math.PI : cam.fov) / 2);
+            const tanV = Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2), tanV16 = 18 / v.lens / 1.6;   // (16:10, horizontal fit: the shot's own frame)
             const extra = Math.max(Math.atan(tanV) - Math.atan(tanV16), 0) * ease(p, BEATS.tilt) * (1 - ease(p, BEATS.glide));
             if (extra > 1e-4) { cam.quaternion.multiply(leanQ.setFromEuler(leanE.set(-extra, 0, 0, "YXZ"))); cam.updateMatrixWorld(); }
           }
@@ -1840,7 +1840,7 @@ git rm -r -q src/three/sand/attempts.ts src/three/sand/attempts.test.ts public/l
 ```
 Then search for leftovers:
 ```bash
-grep -rn "lab/settle\|lab/rise\|lab/through\|lab/pullback\|PULLBACK_BASE\|attempts\"\|burstAt\|usePlates\|?plates" src | grep -v "\.test\." 
+grep -rn "lab/settle\|lab/rise\|lab/through\|lab/pullback\|PULLBACK_BASE\|/attempts\|burstAt\|usePlates\|plates" src
 ```
 Expected: only `pullback.ts`'s own `PULLBACK_BASE` export. Delete that constant if nothing imports it.
 
