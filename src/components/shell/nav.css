@@ -1,0 +1,80 @@
+/* The site nav and the Back button, as on the case-study boards (docs/prototypes/*-mockups.html, "00 · Nav motion"):
+   fully round pills and a 44px circle; the pointer is a soft light that the surface and its rim catch; one filled pill
+   slides to the active page. html[data-nav-tone] says what the nav sits on (nav-tone.ts); --nav-ink is the dark colour
+   and --nav-canvas the light one, the site's here and each case study's own inside it (worlds.css). Only transform,
+   opacity and colours animate. */
+:root { --nav-ink: #0b0908; --nav-canvas: #f7fafc; --nav-settle: cubic-bezier(0.22, 1, 0.36, 1); }
+
+.sh-back, .sh-pill {
+  --x: 50%; --y: 50%;
+  /* on a light ground: dark pills' light is dark, its rim darker */
+  --light: rgba(26, 26, 46, .08); --rim: rgba(26, 26, 46, .55); --flat: rgba(26, 26, 46, .06);
+  isolation: isolate; cursor: pointer; outline: none;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: transform 120ms var(--nav-settle), color 320ms var(--nav-settle), background-color 320ms var(--nav-settle), box-shadow 320ms var(--nav-settle);
+}
+/* (the Back button keeps the position its markup gives it, fixed; a pill is the light's frame) */
+.sh-pill {
+  position: relative; display: flex; align-items: center; height: 44px; padding: 0 20px; border: 0; border-radius: 999px;
+  font: 500 14px/1 var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif; letter-spacing: -.005em;
+  color: var(--nav-ink); background-color: rgba(255, 255, 255, .72); box-shadow: inset 0 0 0 1px rgba(26, 26, 46, .2); z-index: 1;
+}
+.sh-pill.is-active { color: var(--nav-canvas); background-color: rgba(255, 255, 255, 0); box-shadow: inset 0 0 0 1px rgba(26, 26, 46, 0);
+  --light: rgba(255, 255, 255, .14); --rim: rgba(255, 255, 255, .55); --flat: rgba(255, 255, 255, .1); }
+.sh-back {
+  display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%;
+  background-color: var(--nav-ink); color: var(--nav-canvas);
+  --light: rgba(255, 255, 255, .14); --rim: rgba(255, 255, 255, .55); --flat: rgba(255, 255, 255, .1);
+}
+.sh-back svg { width: 18px; height: 18px; transition: transform 320ms var(--nav-settle); }
+
+/* the light (fill) and the rim catching it (border only, via mask exclude) */
+.sh-back::before, .sh-pill::before, .sh-back::after, .sh-pill::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity 320ms ease-out;
+}
+.sh-back::before, .sh-pill::before { z-index: -1; background: radial-gradient(circle 60px at var(--x) var(--y), var(--light), transparent); }
+.sh-back::after, .sh-pill::after {
+  padding: 1px; background: radial-gradient(circle 60px at var(--x) var(--y), var(--rim), transparent);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+}
+@media (hover: hover) {
+  .sh-back:hover::before, .sh-pill:hover::before, .sh-back:hover::after, .sh-pill:hover::after { opacity: 1; transition-duration: 180ms; }
+  .sh-back:hover svg { transform: translateX(-2px); }
+}
+.sh-back:focus-visible::before, .sh-pill:focus-visible::before, .sh-back:focus-visible::after, .sh-pill:focus-visible::after { opacity: 1; transition-duration: 180ms; }
+.sh-back:focus-visible, .sh-pill:focus-visible { outline: 2px solid var(--nav-ink); outline-offset: 3px; }
+.sh-back:active, .sh-pill:active { transform: scale(.97); }
+
+/* the active page: one filled pill that slides (two caps and a scaled bar, so the round ends never squash) */
+.sh-nav { position: relative; display: flex; gap: 8px; }
+.sh-nav .hl { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 320ms var(--nav-settle); z-index: 0; }
+.sh-nav .hl.on { opacity: 1; }
+.sh-nav .hl i { position: absolute; top: 0; left: 0; height: 44px; background: var(--nav-ink); transform-origin: 0 0;
+  transition: transform 320ms var(--nav-settle), background-color 320ms var(--nav-settle); will-change: transform; }
+.sh-nav .hl i:nth-child(1) { width: 22px; border-radius: 22px 0 0 22px; }
+.sh-nav .hl i:nth-child(2) { width: 1px; }
+.sh-nav .hl i:nth-child(3) { width: 22px; border-radius: 0 22px 22px 0; }
+.sh-nav .hl.snap i { transition: none; }
+
+/* on a dark ground: light pills, the light and rim pale */
+html[data-nav-tone="dark"] .sh-pill { color: var(--nav-canvas); background-color: rgba(255, 255, 255, .04); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .22);
+  --light: rgba(255, 255, 255, .14); --rim: rgba(255, 255, 255, .6); --flat: rgba(255, 255, 255, .08); }
+html[data-nav-tone="dark"] .sh-pill.is-active { color: var(--nav-ink); background-color: rgba(255, 255, 255, 0); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0);
+  --light: rgba(26, 26, 46, .08); --rim: rgba(26, 26, 46, .5); --flat: rgba(26, 26, 46, .06); }
+html[data-nav-tone="dark"] .sh-back { background-color: var(--nav-canvas); color: var(--nav-ink);
+  --light: rgba(26, 26, 46, .08); --rim: rgba(26, 26, 46, .5); --flat: rgba(26, 26, 46, .06); }
+html[data-nav-tone="dark"] .sh-nav .hl i { background: var(--nav-canvas); }
+html[data-nav-tone="dark"] .sh-back:focus-visible, html[data-nav-tone="dark"] .sh-pill:focus-visible { outline-color: var(--nav-canvas); }
+
+/* entrance, on load: the Back button first, then the pills, 60ms apart */
+@keyframes sh-settle-in { from { opacity: 0; transform: translateY(8px); filter: blur(4px); } to { opacity: 1; transform: none; filter: blur(0); } }
+@keyframes sh-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.sh-enter { animation: sh-settle-in 600ms var(--nav-settle) backwards; animation-delay: calc(var(--i, 0) * 60ms); }
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-enter { animation-name: sh-fade-in; }
+  .sh-back::before, .sh-pill::before { background: var(--flat); transition: none; }
+  .sh-back::after, .sh-pill::after { display: none; }
+  .sh-back svg { transition: none; transform: none !important; }
+  .sh-nav .hl, .sh-nav .hl i, .sh-back, .sh-pill { transition: none; }
+}
