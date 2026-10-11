@@ -86,7 +86,7 @@ export const SAND_LOOK = {
   // reference has a light blur, a full 1/60 s read as rice), and its streak at most this many grain lengths longer
   // depth of field (the cinematic look, Blender's hero camera): f/3.2 on the cloud's lit front, the hero's 45 mm lens
   dofFocus: 8.4,
-  dofFstop: 0.35,   // Liam, 2026-10-11: the dreamy hero (f/0.18 = the desk test's softness at the hero's scale; 0.35 keeps the shape)
+  dofFstop: 2.0,   // Liam, 2026-10-11: the hero crisp with a gentle depth (f/0.35's gathered blur read as an unfinished render)
   dofLensMm: 45,
   dofDense: 0.15,
   // the size range (Lusion's depth): pebbles, a share of the grains (more on the side facing the lens), this many times bigger

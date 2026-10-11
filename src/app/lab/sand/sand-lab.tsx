@@ -33,6 +33,8 @@ const PAGE_VH = STORY_SCREENS * 100 + 100;
 /** The frame the screen wakes on (0-based; the shot's camera.json). */
 let WAKE_FRAME = 136;
 const SHOT_BASE = "/lab/shot";
+/** The hero's per-grain depth of field (sand-field.ts uDof at SAND_LOOK.dofFstop): gentle, never the screen-door dither. */
+const HERO_GRAIN_DOF = 0.5;
 /** (the removed cloud passage and front key, held off) */
 const NO_AXIS = new THREE.Vector3(0, 0, 1), NO_KEY = new THREE.Vector3();
 /** The open laptop's fill (lookdev.py: area light, 0.9 m, 38 W, rising with the lid), lighting the sand too. */
@@ -662,10 +664,13 @@ export function SandLab() {
             const shotF = shot && shotMeta ? (shot.data.path as unknown as { focus_m: number }[])[Math.min(Math.round(shotFrame(pg, shotMeta.beats)), shotMeta.frames - 1)].focus_m / shot.data.chaos_scale : toFocus;
             const focusD = THREE.MathUtils.lerp(toFocus, shotF, hero ? ease(pg, BEATS.tilt) : 0);
             if (composite) {
-              composite.lens.amount = lensK; composite.lens.focus = Math.max(focusD, 0.5);
+              // (Liam, 2026-10-11: the hero crisp, with a gentle depth: each grain its own small softness, f/2; the gathered
+              // lens left the cloud looking like an unfinished render. The gather comes in over the desk, as approved there)
+              const overDesk = hero ? ease(pg, BEATS.tilt) : 1;
+              composite.lens.amount = lensK * overDesk; composite.lens.focus = Math.max(focusD, 0.5);
               composite.lens.fstop = fstop; composite.lens.lensMm = SAND_LOOK.dofLensMm;
               composite.lens.desk = lensK * (hero ? ease(pg, BEATS.tilt) : 0);   // the desk in the same lens, as it comes into view
-              field!.setDof(0);
+              field!.setDof(dofOn ? HERO_GRAIN_DOF * (1 - overDesk) : 0);
             } else field!.setDof(lensK);
           }
           const formed = ease(state.compact, [0.5, 0.92]);   // none around the formed ball (Liam, 2026-10-10)
