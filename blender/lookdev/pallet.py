@@ -105,13 +105,31 @@ def pallet_wood():
     L.new(mapped((2.6, 7.0, 1.0)), zone_n.inputs["Vector"])
     zone = mr(zone_n.outputs["Fac"], 0.58, 0.7)
     wear = op("MINIMUM", op("MULTIPLY", streak, op("ADD", 0.12, op("MULTIPLY", zone, 1.2))), 1.0)
-    # fine scratches, two ways
-    def scratches(rot, lo):
+    # fine scratches (Liam: calmer, their direction and closeness never the same): five sets, each at its own angle,
+    # spacing and wobble, each living only in its own patches, so one stretch of desk is scratched one way and the next
+    # another; the ones across the grain broken into short marks (long straight lines read as drawn)
+    def scratches(rot, across, lo, patch, seed, short=0.0, wobble=0.3):
         n = N.new("ShaderNodeTexNoise"); n.inputs["Scale"].default_value = 1.0; n.inputs["Detail"].default_value = 2.0
-        L.new(mapped((700.0, 5.0, 1.0), rot), n.inputs["Vector"]); return mr(n.outputs["Fac"], lo, lo + 0.035)
-    # (along the grain; the crosswise ones broken into short marks by a mask: long straight lines read as drawn)
-    cross_n = N.new("ShaderNodeTexNoise"); cross_n.inputs["Scale"].default_value = 18.0; L.new(P, cross_n.inputs["Vector"])
-    scratch = op("MAXIMUM", scratches(0.08, 0.725), op("MULTIPLY", scratches(-0.5, 0.75), mr(cross_n.outputs["Fac"], 0.6, 0.66)))
+        n.inputs["Distortion"].default_value = wobble
+        # (turned first, then stretched: a mapping node scales before it rotates, and rotating stretched isotropic
+        # noise turns nothing; long along x, so rot = 0 runs with the grain)
+        m1 = N.new("ShaderNodeMapping"); m1.inputs["Rotation"].default_value = (0, 0, rot); L.new(P, m1.inputs["Vector"])
+        m2 = N.new("ShaderNodeMapping"); m2.inputs["Scale"].default_value = (5.0, across, 1.0); L.new(m1.outputs["Vector"], m2.inputs["Vector"])
+        L.new(m2.outputs["Vector"], n.inputs["Vector"])
+        line = mr(n.outputs["Fac"], lo, lo + 0.025)
+        pn = N.new("ShaderNodeTexNoise"); pn.noise_dimensions = "4D"; pn.inputs["Scale"].default_value = patch
+        pn.inputs["W"].default_value = seed; L.new(P, pn.inputs["Vector"])
+        line = op("MULTIPLY", line, mr(pn.outputs["Fac"], 0.46, 0.58))
+        if short:
+            sn = N.new("ShaderNodeTexNoise"); sn.noise_dimensions = "4D"; sn.inputs["Scale"].default_value = short
+            sn.inputs["W"].default_value = seed + 5.0; L.new(P, sn.inputs["Vector"])
+            line = op("MULTIPLY", line, mr(sn.outputs["Fac"], 0.58, 0.64))
+        return line
+    scratch = scratches(0.05, 620.0, 0.71, 2.2, 1.0)                                     # along the grain, open
+    scratch = op("MAXIMUM", scratch, scratches(-0.12, 1150.0, 0.72, 3.1, 2.0, wobble=0.6))   # along, close-set
+    scratch = op("MAXIMUM", scratch, scratches(0.42, 880.0, 0.73, 2.7, 3.0, short=16.0))     # diagonal, short
+    scratch = op("MAXIMUM", scratch, scratches(-0.68, 480.0, 0.74, 3.6, 4.0, short=22.0, wobble=0.8))   # the other diagonal, sparse
+    scratch = op("MAXIMUM", scratch, scratches(1.25, 760.0, 0.75, 4.2, 5.0, short=30.0))     # across, a few nicks
     # nail holes: small dark dots near the planks' ends
     nv = N.new("ShaderNodeTexVoronoi"); nv.inputs["Scale"].default_value = 22.0; L.new(P, nv.inputs["Vector"])
     ends = mr(op("ABSOLUTE", sep.outputs["X"]), 0.5, 0.54)
@@ -139,7 +157,7 @@ def pallet_wood():
     col = mixc(base, line_col, grain, 0.85)       # the grain: plum-brown
     col = mixc(col, deep("#dcc6a8", 0.62), op("MULTIPLY", wear, op("SUBTRACT", 1.0, op("MULTIPLY", knot, 0.8))), 0.9)   # rubbed back to pale wood (toward bone; the knots' hard resin wears less)
     col = mixc(col, deep("#24130f", 0.14), knot, 1.0)            # (over the wear: the knots stay bold)
-    col = mixc(col, deep("#e3d6c6", 0.7), scratch, 0.5)
+    col = mixc(col, deep("#e3d6c6", 0.7), scratch, 0.3)   # (calmer: they caught the lamp as white streaks)
     col = mixc(col, srgb("#1c1012"), nail, 0.9)
     col = mixc(col, srgb("#160d0e"), gap, 1.0)           # the gaps
     L.new(col, b.inputs["Base Color"])
@@ -147,7 +165,7 @@ def pallet_wood():
     L.new(op("MAXIMUM", rough, op("MULTIPLY", gap, 0.92)), b.inputs["Roughness"])
     b.inputs["Specular IOR Level"].default_value = 0.25
     bump = N.new("ShaderNodeBump"); bump.inputs["Strength"].default_value = 0.35; bump.inputs["Distance"].default_value = 0.002
-    L.new(op("SUBTRACT", op("ADD", op("MULTIPLY", grain, 0.25), op("MULTIPLY", scratch, -0.3)), op("MULTIPLY", gap, 1.0)), bump.inputs["Height"])
+    L.new(op("SUBTRACT", op("ADD", op("MULTIPLY", grain, 0.25), op("MULTIPLY", scratch, -0.1)), op("MULTIPLY", gap, 1.0)), bump.inputs["Height"])
     L.new(bump.outputs["Normal"], b.inputs["Normal"])
     return m
 
