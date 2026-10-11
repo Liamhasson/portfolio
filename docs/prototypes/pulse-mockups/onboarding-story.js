@@ -4,7 +4,7 @@
    The screens are the coded app (onboarding-app.js), played by a scripted user: within a screen's
    scroll its taps are scrubbed, each at its own point, and scrolling back undoes them. */
 
-import { mountStoryScreens } from "./onboarding-app.js";
+import { mountStoryScreens } from "./onboarding-app.js?v=2";
 
 const { gsap, ScrollTrigger } = window;
 gsap.registerPlugin(ScrollTrigger);
