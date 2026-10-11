@@ -19,6 +19,9 @@ uniform vec3 uCursorCol;
 uniform float uCursorReach;
 uniform float uExposure;
 uniform float uShutter;
+uniform vec4 uShadeBall;   // the ball's shadow on the lamp's light (rising sand): its centre and radius, the lamp's,
+uniform vec4 uShadeLamp;   // and how dark (0: none, the floating grains)
+uniform float uShadeK;
 uniform vec2 uMotionBlur;
 uniform float uPointScale;
 uniform float uMinPx;
@@ -95,6 +98,16 @@ const LOOSE_BODY = /* glsl */ `
     E[i] = uLightCol[i] * T / (dot(Lv, Lv) + uLightR2[i]);
   }
   E[0] *= smoothstep(uSpotCos.x, uSpotCos.y, dot(normalize(iPos - uLightPos[0]), uSpotDir));
+  // in the ball's shadow (the share of the lamp's disc the ball covers, seen from the grain): as the desk under it
+  if (uShadeK > 0.0) {
+    vec3 toL = uShadeLamp.xyz - iPos, toB = uShadeBall.xyz - iPos;
+    float dL = length(toL), dB = length(toB);
+    if (dB < dL) {
+      float rL = uShadeLamp.w / dL, rB = uShadeBall.w / dB;
+      float a = acos(clamp(dot(toL / dL, toB / dB), -1.0, 1.0));
+      E[0] *= 1.0 - uShadeK * (1.0 - smoothstep(abs(rL - rB), rL + rB, a)) * min(1.0, (rB * rB) / (rL * rL));
+    }
+  }
   float dc = distance(iPos, uCursorPos) / uCursorReach;
   vec3 Ec = uCursorCol / (1.0 + dc * dc * dc * dc);
   // where no light reaches it, it isn't there
@@ -106,7 +119,8 @@ const LOOSE_BODY = /* glsl */ `
   vec2 suv = gl_Position.xy / gl_Position.w * 0.5 + 0.5;
   vec2 pvel = texture(uPaint, suv).xy;
   gl_Position.xy += pvel * uPaintScale / (uViewport * 0.5) * gl_Position.w;
-  vec2 blur = pvel * uPaintScale * 6.0 * uShutter * 60.0 * (uBufH / uViewport.y);
+  // the cursor only moves them, never stretches them (Liam, 2026-10-10, the sand's own fix 01138e3: its streak smudged)
+  vec2 blur = vec2(0.0);
   // the grain: a randomly squashed, randomly turned pebble, as the sand's
   float h1 = fract(iSeed * 7.13), h2 = fract(iSeed * 13.71), h3 = fract(iSeed * 3.97);
   vec2 squash = 1.0 + 0.22 * (vec2(h1, h2) * 2.0 - 1.0);
@@ -169,5 +183,6 @@ export function looseGrainUniforms(sand: THREE.ShaderMaterial): Record<string, T
     uLo: su.uLo, uSize: su.uSize, uVolA: su.uVolA, uVolB: su.uVolB, uVolMix: su.uVolMix, uSigmaMax: su.uSigmaMax,
     uShadowK: su.uShadowK, uCompact: su.uCompact, uChaosC: su.uChaosC, uChaosRot: su.uChaosRot, uBallC: su.uBallC,
     uBallVolC: su.uBallVolC, uBallVolS: su.uBallVolS, uBallRot: su.uBallRot, uGrainShadow: { value: 1 },
+    uShadeBall: { value: new THREE.Vector4() }, uShadeLamp: { value: new THREE.Vector4() }, uShadeK: { value: 0 },
   };
 }

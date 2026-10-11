@@ -90,8 +90,8 @@ export const SAND_LOOK = {
   dofLensMm: 45,
   dofDense: 0.15,
   // the size range (Lusion's depth): pebbles, a share of the grains (more on the side facing the lens), this many times bigger
-  pebbleShare: 0.004,
-  pebbleFront: 0.022,
+  pebbleShare: 0,   // (Liam, 2026-10-11: big only because near the lens, never at random)
+  pebbleFront: 0,
   pebbleMin: 3,
   pebbleMax: 7,
   sizeJitter: 0.35,   // every grain's unevenness (log-normal spread)   // how dense the sand must be for its blurred grains to stay solid (they overlap into a soft mass)

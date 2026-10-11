@@ -46,7 +46,8 @@ export class Stage {
   ) {
     const base = settingsFor(tier, window.devicePixelRatio || 1);
     this.grainGov = new GrainGovernor(
-      { min: base.grainsMin, max: base.grains, start: base.grainsStart },
+      // (the count held: changing it resizes every grain (its look follows the count), a visible jump mid-scroll)
+      { min: base.grainsStart, max: base.grainsStart, start: base.grainsStart },
       { min: base.pixelRatioMin, max: base.pixelRatio, start: base.pixelRatio },
     );
     this.settings = { ...base, grains: this.grainGov.grains };

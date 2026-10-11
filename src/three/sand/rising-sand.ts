@@ -62,6 +62,14 @@ export class RisingSand {
     this.mesh.visible = on > 0.001;
   }
 
+  /** The ball's shadow on them (world, hero units): the ball's centre and radius, the lamp's position and radius, k. */
+  setShadow(ball: THREE.Vector3, ballR: number, lamp: THREE.Vector3, lampR: number, k: number): void {
+    const u = this.material.uniforms;
+    (u.uShadeBall.value as THREE.Vector4).set(ball.x, ball.y, ball.z, ballR);
+    (u.uShadeLamp.value as THREE.Vector4).set(lamp.x, lamp.y, lamp.z, lampR);
+    u.uShadeK.value = k;
+  }
+
   static async loadSpots(url: string, c: [number, number, number], k: number): Promise<Float32Array> {
     const r = await fetch(url);
     if (!r.ok) throw new Error(`${url}: ${r.status}`);

@@ -584,6 +584,7 @@ export function SandLab() {
             const ballR = (field!.material.uniforms.uBallR.value as number) * shadowK[2];
             const k = shadowK[1] * state.compact;
             desk3d.setBallShadow(ballC, ballR, deskNow.lights[0].pos, shadowK[0], k, 0, k, k);
+            rising?.setShadow(ballC, ballR, deskNow.lights[0].pos, shadowK[0], k);   // the grains in it too (Liam: they looked pasted)
             const below = new THREE.Vector3(ballC.x, deskTop ? deskTop.y : ballC.y - 4.6, ballC.z);
             desk3d.setSpill(below, 2.5, new THREE.Vector3(0.35, 0.26, 0.2).multiplyScalar(state.compact * h));
           }
@@ -667,9 +668,11 @@ export function SandLab() {
               // (Liam, 2026-10-11: the hero crisp, with a gentle depth: each grain its own small softness, f/2; the gathered
               // lens left the cloud looking like an unfinished render. The gather comes in over the desk, as approved there)
               const overDesk = hero ? ease(pg, BEATS.tilt) : 1;
-              composite.lens.amount = lensK * overDesk; composite.lens.focus = Math.max(focusD, 0.5);
+              // (the gathered lens is off everywhere: in the hero it read as an unfinished render, over the desk it cut a dark
+              // band near the camera; Liam, 2026-10-11. The sand's depth is per grain)
+              composite.lens.amount = 0; composite.lens.focus = Math.max(focusD, 0.5);
               composite.lens.fstop = fstop; composite.lens.lensMm = SAND_LOOK.dofLensMm;
-              composite.lens.desk = lensK * (hero ? ease(pg, BEATS.tilt) : 0);   // the desk in the same lens, as it comes into view
+              composite.lens.desk = 0;
               field!.setDof(dofOn ? HERO_GRAIN_DOF * (1 - overDesk) : 0);
             } else field!.setDof(lensK);
           }
