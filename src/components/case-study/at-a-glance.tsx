@@ -1,22 +1,37 @@
 import type { AtAGlance as Data } from "@/lib/case-studies/types";
 
+/** Board frame 02 · At a glance: one ruled strip; the tools as a dotted run; the type under the tools. */
 export function AtAGlance({ data }: { data: Data }) {
-  const rows: [string, string][] = [
-    ["Role", data.role],
-    ["Timeline", data.timeline],
-    ["Team", data.team],
-    ["Tools", data.tools.join(" · ")],
-  ];
-  if (data.type) rows.push(["Type", data.type]);
-
   return (
-    <dl aria-label="At a glance" className="grid gap-x-8 gap-y-2 px-[5vw] py-8 md:grid-cols-5">
-      {rows.map(([term, value]) => (
-        <div key={term}>
-          <dt className="font-mono text-xs uppercase tracking-[0.08em] text-ink-3">{term}</dt>
-          <dd className="mt-1">{value}</dd>
+    <div className="f glance">
+      <dl aria-label="At a glance" className="strip">
+        <div>
+          <dt className="label">Role</dt>
+          <dd><p>{data.role}</p></dd>
         </div>
-      ))}
-    </dl>
+        <div>
+          <dt className="label">Timeline</dt>
+          <dd><p>{data.timeline}</p></dd>
+        </div>
+        <div>
+          <dt className="label">Team</dt>
+          <dd><p>{data.team}</p></dd>
+        </div>
+        <div>
+          <dt className="label">Tools</dt>
+          <dd>
+            <ul className="tools">
+              {data.tools.map((t) => <li key={t}>{t}</li>)}
+            </ul>
+          </dd>
+          {data.type && (
+            <>
+              <dt className="label" style={{ margin: "calc(var(--u) * 22) 0 calc(var(--u) * 10)" }}>Type</dt>
+              <dd><p>{data.type}</p></dd>
+            </>
+          )}
+        </div>
+      </dl>
+    </div>
   );
 }

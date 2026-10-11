@@ -14,6 +14,7 @@ const base: CaseStudy = {
   atAGlance: { role: "r", timeline: "t", team: "s", tools: ["Figma"] },
   challenges: [design, engineering],
   outcome: { lines: ["A tested prototype."] },
+  peek: { src: "/case-studies/pulse/peek.jpg", alt: "a peek", width: 1, height: 1 },
   budget: STANDARD_BUDGET,
 };
 
@@ -46,6 +47,12 @@ describe("validateCaseStudy", () => {
 
   test("a budget totalling exactly the cap is valid", () => {
     expect(validateCaseStudy({ ...base, budget: { ...STANDARD_BUDGET, signature: 2.5 } })).toEqual([]);
+  });
+
+  test("a study can carry its own cap, and is held to it", () => {
+    const long = { ...base, budget: { ...STANDARD_BUDGET, supporting: 2.3 }, screenCap: 9.5 };
+    expect(validateCaseStudy(long)).toEqual([]);
+    expect(validateCaseStudy({ ...long, budget: { ...STANDARD_BUDGET, supporting: 3.9 } })).toEqual(["pulse: 10.4 screens (cap 9.5)"]);
   });
 
   test("rejects a budget over the cap", () => {

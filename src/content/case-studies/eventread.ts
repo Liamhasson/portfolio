@@ -29,14 +29,6 @@ export const eventread: CaseStudy = {
       did: "I dropped the number and kept three bands, Safe, Threat and Critical, after checking the cut-points on 3,172 real listings.",
       changed: "The formula produced only 27 distinct values, and none fell between 35–45 or 64–80: the bands sit on real gaps.",
     },
-    {
-      kind: "design",
-      title: "One product, two visual languages",
-      happened:
-        "The interface had grown by feature: pill-shaped navigation next to square buttons, colour used for decoration as much as for risk.",
-      did: "I surveyed product design systems and built one from three references: Vercel's type, Ramp's colour discipline, Cal.com's month view. Risk became the only colour, shown as a dot and a word.",
-      changed: "One type family, one set of shapes, three colours that always mean risk, and a CI test that fails if an old style comes back.",
-    },
   ],
   outcome: {
     lines: [
@@ -45,7 +37,9 @@ export const eventread: CaseStudy = {
     ],
     link: { href: "https://eventread.vercel.app", label: "Try it" },
   },
-  // How it works walks the product (search and acts, followed dates, tours), so
-  // it takes about two screens; the Danger Score band gives back 0.4 to stay in the cap.
-  budget: { ...STANDARD_BUDGET, signature: 1.6, supporting: 1.9 },
+  peek: { src: "/case-studies/eventread/peek.jpg", alt: "Eventread month view for Berlin, November 2026", width: 2400, height: 1500 },
+  // Measured at 1440×900 (2026-10-11): How it works walks the product (2.0) and the design system has its own section
+  // (1.2), so Eventread runs ~9.3 screens. Liam kept it as it is: its own cap.
+  screenCap: 9.5,
+  budget: { ...STANDARD_BUDGET, signature: 1.6, supporting: 3.2, challenges: 0.9, outcome: 0.6 },
 };

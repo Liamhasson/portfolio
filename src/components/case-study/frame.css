@@ -1,0 +1,35 @@
+/* The boards are drawn in --u: 1/1440 of the frame at desktop, 1/390 in the phone frames. The page keeps that:
+   ≥ 1100px the board's desktop layout, fluid; below, the board's phone layout in a centred column (max 1.6× the
+   phone frame, so tablets read it comfortably). */
+.cs { container-type: inline-size; display: block; }
+.cs .f { --u: calc(100cqw / 1440); position: relative; overflow: clip; }
+@container (max-width: 1099px) {
+  .cs .f { --u: min(calc(100cqw / 390), 1.6px);
+    padding-inline: max(0px, calc((100cqw - var(--u) * 390) / 2)); }
+}
+/* resets at zero specificity, so every board rule wins over them */
+:where(.cs .f) p { margin: 0; }
+:where(.cs .f) :is(h1, h2, h3) { margin: 0; font-weight: 400; }
+:where(.cs .f) a { color: inherit; text-decoration: none; }
+
+/* The boards' type stacks, on the site's own Geist (src/app/fonts.ts). */
+.cs { --sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif; --mono: var(--font-geist-mono), ui-monospace, monospace; }
+.cs .f { font-family: var(--sans); font-weight: 400; }
+:where(.cs .f) :is(dl, dd, ol, ul) { margin: 0; padding: 0; }
+:where(.cs .f) :is(ol, ul) { list-style: none; }
+:where(.cs .f) :is(figure, blockquote) { margin: 0; }
+
+/* A middle section not yet built from its board (MiddleBlock): the board's grid, Liam's words beside the title. */
+:where(.cs) .mid { padding: calc(var(--u) * 112) 0; }
+:where(.cs) .mid-body { grid-column: 7 / 13; max-width: none; }
+:where(.cs) .mid-body > * + * { margin-top: 1em; }
+:where(.cs) .mid-body ul { list-style: disc; padding-left: 1.2em; }
+@container (max-width: 1099px) { :where(.cs) .mid { padding: calc(var(--u) * 56) 0; } :where(.cs) .mid-body { margin-top: calc(var(--u) * 20); } }
+
+/* A board shows some pieces in one layout only (Eventread's phone calculator): .only-d at ≥ 1100px, .only-m below. */
+@container (min-width: 1100px) { .cs .only-m { display: none !important; } }
+@container (max-width: 1099px) { .cs .only-d { display: none !important; } }
+
+/* The boards size and crop their pictures freely (a recording wider than its frame, slid into place); the site's base
+   styles cap images and videos at their box. Lift the cap inside case studies (unlayered, so it beats Tailwind's base). */
+:where(.cs .f) :is(img, video) { max-width: none; }

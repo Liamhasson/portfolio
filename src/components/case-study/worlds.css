@@ -1,0 +1,27 @@
+/* The boards' :root tokens, each scoped to its world.
+   Eventread: docs/prototypes/eventread-mockups.html:19-26 · Cyvore: cyvore-mockups.html:19-34 · Pulse: pulse-mockups.html:22-32 */
+[data-world="eventread"] {
+  --canvas: #f8f8f6; --surface: #ffffff; --subtle: #f2f1ec; --hair: #e6e4de; --hair-2: #d6d3cb;
+  --ink: #1a1a2e; --ink-2: #4a4a5c; --ink-3: #6b6b80; --ink-4: #9a9aac;
+  --critical: #c8333a; --threat: #965a06; --threat-dot: #f0a020; --safe: #23784d; --violet: #120a24;
+  background: var(--canvas); color: var(--ink);
+}
+[data-world="eventread"] .f { background: var(--canvas); color: var(--ink); }
+
+[data-world="cyvore"] {
+  --void: #0b0814; --panel: #120d1f; --raise: #191229; --hair: rgba(236,230,250,.09); --hair-2: rgba(236,230,250,.16);
+  --ink: #f1edf9; --ink-2: rgba(241,237,249,.74); --ink-3: rgba(241,237,249,.56);
+  --v1: #8a38f5; --v2: #9c83fb; --v3: #51218f; --v4: #411f6e; --v5: #43246c; --v6: #2c1747; --v7: #160b23;
+  --site: #0c0e12; --tab: #1a1230; --cta-grey: #d1d5dc; --pulse: #06122a; --settle: cubic-bezier(0.22, 1, 0.36, 1);
+  background: var(--void); color: var(--ink);
+}
+[data-world="cyvore"] .f { background: var(--void); color: var(--ink); }
+
+[data-world="pulse"] {
+  --void: #060b14; --panel: #0b1422; --raise: #101b2e; --hair: rgba(220,232,250,.09); --hair-2: rgba(220,232,250,.16);
+  --ink: #eef3fa; --ink-2: rgba(238,243,250,.74); --ink-3: rgba(238,243,250,.56);
+  --blue: #1f80ee; --teal: #33d0e7; --navy-glow: #113669; --grad: linear-gradient(90deg, #1f80ee, #33d0e7);
+  --settle: cubic-bezier(0.22, 1, 0.36, 1);
+  background: var(--void); color: var(--ink);
+}
+[data-world="pulse"] .f { background: var(--void); color: var(--ink); }

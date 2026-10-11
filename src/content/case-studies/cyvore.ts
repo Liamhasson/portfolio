@@ -40,5 +40,6 @@ export const cyvore: CaseStudy = {
       title: "CTO, Cyvore",
     },
   },
+  peek: { src: "/case-studies/cyvore/peek.jpg", alt: "Cyvore website hero on a laptop", width: 1600, height: 1200 },
   budget: STANDARD_BUDGET,
 };

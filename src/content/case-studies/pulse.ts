@@ -42,5 +42,6 @@ export const pulse: CaseStudy = {
       "After the fixes, 6 of 6 testers in round 2 (returning and new) completed every scenario task.",
     ],
   },
+  peek: { src: "/case-studies/pulse/peek.jpg", alt: "Pulse's first onboarding screen", width: 600, height: 1300 },
   budget: STANDARD_BUDGET,
 };

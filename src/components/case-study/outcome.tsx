@@ -1,32 +1,67 @@
 import { useId } from "react";
 import type { Outcome as Data } from "@/lib/case-studies/types";
+import { Icon } from "./icons";
 
+/** The first line with the live site's address underlined as a link (Eventread's board: "Live at eventread.vercel.app"). */
+function LinkedLine({ line, href }: { line: string; href: string }) {
+  const host = new URL(href).host;
+  const at = line.indexOf(host);
+  if (at < 0) return <>{line}</>;
+  return (
+    <>
+      {line.slice(0, at)}
+      <a href={href} target="_blank" rel="noreferrer">
+        {host}<span className="sr-only"> (opens in a new tab)</span>
+      </a>
+      {line.slice(at + host.length)}
+    </>
+  );
+}
+
+/** Board frame 07 · Impact: the lines large (the second quieter); Cyvore adds the quote, Eventread the way in. */
 export function Outcome({ outcome }: { outcome: Data }) {
   const headingId = useId();
+  const [first, ...rest] = outcome.lines;
   return (
-    <section aria-labelledby={headingId} className="px-[5vw] py-[10vh]">
-      <h2 id={headingId} className="text-[clamp(2rem,4vw,3.6rem)] font-normal leading-[1.15]">
-        Impact
-      </h2>
-      {outcome.lines.map((line) => (
-        <p key={line} className="mt-4 max-w-[48ch] text-[clamp(1.25rem,2.6vw,2.4rem)] leading-tight">
-          {line}
-        </p>
-      ))}
-      {outcome.quote && (
-        <figure className="mt-10 max-w-[56ch]">
-          <blockquote className="text-xl italic">{outcome.quote.text}</blockquote>
-          <figcaption className="mt-3 font-mono text-xs uppercase tracking-[0.08em] text-ink-3">
-            <span>{outcome.quote.name}</span> · {outcome.quote.title}
-          </figcaption>
-        </figure>
-      )}
-      {outcome.link && (
-        <a href={outcome.link.href} target="_blank" rel="noreferrer" className="mt-8 inline-block underline">
-          {outcome.link.label}
-          <span className="sr-only"> (opens in a new tab)</span>
-        </a>
-      )}
+    <section aria-labelledby={headingId} className="f outcome">
+      <div className="g12">
+        <div style={{ gridColumn: "1 / 12" }}>
+          <h2 id={headingId} className="title" style={{ marginLeft: "calc(var(--u) * -3)" }}>
+            Impact
+          </h2>
+          {outcome.link ? (
+            <>
+              <p className="display">
+                <LinkedLine line={first} href={outcome.link.href} />
+                {rest.map((line) => (
+                  <span key={line} className="quiet"><br />{line}</span>
+                ))}
+              </p>
+              <div className="row-cta">
+                <a href={outcome.link.href} target="_blank" rel="noreferrer" className="btn btn-ink">
+                  {outcome.link.label}<span className="sr-only"> (opens in a new tab)</span>
+                  <Icon name="arrow-up-right" />
+                </a>
+              </div>
+            </>
+          ) : (
+            <p className="out-lines">
+              {outcome.lines.map((line) => <span key={line}>{line}</span>)}
+            </p>
+          )}
+          {outcome.quote && (
+            <figure className="quote">
+              <blockquote>
+                <p>{`“${outcome.quote.text}”`}</p>
+              </blockquote>
+              <figcaption>
+                <b>{outcome.quote.name}</b>
+                <span className="label">{outcome.quote.title}</span>
+              </figcaption>
+            </figure>
+          )}
+        </div>
+      </div>
     </section>
   );
 }

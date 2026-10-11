@@ -1,37 +1,15 @@
-<MiddleBlock kind="problem" title="Problem">
+import { EventreadProblem } from "@/components/case-study/eventread/problem";
+import { EventreadSolution } from "@/components/case-study/eventread/solution";
+import { EventreadHowItWorks } from "@/components/case-study/eventread/how-it-works";
+import { EventreadDesignSystem } from "@/components/case-study/eventread/design-system";
 
-Two bands, one lost night.
+{/* Eventread's middle is its board (docs/prototypes/eventread-mockups.html, frames 03–05b); the copy lives in the
+    components, exactly as approved on the board. */}
 
-My band's release show lost its audience to a Måneskin arena show on the same night. A friend's band lost theirs to the Champions League final. Nobody had checked, because there was nothing to check with.
+<EventreadProblem kind="problem" title="Problem" />
 
-Eventread is built for the two people I worked with for ten years: artists and managers picking a date, and promoters and agents filling a room. Both pick a date and hope: ticketing platforms show their own events, and nobody shows the whole night.
+<EventreadSolution kind="signature" title="Solution" />
 
-Live Nation alone puts on 54,000 shows a year, about 150 every night. Every independent show gets booked around that calendar, usually without seeing it. Prism.fm, TourSmart and ChatGPT each answer part of the question; none checks a date against everything happening that night.
+<EventreadHowItWorks kind="supporting" title="How it works" />
 
-</MiddleBlock>
-
-<MiddleBlock kind="signature" title="Solution">
-
-The Danger Score.
-
-Every competing event gets three weights: how big its room is next to yours, how close its genre is to yours, and how close its start time is to yours. Multiplied together, they place the night in one of three bands: Safe, Threat or Critical.
-
-On the live product's own example, a 1,000-cap rock show in Berlin on 18 November 2026, Muse at the Uber Arena is Critical, Horse Lords in a 532-cap room is a Threat because it's the same genre, and TAEMIN at 3,638 is Safe. Size isn't danger; relevance is.
-
-</MiddleBlock>
-
-<MiddleBlock kind="supporting" title="How it works">
-
-One search, then it remembers.
-
-Pick a city, a month, your genre and your room size, and the month comes back laid out by risk. Around that search sit three things bookers do every week: book for several acts, watch a date after it's booked, and route a tour.
-
-**Search, then save it as an act.** A manager or an agent books for several acts, and every search asked for the same genre and room size again. Signed in, a search offers to save itself as an act. After that the act is one click on the search page, and its genre and room size fill in.
-
-**Follow the date you booked.** Shows keep getting announced after a date is booked. A followed date is re-checked every day, and an email goes out when a competing show lands on that night.
-
-**Plan a tour as one run.** Eight cities typed in any order, one date already booked in Paris. The planner routes Berlin to Paris in 12 days and 2,495 km, keeps every drive possible, picks the quietest nights the run can reach, then checks the 20 shortest alternatives: none beats it.
-
-Under the hood: Ticketmaster covers the big ticketed shows and JamBase the local ones it doesn't list: for Berlin in November 2026, 487 shows against 93, 436 of them not on Ticketmaster at all. "Cambridge" returned 124 events across the UK and the US until places carried their country (21 after the fix), and tour shows wanting the same night are assigned in two passes.
-
-</MiddleBlock>
+<EventreadDesignSystem kind="supporting" title="Design system" />
