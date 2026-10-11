@@ -1,0 +1,658 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pulse mockups</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:ital,wght@0,400;0,500;1,400&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ------------------------------------------------------------------
+   Board chrome (real px). Frames use --u = 1/1440 of the frame width.
+   Mobile frame: --u = 1/390.
+   Pulse world: the page in Pulse's own deep navy (sampled from its
+   screens); the blue-to-teal gradient only where the app is.
+   Liam's words in Geist; the app's type stays inside the screens.
+   ------------------------------------------------------------------ */
+:root {
+  --void: #060b14; --panel: #0b1422; --raise: #101b2e;
+  --hair: rgba(220,232,250,.09); --hair-2: rgba(220,232,250,.16);
+  --ink: #eef3fa; --ink-2: rgba(238,243,250,.74); --ink-3: rgba(238,243,250,.56);
+  --blue: #1f80ee; --teal: #33d0e7; --navy-glow: #113669;
+  --grad: linear-gradient(90deg, #1f80ee, #33d0e7);
+  --sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --mono: "Geist Mono", ui-monospace, monospace;
+  --settle: cubic-bezier(0.22, 1, 0.36, 1);
+}
+* { box-sizing: border-box; }
+html, body { background: #03060c; }
+body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
+.board { max-width: 1536px; margin: 0 auto; padding: 64px 48px 160px; }
+.board-head { display: grid; grid-template-columns: 1fr auto; gap: 24px 48px; align-items: end; padding-bottom: 40px; border-bottom: 1px solid #1a1f2a; }
+.board-head h1 { margin: 0; font: 400 32px/1.1 var(--sans); color: #f2f2f4; letter-spacing: -.01em; }
+.board-head h1 em { font-style: italic; color: #8c8c96; }
+.board-head p { margin: 10px 0 0; max-width: 74ch; color: #8c8c96; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 20px; font: 400 11px/1.4 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: #8c8c96; }
+.legend i { display: inline-block; width: 18px; height: 0; border-top: 1px dashed #8c8c96; vertical-align: middle; margin-right: 8px; }
+.block { margin-top: 80px; }
+.cap { display: flex; justify-content: space-between; gap: 16px; margin: 0 auto 12px; max-width: 1440px; font: 400 12px/1.4 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: #8c8c96; }
+.cap b { font-weight: 400; color: #e6e6ea; }
+.frame { container-type: inline-size; max-width: 1440px; margin: 0 auto; border-radius: 3px; overflow: clip; box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 30px 80px -40px rgba(0,0,0,.9); }
+.f { --u: calc(100cqw / 1440); position: relative; overflow: clip; background: var(--void); color: var(--ink); font-family: var(--sans); font-weight: 400; }
+.f.m { --u: calc(100cqw / 390); }
+.f p { margin: 0; }
+.f h1, .f h2, .f h3 { margin: 0; font-weight: 400; }
+.f a { color: inherit; text-decoration: none; }
+.fold { position: absolute; left: 0; right: 0; height: 0; pointer-events: none; z-index: 60; }
+.fold::before, .fold::after { content: ""; position: absolute; top: 0; width: calc(var(--u) * 28); border-top: calc(var(--u) * 1.5) dashed rgba(238,243,250,.35); }
+.fold::before { left: 0; } .fold::after { right: 0; }
+.fold span { position: absolute; right: calc(var(--u) * 36); top: calc(var(--u) * -6); font: 400 calc(var(--u) * 10)/1 var(--mono); letter-spacing: .08em; color: rgba(238,243,250,.35); }
+
+/* ------------------------------ Liam's type (Geist 400) ------------------------------ */
+.label { font: 400 calc(var(--u) * 12)/1.15 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
+.title { font-size: calc(var(--u) * 72); line-height: .95; letter-spacing: -.025em; }
+.display { font-size: calc(var(--u) * 48); line-height: 1.16; letter-spacing: -.018em; }
+.display em { font-style: italic; }
+.quiet { color: var(--ink-3); }
+.body { font-size: calc(var(--u) * 18); line-height: 1.55; color: var(--ink-2); max-width: 46ch; }
+.body .lead { color: var(--ink); }
+.g12 { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: calc(var(--u) * 24); padding: 0 calc(var(--u) * 72); }
+.ic { width: calc(var(--u) * 16); height: calc(var(--u) * 16); fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ------------------------------ shell ------------------------------ */
+/* The site's own shell (not Eventread's 6px rule): fully round pills + a 44px circle.
+   Motion idea: "light finding the material" — the pointer is a soft light that the
+   pill's surface and rim catch. Only transform / opacity / background animate. */
+.f { --settle: cubic-bezier(0.22, 1, 0.36, 1); }
+.f .sh-back, .f .pill {
+  --x: 50%; --y: 50%;
+  --light: rgba(26,26,46,.08); --rim: rgba(26,26,46,.55); --flat: rgba(26,26,46,.06);
+  position: relative; isolation: isolate; cursor: pointer; outline: none;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: transform 120ms var(--settle), color 320ms var(--settle), background-color 320ms var(--settle), box-shadow 320ms var(--settle);
+}
+.f .sh-back { position: absolute; left: calc(var(--u) * 72); top: calc(var(--u) * 40); width: calc(var(--u) * 44); height: calc(var(--u) * 44); border-radius: 50%; background-color: var(--ink); color: var(--canvas); display: grid; place-items: center; z-index: 5;
+  --light: rgba(255,255,255,.14); --rim: rgba(255,255,255,.55); --flat: rgba(255,255,255,.1); }
+.sh-back .ic { width: calc(var(--u) * 18); height: calc(var(--u) * 18); transition: transform 320ms var(--settle); }
+.sh-nav { position: absolute; right: calc(var(--u) * 72); top: calc(var(--u) * 40); display: flex; gap: calc(var(--u) * 8); z-index: 5; }
+.f .pill { display: flex; align-items: center; height: calc(var(--u) * 44); padding: 0 calc(var(--u) * 20); border-radius: calc(var(--u) * 999); font: 500 calc(var(--u) * 14)/1 var(--sans); letter-spacing: -.005em; color: var(--ink); background-color: rgba(255,255,255,.72); box-shadow: inset 0 0 0 calc(var(--u) * 1) rgba(26,26,46,.2); z-index: 1; }
+.f .pill.is-active { color: var(--canvas); background-color: rgba(255,255,255,0); box-shadow: inset 0 0 0 calc(var(--u) * 1) rgba(26,26,46,0);
+  --light: rgba(255,255,255,.14); --rim: rgba(255,255,255,.55); --flat: rgba(255,255,255,.1); }
+/* the light (fill) and the rim catching it (border only, via mask exclude) */
+.f .sh-back::before, .f .pill::before, .f .sh-back::after, .f .pill::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity 320ms ease-out; }
+.f .sh-back::before, .f .pill::before { z-index: -1; background: radial-gradient(circle calc(var(--u) * 60) at var(--x) var(--y), var(--light), transparent); }
+.f .sh-back::after, .f .pill::after { padding: calc(var(--u) * 1); background: radial-gradient(circle calc(var(--u) * 60) at var(--x) var(--y), var(--rim), transparent);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+@media (hover: hover) {
+  .f .sh-back:hover::before, .f .pill:hover::before, .f .sh-back:hover::after, .f .pill:hover::after { opacity: 1; transition-duration: 180ms; }
+  .f .sh-back:hover .ic { transform: translateX(calc(var(--u) * -2)); }
+}
+.f .sh-back:focus-visible::before, .f .pill:focus-visible::before, .f .sh-back:focus-visible::after, .f .pill:focus-visible::after { opacity: 1; transition-duration: 180ms; }
+.f .sh-back:focus-visible, .f .pill:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.f .sh-back:active, .f .pill:active { transform: scale(.97); }
+/* active page: one ink pill that slides (two caps + a scaled bar, so the round ends never squash) */
+.sh-nav .hl { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 320ms var(--settle); z-index: 0; }
+.sh-nav .hl.on { opacity: 1; }
+.sh-nav .hl i { position: absolute; top: 0; left: 0; height: calc(var(--u) * 44); background: var(--ink); transform-origin: 0 0; transition: transform 320ms var(--settle); will-change: transform; }
+.sh-nav .hl i:nth-child(1) { width: calc(var(--u) * 22); border-radius: calc(var(--u) * 22) 0 0 calc(var(--u) * 22); }
+.sh-nav .hl i:nth-child(2) { width: 1px; }
+.sh-nav .hl i:nth-child(3) { width: calc(var(--u) * 22); border-radius: 0 calc(var(--u) * 22) calc(var(--u) * 22) 0; }
+.sh-nav .hl.snap i { transition: none; }
+/* the same shell on a dark surface */
+.on-dark .pill { color: var(--canvas); background-color: rgba(255,255,255,.04); box-shadow: inset 0 0 0 calc(var(--u) * 1) rgba(255,255,255,.22);
+  --light: rgba(255,255,255,.14); --rim: rgba(255,255,255,.6); --flat: rgba(255,255,255,.08); }
+.on-dark .pill.is-active { color: var(--ink); background-color: rgba(255,255,255,0); box-shadow: inset 0 0 0 calc(var(--u) * 1) rgba(255,255,255,0);
+  --light: rgba(26,26,46,.08); --rim: rgba(26,26,46,.5); --flat: rgba(26,26,46,.06); }
+.on-dark .sh-back { background-color: var(--canvas); color: var(--ink); --light: rgba(26,26,46,.08); --rim: rgba(26,26,46,.5); --flat: rgba(26,26,46,.06); }
+.on-dark .hl i { background: var(--canvas); }
+.on-dark .sh-back:focus-visible, .on-dark .pill:focus-visible { outline-color: var(--canvas); }
+/* entrance: back button first, then the pills, 60ms apart */
+@keyframes settle-in { from { opacity: 0; transform: translateY(calc(var(--u) * 8)); filter: blur(calc(var(--u) * 4)); } to { opacity: 1; transform: none; filter: blur(0); } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+.play .settle { animation: settle-in 600ms var(--settle) backwards; animation-delay: calc(var(--i, 0) * 60ms); }
+@media (prefers-reduced-motion: reduce) {
+  .play .settle { animation-name: fade-in; }
+  .f .sh-back::before, .f .pill::before { background: var(--flat); transition: none; }
+  .f .sh-back::after, .f .pill::after { display: none; }
+  .f .sh-back .ic { transition: none; transform: none !important; }
+  .sh-nav .hl, .sh-nav .hl i { transition: none; }
+  .f .sh-back, .f .pill { transition: none; }
+}
+
+
+.sh-back, .sh-nav { --ink: #0b1422; --canvas: #eef3fa; }
+
+/* ------------------------------ the slim phone (one frame everywhere) ------------------------------ */
+.phone { --w: calc(var(--u) * 300); position: relative; width: var(--w); aspect-ratio: 1179 / 2556; border-radius: calc(var(--w) * .15); padding: calc(var(--w) * .022); background: #0a0f19; box-shadow: inset 0 0 0 calc(var(--u) * 1) rgba(220,232,250,.16), 0 calc(var(--u) * 30) calc(var(--u) * 80) calc(var(--u) * -30) rgba(0,0,0,.8); flex: none; }
+.phone-screen { position: relative; width: 100%; height: 100%; border-radius: calc(var(--w) * .13); overflow: hidden; background: #060b14; }
+.phone-screen > img, .phone-screen > video { display: block; width: 100%; height: 100%; object-fit: cover; }
+.glow { position: absolute; pointer-events: none; border-radius: 50%; background: radial-gradient(closest-side, rgba(31,128,238,.32), rgba(31,128,238,0)); }
+
+/* ------------------------------ 1 hero ------------------------------ */
+.hero { height: calc(var(--u) * 900); }
+.hero-head { position: absolute; left: calc(var(--u) * 72); top: calc(var(--u) * 132); width: calc(var(--u) * 560); }
+.hero-line { font-size: calc(var(--u) * 28); line-height: 1.2; letter-spacing: -.01em; color: var(--ink-2); margin-top: calc(var(--u) * 32); max-width: 22ch; }
+.hero-tray { position: absolute; left: calc(var(--u) * 680); right: calc(var(--u) * 72); top: calc(var(--u) * 112); bottom: calc(var(--u) * 48); border-radius: calc(var(--u) * 24); background: var(--panel); box-shadow: inset 0 0 0 calc(var(--u) * 1) var(--hair); overflow: hidden; display: grid; place-items: center; }
+.hero-tray .glow { width: calc(var(--u) * 760); height: calc(var(--u) * 760); left: 50%; top: 52%; transform: translate(-50%, -50%); }
+.hero-tray .phone { --w: calc(var(--u) * 320); }
+
+/* ------------------------------ 2 at a glance ------------------------------ */
+.glance { height: calc(var(--u) * 270); padding-top: calc(var(--u) * 56); }
+.strip { margin: 0 calc(var(--u) * 72); display: grid; grid-template-columns: calc(var(--u) * 300) calc(var(--u) * 240) calc(var(--u) * 280) 1fr; border-top: calc(var(--u) * 1) solid var(--hair-2); border-bottom: calc(var(--u) * 1) solid var(--hair-2); }
+.strip > div { padding: calc(var(--u) * 28) calc(var(--u) * 24) calc(var(--u) * 30); border-left: calc(var(--u) * 1) solid var(--hair); }
+.strip > div:first-child { padding-left: 0; border-left: 0; }
+.strip .label { margin-bottom: calc(var(--u) * 14); }
+.strip p { font-size: calc(var(--u) * 17); line-height: 1.5; max-width: 30ch; }
+.tools { display: flex; flex-wrap: wrap; gap: 0 calc(var(--u) * 20); font-size: calc(var(--u) * 17); line-height: 1.55; }
+.tools span { position: relative; white-space: nowrap; }
+.tools span:not(:last-child)::after { content: ""; position: absolute; right: calc(var(--u) * -12); top: .74em; width: calc(var(--u) * 3); height: calc(var(--u) * 3); border-radius: 50%; background: var(--ink-3); }
+
+/* ------------------------------ 3 problem: the four milestones ------------------------------ */
+.problem { padding: calc(var(--u) * 96) 0 calc(var(--u) * 88); }
+.f .problem-copy a { text-decoration: underline; text-underline-offset: .18em; text-decoration-color: var(--hair-2); }
+.miles { position: relative; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: calc(var(--u) * 24); margin: calc(var(--u) * 80) calc(var(--u) * 72) 0; padding-top: calc(var(--u) * 40); }
+.miles::before { content: ""; position: absolute; left: 0; right: 0; top: calc(var(--u) * 8); height: calc(var(--u) * 2); border-radius: 2px; background: linear-gradient(90deg, rgba(31,128,238,.25), #1f80ee 40%, #33d0e7); }
+.mile { position: relative; }
+.mile::before { content: ""; position: absolute; left: 0; top: calc(var(--u) * -40); width: calc(var(--u) * 18); height: calc(var(--u) * 18); border-radius: 50%; background: var(--void); box-shadow: inset 0 0 0 calc(var(--u) * 2) #33d0e7, 0 0 calc(var(--u) * 16) rgba(51,208,231,.4); }
+.mile-day { font-size: calc(var(--u) * 56); line-height: 1; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.mile-day small { font-size: .32em; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); font-family: var(--mono); margin-right: calc(var(--u) * 8); vertical-align: .55em; }
+.mile p { font-size: calc(var(--u) * 17); line-height: 1.5; color: var(--ink-2); margin-top: calc(var(--u) * 16); max-width: 26ch; }
+.mile p b { font-weight: 400; color: var(--ink); }
+
+/* ------------------------------ 4 solution: the onboarding story ------------------------------ */
+.solution { padding: calc(var(--u) * 112) 0 calc(var(--u) * 104); }
+.sol-glow { width: calc(var(--u) * 1100); height: calc(var(--u) * 900); right: calc(var(--u) * -120); top: calc(var(--u) * 260); }
+.ob { position: relative; margin: calc(var(--u) * 72) calc(var(--u) * 72) 0; }
+.ob-track { position: relative; }
+.ob-pin { position: sticky; top: var(--pin-top, 24px); display: grid; grid-template-columns: minmax(0, calc(var(--u) * 560)) auto; justify-content: center; gap: calc(var(--u) * 120); align-items: center; }
+.ob-side { display: flex; flex-direction: column; gap: calc(var(--u) * 40); }
+.ob-count { font: 400 calc(var(--u) * 14)/1 var(--mono); letter-spacing: .08em; color: var(--ink-3); }
+.ob-caps { position: relative; min-height: calc(var(--u) * 140); margin: 0; padding: 0; list-style: none; }
+.ob-cap { position: absolute; left: 0; top: 0; font-size: calc(var(--u) * 48); line-height: 1.12; letter-spacing: -.018em; max-width: 16ch; opacity: 0; transform: translateY(calc(var(--u) * -8)); transition: opacity 140ms ease-in, transform 140ms ease-in; }
+/* the old caption leaves first, then the new one arrives: two lines are never readable at once */
+.ob-cap.is-on { opacity: 1; transform: none; transition: opacity 320ms var(--settle) 150ms, transform 420ms var(--settle) 150ms; }
+@media (prefers-reduced-motion: reduce) { .ob-cap, .ob-cap.is-on { transition: none; } }
+.ob-stages { display: grid; grid-template-columns: 3fr 6fr 3fr; gap: calc(var(--u) * 10); max-width: calc(var(--u) * 560); }
+.ob-stage { color: var(--ink-3); transition: color 320ms var(--settle); }
+.ob-stage.is-on { color: var(--ink); }
+.ob-stage span { display: block; font: 400 calc(var(--u) * 12)/1.3 var(--mono); letter-spacing: .06em; text-transform: uppercase; margin-top: calc(var(--u) * 12); }
+.ob-stage i { position: relative; display: block; height: calc(var(--u) * 3); border-radius: 3px; background: var(--hair-2); overflow: hidden; }
+.ob-stage i::after { content: ""; position: absolute; inset: 0; background: var(--grad); transform-origin: 0 50%; transform: scaleX(var(--fill, 0)); }
+.ob-phone { --w: calc(var(--u) * 340); }
+.ob-screen { position: absolute; inset: 0; margin: 0; opacity: 0; visibility: hidden; }
+.ob-screen img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.ob-screen figcaption { display: none; }
+/* reduced motion: the twelve screens as a still grid, each with its caption */
+.ob.is-static .ob-track { height: auto !important; }
+.ob.is-static .ob-pin { position: static; display: block; }
+.ob.is-static .ob-caps, .ob.is-static .ob-count, .ob.is-static .ob-stages { display: none; }
+.ob.is-static .ob-phone { width: auto; aspect-ratio: auto; padding: 0; background: none; box-shadow: none; border-radius: 0; }
+.ob.is-static .phone-screen { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: calc(var(--u) * 32) calc(var(--u) * 20); height: auto; overflow: visible; background: none; border-radius: 0; }
+.ob.is-static .ob-screen { position: static; opacity: 1; visibility: visible; }
+.ob.is-static .ob-screen img { border-radius: calc(var(--u) * 20); box-shadow: inset 0 0 0 1px var(--hair-2); aspect-ratio: 1179 / 2556; height: auto; }
+.ob.is-static .ob-screen figcaption { display: block; margin-top: calc(var(--u) * 12); font-size: calc(var(--u) * 14); line-height: 1.4; color: var(--ink-2); }
+
+/* ------------------------------ 5 how it works ------------------------------ */
+.how { padding: calc(var(--u) * 112) 0 calc(var(--u) * 104); }
+.trio { display: flex; justify-content: center; gap: calc(var(--u) * 72); margin: calc(var(--u) * 72) calc(var(--u) * 72) 0; position: relative; }
+.trio figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 20); }
+.trio .phone { --w: calc(var(--u) * 280); }
+.trio figcaption { text-align: center; }
+.brand { display: grid; grid-template-columns: calc(var(--u) * 296) calc(var(--u) * 296) 1fr; gap: calc(var(--u) * 24); margin: calc(var(--u) * 72) calc(var(--u) * 72) 0; }
+.brand > div { border-radius: calc(var(--u) * 20); overflow: hidden; background: var(--panel); box-shadow: inset 0 0 0 calc(var(--u) * 1) var(--hair); height: calc(var(--u) * 240); display: grid; place-items: center; }
+.brand img { display: block; }
+.brand .b-logo img { width: calc(var(--u) * 96); }
+.brand .b-icon img { width: 100%; height: 100%; object-fit: cover; }
+.brand .b-board img { width: 100%; height: 100%; object-fit: cover; }
+
+/* ------------------------------ 6 challenges ------------------------------ */
+.chal { padding: calc(var(--u) * 112) 0 calc(var(--u) * 104); }
+.chs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(6, auto); column-gap: calc(var(--u) * 48); margin: calc(var(--u) * 64) calc(var(--u) * 72) 0; }
+.ch { display: grid; grid-row: span 6; grid-template-rows: subgrid; border-top: calc(var(--u) * 1) solid var(--ink); padding-top: calc(var(--u) * 20); }
+.ch-head { display: flex; flex-direction: column; gap: calc(var(--u) * 18); }
+.ch-num { font: 400 calc(var(--u) * 12)/1 var(--mono); letter-spacing: .08em; color: var(--ink-3); }
+.ch-title { font-size: calc(var(--u) * 26); line-height: 1.2; letter-spacing: -.012em; padding-right: calc(var(--u) * 24); }
+.ch-chips { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--u) * 8); padding: calc(var(--u) * 20) 0 calc(var(--u) * 4); }
+.chip { display: inline-flex; align-items: center; gap: calc(var(--u) * 7); height: calc(var(--u) * 26); padding: 0 calc(var(--u) * 10); border-radius: calc(var(--u) * 999); border: calc(var(--u) * 1) solid var(--hair-2); font: 500 calc(var(--u) * 11)/1 var(--mono); letter-spacing: .07em; text-transform: uppercase; white-space: nowrap; color: var(--ink-2); }
+.chip b { font-weight: 500; color: var(--ink); }
+.ch-shot { margin-top: calc(var(--u) * 20); height: calc(var(--u) * 220); border-radius: calc(var(--u) * 16); overflow: hidden; background: var(--panel); box-shadow: inset 0 0 0 calc(var(--u) * 1) var(--hair); position: relative; }
+.ch-shot img { position: absolute; left: 50%; top: calc(var(--u) * 18); width: calc(var(--u) * 240); transform: translateX(-50%); border-radius: calc(var(--u) * 22) calc(var(--u) * 22) 0 0; box-shadow: inset 0 0 0 1px var(--hair-2); }
+.step { padding-top: calc(var(--u) * 18); }
+.step .k { font: 400 calc(var(--u) * 11)/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.step p { font-size: calc(var(--u) * 16); line-height: 1.55; color: var(--ink-2); margin-top: calc(var(--u) * 10); }
+.step.res { margin-top: calc(var(--u) * 22); padding-top: calc(var(--u) * 16); border-top: calc(var(--u) * 1) solid var(--hair-2); }
+.step.res .k { color: var(--ink); }
+.step.res p { font-size: calc(var(--u) * 20); line-height: 1.34; color: var(--ink); letter-spacing: -.008em; }
+
+/* ------------------------------ 7 impact ------------------------------ */
+.outcome { padding: calc(var(--u) * 96) 0 calc(var(--u) * 96); }
+.f .out-lines { margin-top: calc(var(--u) * 32); font-size: calc(var(--u) * 52); line-height: 1.12; letter-spacing: -.02em; max-width: 24ch; }
+.out-lines span { display: block; }
+.out-lines span + span { color: var(--ink-3); margin-top: calc(var(--u) * 12); }
+
+/* ------------------------------ 8 next: Eventread closes the loop ------------------------------ */
+.next { height: calc(var(--u) * 630); }
+.er { position: absolute; left: 0; right: 0; top: calc(var(--u) * 64); bottom: calc(var(--u) * -40); background: #f8f8f6; color: #1a1a2e; border-radius: calc(var(--u) * 32) calc(var(--u) * 32) 0 0; overflow: hidden; }
+.er-text { position: absolute; left: calc(var(--u) * 72); top: calc(var(--u) * 72); width: calc(var(--u) * 520); }
+.er-next { display: flex; align-items: center; gap: calc(var(--u) * 14); font: 400 calc(var(--u) * 13)/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #6b6b80; }
+.er-next i { display: block; width: calc(var(--u) * 80); height: calc(var(--u) * 1); background: #d6d3cb; }
+.er-title { font-size: calc(var(--u) * 72); line-height: .95; letter-spacing: -.025em; color: rgba(26,26,46,.55); margin-top: calc(var(--u) * 150); }
+.f .er-line { font-size: calc(var(--u) * 19); line-height: 1.5; color: #4a4a5c; margin-top: calc(var(--u) * 40); max-width: 32ch; }
+.er-frame { position: absolute; left: calc(var(--u) * 640); top: calc(var(--u) * 72); width: calc(var(--u) * 728); height: calc(var(--u) * 560); border-radius: calc(var(--u) * 20); overflow: hidden; background: #f2f1ec; box-shadow: 0 0 0 calc(var(--u) * 1) #e6e4de; }
+.er-frame img { width: 100%; height: 100%; object-fit: cover; object-position: 0 0; display: block; }
+
+
+/* ------------------------------ the button that opens the clickable prototype ------------------------------ */
+.ob-try { align-self: flex-start; display: inline-flex; align-items: center; gap: calc(var(--u) * 10); height: calc(var(--u) * 48); padding: 0 calc(var(--u) * 22); border: 0; border-radius: 999px; cursor: pointer; font: 500 calc(var(--u) * 15)/1 var(--sans); color: var(--ink); background: linear-gradient(var(--void), var(--void)) padding-box, var(--grad) border-box; border: calc(var(--u) * 1.5) solid transparent; transition: transform 160ms var(--settle), box-shadow 320ms var(--settle); }
+.ob-try:hover { box-shadow: 0 0 calc(var(--u) * 28) rgba(51,208,231,.25); }
+.ob-try:active { transform: scale(.97); }
+.ob-try:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
+.ob-try .ic { width: calc(var(--u) * 16); height: calc(var(--u) * 16); }
+.m-ob .ob-try { height: calc(var(--u) * 44); font-size: calc(var(--u) * 14); padding: 0 calc(var(--u) * 18); }
+
+/* ------------------------------ the prototype overlay (real px: it sits over the whole page) ------------------------------ */
+.proto { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; font-family: var(--sans); color: var(--ink); }
+.proto[hidden] { display: none; }
+.proto-backdrop { position: absolute; inset: 0; background: rgba(3,6,12,.84); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.proto-body { --ph: min(84vh, 780px); position: relative; display: flex; align-items: center; gap: 64px; padding: 24px; }
+.proto-side { width: 300px; display: flex; flex-direction: column; gap: 18px; }
+.proto-eyebrow { margin: 0; font: 400 12px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.proto-count { margin: 0; font: 400 14px/1 var(--mono); letter-spacing: .08em; color: var(--ink-3); }
+.proto-caps { position: relative; min-height: 96px; margin: 0; padding: 0; list-style: none; }
+.proto-cap { position: absolute; inset: 0 0 auto; font-size: 30px; line-height: 1.15; letter-spacing: -.015em; opacity: 0; transition: opacity 140ms ease-in; }
+.proto-cap.is-on { opacity: 1; transition: opacity 300ms var(--settle) 140ms; }
+.proto-note { margin: 0; font-size: 14px; line-height: 1.55; color: var(--ink-2); }
+.proto-actions { display: flex; gap: 10px; }
+.proto-btn { height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid var(--hair-2); background: transparent; color: var(--ink); font: 500 14px/1 var(--sans); cursor: pointer; }
+.proto-btn:hover { background: rgba(238,243,250,.06); }
+.proto-btn:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
+.proto-phone { height: var(--ph); aspect-ratio: 393 / 852; border-radius: calc(var(--ph) * .07); padding: calc(var(--ph) * .01); background: #0a0f19; box-shadow: inset 0 0 0 1px rgba(220,232,250,.18), 0 30px 90px -20px rgba(31,128,238,.35); }
+.proto-screen { position: relative; width: 100%; height: 100%; border-radius: calc(var(--ph) * .06); overflow: hidden; background: #060b14; cursor: pointer; }
+.proto-shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; visibility: hidden; }
+.proto-hots { position: absolute; inset: 0; z-index: 5; }
+.hot { position: absolute; padding: 0; margin: 0; border: 0; border-radius: 14px; background: transparent; cursor: pointer; transition: background-color 200ms ease, box-shadow 200ms ease; -webkit-tap-highlight-color: transparent; }
+.hot:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.proto-screen.is-hinting .hot { background: rgba(51,208,231,.16); box-shadow: inset 0 0 0 2px rgba(51,208,231,.85); }
+/* the slide-to-book control, re-drawn only while it slides */
+.proto-track { position: absolute; left: calc(24 / 393 * 100%); top: calc(716 / 852 * 100%); width: calc(345 / 393 * 100%); height: calc(56 / 852 * 100%); z-index: 4; pointer-events: none; }
+.proto-knob { position: absolute; left: 3%; top: 8%; height: 84%; aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(135deg, #1f80ee, #33d0e7); box-shadow: 0 0 18px rgba(51,208,231,.55); opacity: 0; visibility: hidden; }
+.proto-knob svg { width: 44%; height: 44%; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+@media (max-width: 760px) {
+  .proto-body { --ph: min(70vh, 640px); flex-direction: column-reverse; gap: 16px; }
+  .proto-side { width: min(90vw, 360px); gap: 10px; }
+  .proto-caps { min-height: 60px; }
+  .proto-cap { font-size: 20px; }
+  .proto-note { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .proto-cap, .proto-cap.is-on, .hot { transition: none; } }
+
+/* ------------------------------ mobile frame ------------------------------ */
+.phone-row { display: grid; grid-template-columns: 390px minmax(0, 1fr); gap: 56px; max-width: 1440px; margin: 0 auto; align-items: start; }
+.phone-row .frame { max-width: 390px; width: 100%; margin: 0; }
+.phone-notes { position: sticky; top: 32px; font: 400 14px/1.6 var(--sans); color: #a6a6ae; max-width: 52ch; }
+.phone-notes h3 { margin: 0 0 12px; font: 400 12px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #e6e6ea; }
+.phone-notes ol { margin: 0; padding-left: 20px; }
+.phone-notes li { margin: 0 0 10px; }
+.m .sh-back { left: calc(var(--u) * 16); top: calc(var(--u) * 16); }
+.m .sh-nav { right: calc(var(--u) * 16); top: calc(var(--u) * 16); gap: calc(var(--u) * 6); }
+.m .pill { padding: 0 calc(var(--u) * 13); font-size: calc(var(--u) * 13); }
+.m-hero { padding: calc(var(--u) * 108) calc(var(--u) * 16) calc(var(--u) * 32); }
+.m-hero .title { font-size: calc(var(--u) * 48); margin-top: calc(var(--u) * 14); }
+.m-hero .hero-line { font-size: calc(var(--u) * 22); margin-top: calc(var(--u) * 14); }
+.m-hero .phone { --w: calc(var(--u) * 220); margin: calc(var(--u) * 28) auto 0; }
+.m-gap { padding: calc(var(--u) * 18) calc(var(--u) * 16); border-top: calc(var(--u) * 1) solid var(--hair-2); border-bottom: calc(var(--u) * 1) solid var(--hair-2); font: 400 calc(var(--u) * 10)/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); text-align: center; }
+.m-sol { padding: calc(var(--u) * 64) calc(var(--u) * 16) calc(var(--u) * 72); }
+.m-sol .title { font-size: calc(var(--u) * 44); }
+.m-sol .body { font-size: calc(var(--u) * 16); margin-top: calc(var(--u) * 18); }
+.m-ob { margin: calc(var(--u) * 32) 0 0; }
+.m-ob .ob-pin { grid-template-columns: 1fr; gap: calc(var(--u) * 20); justify-items: center; }
+.m-ob .ob-side { gap: calc(var(--u) * 14); width: 100%; order: 2; }
+.m-ob .ob-caps { min-height: calc(var(--u) * 64); }
+.m-ob .ob-cap { font-size: calc(var(--u) * 22); }
+.m-ob .ob-count { font-size: calc(var(--u) * 11); }
+.m-ob .ob-stage span { font-size: calc(var(--u) * 9); }
+.m-ob .ob-stages { max-width: none; }
+.m-ob .ob-phone { --w: calc(var(--u) * 230); }
+
+@media (max-width: 900px) {
+  .board { padding: 32px 16px 96px; }
+  .board-head { grid-template-columns: 1fr; }
+  .board-head h1 { font-size: 24px; }
+  .block { margin-top: 56px; }
+  .cap { flex-direction: column; gap: 2px; font-size: 11px; }
+  .phone-row { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .phone-row .frame { margin: 0 auto; }
+  .phone-notes { position: static; }
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+</svg>
+<main class="board">
+
+<header class="board-head">
+  <div>
+    <h1>Pulse case study <em>— mockup board, v1</em></h1>
+    <p>The deep-blue world: the page in Pulse's own navy, the blue-to-teal gradient only where the app is. Every screen sits in one slim phone frame. Section copy verbatim from pulse.ts and pulse.mdx; the twelve onboarding captions are Liam's approved new copy.</p>
+  </div>
+  <div class="legend"><span><i></i>End of a 900px screen (board only)</span><span>1440 frames, scaled</span></div>
+</header>
+
+<!-- ============================== 1 HERO ============================== -->
+<section class="block">
+  <div class="cap"><span><b>01 · Hero</b> — shared; the home screen loading in, in the slim phone</span><span>1 screen · 1440 × 900</span></div>
+  <div class="frame"><div class="f hero on-dark play">
+    <a class="sh-back settle" style="--i:0" href="#" data-light aria-label="Back to projects"><svg class="ic"><use href="#i-chevron-left"/></svg></a>
+    <nav class="sh-nav" aria-label="Primary"><span class="hl settle" aria-hidden="true"><i></i><i></i><i></i></span><a class="pill settle" style="--i:1" href="#" data-light>Projects</a><a class="pill settle" style="--i:2" href="#" data-light>About</a><a class="pill settle" style="--i:3" href="#" data-light>Contact</a></nav>
+    <div class="hero-head">
+      <div class="label">Fitness app</div>
+      <h1 class="title" style="margin-top:calc(var(--u) * 20);margin-left:calc(var(--u) * -3)">Pulse</h1>
+      <p class="hero-line">A goal-focused fitness app designed around four retention milestones.</p>
+    </div>
+    <div class="hero-tray">
+      <div class="glow" aria-hidden="true"></div>
+      <div class="phone"><div class="phone-screen"><video data-inview src="pulse-mockups/home.mp4" poster="pulse-mockups/home-poster.jpg" muted loop playsinline aria-label="Pulse's home screen loading in: Challenges, My Routine, Training Log, your trainers"></video></div></div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ============================== 2 AT A GLANCE ============================== -->
+<section class="block">
+  <div class="cap"><span><b>02 · At a glance</b> — shared</span><span>0.3 screen · 1440 × 270</span></div>
+  <div class="frame"><div class="f glance">
+    <div class="strip">
+      <div><div class="label">Role</div><p>UX design, research and branding</p></div>
+      <div><div class="label">Timeline</div><p>Dec 2025 – Feb 2026</p></div>
+      <div><div class="label">Team</div><p>Solo, with a CareerFoundry mentor</p></div>
+      <div><div class="label">Tools</div><div class="tools"><span>Figma</span><span>Figma MCP</span><span>Claude Code</span></div><div class="label" style="margin:calc(var(--u) * 22) 0 calc(var(--u) * 10)">Type</div><p>CareerFoundry final project · prototype</p></div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ============================== 3 PROBLEM ============================== -->
+<section class="block">
+  <div class="cap"><span><b>03 · Problem</b> — the four milestones as one line</span><span>~1.1 screens · 1440 × ~980</span></div>
+  <div class="frame"><div class="f problem">
+    <div class="fold" style="top:calc(var(--u) * 900)"><span>900</span></div>
+    <div class="g12">
+      <h2 class="title" style="grid-column:1/13;margin-left:calc(var(--u) * -3)">Problem</h2>
+      <p class="display" style="grid-column:1/12;margin-top:calc(var(--u) * 48)">Users quit before the habit. <em class="quiet">Fitness apps lose people before a habit forms.</em></p>
+    </div>
+    <div class="g12 problem-copy" style="margin-top:calc(var(--u) * 56)">
+      <p class="body" style="grid-column:1/7">In a study of 389,481 Fitbod users, training consistently in the first 28 days was the strongest predictor of sticking with it (<a href="https://doi.org/10.3389/fspor.2026.1855668">Conti et al., 2026</a>). BEAT81 and Urban Sports Club sell access to classes. Pulse is built around the habit.</p>
+      <p class="body" style="grid-column:8/13">I designed Pulse around four milestones, each with its own job:</p>
+    </div>
+    <div class="miles problem-copy">
+      <div class="mile"><div class="mile-day"><small>Day</small>7</div><p><b>The first habit loop.</b></p></div>
+      <div class="mile"><div class="mile-day"><small>Day</small>30</div><p><b>A routine.</b> The first month predicts who stays.</p></div>
+      <div class="mile"><div class="mile-day"><small>Day</small>60</div><p><b>A habit.</b> Habits take a median of 66 days to become automatic (<a href="https://doi.org/10.1002/ejsp.674">Lally et al., 2010</a>).</p></div>
+      <div class="mile"><div class="mile-day"><small>Day</small>90</div><p><b>Staying power.</b></p></div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ============================== 4 SOLUTION ============================== -->
+<section class="block">
+  <div class="cap"><span><b>04 · Solution</b> — the onboarding: scroll steps through the 12 screens</span><span>~1.6 screens seen · pinned scroll not counted</span></div>
+  <div class="frame"><div class="f solution">
+    <div class="fold" style="top:calc(var(--u) * 900)"><span>900</span></div>
+    <div class="glow sol-glow" aria-hidden="true"></div>
+    <div class="g12" style="align-items:end;position:relative">
+      <h2 class="title" style="grid-column:1/7;margin-left:calc(var(--u) * -3)">Solution</h2>
+      <p class="body" style="grid-column:8/13"><span class="lead">Goal-based onboarding.</span> Twelve screens. Screens 1–3 frame the app and learn your goal; 4–9 walk you through your first booking; 10–12 give the tour, ask for permissions and close.</p>
+    </div>
+    <div class="ob" data-story="desktop">
+      <div class="ob-track">
+        <div class="ob-pin">
+          <div class="ob-side">
+            <div class="ob-count" data-count>01 / 12</div>
+            <ol class="ob-caps"><li class="ob-cap is-on">What Pulse is for, in three lines.</li><li class="ob-cap">Pick the goals that matter to you.</li><li class="ob-cap">Choose the activities; the plan follows.</li><li class="ob-cap">Your first booking, free to cancel.</li><li class="ob-cap">The best matches for your activities.</li><li class="ob-cap">Studios near you, with ratings.</li><li class="ob-cap">A slot that fits, with what's still free.</li><li class="ob-cap">Everything in one place before you book.</li><li class="ob-cap">Booked, and one tap to your calendar.</li><li class="ob-cap">What else Pulse does, in four lines.</li><li class="ob-cap">Notifications, asked for with a reason.</li><li class="ob-cap">In.</li></ol>
+            <div class="ob-stages" aria-hidden="true">
+              <div class="ob-stage is-on"><i></i><span>Frame &amp; goal</span></div>
+              <div class="ob-stage"><i></i><span>First booking</span></div>
+              <div class="ob-stage"><i></i><span>Tour &amp; close</span></div>
+            </div>
+            <button type="button" class="ob-try" data-proto-open>Tap through it yourself<svg class="ic" aria-hidden="true"><use href="#i-arrow-right"/></svg></button>
+          </div>
+          <div class="phone ob-phone"><div class="phone-screen">
+            <figure class="ob-screen"><img src="pulse-mockups/onb-01.jpg" alt="Onboarding screen 1: Welcome"><figcaption>01 · What Pulse is for, in three lines.</figcaption></figure>
+            <figure class="ob-screen"><img src="pulse-mockups/onb-02.jpg" alt="Onboarding screen 2: What brings you here?"><figcaption>02 · Pick the goals that matter to you.</figcaption></figure>
+            <figure class="ob-screen"><img src="pulse-mockups/onb-03.jpg" alt="Onboarding screen 3: What do you love?" loading="lazy"><figcaption>03 · Choose the activities; the plan follows.</figcaption></figure>
+            <figure class="ob-screen"><img src="pulse-mockups/onb-04.jpg" alt="Onboarding screen 4: Book your first workout" loading="lazy"><figcaption>04 · Your first booking, free to cancel.</figcaption></figure>
+            <figure class="ob-screen"><img src="pulse-mockups/onb-05.jpg" alt="Onboarding screen 5: Choose a workout" loading="lazy"><figcaption>05 · The best matches for your activities.</figcaption></figure>
+            <figure class="ob-screen"><img src="pulse-mockups/onb-06.jpg" alt="Onboarding screen 6: Choose a studio" loading="lazy"><figcaption>06 · Studios near you, with ratings.</figcaption></figure>
+            <figure class="ob-screen"><img src="pulse-mockups/onb-07.jpg" alt="Onboarding screen 7: Pick a time" loading="lazy"><figcaption>07 · A slot that fits, with what's still free.</figcaption></figure>
+            <figure class="ob-screen"><img src="pulse-mockups/onb-08.jpg" alt="Onboarding screen 8: Confirm booking" loading="lazy"><figcaption>08 · Everything in one place before you book.</figcaption></figure>
+            <figure class="ob-screen"><img src="pulse-mockups/onb-09.jpg" alt="Onboarding screen 9: You're booked!" loading="lazy"><figcaption>09 · Booked, and one tap to your calendar.</figcaption></figure>
+            <figure class="ob-screen"><img src="pulse-mockups/onb-10.jpg" alt="Onboarding screen 10: You're all set" loading="lazy"><figcaption>10 · What else Pulse does, in four lines.</figcaption></figure>
+            <figure class="ob-screen"><img src="pulse-mockups/onb-11.jpg" alt="Onboarding screen 11: Stay in the loop" loading="lazy"><figcaption>11 · Notifications, asked for with a reason.</figcaption></figure>
+            <figure class="ob-screen"><img src="pulse-mockups/onb-12.jpg" alt="Onboarding screen 12: Welcome to Pulse" loading="lazy"><figcaption>12 · In.</figcaption></figure>
+          </div></div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ============================== 5 HOW IT WORKS ============================== -->
+<section class="block">
+  <div class="cap"><span><b>05 · How it works</b> — overview, reflect, progress; the brand as one strip</span><span>~1.4 screens · 1440 × ~1260</span></div>
+  <div class="frame"><div class="f how">
+    <div class="fold" style="top:calc(var(--u) * 900)"><span>900</span></div>
+    <div class="g12" style="align-items:end">
+      <h2 class="title" style="grid-column:1/7;margin-left:calc(var(--u) * -3)">How it works</h2>
+      <p class="body" style="grid-column:8/13"><span class="lead">Challenges without pressure.</span> Overview, reflect, progress: a Training Log for how sessions felt, and Challenges that are private, progress-based and unlimited.</p>
+    </div>
+    <div class="trio">
+      <div class="glow" aria-hidden="true" style="width:calc(var(--u) * 1000);height:calc(var(--u) * 700);left:50%;top:50%;transform:translate(-50%,-50%)"></div>
+      <figure><div class="phone"><div class="phone-screen"><img src="pulse-mockups/training-log.jpg" alt="Training Log: weekly goal, current focus, most booked activities and trainers"></div></div><figcaption class="label">Training Log</figcaption></figure>
+      <figure><div class="phone"><div class="phone-screen"><img src="pulse-mockups/challenges.jpg" alt="Challenges: Strength Development in progress, and challenges to browse"></div></div><figcaption class="label">Challenges</figcaption></figure>
+      <figure><div class="phone"><div class="phone-screen"><video data-inview src="pulse-mockups/challenge-done.mp4" poster="pulse-mockups/challenge-done-poster.jpg" muted loop playsinline aria-label="Challenge completed: you crushed the Strength Development challenge"></video></div></div><figcaption class="label">A challenge completed</figcaption></figure>
+    </div>
+    <div class="g12" style="margin-top:calc(var(--u) * 72)">
+      <p class="body" style="grid-column:1/7">The brand carries the same promise: you set the goal, the app shows the way.</p>
+    </div>
+    <div class="brand">
+      <div class="b-logo"><img src="pulse-mockups/logo.svg" alt="Pulse logo"></div>
+      <div class="b-icon"><img src="pulse-mockups/app-icon.jpg" alt="Pulse app icon"></div>
+      <div class="b-board"><img src="pulse-mockups/billboard.jpg" alt="Pulse billboard: You set the goal, we show the way"></div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ============================== 6 CHALLENGES ============================== -->
+<section class="block">
+  <div class="cap"><span><b>06 · Challenges</b> — shared; each with its final screen</span><span>~1.2 screens · 1440 × ~1100</span></div>
+  <div class="frame"><div class="f chal">
+    <div class="fold" style="top:calc(var(--u) * 900)"><span>900</span></div>
+    <div class="g12"><h2 class="title" style="grid-column:1/10;margin-left:calc(var(--u) * -3)">Challenges</h2></div>
+    <div class="chs">
+      <article class="ch">
+        <div class="ch-head"><span class="ch-num">01</span><h3 class="ch-title">The Injury Log read as medical advice</h3></div>
+        <div class="ch-chips"><span class="chip"><b>4 of 6</b> testers</span></div>
+        <div class="ch-shot"><img src="pulse-mockups/training-log.jpg" alt="The Training Log that replaced it"></div>
+        <div class="step"><div class="k">What happened</div><p>4 of 6 testers took the Injury Log's results as medical advice: a liability risk.</p></div>
+        <div class="step"><div class="k">What I did</div><p>I removed the Injury Log and reframed it as the Training Log: progress and habit-building instead of analysis and guidance.</p></div>
+        <div class="step res"><div class="k">What it changed</div><p>Nothing in the app reads as medical guidance any more: the log tracks how sessions felt, milestones and progression.</p></div>
+      </article>
+      <article class="ch">
+        <div class="ch-head"><span class="ch-num">02</span><h3 class="ch-title">People wanted to set a goal first</h3></div>
+        <div class="ch-chips"><span class="chip"><b>5 of 6</b> testers</span></div>
+        <div class="ch-shot"><img src="pulse-mockups/onb-02.jpg" alt="Onboarding: What brings you here? Pick the goals that matter most"></div>
+        <div class="step"><div class="k">What happened</div><p>5 of 6 testers expected to set a goal during onboarding.</p></div>
+        <div class="step"><div class="k">What I did</div><p>I redesigned onboarding around goals, activity preferences and booking habits, before anything else.</p></div>
+        <div class="step res"><div class="k">What it changed</div><p>The goal-based onboarding shown above.</p></div>
+      </article>
+      <article class="ch">
+        <div class="ch-head"><span class="ch-num">03</span><h3 class="ch-title">Challenges looked public</h3></div>
+        <div class="ch-chips"><span class="chip"><b>4 of 6</b> testers</span><span class="chip"><b>6 of 6</b> in round 2</span></div>
+        <div class="ch-shot"><img src="pulse-mockups/challenges.jpg" alt="Challenges, private and progress-based"></div>
+        <div class="step"><div class="k">What happened</div><p>4 of 6 testers thought Challenges were public.</p></div>
+        <div class="step"><div class="k">What I did</div><p>I gave each feature a one-screen introduction.</p></div>
+        <div class="step res"><div class="k">What it changed</div><p>In round 2, 6 of 6 testers understood that Challenges are private.</p></div>
+      </article>
+    </div>
+  </div></div>
+</section>
+
+<!-- ============================== 7 IMPACT ============================== -->
+<section class="block">
+  <div class="cap"><span><b>07 · Impact</b> — shared</span><span>~0.6 screen · 1440 × ~540</span></div>
+  <div class="frame"><div class="f outcome">
+    <div class="g12"><div style="grid-column:1/12">
+      <h2 class="title" style="margin-left:calc(var(--u) * -3)">Impact</h2>
+      <p class="out-lines"><span>A tested prototype.</span><span>After the fixes, 6 of 6 testers in round 2 (returning and new) completed every scenario task.</span></p>
+    </div></div>
+  </div></div>
+</section>
+
+<!-- ============================== 8 NEXT ============================== -->
+<section class="block">
+  <div class="cap"><span><b>08 · Next project</b> — Eventread peeks in, light; the loop closes</span><span>0.7 screen · 1440 × 630</span></div>
+  <div class="frame"><div class="f next">
+    <div class="er">
+      <div class="er-text">
+        <div class="er-next">Next project<i></i><svg class="ic"><use href="#i-arrow-right"/></svg></div>
+        <div class="er-title">Eventread</div>
+        <p class="er-line">The check every booker skips.</p>
+      </div>
+      <div class="er-frame"><img src="pulse-mockups/eventread-peek.jpg" alt="Eventread month view for Berlin, November 2026"></div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ============================== PHONE ============================== -->
+<section class="block">
+  <div class="cap"><span><b>Phone</b> — hero and the onboarding story, stacked</span><span>390 wide</span></div>
+  <div class="phone-row">
+    <div class="frame"><div class="f m on-dark play">
+      <a class="sh-back settle" style="--i:0" href="#" data-light aria-label="Back to projects"><svg class="ic"><use href="#i-chevron-left"/></svg></a>
+      <nav class="sh-nav" aria-label="Primary"><span class="hl settle" aria-hidden="true"><i></i><i></i><i></i></span><a class="pill settle" style="--i:1" href="#" data-light>Projects</a><a class="pill settle" style="--i:2" href="#" data-light>About</a><a class="pill settle" style="--i:3" href="#" data-light>Contact</a></nav>
+      <div class="m-hero">
+        <div class="label">Fitness app</div>
+        <h1 class="title">Pulse</h1>
+        <p class="hero-line">A goal-focused fitness app designed around four retention milestones.</p>
+        <div class="phone"><div class="phone-screen"><video data-inview src="pulse-mockups/home.mp4" poster="pulse-mockups/home-poster.jpg" muted loop playsinline aria-label="Pulse's home screen loading in"></video></div></div>
+      </div>
+      <div class="m-gap">At a glance · Problem</div>
+      <div class="m-sol">
+        <h2 class="title">Solution</h2>
+        <p class="body"><span class="lead">Goal-based onboarding.</span> Twelve screens, one goal-first flow.</p>
+        <div class="ob m-ob" data-story="phone" data-clone="desktop"><div class="ob-track"></div></div>
+      </div>
+      <div class="m-gap">How it works · Challenges · Impact · Next</div>
+    </div></div>
+    <div class="phone-notes">
+      <h3>Phone</h3>
+      <ol>
+        <li>The hero phone sits under the line, full width of the column.</li>
+        <li>The onboarding is the same twelve screens, pinned: the phone on top, the caption and the three stages under it.</li>
+        <li>Reduced motion: a still grid of the twelve screens, each with its caption; nothing pinned.</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+
+<!-- ============================== CLICKABLE PROTOTYPE (overlay) ============================== -->
+<div class="proto" data-proto role="dialog" aria-modal="true" aria-label="Pulse onboarding prototype" hidden>
+  <div class="proto-backdrop"></div>
+  <div class="proto-body">
+    <div class="proto-side">
+      <p class="proto-eyebrow">Pulse · onboarding prototype</p>
+      <p class="proto-count" data-proto-count>01 / 12</p>
+      <ol class="proto-caps"><li class="proto-cap is-on">What Pulse is for, in three lines.</li><li class="proto-cap">Pick the goals that matter to you.</li><li class="proto-cap">Choose the activities; the plan follows.</li><li class="proto-cap">Your first booking, free to cancel.</li><li class="proto-cap">The best matches for your activities.</li><li class="proto-cap">Studios near you, with ratings.</li><li class="proto-cap">A slot that fits, with what's still free.</li><li class="proto-cap">Everything in one place before you book.</li><li class="proto-cap">Booked, and one tap to your calendar.</li><li class="proto-cap">What else Pulse does, in four lines.</li><li class="proto-cap">Notifications, asked for with a reason.</li><li class="proto-cap">In.</li></ol>
+      <p class="proto-note">Tap the screen as you would in the app. Screens from the Figma file; only its real controls respond.</p>
+      <div class="proto-actions"><button type="button" class="proto-btn" data-proto-restart>Restart</button><button type="button" class="proto-btn" data-proto-close>Close</button></div>
+    </div>
+    <div class="proto-phone"><div class="proto-screen">
+      <img class="proto-shot" src="pulse-mockups/proto/p-01.jpg" alt="Screen 1: Welcome"><img class="proto-shot" src="pulse-mockups/proto/p-02.jpg" alt="Screen 2: What brings you here?" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-03.jpg" alt="Screen 3: What do you love?" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-04.jpg" alt="Screen 4: Book your first workout" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-05.jpg" alt="Screen 5: Choose a workout" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-06.jpg" alt="Screen 6: Choose a studio" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-07.jpg" alt="Screen 7: Pick a time" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-08.jpg" alt="Screen 8: Confirm booking" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-09.jpg" alt="Screen 9: You're booked!" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-10.jpg" alt="Screen 10: You're all set" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-11.jpg" alt="Screen 11: Stay in the loop" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-12.jpg" alt="Screen 12: Welcome to Pulse" loading="lazy">
+      <div class="proto-track" aria-hidden="true"><span class="proto-knob"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></span></div>
+      <div class="proto-hots"></div>
+    </div></div>
+  </div>
+</div>
+</main>
+<script>
+/* Nav motion: pointer light (rAF-throttled, rect cached per hover), sliding active pill, replay. */
+(() => {
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)");
+  const live = new Set();
+  addEventListener("scroll", () => live.forEach((s) => (s.rect = null)), { passive: true });
+
+  document.querySelectorAll("[data-light]").forEach((el) => {
+    const s = { rect: null, x: 0, y: 0, raf: 0 };
+    const write = () => { s.raf = 0; el.style.setProperty("--x", s.x + "px"); el.style.setProperty("--y", s.y + "px"); };
+    const read = (e) => { if (!s.rect) s.rect = el.getBoundingClientRect(); s.x = e.clientX - s.rect.left; s.y = e.clientY - s.rect.top; };
+    el.addEventListener("pointerenter", (e) => {
+      if (reduce.matches || e.pointerType !== "mouse") return;
+      live.add(s); s.rect = null; read(e); write(); // place the light before it fades in
+    });
+    el.addEventListener("pointermove", (e) => {
+      if (reduce.matches || e.pointerType !== "mouse") return;
+      read(e); if (!s.raf) s.raf = requestAnimationFrame(write);
+    });
+    el.addEventListener("pointerleave", () => { live.delete(s); s.rect = null; }); // keep last --x/--y: the light fades where it was
+    el.addEventListener("focus", () => {
+      if (el.matches(":focus-visible")) { el.style.setProperty("--x", "50%"); el.style.setProperty("--y", "50%"); }
+    });
+    el.addEventListener("click", (e) => e.preventDefault());
+  });
+
+  const navs = [...document.querySelectorAll(".sh-nav")];
+  const place = (nav, snap) => {
+    const pills = [...nav.querySelectorAll(".pill")];
+    const hl = nav.querySelector(".hl");
+    const [l, m, r] = hl.children;
+    const p = pills.find((x) => x.classList.contains("is-active"));
+    if (!p) { hl.classList.remove("on"); return; }
+    const x = p.offsetLeft, w = p.offsetWidth, rad = p.offsetHeight / 2;
+    hl.style.setProperty("--i", pills.indexOf(p) + 1); // the highlight enters with its pill
+    const wasOff = !hl.classList.contains("on");
+    if (snap || wasOff || reduce.matches) hl.classList.add("snap");
+    l.style.transform = `translateX(${x}px)`;
+    m.style.transform = `translateX(${x + rad - 0.5}px) scaleX(${w - 2 * rad + 1})`;
+    r.style.transform = `translateX(${x + w - rad}px)`;
+    hl.classList.add("on");
+    if (hl.classList.contains("snap")) requestAnimationFrame(() => requestAnimationFrame(() => hl.classList.remove("snap")));
+  };
+  navs.forEach((nav) => {
+    nav.addEventListener("click", (e) => {
+      const p = e.target.closest(".pill"); if (!p) return;
+      nav.querySelectorAll(".pill").forEach((x) => { x.classList.toggle("is-active", x === p); x.toggleAttribute("aria-current", x === p); if (x === p) x.setAttribute("aria-current", "page"); });
+      place(nav, false);
+    });
+  });
+  const placeAll = () => navs.forEach((n) => place(n, true));
+  document.fonts.ready.then(placeAll);
+  let rz = 0; addEventListener("resize", () => { cancelAnimationFrame(rz); rz = requestAnimationFrame(placeAll); });
+
+  document.querySelectorAll("[data-replay]").forEach((b) => b.addEventListener("click", () => {
+    const f = document.querySelector(b.dataset.replay);
+    f.classList.remove("play"); void f.offsetWidth; f.classList.add("play");
+  }));
+})();
+
+
+</script>
+<script>
+/* Loops play only while on screen, and never under reduced motion. */
+(() => {
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)");
+  const io = new IntersectionObserver((entries) => entries.forEach((en) => {
+    const v = en.target;
+    if (en.isIntersecting && !reduce.matches) v.play().catch(() => {}); else v.pause();
+  }), { threshold: 0.25 });
+  document.querySelectorAll("video[data-inview]").forEach((v) => io.observe(v));
+})();
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script type="module" src="pulse-mockups/onboarding-story.js"></script>
+<script type="module" src="pulse-mockups/onboarding-proto.js"></script>
+</body>
+</html>
