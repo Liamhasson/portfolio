@@ -3,8 +3,9 @@ laptop's screen, in desk metres (Blender z-up). Pure Python (no bpy): run with a
 
   frames   0-39   ease   the hero framing easing in 4% toward the ball while it forms
           39-79   tilt   in place, down until the ball has left the frame above and the desk fills it
-          79-149  glide  down and forward, past the notes, to the approved tail's frame 151 (the lid opening on the way)
-         149-208  tail   public/lab/through/camera.json frames 151-210, verbatim (the lid's last degrees, the wake, the push)
+          79-149  glide  down and forward, low past the note "Who is this product for?" (it reads: Liam, 2026-10-11), the lid
+                         opening and the screen waking on the way, to the approved tail's frame 171
+         149-188  tail   public/lab/through/camera.json frames 171-210, verbatim (the push into the screen)
 
   python3 blender/lookdev/shot_path.py            # writes public/lab/shot/camera.json
   python3 blender/lookdev/shot_path.py --check    # and asserts the joins, the direction and the ball leaving the frame
@@ -26,8 +27,13 @@ BALL_R = 0.11                        # (its radius 1.1: 47% of the hero's height
 EASE_IN = 0.04                       # the ease-in: 4% of the way to the ball
 TILT_AT = (0.0, 0.16, 0.0)           # where the tilt ends looking: ~26.5 degrees down, the frame's bottom edge just on the desk's
                                      # front edge (steeper showed the void in front of it), the ball just clear of the top
-JOIN = 150                           # the tail's index joined (its frame 151: below the hero's height, the lid at 101)
-BEATS = {"ease": (0, 39), "tilt": (39, 79), "glide": (79, 149), "tail": (149, 208)}
+JOIN = 170                           # the tail's index joined (its frame 171: low enough that the glide can pass the note and
+                                     # only ever fall; the lid open, the screen awake)
+BEATS = {"ease": (0, 39), "tilt": (39, 79), "glide": (79, 149), "tail": (149, 188)}
+LID = (0.6, 1.0)                     # the glide's share over which the lid opens (the tail's own opening, its frames 137-171)
+WAKE_K = 154                         # the tail's wake (its frame 155)
+NOTE = (0.075, -0.095, 0.0008)       # "Who is this product for?" (lookdev.py sticky_hero), 7.6 cm
+NOTE_SIZE = 0.076
 BLEND = 15                           # the glide's last frames turn from the look-at to the tail's own orientation
 
 
@@ -101,18 +107,22 @@ def build():
             pos, at, lens = p1, lerp(HERO_AT, TILT_AT, t), 45.0
         else:
             t = smoother((i - BEATS["glide"][0]) / (BEATS["glide"][1] - BEATS["glide"][0]))
-            # down and forward: the height only ever falls (control points between the ends)
-            c1 = (p1[0], p1[1] + 0.16, p1[2] - 0.012)
-            c2 = (j_pos[0], j_pos[1] - 0.14, j_pos[2] + 0.004)
-            pos = bezier(p1, c1, c2, j_pos, t)
-            at = lerp(TILT_AT, j_at, t)
-            lens = 45.0 + (j_lens - 45.0) * t
+            # down and forward, low past the note: the height only ever falls (control points between the ends)
+            pos = bezier(p1, (0.0, -0.75, 0.40), (0.03, -0.45, 0.34), j_pos, t)
+            # the eye: the note at mid-glide, then the laptop (the tail's own line of sight)
+            at = lerp(TILT_AT, NOTE, smoother(t / 0.5)) if t < 0.5 else lerp(NOTE, j_at, smoother((t - 0.5) / 0.5))
+            lens = 45.0 + 10.0 * smoother(t / 0.5) if t < 0.5 else 55.0 + (j_lens - 55.0) * smoother((t - 0.5) / 0.5)
         q = look_quat(pos, at)
         if i > BEATS["glide"][1] - BLEND:
             q = slerp(q, j_q, smoother((i - (BEATS["glide"][1] - BLEND)) / BLEND))
-        # the lid: shut until the glide's last frames, then the tail's own opening (its frames 136-150)
-        k = JOIN - (BEATS["glide"][1] - i)
-        lid = tp[k]["lid_open_deg"] if i > BEATS["glide"][1] - 15 else 0.0
+        # the lid: shut, then the tail's own opening (its frames 137-171) over the glide's last 40%
+        lid = 0.0
+        if i > BEATS["ease"][1] and i > BEATS["tilt"][1]:
+            tg = (i - BEATS["glide"][0]) / (BEATS["glide"][1] - BEATS["glide"][0])
+            if tg > LID[0]:
+                kf = 136 + (JOIN - 136) * (tg - LID[0]) / (LID[1] - LID[0])
+                k0 = min(int(kf), JOIN - 1)
+                lid = tp[k0]["lid_open_deg"] + (tp[k0 + 1]["lid_open_deg"] - tp[k0]["lid_open_deg"]) * (kf - k0)
         frames.append({"frame": i + 1, "position": list(pos), "quaternion": list(q), "lens_mm": lens, "sensor_mm": 36,
                        "lid_open_deg": max(lid, 0.0), "focus_m": math.sqrt(dot(sub(at, pos), sub(at, pos)))})
     frames[-1].update(position=list(j_pos), quaternion=list(j_q), lens_mm=j_lens, lid_open_deg=tp[JOIN]["lid_open_deg"])
@@ -120,11 +130,12 @@ def build():
         e = tp[k]
         frames.append({"frame": len(frames) + 1, "position": e["position"], "quaternion": e["quaternion"], "lens_mm": e["lens_mm"],
                        "sensor_mm": 36, "lid_open_deg": e["lid_open_deg"], "focus_m": frames[-1]["focus_m"]})
-    off = BEATS["glide"][1] - JOIN   # tail index k -> shot index k + off
+    g0, g1 = BEATS["glide"]
+    at_k = lambda k: g0 + (g1 - g0) * (LID[0] + (LID[1] - LID[0]) * (k - 136) / (JOIN - 136))   # tail index -> glide frame
     return {
         "move": "shot", "fps": 24, "frames": len(frames), "units": "metres", "up": "z",
         "chaos_center": th["chaos_center"], "chaos_scale": th["chaos_scale"], "plate_overscan": 1.0,
-        "wake_frame": th["wake_frame"] + off, "screen_from": 129 + off,
+        "wake_frame": round(at_k(WAKE_K)) + 1, "screen_from": round(at_k(136)),
         "beats": {k: list(v) for k, v in BEATS.items()},
         "lights": json.load(open(PULLBACK))["lights"],
         "path": frames,
@@ -133,13 +144,13 @@ def build():
 
 def check(d):
     P = d["path"]
-    assert d["frames"] == 209 and len(P) == 209, d["frames"]
+    assert d["frames"] == 189 and len(P) == 189, d["frames"]
     assert max(abs(a - b) for a, b in zip(P[0]["position"], HERO_POS)) < 1e-9, "starts on the hero framing"
     th = json.load(open(THROUGH))["path"]
-    for i, k in ((149, 150), (150, 151), (208, 209)):
+    for i, k in ((149, JOIN), (150, JOIN + 1), (188, 209)):
         assert max(abs(a - b) for a, b in zip(P[i]["position"], th[k]["position"])) < 1e-9, ("joins the tail", i)
     # forward and down: from the tilt on, the camera never climbs or backs away (0.5 cm tolerance: the tail's wobble)
-    for i in range(BEATS["tilt"][0], 208):
+    for i in range(BEATS["tilt"][0], d["frames"] - 1):
         assert P[i + 1]["position"][2] <= P[i]["position"][2] + 0.005, ("climbs", i)
         assert P[i + 1]["position"][1] >= P[i]["position"][1] - 0.005, ("backs away", i)
     # the ball is above the frame's top (16:10, horizontal fit) once the tilt has ended
@@ -152,6 +163,18 @@ def check(d):
     bot = rotate(q, norm((0.0, -tan_v, -1.0)))
     t_hit = -pos[2] / bot[2]
     assert bot[2] < 0 and pos[1] + bot[1] * t_hit >= -0.3, ("the void below the desk's front edge in frame", pos[1] + bot[1] * t_hit)
+    # the note reads on the way past (Liam, 2026-10-11): "Who is this product for?" fills a quarter of the frame's height
+    # somewhere in the glide, well inside the frame (its central 60%)
+    best = 0.0
+    for i in range(d["beats"]["glide"][0], d["beats"]["glide"][1] + 1):
+        q, pos = tuple(P[i]["quaternion"]), tuple(P[i]["position"])
+        c = rotate((q[0], -q[1], -q[2], -q[3]), sub(NOTE, pos))
+        if c[2] >= 0:
+            continue
+        tv = 18.0 / P[i]["lens_mm"] / 1.6
+        if abs(c[0] / -c[2]) < tv * 1.6 * 0.6 and abs(c[1] / -c[2]) < tv * 0.6:
+            best = max(best, NOTE_SIZE / -c[2] / (2 * tv))
+    assert best >= 0.25, ("the note too small to read on the way past", round(best, 3))
     print("shot ok:", d["frames"], "frames; wake", d["wake_frame"], "; screen from", d["screen_from"])
 
 
