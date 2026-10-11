@@ -10,11 +10,12 @@ import { HeroOverlay } from "./hero-overlay";
 import { WorkIndex, type WorkIndexHandle } from "./work-index";
 import { BakedDesk } from "@/three/sand/baked-desk";
 import { revealAt } from "@/three/sand/screen-reveal";
-import { DriftGrains, type StreamCurve } from "@/three/sand/drift-grains";
+import { DriftGrains } from "@/three/sand/drift-grains";
 import { SAND_ENCODE, SAND_LAYER, SandComposite } from "@/three/sand/sand-composite";
 import { Pullback } from "@/three/sand/pullback";
 import { BEATS, STORY_SCREENS, ease, pAtFrame, reducedStory, shotFrame, span, type ShotMeta } from "@/three/sand/story-timeline";
 import { RisingSand } from "@/three/sand/rising-sand";
+import { vortexStreams } from "@/three/sand/vortex-streams";
 import { FilmGradePass } from "@/three/sand/film-grade-pass";
 import * as THREE from "three";
 import { parseTierOverride, pickTier, readSignals, settingsFor } from "@/three/tier";
@@ -180,12 +181,9 @@ export function SandLab() {
       // grains leaving the sand: the scene's atmosphere (drift-grains.ts)
       const drift = new DriftGrains(field.material, tier === "low" ? 600 : 1600);
       if (new URLSearchParams(window.location.search).get("streams") === "0") drift.streams = 0;   // compare: all loose
-      // the streams' drawn paths (blender/lookdev/stream_curves.py); ?curves=0: each stream finds its own way
-      if (new URLSearchParams(window.location.search).get("curves") !== "0") {
-        fetch(`${SAND_BASE}/streams.json`).then((r) => (r.ok ? r.json() : null))
-          .then((j: { streams: StreamCurve[] } | null) => { if (j) drift.curves = j.streams; })
-          .catch(() => {});
-      }
+      // the streams: in from beyond the frame into the vortex, and flung out of it (vortex-streams.ts; Liam, 2026-10-11);
+      // ?curves=0: each stream finds its own way
+      if (new URLSearchParams(window.location.search).get("curves") !== "0") drift.curves = vortexStreams();
       if (new URLSearchParams(window.location.search).get("grainshadow") === "0") drift.material.uniforms.uGrainShadow.value = 0;   // compare: unshadowed
       drift.mesh.layers.set(SAND_LAYER);
       stage.scene.add(drift.mesh);

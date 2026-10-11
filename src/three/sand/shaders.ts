@@ -1,3 +1,4 @@
+import { SWIRL_GLSL } from "./swirl";
 /**
  * The sand's shaders (GLSL 3, three.js ShaderMaterial). Look target: the approved Cycles renders
  * (`blender/lookdev/renders/lookdev-ch1-hero-*.jpg`): solid, crisp, matte grains, no glow, lit by a warm key front left,
@@ -130,6 +131,7 @@ uniform float uShutter;      // motion blur: seconds
 // into the offset): the grains travel along curved, shared paths instead of straight lines, so the cloud folds into
 // sheets and tendrils on its way; strongest halfway, nothing at either end (the approved chaos and ball stay as they are)
 uniform vec4 uFlow;          // amplitude (world units), frequency, warp (Blender's distortion), speed
+uniform float uSwirl;         // the chaos at rest: Lusion's flow and the inward vortex (swirl.ts), 0..1
 // the grain's own motion for its blur: everything that places it, as it was the frame before
 uniform float uCompactPrev;
 uniform float uTimePrev;
@@ -199,6 +201,7 @@ float hash(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 4
 
 // The flow's push on a grain at p, t of the way from chaos to ball: one smooth noise field shared by all the grains
 // (neighbours move together: sheets, not static), its domain warped as Blender's distortion warps it
+${SWIRL_GLSL}
 vec3 flowOffset(vec3 p, float t, float time) {
   float k = 4.0 * t * (1.0 - t);
   if (uFlow.x <= 0.0 || k <= 0.0) return vec3(0.0);
@@ -239,6 +242,19 @@ void main() {
   // the flow (the shadows are baked for the straight path: they look up where the grain would be without it)
   vec3 flow = flowOffset(p, t, uTime);
   p += flow;
+  // the chaos at rest (Liam, 2026-10-11, Lusion's about page): each grain spirals in on its own life and a slow current
+  // carries them in sheets (swirl.ts); it gives way as the sand compacts, each grain on its own way to the ball
+  float swK = (1.0 - t) * uSwirl;
+  vec3 swSeed = vec3(hash(aPosA + 51.3), hash(aPosA + 52.7), hash(aPosA + 53.9));
+  float swR = 0.5 * max(uChaosSize.x, uChaosSize.z);
+  vec3 swirl = vec3(0.0);
+  float swSize = 1.0;
+  if (swK > 0.001) {
+    vec4 sw = swirlAt(p, swSeed, uChaosC, swR, uTime);
+    swirl = (sw.xyz - p) * swK;
+    swSize = mix(1.0, sw.w, swK);
+  }
+  p += swirl;
   // the same grain a frame ago, for its blur (only on a frame where something moved it: uMotionBlur.x is 0 otherwise);
   // the slow ambient drift barely moves in a frame, so it rides along as it is now
   vec3 pMoved = p, pPrev = p;
@@ -247,6 +263,8 @@ void main() {
     pPrev = pathAt(A, normalize(dir) * (bDist * uBallPosMaxPrev), uCompactPrev, uBallCPrev, uBallRotPrev, uChaosRotPrev,
                    tPrev) + drift;
     pPrev += flowOffset(pPrev, tPrev, uTimePrev);
+    float swKPrev = (1.0 - tPrev) * uSwirl;
+    if (swKPrev > 0.001) pPrev += (swirlAt(pPrev, swSeed, uChaosC, swR, uTimePrev).xyz - pPrev) * swKPrev;
   }
   // 2.2's attempts (Liam, 2026-10-10, sand only): the ball breaks form a little, as if going back to chaos, in a small
   // burst, each attempt a different shape (a patch, a seam, a ring); the ball draws in a touch before and swells a
@@ -318,7 +336,7 @@ void main() {
   // shadows: march in the volumes' own (unturned) frame, so shadows turn with the chaos and with the ball
   mat3 chaosInv = transpose(uChaosRot);
   mat3 ballInv = transpose(uBallRot);
-  vec3 ps = p - flow;   // the shadows were baked for the straight path: shaded as it would be there
+  vec3 ps = p - flow - swirl;   // the shadows were baked for the straight path: shaded as it would be there (its rest spot)
   vec3 pv = mix(uChaosC + chaosInv * (ps - uChaosC), uBallVolC + ballInv * (ps - uBallC) * uBallVolS, t);
   float j = hash(aPosA);
   vec3 E[3];
@@ -388,6 +406,7 @@ void main() {
   // the size range: a log-normal unevenness on every grain, and pebbles in the loose cloud, more of them toward the lens
   float facing = clamp(dot(p - uChaosC, normalize(cameraPosition - uChaosC)) / (0.5 * max(uChaosSize.x, uChaosSize.z)), 0.0, 1.0);
   float pebble = step(hash(aPosA + 4.4), uPebble.x + uPebble.y * facing * facing);
+  rad *= swSize;   // (grown in at its spot, shrunk away at the core)
   rad *= exp(uSizeJitter * (hash(aPosA + 6.1) + hash(aPosA + 7.3) - 1.0))
        * mix(1.0, mix(uPebble.z, uPebble.w, hash(aPosA + 8.2) * hash(aPosA + 8.9)), pebble * (1.0 - t));
   vBig = pebble * (1.0 - t);

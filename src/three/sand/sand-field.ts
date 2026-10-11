@@ -94,6 +94,7 @@ export const SAND_LOOK = {
   pebbleFront: 0,
   pebbleMin: 3,
   pebbleMax: 7,
+  swirl: 1,   // the chaos at rest: Lusion's flow and the inward vortex (swirl.ts; Liam, 2026-10-11)
   sizeJitter: 0.35,   // every grain's unevenness (log-normal spread)   // how dense the sand must be for its blurred grains to stay solid (they overlap into a soft mass)
   hueJitter: 0.32,   // the formed ball's colours mixed grain by grain (Liam picked the render's mottled ball, 2026-10-11)
   motionBlur: 0.5,
@@ -237,6 +238,7 @@ export class SandField {
         uDofDense: { value: SAND_LOOK.dofDense },
         uPebble: { value: new THREE.Vector4(SAND_LOOK.pebbleShare, SAND_LOOK.pebbleFront, SAND_LOOK.pebbleMin, SAND_LOOK.pebbleMax) },
         uSizeJitter: { value: SAND_LOOK.sizeJitter },
+        uSwirl: { value: SAND_LOOK.swirl },
       },
     });
     this.points = new THREE.Points(geo, this.material);
@@ -425,7 +427,8 @@ export class SandField {
     // only a frame where the grains moved (the scroll, the ball travelling or rolling) draws streaks: the slow spin and
     // drift move them far less than a grain in a frame, and skipping them saves the grains a second placing
     const moved = Math.abs(s.compact - last.compact) > 1e-5 || last.ballC.distanceToSquared(ballC) > 1e-12
-      || last.posMax !== u.uBallPosMax.value || last.roll !== (s.ballRoll ?? 0);
+      || last.posMax !== u.uBallPosMax.value || last.roll !== (s.ballRoll ?? 0)
+      || (this.look.swirl > 0 && s.compact < 0.999 && s.time !== last.time);   // (the chaos at rest always moves now)
     (u.uMotionBlur.value as THREE.Vector2).x = moved && !jumped ? this.look.motionBlur : 0;
     last.compact = s.compact; last.time = s.time; last.ballC.copy(ballC); last.posMax = u.uBallPosMax.value;
     last.roll = s.ballRoll ?? 0; last.at = now;
@@ -444,6 +447,7 @@ export class SandField {
     u.uDofDense.value = l.dofDense;
     (u.uPebble.value as THREE.Vector4).set(l.pebbleShare, l.pebbleFront, l.pebbleMin, l.pebbleMax);
     u.uSizeJitter.value = l.sizeJitter;
+    u.uSwirl.value = l.swirl;
     u.uSSS.value = l.sss;
     u.uCursorReach.value = l.cursorReach;
     u.uPaintScale.value = l.paintScale;
