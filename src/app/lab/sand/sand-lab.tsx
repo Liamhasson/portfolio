@@ -14,7 +14,7 @@ import { DriftGrains, type StreamCurve } from "@/three/sand/drift-grains";
 import { FilmGrade } from "./film-grade";
 import { SAND_ENCODE, SAND_LAYER, SandComposite } from "@/three/sand/sand-composite";
 import { Pullback } from "@/three/sand/pullback";
-import { BEATS, STORY_SCREENS, ease, pAtFrame, shotFrame, span, type ShotMeta } from "@/three/sand/story-timeline";
+import { BEATS, STORY_SCREENS, ease, pAtFrame, reducedStory, shotFrame, span, type ShotMeta } from "@/three/sand/story-timeline";
 import { RisingSand } from "@/three/sand/rising-sand";
 import * as THREE from "three";
 import { parseTierOverride, pickTier, readSignals, settingsFor } from "@/three/tier";
@@ -74,6 +74,7 @@ export function SandLab() {
   const readLeave = useCallback(() => span(progressRef.current, BEATS.headlineOut), []);
   const indexRef = useRef<WorkIndexHandle | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
+  const veilRef = useRef<HTMLDivElement>(null);
   const spacerRef = useRef<HTMLDivElement>(null);
   const bindIndex = useCallback((h: WorkIndexHandle) => { indexRef.current = h; }, []);
   const [status, setStatus] = useState("loading sand");
@@ -389,7 +390,13 @@ export function SandLab() {
         // (the story's own length: past it, the page runs on through the index's projects)
         const max = Math.max(1, (pageRef.current?.offsetHeight ?? document.documentElement.scrollHeight) - window.innerHeight);
         const progress = Math.min(window.scrollY / max, 1);
-        progressRef.current = damp(progressRef.current, hero ? (progress * (PAGE_VH - 100)) / 100 : progress, 6, dt);
+        const rawP = hero ? (progress * (PAGE_VH - 100)) / 100 : progress;
+        if (hero && reduced) {
+          // reduced motion (spec §8): held states joined by crossfades through black, no shot
+          const r = reducedStory(rawP);
+          progressRef.current = r.p;
+          if (veilRef.current) veilRef.current.style.opacity = String(r.veil);
+        } else progressRef.current = damp(progressRef.current, rawP, 6, dt);
         if (Number.isFinite(holdFrame) && shotMeta) progressRef.current = pAtFrame(holdFrame - 1, shotMeta.beats);
         const p = progressRef.current;
         state.compact = shot
@@ -550,10 +557,11 @@ export function SandLab() {
           );
           // the name leaves the frame with the ball (it is a plane in the world behind it); faded once it has gone
           wordmark?.setFade(1 - ease(p, [BEATS.tilt[0] + 0.3, BEATS.tilt[1]]));
-          // the rising sand: on once the desk is coming into view, off inside the screen (its clock: ambient)
+          // the rising sand: on once the desk is coming into view, off inside the screen (its clock: ambient; frozen, so still,
+          // under reduced motion)
           const um = field!.material.uniforms;
           const grainR = (um.uRadMax.value as number) * (um.uCountScale.value as number) * 0.7 * (um.uRadScale.value as THREE.Vector2).y;
-          rising?.update(state.time, (reduced ? 0 : 1) * ease(p, [BEATS.tilt[0], BEATS.tilt[0] + 0.3]) * (1 - ease(p, [BEATS.tail[1] - 0.15, BEATS.tail[1]])),
+          rising?.update(state.time, ease(p, [BEATS.tilt[0], BEATS.tilt[0] + 0.3]) * (1 - ease(p, [BEATS.tail[1] - 0.15, BEATS.tail[1]])),
             deskTop ? deskTop.y : -4.6, grainR);
         }
         // scroll turns the ball; when scrolling stops it keeps a slow idle spin
@@ -729,6 +737,7 @@ export function SandLab() {
     <div ref={pageRef} className="relative bg-black" style={{ height: hero ? `${PAGE_VH}vh` : "400vh" }}>
       <canvas ref={canvasRef} className="fixed inset-0 h-screen w-screen" data-testid="sand-canvas" />
       {gradeOn && <FilmGrade />}
+      {hero && <div ref={veilRef} aria-hidden className="pointer-events-none fixed inset-0 bg-black opacity-0" style={{ zIndex: 5 }} />}
       {/* the nav's Projects (/#projects) lands where the index has settled (once this page is the home) */}
       {hero && <div id="projects" aria-hidden className="pointer-events-none absolute left-0 w-px" style={{ top: `${PAGE_VH - 100}vh`, height: 1 }} />}
       {hero && <WorkIndex bind={bindIndex} />}
