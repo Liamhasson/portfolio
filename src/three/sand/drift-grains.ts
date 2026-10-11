@@ -173,12 +173,28 @@ const COHESION = 6;                 // per second squared, toward the neighbours
 const COHESION_R = 7;               // grain radii
 const GRID = 4096;                  // the neighbour grid's hash table size
 
+/** A stream's drawn path (blender/lookdev/stream_curves.py, public/lab/sand/streams.json): points about the cloud's centre
+ *  in cloud radii, in the view's frame (x right, y up, z toward the viewer), evenly spaced along it. */
+export interface StreamCurve {
+  points: [number, number, number][];
+  /** Its length, in cloud radii. */
+  length: number;
+  /** Grain radii across where it leaves the sand. */
+  width: number;
+  /** How much wider it grows per unit it travels. */
+  fan: number;
+  /** A grain's life along it, seconds. */
+  pace: number;
+}
+
 export class DriftGrains {
   readonly mesh: THREE.InstancedMesh;
   readonly material: THREE.ShaderMaterial;
   readonly max: number;
   /** The share of grains that leave in streams (the rest stay loose); 0 = all loose, as before the streams. */
   streams = 1 - LOOSE;
+  /** The streams' drawn paths (one per stream, in turn); none: each stream finds its own way (its emitter wanders). */
+  curves: StreamCurve[] | null = null;
   private readonly pos: Float32Array;
   private readonly vel: Float32Array;
   private readonly rot: Float32Array;
@@ -317,7 +333,8 @@ export class DriftGrains {
       const fill = 0.45 + 0.3 * hk(10);
       const loose = s1 >= this.streams || s1 / this.streams >= fill;
       // and has its own pace (Liam: streams of different sizes, paces, lengths and depths)
-      const L = loose ? 10 * (0.7 + 0.6 * s3) : 10 * (0.55 + 0.9 * hk(0));
+      const curve = !loose && this.curves?.length ? this.curves[k % this.curves.length] : null;
+      const L = loose ? 10 * (0.7 + 0.6 * s3) : curve ? curve.pace * (0.9 + 0.2 * hk(0)) : 10 * (0.55 + 0.9 * hk(0));
       // a stream's grains are let go one after another, evenly through its life (a little jitter: not a metronome)
       const cyc = loose ? time / L + s0 * 7 : time / L + hk(1) * 7 + ((i % PER_STREAM) + 0.4 * s0) / PER_STREAM;
       const life = cyc - Math.floor(cyc), gen = Math.floor(cyc);
@@ -341,6 +358,35 @@ export class DriftGrains {
         const sw = life * (s3 * 1.8 - 0.9), cs = Math.cos(sw), sn = Math.sin(sw);
         const rx = tx - centre.x, rz = tz - centre.z;
         tx = centre.x + rx * cs - rz * sn; tz = centre.z + rx * sn + rz * cs;
+      } else if (curve) {
+        // along its stream's drawn curve (the rocks tutorial's curve guide): each grain a little faster or slower than
+        // its stream, so the stream loosens along its length; tight where it leaves the sand, then each grain drifts
+        // off on its own heading, across the stream and in depth, so it fans out into a plume as it goes
+        const pts = curve.points, last = pts.length - 1;
+        const u = life * (0.85 + 0.3 * h(7));
+        const f = Math.min(u, 1) * last, j = Math.min(Math.floor(f), last - 1), w = f - j;
+        const a0 = pts[j], a1 = pts[j + 1];
+        // its tangent (view frame), and past the curve's end it carries on along it
+        let gx = a1[0] - a0[0], gy = a1[1] - a0[1], gz = a1[2] - a0[2];
+        const gl = Math.hypot(gx, gy, gz) || 1; gx /= gl; gy /= gl; gz /= gl;
+        const over = Math.max(u - 1, 0) * curve.length;
+        const cx = a0[0] + (a1[0] - a0[0]) * w + gx * over;
+        const cy = a0[1] + (a1[1] - a0[1]) * w + gy * over;
+        const cz = a0[2] + (a1[2] - a0[2]) * w + gz * over;
+        // across it: one direction in the screen's plane, one in depth (both perpendicular to its way)
+        let nx = -gy, ny = gx;
+        const nz = 0;
+        const nl = Math.hypot(nx, ny) || 1; nx /= nl; ny /= nl;
+        const bx = gy * nz - gz * ny, by = gz * nx - gx * nz, bz = gx * ny - gy * nx;
+        const travelled = u * curve.length;   // cloud radii
+        const across = (curve.width * grainR / radius + curve.fan * travelled) * Math.sqrt(h(4)), ang = h(5) * Math.PI * 2;
+        const ca = Math.cos(ang) * across, sa = Math.sin(ang) * across;
+        // the stream breathes: its whole path sways a little, slowly, with time
+        const sway = 0.04 * travelled * Math.sin(time * 0.25 + hk(7) * 6.28);
+        const qx = cx + nx * (ca + sway) + bx * sa, qy = cy + ny * (ca + sway) + by * sa, qz = cz + nz * (ca + sway) + bz * sa;
+        tx = centre.x + (vRight.x * qx + vUp.x * qy + vFwd.x * qz) * radius;
+        ty = centre.y + (vRight.y * qx + vUp.y * qy + vFwd.y * qz) * radius;
+        tz = centre.z + (vRight.z * qx + vUp.z * qy + vFwd.z * qz) * radius;
       } else {
         // born where its stream's emitter was when it left. The emitters sit on the sand's side facing the viewer, in
         // a ring around the view, each at its own depth (from the sand's surface to halfway to the lens), spread
