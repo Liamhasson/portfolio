@@ -38,7 +38,8 @@ export const eventread: CaseStudy = {
     link: { href: "https://eventread.vercel.app", label: "Try it" },
   },
   peek: { src: "/case-studies/eventread/peek.jpg", alt: "Eventread month view for Berlin, November 2026", width: 2400, height: 1500 },
-  // How it works walks the product (search and acts, followed dates, tours), so
-  // it takes about two screens; the Danger Score band gives back 0.4 to stay in the cap.
-  budget: { ...STANDARD_BUDGET, signature: 1.6, supporting: 1.9 },
+  // Measured at 1440×900 (2026-10-11): How it works walks the product (2.0) and the design system has its own section
+  // (1.2), so Eventread runs ~9.3 screens. Liam kept it as it is: its own cap.
+  screenCap: 9.5,
+  budget: { ...STANDARD_BUDGET, signature: 1.6, supporting: 3.2, challenges: 0.9, outcome: 0.6 },
 };

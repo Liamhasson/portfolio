@@ -65,3 +65,19 @@ test("the focus trap works where checkVisibility doesn't exist (Safari < 17.4)",
   }
   expect(errors).toEqual([]);
 });
+
+/* Liam, 2026-10-11: "two videos have changed into still images". The board's recordings play when on screen. */
+for (const [slug, sel] of [["eventread", ".w-step"], ["cyvore", ".f.how"], ["pulse", ".f.how"]] as const) {
+  test(`/${slug}: videos play once on screen, even after a jump straight to them`, async ({ page }) => {
+    await page.goto(`/${slug}`, { waitUntil: "networkidle" });
+    await page.evaluate((s) => document.querySelector(s)!.scrollIntoView(), sel);
+    await expect.poll(() => page.evaluate((s) => [...document.querySelector(s)!.querySelectorAll("video")].every((v) => !v.paused && v.currentTime > 0), sel), { timeout: 8000 }).toBe(true);
+  });
+}
+
+test("the heroes' videos play at load", async ({ page }) => {
+  for (const slug of ["cyvore", "pulse"]) {
+    await page.goto(`/${slug}`, { waitUntil: "networkidle" });
+    await expect.poll(() => page.evaluate(() => { const v = document.querySelector("header video") as HTMLVideoElement; return !v.paused && v.currentTime > 0; }), { timeout: 8000 }).toBe(true);
+  }
+});

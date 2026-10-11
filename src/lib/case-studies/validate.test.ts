@@ -49,6 +49,12 @@ describe("validateCaseStudy", () => {
     expect(validateCaseStudy({ ...base, budget: { ...STANDARD_BUDGET, signature: 2.5 } })).toEqual([]);
   });
 
+  test("a study can carry its own cap, and is held to it", () => {
+    const long = { ...base, budget: { ...STANDARD_BUDGET, supporting: 2.3 }, screenCap: 9.5 };
+    expect(validateCaseStudy(long)).toEqual([]);
+    expect(validateCaseStudy({ ...long, budget: { ...STANDARD_BUDGET, supporting: 3.9 } })).toEqual(["pulse: 10.4 screens (cap 9.5)"]);
+  });
+
   test("rejects a budget over the cap", () => {
     expect(validateCaseStudy({ ...base, budget: { ...STANDARD_BUDGET, signature: 3 } })).toContain(
       "pulse: 8.5 screens (cap 8)",

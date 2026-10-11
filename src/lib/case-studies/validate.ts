@@ -17,8 +17,9 @@ export function validateCaseStudy(study: CaseStudy): string[] {
     problems.push(`${slug}: no design, user or stakeholder challenge`);
   }
 
+  const cap = study.screenCap ?? SCREEN_CAP;
   const total = Math.round(Object.values(budget).reduce((s, n) => s + n, 0) * 10) / 10;
-  if (total > SCREEN_CAP) problems.push(`${slug}: ${total} screens (cap ${SCREEN_CAP})`);
+  if (total > cap) problems.push(`${slug}: ${total} screens (cap ${cap})`);
 
   const texts = [...challenges.flatMap((c) => [c.title, c.happened, c.did, c.changed]), ...outcome.lines];
   for (const text of texts) {

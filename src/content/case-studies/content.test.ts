@@ -36,6 +36,14 @@ describe("case-study content", () => {
     expect(study.peek.height).toBeGreaterThan(0);
   });
 
+  test("Eventread runs longer by Liam's call (2026-10-11: keep it as it is, ~9.3 screens): its own cap, real numbers", () => {
+    const total = Object.values(eventread.budget).reduce((a, n) => a + n, 0);
+    expect(eventread.screenCap).toBe(9.5);
+    expect(total).toBeGreaterThan(9);
+    expect(cyvore.screenCap).toBeUndefined();
+    expect(pulse.screenCap).toBeUndefined();
+  });
+
   test("Pulse reports counts, not percentages", () => {
     const text = [...pulse.challenges.map((c) => c.happened), ...pulse.outcome.lines].join(" ");
     expect(text).toContain("4 of 6");

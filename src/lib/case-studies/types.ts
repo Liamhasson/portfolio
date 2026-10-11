@@ -69,6 +69,8 @@ export interface CaseStudy {
   outcome: Outcome;
   /** What the previous study shows of this one when it "peeks in" (Part C: next-project block). */
   peek: Media;
+  /** A study's own screen cap, when Liam has chosen to let it run longer than SCREEN_CAP. */
+  screenCap?: number;
   /** Screens per block at 1440×900 (spec §2). */
   budget: Readonly<Record<BlockId, number>>;
 }
