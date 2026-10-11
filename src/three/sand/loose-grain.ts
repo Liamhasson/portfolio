@@ -91,7 +91,7 @@ const LOOSE_BODY = /* glsl */ `
   for (int i = 0; i < 3; i++) {
     vec3 Lv = uLightPos[i] - iPos;
     vec3 lp = mix(uChaosC + chaosInv * (uLightPos[i] - uChaosC), uBallVolC + ballInv * (uLightPos[i] - uBallC) * uBallVolS, t);
-    float T = transmittance(pv, lp, min(length(Lv) * mix(1.0, uBallVolS, t), mix(8.5, 3.0, t)), shadowK);
+    float T = shadowK > 0.0 ? transmittance(pv, lp, min(length(Lv) * mix(1.0, uBallVolS, t), mix(8.5, 3.0, t)), shadowK) : 1.0;   // (no march when unshadowed)
     E[i] = uLightCol[i] * T / (dot(Lv, Lv) + uLightR2[i]);
   }
   E[0] *= smoothstep(uSpotCos.x, uSpotCos.y, dot(normalize(iPos - uLightPos[0]), uSpotDir));
