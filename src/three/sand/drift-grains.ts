@@ -1,14 +1,14 @@
 import * as THREE from "three";
+import { SAND_FRAGMENT } from "./shaders";
 
 /**
  * Grains leaving the sand: the atmosphere around the main object, as real pebbles.
  *
- * Read from Lusion's and Oryzo's code (2026-10-10): their loose particles are real meshes (Oryzo: a scanned bean, a few
- * thousand instances), simulated on the CPU: each is drawn toward a slowly moving path, damped, pushed by the cursor (a
- * sphere that shoves them out and hands them some of its own speed), and turned to face where it is going plus its own
- * fixed tumble. Ours do the same with our grains: the shape the sand is made of in Blender (an icosphere, smooth shaded,
- * randomly squashed and turned; roughness 0.62), in the sand's palette, lit by the scene's lights and the cursor's warm
- * light. Each is born on the sand's surface, carried up and out in a slow swirl, shrinks away and is reborn. About half
+ * One system with the cloud (Liam, 2026-10-11: the near-lens grains read as a separate layer; Lusion's loose particles
+ * are the cloud's own): drawn as the sand's grains are, shaded by the sand's own fragment shader (its light, gloss,
+ * subsurface, coverage, streaks), moved by the cursor's drift field as the sand's front grains are, in its layer (so the
+ * lens and the shadows are the same). Simulated on the CPU (Oryzo's model): each drawn toward a slowly moving path,
+ * damped. Each is born on the sand's surface, carried up and out in a slow swirl, shrinks away and is reborn. About half
  * leave in streams (one wandering emitter each, its grains let go one after another along one sinuous path: a tendril
  * that fans out into a plume as it goes; each stream its own size, pace, length and depth), held together as a flock
  * (separation + cohesion, from the C4D particles tutorial); the rest stay loose, a spray.
@@ -20,11 +20,10 @@ import * as THREE from "three";
  */
 const VERTEX = /* glsl */ `
 precision highp float;
-in vec3 iPos;              // per grain: position (world), velocity (world / s), rotation, squash, size and hue
+in vec3 iPos;              // per grain: position (world), velocity (world / s), size and hue
 in vec3 iVel;
-in vec4 iRot;
-in vec3 iSquash;
 in vec2 iSizeHue;
+in float iSeed;
 uniform vec3 uRamp[5];
 uniform float uRampAt[5];
 uniform vec3 uLightPos[3];
@@ -36,7 +35,16 @@ uniform vec3 uCursorPos;
 uniform vec3 uCursorCol;
 uniform float uCursorReach;
 uniform float uExposure;
-uniform float uShutter;    // seconds the blur spans
+uniform float uShutter;
+uniform vec2 uMotionBlur;
+uniform float uPointScale;
+uniform float uMinPx;
+uniform vec2 uEdge;
+uniform vec2 uGround;
+uniform sampler2D uPaint;    // the cursor's drift field, as the sand's (CSS px / s)
+uniform float uPaintScale;
+uniform vec2 uViewport;
+uniform float uBufH;
 // the sand's own shadows (shaders.ts: the same density volumes, frames and march), so a grain behind the cloud is in
 // its shadow as the cloud's own grains are
 uniform vec3 uLo;
@@ -54,17 +62,26 @@ uniform vec3 uBallC;
 uniform vec3 uBallVolC;
 uniform float uBallVolS;
 uniform mat3 uBallRot;
-out vec3 vNormal;          // view space
-out vec3 vView;
+// what the sand's fragment shader reads (shaders.ts SAND_FRAGMENT): these grains are shaded by it, as its own
 out vec3 vAlbedo;
 out vec3 vL0; out vec3 vL1; out vec3 vL2; out vec3 vL3;
 out vec3 vE0; out vec3 vE1; out vec3 vE2; out vec3 vE3;
+out float vAlpha;
+out float vAmbient;
+out vec3 vFillE;
+out float vCompact;
+out vec4 vEll;
+out float vGround;
+out float vBounceW;
+out float vPx;
+out float vEdgePx;
+out float vBlur;
+out float vBig;
 vec3 ramp(float h) {
   vec3 c = uRamp[0];
   for (int i = 1; i < 5; i++) c = mix(c, uRamp[i], clamp((h - uRampAt[i - 1]) / max(uRampAt[i] - uRampAt[i - 1], 1e-4), 0.0, 1.0));
   return c;
 }
-vec3 qrot(vec4 q, vec3 v) { return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v); }
 float density(vec3 p) {
   vec3 uvw = (p - uLo) / uSize;
   if (any(lessThan(uvw, vec3(0.0))) || any(greaterThan(uvw, vec3(1.0)))) return 0.0;
@@ -97,60 +114,53 @@ void main() {
   // where no light reaches it, it isn't there
   float lit = smoothstep(0.015, 0.12, dot((E[0] + E[1] + E[2] + Ec) * uExposure, vec3(0.2126, 0.7152, 0.0722)));
   float size = iSizeHue.x * lit;
-  vec3 local = qrot(iRot, position * iSquash) * size;
-  vec3 nrm = normalize(qrot(iRot, normal / iSquash));
-  vec4 mv = viewMatrix * vec4(iPos + local, 1.0);
-  // motion blur: the side facing away from the motion trails behind it
-  // (no grain, no trail; and never longer than a few grains: a jump is not a motion)
-  vec3 vv = mat3(viewMatrix) * iVel * uShutter * step(1e-6, size);
-  float vl = length(vv), cap = iSizeHue.x * 6.0;
-  if (vl > cap) vv *= cap / vl;
-  vec3 nv = normalize(mat3(viewMatrix) * nrm);
-  mv.xyz -= vv * step(dot(nv, vv), 0.0);
+  vec4 mv = viewMatrix * vec4(iPos, 1.0);
   gl_Position = projectionMatrix * mv;
-  vNormal = nv;
-  vView = -mv.xyz;
+  // the cursor's drift, as it moves the sand's front grains (one system: the same field, the same strength)
+  vec2 suv = gl_Position.xy / gl_Position.w * 0.5 + 0.5;
+  vec2 pvel = texture(uPaint, suv).xy;
+  gl_Position.xy += pvel * uPaintScale / (uViewport * 0.5) * gl_Position.w;
+  vec2 blur = pvel * uPaintScale * 6.0 * uShutter * 60.0 * (uBufH / uViewport.y);
+  // the grain: a randomly squashed, randomly turned pebble, as the sand's
+  float h1 = fract(iSeed * 7.13), h2 = fract(iSeed * 13.71), h3 = fract(iSeed * 3.97);
+  vec2 squash = 1.0 + 0.22 * (vec2(h1, h2) * 2.0 - 1.0);
+  float ang = h3 * 6.2831853;
+  float px = 2.0 * size * uPointScale / -mv.z * max(squash.x, squash.y);
+  // its own motion over the shutter, as the sand's (at most a few grain lengths)
+  if (uMotionBlur.x > 0.0 && px > 0.0) {
+    vec4 c1 = projectionMatrix * viewMatrix * vec4(iPos - iVel * uShutter * uMotionBlur.x, 1.0);
+    if (c1.w > 0.0) {
+      vec2 bufPx = vec2(uViewport.x * uBufH / uViewport.y, uBufH);
+      vec2 own = (gl_Position.xy / gl_Position.w - c1.xy / c1.w) * 0.5 * bufPx;
+      float ol = length(own), cap = px * uMotionBlur.y;
+      if (ol > cap) own *= cap / ol;
+      blur += own;
+    }
+  }
+  float bl = length(blur);
+  if (bl > 0.5 && px > 0.0) {
+    float k = 1.0 + bl / px;
+    squash = vec2(max(squash.x, squash.y) * k, min(squash.x, squash.y));
+    ang = atan(blur.y, blur.x);
+    px *= k;
+  }
+  vEll = vec4(squash, cos(ang), sin(ang));
+  vAlpha = clamp((px * px) / (uMinPx * uMinPx), 0.0, 1.0);
+  gl_PointSize = px > 0.0 ? max(px, uMinPx) : 0.0;
+  vPx = gl_PointSize;
+  vEdgePx = uEdge.x;
+  vBlur = 0.0;
+  vBig = 0.0;
   vAlbedo = ramp(iSizeHue.y);
   vL0 = normalize((viewMatrix * vec4(uLightPos[0], 1.0)).xyz - mv.xyz); vE0 = E[0];
   vL1 = normalize((viewMatrix * vec4(uLightPos[1], 1.0)).xyz - mv.xyz); vE1 = E[1];
   vL2 = normalize((viewMatrix * vec4(uLightPos[2], 1.0)).xyz - mv.xyz); vE2 = E[2];
   vL3 = normalize((viewMatrix * vec4(uCursorPos, 1.0)).xyz - mv.xyz); vE3 = Ec;
-}
-`;
-
-const FRAGMENT = /* glsl */ `
-precision highp float;
-out highp vec4 pc_fragColor;
-#define gl_FragColor pc_fragColor
-in vec3 vNormal;
-in vec3 vView;
-in vec3 vAlbedo;
-in vec3 vL0; in vec3 vL1; in vec3 vL2; in vec3 vL3;
-in vec3 vE0; in vec3 vE1; in vec3 vE2; in vec3 vE3;
-uniform float uExposure;
-uniform float uOutScale;
-uniform float uWrap;
-uniform float uSpec;
-uniform float uGloss;     // the sand's own gloss and subsurface (shaders.ts)
-uniform float uSSS;
-uniform float uLampSat;
-uniform float uGain;
-void main() {
-  vec3 n = normalize(vNormal), v = normalize(vView);
-  vec3 L[4] = vec3[4](vL0, vL1, vL2, vL3);
-  vec3 E[4] = vec3[4](vE0, vE1, vE2, vE3);
-  vec3 col = vec3(0.0);
-  for (int i = 0; i < 4; i++) {
-    float ndl = max((dot(n, L[i]) + uWrap) / (1.0 + uWrap), 0.0);
-    vec3 wrap3 = vec3(uWrap) + uSSS * vec3(1.0, 0.45, 0.45);
-    vec3 ndl3 = max((vec3(dot(n, L[i])) + wrap3) / (1.0 + wrap3), 0.0);
-    // the sand's matte stone (Blender: roughness 0.62): a broad, faint sheen, at the sand's calibrated strength
-    float spec = pow(max(dot(n, normalize(L[i] + v)), 0.0), uGloss) * (uGloss + 8.0) / (8.0 * 3.14159265) * uSpec;
-    // as the sand: the lamp's light, filtered through sand, saturates the grain's colour
-    vec3 alb = i == 0 ? mix(vAlbedo, vAlbedo * vAlbedo * 2.2, uLampSat) : vAlbedo;
-    col += E[i] * (alb * ndl3 / 3.14159265 + spec * ndl);
-  }
-  gl_FragColor = vec4(col * uExposure * uOutScale * uGain, 1.0);
+  vAmbient = 1.0;
+  vFillE = vec3(0.0);
+  vCompact = 0.0;
+  vBounceW = 0.0;
+  vGround = exp(-max(iPos.y - uGround.x, 0.0) / uGround.y);
 }
 `;
 
@@ -160,9 +170,6 @@ const VELOCITY_DAMPING_RATE = 3;    // per second: a pushed grain swings back on
 /** How much of the sand's own motion (a scene change: the camera's move, the ball forming, rising) the grains ride
  *  outright; the spring only catches up the rest, so a transition shows as a barely visible, brief give. */
 const CARRY = 0.94;
-const MOUSE_PUSH_FORCE = 0.25;      // per unit of overlap, per 60 fps frame
-const MOUSE_VELOCITY_TRANSFER = 0.1;
-const TURN_RATE = 6;                // per second: how fast a grain turns to face its motion
 // Streams (Liam, 2026-10-10, from the C4D particles tutorial: an emitter's trail, held together by a flock): most grains
 // leave the sand in streams. A stream's emitter wanders slowly over the sand's surface and lets a grain go every
 // tenth of a second or so; they all follow the same sinuous path, so together they draw a tendril
@@ -190,7 +197,7 @@ export interface StreamCurve {
 }
 
 export class DriftGrains {
-  readonly mesh: THREE.InstancedMesh;
+  readonly mesh: THREE.Points;
   readonly material: THREE.ShaderMaterial;
   readonly max: number;
   /** The share of grains that leave in streams (the rest stay loose); 0 = all loose, as before the streams. */
@@ -199,30 +206,19 @@ export class DriftGrains {
   curves: StreamCurve[] | null = null;
   private readonly pos: Float32Array;
   private readonly vel: Float32Array;
-  private readonly rot: Float32Array;
-  private readonly tumble: Float32Array;   // each grain's own fixed turn (quaternion)
   private readonly seed: Float32Array;     // 4 randoms per grain
   private readonly gen: Float32Array;      // its current life's number (rebirth: a new place)
   private readonly home: Float32Array;     // where its path had it last frame
   private readonly sizes: Float32Array;
-  private readonly aPos: THREE.InstancedBufferAttribute;
-  private readonly aVel: THREE.InstancedBufferAttribute;
-  private readonly aRot: THREE.InstancedBufferAttribute;
-  private readonly aSize: THREE.InstancedBufferAttribute;
+  private readonly aPos: THREE.BufferAttribute;
+  private readonly aVel: THREE.BufferAttribute;
+  private readonly aSize: THREE.BufferAttribute;
   private readonly flock: Float32Array;    // each grain's acceleration from its neighbours, this frame
   private readonly gridHead = new Int32Array(GRID);
   private readonly gridNext: Int32Array;
-  private readonly cursorPrev = new THREE.Vector3();
-  private cursorHas = false;
   private readonly lastCentre = new THREE.Vector3(NaN, NaN, NaN);
-  private readonly q = new THREE.Quaternion();
-  private readonly q2 = new THREE.Quaternion();
-  private readonly qt = new THREE.Quaternion();
-  private readonly m = new THREE.Matrix4();
-  private readonly dir = new THREE.Vector3();
   private readonly side = new THREE.Vector3();
   private readonly back = new THREE.Vector3();
-  private readonly push = new THREE.Vector3();
   private readonly up = new THREE.Vector3(0, 1, 0);
   private readonly alt = new THREE.Vector3(1, 0, 0);
   private readonly vFwd = new THREE.Vector3();
@@ -234,8 +230,6 @@ export class DriftGrains {
     this.max = max;
     this.pos = new Float32Array(max * 3);
     this.vel = new Float32Array(max * 3);
-    this.rot = new Float32Array(max * 4);
-    this.tumble = new Float32Array(max * 4);
     this.seed = new Float32Array(max * 4);
     this.gen = new Float32Array(max).fill(-1);
     this.home = new Float32Array(max * 3);
@@ -243,51 +237,44 @@ export class DriftGrains {
     this.flock = new Float32Array(max * 3);
     this.gridNext = new Int32Array(max);
     for (let i = 0; i < max * 4; i++) this.seed[i] = Math.random();
-    const axis = new THREE.Vector3();
-    for (let i = 0; i < max; i++) {
-      this.q.setFromAxisAngle(axis.set(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1).normalize(), (Math.random() - 0.5) * 2 * Math.PI);
-      this.q.toArray(this.tumble, i * 4);
-      this.q.toArray(this.rot, i * 4);
-      this.sizes[i * 2 + 1] = Math.random();
-    }
-    // the grain: Blender's (an icosphere, smooth), each squashed +-22% and coloured from the sand's ramp
-    const ico = new THREE.IcosahedronGeometry(1, 2);
-    const geo = new THREE.InstancedBufferGeometry();
-    geo.setIndex(ico.getIndex());
-    geo.setAttribute("position", ico.getAttribute("position"));
-    geo.setAttribute("normal", ico.getAttribute("normal"));
-    const squash = new Float32Array(max * 3);
-    for (let i = 0; i < max * 3; i++) squash[i] = 1 + 0.22 * (Math.random() * 2 - 1);
-    this.aPos = new THREE.InstancedBufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage);
-    this.aVel = new THREE.InstancedBufferAttribute(this.vel, 3).setUsage(THREE.DynamicDrawUsage);
-    this.aRot = new THREE.InstancedBufferAttribute(this.rot, 4).setUsage(THREE.DynamicDrawUsage);
-    this.aSize = new THREE.InstancedBufferAttribute(this.sizes, 2).setUsage(THREE.DynamicDrawUsage);
+    const grainSeed = new Float32Array(max);
+    for (let i = 0; i < max; i++) { this.sizes[i * 2 + 1] = Math.random(); grainSeed[i] = Math.random(); }
+    // each grain one point, drawn as the sand's are
+    const geo = new THREE.BufferGeometry();
+    this.aPos = new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage);
+    this.aVel = new THREE.BufferAttribute(this.vel, 3).setUsage(THREE.DynamicDrawUsage);
+    this.aSize = new THREE.BufferAttribute(this.sizes, 2).setUsage(THREE.DynamicDrawUsage);
+    geo.setAttribute("position", this.aPos);   // (three needs one; the shader reads iPos)
     geo.setAttribute("iPos", this.aPos);
     geo.setAttribute("iVel", this.aVel);
-    geo.setAttribute("iRot", this.aRot);
-    geo.setAttribute("iSquash", new THREE.InstancedBufferAttribute(squash, 3));
     geo.setAttribute("iSizeHue", this.aSize);
-    geo.instanceCount = max;
+    geo.setAttribute("iSeed", new THREE.BufferAttribute(grainSeed, 1));
     const su = sand.uniforms;
     this.material = new THREE.ShaderMaterial({
       glslVersion: THREE.GLSL3,
       vertexShader: VERTEX,
-      fragmentShader: FRAGMENT,
+      fragmentShader: SAND_FRAGMENT,
+      transparent: false,
+      depthWrite: true,
+      depthTest: true,
+      alphaToCoverage: true,
+      // the sand's own uniforms, shared: its palette, lights, material, cursor, drift field, grain look
       uniforms: {
         uRamp: su.uRamp, uRampAt: su.uRampAt,
         uLightPos: su.uLightPos, uLightCol: su.uLightCol, uLightR2: su.uLightR2, uSpotDir: su.uSpotDir, uSpotCos: su.uSpotCos,
-        uCursorPos: su.uCursorPos, uCursorCol: { value: new THREE.Vector3() }, uCursorReach: su.uCursorReach,
-        uExposure: su.uExposure, uOutScale: su.uOutScale, uWrap: su.uWrap,
-        uSpec: su.uSpec, uGloss: su.uGloss, uSSS: su.uSSS, uLampSat: su.uLampSat,   // the sand's calibrated sheen and lamp colour
-        uGain: { value: 1 },
-        uShutter: { value: 1 / 60 },
+        uCursorPos: su.uCursorPos, uCursorCol: su.uCursorCol, uCursorReach: su.uCursorReach,
+        uExposure: su.uExposure, uOutScale: su.uOutScale, uWrap: su.uWrap, uGapFill: su.uGapFill, uRough: su.uRough,
+        uBounce: su.uBounce, uGroundCol: su.uGroundCol, uFillCol: su.uFillCol, uFrontKey: su.uFrontKey, uUpView: su.uUpView,
+        uSpec: su.uSpec, uGloss: su.uGloss, uSSS: su.uSSS, uLampSat: su.uLampSat,
+        uShutter: su.uShutter, uMotionBlur: su.uMotionBlur, uPointScale: su.uPointScale, uMinPx: su.uMinPx, uEdge: su.uEdge,
+        uGround: su.uGround, uPaint: su.uPaint, uPaintScale: su.uPaintScale, uViewport: su.uViewport, uBufH: su.uBufH,
         // the sand's shadows: its own uniforms, shared (its volumes swap as it compacts)
         uLo: su.uLo, uSize: su.uSize, uVolA: su.uVolA, uVolB: su.uVolB, uVolMix: su.uVolMix, uSigmaMax: su.uSigmaMax,
         uShadowK: su.uShadowK, uCompact: su.uCompact, uChaosC: su.uChaosC, uChaosRot: su.uChaosRot, uBallC: su.uBallC,
         uBallVolC: su.uBallVolC, uBallVolS: su.uBallVolS, uBallRot: su.uBallRot, uGrainShadow: { value: 1 },
       },
     });
-    this.mesh = new THREE.InstancedMesh(geo, this.material, max);
+    this.mesh = new THREE.Points(geo, this.material);
     this.mesh.frustumCulled = false;
   }
 
@@ -299,9 +286,10 @@ export class DriftGrains {
    */
   update(time: number, dt: number, centre: THREE.Vector3, radius: number, density: number, travel: number, grainR: number,
     cursor: THREE.Vector3 | null, cursorDir: THREE.Vector3, cursorR: number, cursorCol: THREE.Vector3, camera: THREE.Camera): void {
-    (this.material.uniforms.uCursorCol.value as THREE.Vector3).copy(cursorCol);
+    // (the cursor moves and lights them as it does the sand: its drift field and its light, shared; no push of their own)
+    void cursor; void cursorDir; void cursorR; void cursorCol;
     const count = Math.round(this.max * Math.min(Math.max(density, 0), 1));
-    this.mesh.count = count;
+    this.mesh.geometry.setDrawRange(0, count);
     this.mesh.visible = count > 0;
     if (!count) return;
     dt = Math.min(Math.max(dt, 1e-4), 1 / 20);
@@ -309,16 +297,7 @@ export class DriftGrains {
     const leapt = !(this.lastCentre.distanceTo(centre) < radius * 0.25);
     this.lastCentre.copy(centre);
     if (leapt) this.gen.fill(-1);
-    // the cursor's own motion (handed to the grains it touches)
-    this.push.set(0, 0, 0);
-    if (cursor) {
-      if (this.cursorHas) this.push.subVectors(cursor, this.cursorPrev);
-      this.cursorPrev.copy(cursor);
-      this.cursorHas = true;
-    } else this.cursorHas = false;
-    const f60 = dt * 60;
     const damp = Math.exp(-dt * VELOCITY_DAMPING_RATE);
-    const turn = 1 - Math.exp(-dt * TURN_RATE);
     const cam = camera.position;
     // the view's frame at the sand: toward the viewer, and the screen's right and up (the streams' emitters ring it)
     const vFwd = this.vFwd.subVectors(cam, centre).normalize();
@@ -444,30 +423,7 @@ export class DriftGrains {
       this.vel[o] = (this.vel[o] + ((tx - this.pos[o]) * PATH_STIFFNESS + this.flock[o]) * dt) * damp;
       this.vel[o + 1] = (this.vel[o + 1] + ((ty - this.pos[o + 1]) * PATH_STIFFNESS + this.flock[o + 1]) * dt) * damp;
       this.vel[o + 2] = (this.vel[o + 2] + ((tz - this.pos[o + 2]) * PATH_STIFFNESS + this.flock[o + 2]) * dt) * damp;
-      // the cursor: a sphere that shoves grains out of it and hands them some of its own speed
-      if (cursor) {
-        let ex = this.pos[o] - cursor.x, ey = this.pos[o + 1] - cursor.y, ez = this.pos[o + 2] - cursor.z;
-        const along = ex * cursorDir.x + ey * cursorDir.y + ez * cursorDir.z;   // off the line of sight, not the point
-        ex -= cursorDir.x * along; ey -= cursorDir.y * along; ez -= cursorDir.z * along;
-        const d = Math.hypot(ex, ey, ez), reach = cursorR + grainR;
-        if (d < reach && d > 1e-5) {
-          const f = MOUSE_PUSH_FORCE * (reach - d) * 60 * f60;
-          this.vel[o] += (ex / d) * f + this.push.x / dt * MOUSE_VELOCITY_TRANSFER;
-          this.vel[o + 1] += (ey / d) * f + this.push.y / dt * MOUSE_VELOCITY_TRANSFER;
-          this.vel[o + 2] += (ez / d) * f + this.push.z / dt * MOUSE_VELOCITY_TRANSFER;
-        }
-      }
       this.pos[o] += this.vel[o] * dt; this.pos[o + 1] += this.vel[o + 1] * dt; this.pos[o + 2] += this.vel[o + 2] * dt;
-      // it turns to face where it goes, plus its own tumble
-      const sp = Math.hypot(this.vel[o], this.vel[o + 1], this.vel[o + 2]);
-      if (sp > grainR * 2) {
-        this.dir.set(this.vel[o] / sp, this.vel[o + 1] / sp, this.vel[o + 2] / sp);
-        this.side.crossVectors(this.dir, Math.abs(this.dir.y) > 0.99 ? this.alt : this.up).normalize();
-        this.back.crossVectors(this.side, this.dir);
-        this.m.makeBasis(this.side, this.dir, this.back);
-        this.q2.setFromRotationMatrix(this.m).multiply(this.qt.fromArray(this.tumble, i * 4));
-        this.q.fromArray(this.rot, i * 4).slerp(this.q2, turn).toArray(this.rot, i * 4);
-      }
       // born small, full most of its life, shrinking away at the end (Lusion's life curve)
       const env = Math.min(life / 0.08, 1) * (1 - Math.min(Math.max((life - 0.55) / 0.45, 0), 1));
       // the main sand's own grain sizes, and on screen the size they would be at the sand (Liam: never bigger than the
@@ -475,7 +431,7 @@ export class DriftGrains {
       const toCam = Math.hypot(this.pos[o] - cam.x, this.pos[o + 1] - cam.y, this.pos[o + 2] - cam.z);
       this.sizes[i * 2] = grainR * (0.6 + s2 * 1.0) * env * Math.min(Math.max(toCam / camDist, 0.05), 1.5);
     }
-    this.aPos.needsUpdate = true; this.aVel.needsUpdate = true; this.aRot.needsUpdate = true; this.aSize.needsUpdate = true;
+    this.aPos.needsUpdate = true; this.aVel.needsUpdate = true; this.aSize.needsUpdate = true;
   }
 
   /** The flock, from where the grains are now: each pushed off the grains it overlaps (separation) and drawn a little

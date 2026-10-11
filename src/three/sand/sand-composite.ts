@@ -202,14 +202,14 @@ export class SandComposite {
   private readonly deskLensMat = new THREE.ShaderMaterial({
     glslVersion: THREE.GLSL3, vertexShader: VERTEX, fragmentShader: DESK_LENS_FRAGMENT,
     depthTest: false, depthWrite: false, toneMapped: false, blending: THREE.NoBlending,
-    uniforms: { uTex: { value: null }, uBlur: { value: null }, uDepth: { value: null }, uDofP: { value: new THREE.Vector4() }, uDofMax: { value: 24 }, uDim: { value: 0 } },
+    uniforms: { uTex: { value: null }, uBlur: { value: null }, uDepth: { value: null }, uDofP: { value: new THREE.Vector4() }, uDofMax: { value: 48 }, uDim: { value: 0 } },
   });
   private readonly dofRt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
   private readonly dofScene = new THREE.Scene();
   private readonly dofMat = new THREE.ShaderMaterial({
     glslVersion: THREE.GLSL3, vertexShader: VERTEX, fragmentShader: DOF_FRAGMENT,
     depthTest: false, depthWrite: false, toneMapped: false, blending: THREE.NoBlending,
-    uniforms: { uSand: { value: null }, uDepth: { value: null }, uTexel: { value: new THREE.Vector2() }, uDofP: { value: new THREE.Vector4() }, uDofMax: { value: 24 } },
+    uniforms: { uSand: { value: null }, uDepth: { value: null }, uTexel: { value: new THREE.Vector2() }, uDofP: { value: new THREE.Vector4() }, uDofMax: { value: 48 } },
   });
   /** The hero's haze (texture, decode scale) and how much of it shows (0..1; it belongs to the hero's light). */
   haze: { texture: THREE.Texture; scale: number } | null = null;
@@ -249,7 +249,7 @@ export class SandComposite {
       toneMapped: true,
       uniforms: {
         uSand: { value: this.rt.texture }, uTexel: { value: new THREE.Vector2() }, uSigma: { value: 1 },
-        uDofTex: { value: this.dofRt.texture }, uDepth: { value: this.rt.depthTexture }, uDofP: { value: new THREE.Vector4() }, uDofMax: { value: 24 },
+        uDofTex: { value: this.dofRt.texture }, uDepth: { value: this.rt.depthTexture }, uDofP: { value: new THREE.Vector4() }, uDofMax: { value: 48 },
       },
     });
     this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.material);

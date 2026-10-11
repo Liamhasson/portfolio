@@ -88,7 +88,13 @@ export const SAND_LOOK = {
   dofFocus: 8.4,
   dofFstop: 0.35,   // Liam, 2026-10-11: the dreamy hero (f/0.18 = the desk test's softness at the hero's scale; 0.35 keeps the shape)
   dofLensMm: 45,
-  dofDense: 0.15,   // how dense the sand must be for its blurred grains to stay solid (they overlap into a soft mass)
+  dofDense: 0.15,
+  // the size range (Lusion's depth): pebbles, a share of the grains (more on the side facing the lens), this many times bigger
+  pebbleShare: 0.004,
+  pebbleFront: 0.022,
+  pebbleMin: 3,
+  pebbleMax: 7,
+  sizeJitter: 0.35,   // every grain's unevenness (log-normal spread)   // how dense the sand must be for its blurred grains to stay solid (they overlap into a soft mass)
   hueJitter: 0.32,   // the formed ball's colours mixed grain by grain (Liam picked the render's mottled ball, 2026-10-11)
   motionBlur: 0.5,
   motionBlurMax: 1.0,
@@ -229,6 +235,8 @@ export class SandField {
         uDof: { value: new THREE.Vector2(0, SAND_LOOK.dofFocus) },
         uHueJitter: { value: SAND_LOOK.hueJitter },
         uDofDense: { value: SAND_LOOK.dofDense },
+        uPebble: { value: new THREE.Vector4(SAND_LOOK.pebbleShare, SAND_LOOK.pebbleFront, SAND_LOOK.pebbleMin, SAND_LOOK.pebbleMax) },
+        uSizeJitter: { value: SAND_LOOK.sizeJitter },
       },
     });
     this.points = new THREE.Points(geo, this.material);
@@ -434,6 +442,8 @@ export class SandField {
     u.uGloss.value = l.gloss;
     u.uHueJitter.value = l.hueJitter;
     u.uDofDense.value = l.dofDense;
+    (u.uPebble.value as THREE.Vector4).set(l.pebbleShare, l.pebbleFront, l.pebbleMin, l.pebbleMax);
+    u.uSizeJitter.value = l.sizeJitter;
     u.uSSS.value = l.sss;
     u.uCursorReach.value = l.cursorReach;
     u.uPaintScale.value = l.paintScale;
