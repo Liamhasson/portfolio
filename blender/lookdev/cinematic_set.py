@@ -6,9 +6,13 @@ scenes like settle write their camera json there.
   SET_LOOK=new SETTLE_FRAME=48 LOOKDEV_LIST=blender/lookdev/cinematic_set.py /Applications/Blender.app/Contents/MacOS/Blender \
     --background --python blender/lookdev/lookdev.py -- --scene settle --out /tmp/x
 
+SET_LIGHTS=hero (Liam, 2026-10-11: the desk with the lamp off, before the ball forms): the set's own lights out, the
+hero's key, rim and fill in their true places (desk = chaos centre + 0.1 x hero, power x 0.1^2), the key lighting the air.
+
 Env: SET_LOOK old (as approved) | new; SET_HAZE density per metre (0.012); SET_KEY the light that lights the air (lamp);
 SET_RES "w,h" (960,600); SET_SAMPLES (64); SET_TAG. Writes blender/lookdev/renders/cinematic-set-<scene>-<look><tag>.png
 """
+import math
 import os
 import sys
 
@@ -29,6 +33,36 @@ def srgb(hex_):
 
 # the live palette (src/three/sand/sand-field.ts SAND_RAMP): the hue positions are absolute, as live
 RAMP = [(0.0, "#26161a"), (0.2277, "#94626c"), (0.4542, "#bf8a78"), (0.5687, "#c4a47e"), (0.6381, "#e3d6c6")]
+
+if os.environ.get("SET_LIGHTS") == "hero":
+    from mathutils import Vector
+    k, c = 0.1, Vector((0.0, 0.03, 0.46))   # lookdev.py CHAOS_SCALE, CHAOS_C
+    for o in [o for o in bpy.data.objects if o.type == "LIGHT"]:
+        print("CINE light out", o.name)
+        bpy.data.objects.remove(o, do_unlink=True)
+    # the hero's lights (src/three/sand/sand-field.ts HERO_LIGHTS, Blender axes), at the desk's scale
+    for name, pos, size, watts, col, aim_at in (
+        ("key", (-7.5, -3.0, 2.8), 3.5, 4200, "#ffdccf", (-0.5, 0.3, 0.2)),
+        ("rim", (1.5, 6.5, 2.5), 2.0, 1300, "#cda2b9", (0, 0, 0)),
+        ("fill", (3.5, -4.0, -1.0), 4.0, 45, "#8a93a8", (0, 0, 0)),
+    ):
+        d = bpy.data.lights.new(name, "AREA"); d.energy = watts * k * k; d.size = size * k; d.color = srgb(col)[:3]
+        ob = bpy.data.objects.new(name, d); scene.collection.objects.link(ob)
+        ob.location = c + Vector(pos) * k
+        ob.rotation_euler = (c + Vector(aim_at) * k - ob.location).to_track_quat("-Z", "Y").to_euler()
+        print("CINE light", name, tuple(round(v, 3) for v in ob.location), round(d.energy, 2), "W")
+        if name == "key" and os.environ.get("SET_KEY_SPREAD"):
+            # barn doors: the key pools on the cloud and falls off across the desk (a vignette in the light itself)
+            d.spread = math.radians(float(os.environ["SET_KEY_SPREAD"]))
+            d.energy *= float(os.environ.get("SET_KEY_GAIN", "1"))   # the narrower beam concentrates its power: the cloud kept as in the hero
+    # the lens: focus on the cloud (SET_FSTOP), the desk below goes soft
+    if os.environ.get("SET_FSTOP"):
+        bpy.context.view_layer.update()
+        cam = scene.camera
+        cam.data.dof.use_dof = True
+        cam.data.dof.focus_distance = (cam.matrix_world.translation - c).length
+        cam.data.dof.aperture_fstop = float(os.environ["SET_FSTOP"])
+        print("CINE focus", round(cam.data.dof.focus_distance, 3), "m at f/", cam.data.dof.aperture_fstop)
 
 if look == "new":
     for m in bpy.data.materials:
