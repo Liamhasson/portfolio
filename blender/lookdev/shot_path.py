@@ -24,7 +24,8 @@ HERO_AT = (0.0, 0.03, 0.47)          # its target (0, 0.1, 0)
 BALL = (0.0, 0.03, 0.47)             # the ball stays here, above the desk (public/lab/sand/sand.json ball centre (0, 0.1, 0))
 BALL_R = 0.11                        # (its radius 1.1: 47% of the hero's height)
 EASE_IN = 0.04                       # the ease-in: 4% of the way to the ball
-TILT_AT = (0.0, -0.06, 0.0)          # where the tilt ends looking: the desk's front middle (about 32 degrees down)
+TILT_AT = (0.0, 0.16, 0.0)           # where the tilt ends looking: ~26.5 degrees down, the frame's bottom edge just on the desk's
+                                     # front edge (steeper showed the void in front of it), the ball just clear of the top
 JOIN = 150                           # the tail's index joined (its frame 151: below the hero's height, the lid at 101)
 BEATS = {"ease": (0, 39), "tilt": (39, 79), "glide": (79, 149), "tail": (149, 208)}
 BLEND = 15                           # the glide's last frames turn from the look-at to the tail's own orientation
@@ -147,6 +148,10 @@ def check(d):
     c = rotate(inv, sub(BALL, pos))
     tan_v = 18.0 / P[BEATS["tilt"][1]]["lens_mm"] / 1.6
     assert c[1] / -c[2] - BALL_R / math.sqrt(dot(c, c)) > tan_v, "the ball still in frame after the tilt"
+    # and the frame's bottom edge lands on the desk (y >= -0.3), not the void in front of it
+    bot = rotate(q, norm((0.0, -tan_v, -1.0)))
+    t_hit = -pos[2] / bot[2]
+    assert bot[2] < 0 and pos[1] + bot[1] * t_hit >= -0.3, ("the void below the desk's front edge in frame", pos[1] + bot[1] * t_hit)
     print("shot ok:", d["frames"], "frames; wake", d["wake_frame"], "; screen from", d["screen_from"])
 
 
