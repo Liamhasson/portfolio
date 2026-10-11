@@ -118,9 +118,34 @@ def pallet_wood():
     fine = N.new("ShaderNodeTexNoise"); fine.inputs["Scale"].default_value = 1.0; fine.inputs["Detail"].default_value = 8.0
     L.new(mapped((1.6, 110.0, 1.0)), fine.inputs["Vector"])
     grain = op("MAXIMUM", grain, mr(fine.outputs["Fac"], 0.52, 0.7))   # irregular grain lines
-    # knots: a few dark ovals
+    # knots (Liam: stronger): dark oval cores, a ring of darker wood round them
     vor = N.new("ShaderNodeTexVoronoi"); vor.inputs["Scale"].default_value = 3.2; L.new(mapped((0.55, 1.6, 1.0)), vor.inputs["Vector"])
-    knot = mr(vor.outputs["Distance"], 0.07, 0.035)
+    kd = vor.outputs["Distance"]
+    knot = op("MAXIMUM", mr(kd, 0.1, 0.05), op("MULTIPLY", mr(kd, 0.17, 0.1), 0.5))
+    # the ring figure (Liam): each plank cut from a tree whose centre runs a few cm below its face, a little off its
+    # middle, wandering along its length; its growth rings cut by the face are the arches and long ovals of flat-sawn
+    # pine. They bend round the knots, and noise keeps them from being machine-even
+    centre = op("ADD", op("MULTIPLY", op("ADD", plank, 0.5), 0.2), -0.3)            # the plank's middle (y)
+    wob = op("MULTIPLY", op("SINE", op("ADD", op("MULTIPLY", sep.outputs["X"], op("ADD", 2.0, op("MULTIPLY", rnd, 2.5))), op("MULTIPLY", rnd, 6.28))), 0.035)
+    pith = op("ADD", op("ADD", centre, op("MULTIPLY", op("SUBTRACT", rnd, 0.5), 0.12)), wob)
+    dy = op("SUBTRACT", sep.outputs["Y"], pith)
+    # (the log tapers, and the board is cut at a slight angle: the centre's depth changes along the plank, so each ring
+    # closes into the tip of an arch where it leaves the face)
+    wn2 = N.new("ShaderNodeTexWhiteNoise"); wn2.noise_dimensions = "1D"; L.new(op("ADD", plank, 17.3), wn2.inputs["W"])
+    slope = op("MULTIPLY", op("ADD", 0.5, wn2.outputs["Value"]), op("SUBTRACT", op("MULTIPLY", op("FLOOR", op("MULTIPLY", wn2.outputs["Value"], 2.0)), 2.0), 1.0))
+    slope = op("MULTIPLY", slope, 0.11)   # (always some taper, either way: 0.05-0.16)
+    depth = op("ABSOLUTE", op("ADD", op("ADD", 0.012, op("MULTIPLY", rnd, 0.03)), op("MULTIPLY", op("ADD", sep.outputs["X"], op("MULTIPLY", rnd, 0.6)), slope)))
+    r = op("SQRT", op("ADD", op("MULTIPLY", dy, dy), op("MULTIPLY", depth, depth)))
+    rn = N.new("ShaderNodeTexNoise"); rn.inputs["Scale"].default_value = 1.0; rn.inputs["Detail"].default_value = 3.0
+    L.new(mapped((3.0, 12.0, 1.0)), rn.inputs["Vector"])
+    r = op("ADD", r, op("MULTIPLY", op("SUBTRACT", rn.outputs["Fac"], 0.5), 0.008))
+    r = op("ADD", r, op("MULTIPLY", mr(kd, 0.28, 0.0), 0.016))                     # (bent round the knots)
+    # ~5 mm between rings, closer toward the bark (a log-like spacing), each ring's dark band its own strength
+    ring = op("FRACT", op("MULTIPLY", op("POWER", r, 0.85), 1 / 0.0095))
+    rs = N.new("ShaderNodeTexNoise"); rs.inputs["Scale"].default_value = 1.0; rs.inputs["Detail"].default_value = 2.0
+    L.new(mapped((1.2, 30.0, 1.0)), rs.inputs["Vector"])
+    latewood = op("MULTIPLY", op("MULTIPLY", mr(ring, 0.68, 0.86), mr(ring, 1.0, 0.92)), mr(rs.outputs["Fac"], 0.3, 0.7, 0.35, 1.0))
+    grain = op("MAXIMUM", op("MULTIPLY", grain, 0.55), latewood)
     # the stain rubbed back along the grain (a notch calmer than the reference), more toward the plank's edges
     wear_n = N.new("ShaderNodeTexNoise"); wear_n.inputs["Scale"].default_value = 1.0; wear_n.inputs["Detail"].default_value = 7.0; wear_n.inputs["Roughness"].default_value = 0.62
     L.new(mapped((1.4, 60.0, 1.0)), wear_n.inputs["Vector"])   # (long streaks along the grain)
@@ -161,7 +186,7 @@ def pallet_wood():
     rose, champ = deep("#8a5442", 0.21), deep("#986a44", 0.21)
     base = mixc(rose, champ, rnd)
     col = mixc(base, deep("#3e221f", 0.2), grain, 0.85)       # the grain: plum-brown
-    col = mixc(col, deep("#3b2220", 0.25), knot, 0.9)
+    col = mixc(col, deep("#2e1918", 0.16), knot, 0.95)
     col = mixc(col, deep("#dcc6a8", 0.62), wear, 0.9)          # rubbed back to pale wood (toward bone)
     col = mixc(col, deep("#e3d6c6", 0.7), scratch, 0.5)
     col = mixc(col, srgb("#1c1012"), nail, 0.9)
