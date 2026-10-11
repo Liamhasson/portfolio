@@ -125,12 +125,19 @@ def pallet_wood():
     wear_n = N.new("ShaderNodeTexNoise"); wear_n.inputs["Scale"].default_value = 1.0; wear_n.inputs["Detail"].default_value = 7.0; wear_n.inputs["Roughness"].default_value = 0.62
     L.new(mapped((1.4, 60.0, 1.0)), wear_n.inputs["Vector"])   # (long streaks along the grain)
     edge_wear = mr(edge, 0.03, 0.006)
-    wear = mr(op("ADD", wear_n.outputs["Fac"], op("MULTIPLY", edge_wear, 0.14)), 0.6, 0.72)
+    streak = mr(op("ADD", wear_n.outputs["Fac"], op("MULTIPLY", edge_wear, 0.12)), 0.6, 0.7)
+    # worn zones (Liam: some worn areas, toward the reference): broad patches where the streaks rub right through
+    zone_n = N.new("ShaderNodeTexNoise"); zone_n.inputs["Scale"].default_value = 1.0; zone_n.inputs["Detail"].default_value = 3.0
+    L.new(mapped((2.6, 7.0, 1.0)), zone_n.inputs["Vector"])
+    zone = mr(zone_n.outputs["Fac"], 0.58, 0.7)
+    wear = op("MINIMUM", op("MULTIPLY", streak, op("ADD", 0.12, op("MULTIPLY", zone, 1.2))), 1.0)
     # fine scratches, two ways
     def scratches(rot, lo):
         n = N.new("ShaderNodeTexNoise"); n.inputs["Scale"].default_value = 1.0; n.inputs["Detail"].default_value = 2.0
         L.new(mapped((700.0, 5.0, 1.0), rot), n.inputs["Vector"]); return mr(n.outputs["Fac"], lo, lo + 0.035)
-    scratch = op("MAXIMUM", scratches(0.08, 0.725), scratches(-0.5, 0.74))
+    # (along the grain; the crosswise ones broken into short marks by a mask: long straight lines read as drawn)
+    cross_n = N.new("ShaderNodeTexNoise"); cross_n.inputs["Scale"].default_value = 18.0; L.new(P, cross_n.inputs["Vector"])
+    scratch = op("MAXIMUM", scratches(0.08, 0.725), op("MULTIPLY", scratches(-0.5, 0.75), mr(cross_n.outputs["Fac"], 0.6, 0.66)))
     # nail holes: small dark dots near the planks' ends
     nv = N.new("ShaderNodeTexVoronoi"); nv.inputs["Scale"].default_value = 22.0; L.new(P, nv.inputs["Vector"])
     ends = mr(op("ABSOLUTE", sep.outputs["X"]), 0.5, 0.54)
@@ -151,11 +158,11 @@ def pallet_wood():
     def deep(hex_, k):
         c = srgb(hex_); return (c[0] * k, c[1] * k, c[2] * k, 1.0)
     # the stain: rose-gold and champagne, deepened to read as wood under the close lamp (the walnut sat at ~8% albedo)
-    rose, champ = deep("#8a5442", 0.42), deep("#986a44", 0.42)
+    rose, champ = deep("#8a5442", 0.21), deep("#986a44", 0.21)
     base = mixc(rose, champ, rnd)
-    col = mixc(base, deep("#4f2e29", 0.4), grain, 0.75)       # the grain: plum-brown
-    col = mixc(col, deep("#3b2220", 0.45), knot, 0.85)
-    col = mixc(col, deep("#d9c2a4", 0.68), wear, 0.85)          # rubbed back to pale wood (toward bone)
+    col = mixc(base, deep("#3e221f", 0.2), grain, 0.85)       # the grain: plum-brown
+    col = mixc(col, deep("#3b2220", 0.25), knot, 0.9)
+    col = mixc(col, deep("#dcc6a8", 0.62), wear, 0.9)          # rubbed back to pale wood (toward bone)
     col = mixc(col, deep("#e3d6c6", 0.7), scratch, 0.5)
     col = mixc(col, srgb("#1c1012"), nail, 0.9)
     col = mixc(col, srgb("#160d0e"), gap, 1.0)           # the gaps
@@ -244,6 +251,18 @@ if look == "new":
                 hit, loc, _n, _i = o.ray_cast(lp, inv.to_3x3() @ V3((0, 0, -1)))
                 if hit:
                     zz[k] = max(zz[k], (o.matrix_world @ loc).z)
+        # (the desk's three planks: the gaps at y = -0.1 and 0.1, ~8 mm wide; a grain over one drops into the crack,
+        # drawn to its middle and a little below the surface, so the cracks fill where the spill is dense)
+        if os.environ.get("SET_DESK") == "pallet":
+            for gy in (-0.1, 0.1):
+                over = (np.abs(q[:, 1] - gy) < 0.0045) & (zz == 0)
+                q[over, 1] = gy + (q[over, 1] - gy) * 0.45
+                zz[over] = -r2[over] * 0.9
+            for arr in (p1,):
+                for gy in (-0.1, 0.1):
+                    over = np.abs(arr[:, 1] - gy) < 0.0045
+                    arr[over, 1] = gy + (arr[over, 1] - gy) * 0.45
+                    arr[over, 2] = arr[over, 2] - 0.0006
         p2 = np.stack([q[:, 0], q[:, 1], r2 + zz], 1)
         print("CINE spill on papers", int((zz > 0).sum()))
         pts = np.vstack([p1, p2]).astype(np.float32)
