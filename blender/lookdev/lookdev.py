@@ -1740,7 +1740,7 @@ def build_bakedesk():
     scale = float(os.environ.get("BAKE_SCALE", "1"))
     deps = bpy.context.evaluated_depsgraph_get()
     hidden = ("trackpad", "display", "bezel")
-    sizes = {"desk": 1024, "base": 1024, "lid": 2048, "mark": 1024, "pick": 256, "Cylinder": 512}
+    sizes = {"desk": 1024, "base": 1024, "lid": 2048, "mark": 1024, "pick": 256, "Cylinder": 512, "keys": 4096}
     keep = []
     for o in list(bpy.data.objects):
         if o.type != "MESH":
@@ -1750,8 +1750,14 @@ def build_bakedesk():
             bpy.data.objects.remove(o, do_unlink=True)
             continue
         keep.append(o)
-    # open: the keyboard (78 keys and the deck) as one mesh, one texture
+    # open: the keyboard (its keys, the deck and the keys' legends) as one mesh, one texture
     caps = [o for o in keep if o.name.split(".")[0] == "Cube" and o.parent and o.parent.name.startswith("laptop")]
+    legends = [o for o in bpy.data.objects if o.type == "FONT" and o.name.split(".")[0] == "legend"]
+    if state == "shut":
+        for o in legends:
+            bpy.data.objects.remove(o, do_unlink=True)
+    elif caps:
+        caps += legends
     if caps:
         bpy.ops.object.select_all(action="DESELECT")
         for o in caps:
@@ -1818,9 +1824,13 @@ def build_bakedesk():
         mats = [m.copy() if m else None for m in (s.material for s in o.material_slots)]
         n = bpy.data.objects.new("bake_" + o.name, me)
         scene.collection.objects.link(n)
+        # (clearing the slots resets every face to the first material: the keyboard baked as all deck, keys and legends
+        # lost. Each face's material is kept)
+        mi = np.empty(len(me.polygons), np.int32); me.polygons.foreach_get("material_index", mi)
         me.materials.clear()
         for m in mats:
             me.materials.append(m)
+        me.polygons.foreach_set("material_index", mi)
         o.hide_render = True; o.hide_viewport = True
         if pivot and on_hinge(o):
             n.parent = pivot; n.matrix_parent_inverse = pivot.matrix_world.inverted()
@@ -1857,6 +1867,20 @@ def build_bakedesk():
             bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.004)
             bpy.ops.object.mode_set(mode="OBJECT")
             w_ = h_ = int(next((v for k, v in sizes.items() if base.startswith(k)), 1024) * scale)
+            # the three states must share each surface's UVs, but smart_project's packing varies a little from run to
+            # run: the shut bake keeps its layout and the others reuse it (where the surface is the same mesh)
+            cache = os.path.join(os.path.dirname(out), "uv", o.name + ".npy")
+            buv = me.uv_layers["bake"]
+            if state == "shut":
+                os.makedirs(os.path.dirname(cache), exist_ok=True)
+                arr = np.empty(len(me.loops) * 2, np.float32); buv.data.foreach_get("uv", arr); np.save(cache, arr)
+            elif os.path.exists(cache):
+                arr = np.load(cache)
+                if len(arr) == len(me.loops) * 2:
+                    buv.data.foreach_set("uv", arr)
+            else:   # (not baked shut, as the keys under the lid: the open bake sets the layout, the lit one reuses it)
+                os.makedirs(os.path.dirname(cache), exist_ok=True)
+                arr = np.empty(len(me.loops) * 2, np.float32); buv.data.foreach_get("uv", arr); np.save(cache, arr)
         if hinge_obj:
             n.data.transform(hinge_obj.matrix_world)
         img = bpy.data.images.new("bake_" + o.name, w_, h_, float_buffer=True)
@@ -1910,6 +1934,28 @@ def build_bakedesk():
         if paper:
             bpy.ops.object.bake(type="COMBINED", margin=16, use_clear=True)
             meta["combined"] = True
+        elif base == "keys":
+            # the keyboard glows (its backlight, through the legends and between the keys): its diffuse light plus its
+            # emission (a combined bake also caught the bright room in the caps' gloss: they came out near white)
+            bpy.ops.object.bake(type="DIFFUSE", pass_filter={"DIRECT", "INDIRECT", "COLOR"}, margin=16, use_clear=True)
+            diff_px = np.array(img.pixels[:], dtype=np.float32)
+            # (the EMIT bake spread the deck's glow over every cap and lost the legends: instead each material's emission,
+            # / 4 to fit, goes into its base colour for a colour-only bake, then back)
+            saved = []
+            for m in n.data.materials:
+                b = next((nd for nd in m.node_tree.nodes if nd.type == "BSDF_PRINCIPLED"), None) if m else None
+                if not b:
+                    continue
+                saved.append((b, tuple(b.inputs["Base Color"].default_value)))
+                ec, es = b.inputs["Emission Color"].default_value, b.inputs["Emission Strength"].default_value
+                b.inputs["Base Color"].default_value = (min(ec[0] * es / 4, 1), min(ec[1] * es / 4, 1), min(ec[2] * es / 4, 1), 1)
+            bpy.ops.object.bake(type="DIFFUSE", pass_filter={"COLOR"}, margin=16, use_clear=True)
+            emit_px = np.array(img.pixels[:], dtype=np.float32) * 4
+            for b, c in saved:
+                b.inputs["Base Color"].default_value = c
+            tot = diff_px + emit_px
+            tot[3::4] = 1.0
+            img.pixels.foreach_set(tot)
         else:
             bpy.ops.object.bake(type="DIFFUSE", pass_filter={"DIRECT", "INDIRECT", "COLOR"}, margin=16, use_clear=True)
         save_png(img, os.path.join(out, n.name + ".diff.png"), True)
