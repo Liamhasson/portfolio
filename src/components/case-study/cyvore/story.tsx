@@ -19,7 +19,7 @@ export function CyvoreStory({ kind, title }: { kind: "signature"; title: string 
         <div className="sol-glow" aria-hidden="true"></div>
         <div className="g12" style={{ alignItems: "end", position: "relative" }}>
           <h2 id={id} className="title" style={{ gridColumn: "1/7", marginLeft: "calc(var(--u) * -3)" }}>{title}</h2>
-          <p className="body" style={{ gridColumn: "8/13" }}><span className="lead">One screen, everything.</span> I rebuilt the information architecture around the meeting, not the scroll. The main screen swaps between Security, Exposure, Coverage and Enables with hover and click animations, while both navigation bars stay visible the whole time.</p>
+          <p className="body" style={{ gridColumn: "8/13" }}><span className="lead">One story, told in one screen.</span> The site tells the story the founder tells in the meeting, in four chapters: why security matters, the numbers that prove the risk, a real attack stopped, and the intelligence behind the product that makes it credible. Both navigation bars stay visible the whole time.</p>
         </div>
 
         <div className="story" data-story="desktop" ref={ref}>
@@ -143,7 +143,7 @@ export function CyvoreStory({ kind, title }: { kind: "signature"; title: string 
         </div>
 
         <div className="g12 sol-foot">
-          <p className="body" style={{ gridColumn: "1/7" }}>Wherever the presentation is, every section is one move away.</p>
+          <p className="body" style={{ gridColumn: "1/7" }}>Wherever the presentation is, every chapter is one move away.</p>
           <p className="body quiet" style={{ gridColumn: "8/13" }}>The replica below is refined for this portfolio: the content and layout are as shipped; type, colour and depth are tightened.</p>
         </div>
       </section>
