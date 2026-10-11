@@ -25,8 +25,8 @@ in vec3 iVel;
 in vec4 iRot;
 in vec3 iSquash;
 in vec2 iSizeHue;
-uniform vec3 uRamp[4];
-uniform vec4 uRampAt;
+uniform vec3 uRamp[5];
+uniform float uRampAt[5];
 uniform vec3 uLightPos[3];
 uniform vec3 uLightCol[3];
 uniform vec3 uLightR2;
@@ -61,9 +61,7 @@ out vec3 vL0; out vec3 vL1; out vec3 vL2; out vec3 vL3;
 out vec3 vE0; out vec3 vE1; out vec3 vE2; out vec3 vE3;
 vec3 ramp(float h) {
   vec3 c = uRamp[0];
-  c = mix(c, uRamp[1], clamp((h - uRampAt.x) / (uRampAt.y - uRampAt.x), 0.0, 1.0));
-  c = mix(c, uRamp[2], clamp((h - uRampAt.y) / (uRampAt.z - uRampAt.y), 0.0, 1.0));
-  c = mix(c, uRamp[3], clamp((h - uRampAt.z) / (uRampAt.w - uRampAt.z), 0.0, 1.0));
+  for (int i = 1; i < 5; i++) c = mix(c, uRamp[i], clamp((h - uRampAt[i - 1]) / max(uRampAt[i] - uRampAt[i - 1], 1e-4), 0.0, 1.0));
   return c;
 }
 vec3 qrot(vec4 q, vec3 v) { return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v); }
@@ -133,6 +131,8 @@ uniform float uExposure;
 uniform float uOutScale;
 uniform float uWrap;
 uniform float uSpec;
+uniform float uGloss;     // the sand's own gloss and subsurface (shaders.ts)
+uniform float uSSS;
 uniform float uLampSat;
 uniform float uGain;
 void main() {
@@ -142,11 +142,13 @@ void main() {
   vec3 col = vec3(0.0);
   for (int i = 0; i < 4; i++) {
     float ndl = max((dot(n, L[i]) + uWrap) / (1.0 + uWrap), 0.0);
+    vec3 wrap3 = vec3(uWrap) + uSSS * vec3(1.0, 0.45, 0.45);
+    vec3 ndl3 = max((vec3(dot(n, L[i])) + wrap3) / (1.0 + wrap3), 0.0);
     // the sand's matte stone (Blender: roughness 0.62): a broad, faint sheen, at the sand's calibrated strength
-    float spec = pow(max(dot(n, normalize(L[i] + v)), 0.0), 12.0) * uSpec;
+    float spec = pow(max(dot(n, normalize(L[i] + v)), 0.0), uGloss) * (uGloss + 8.0) / (8.0 * 3.14159265) * uSpec;
     // as the sand: the lamp's light, filtered through sand, saturates the grain's colour
     vec3 alb = i == 0 ? mix(vAlbedo, vAlbedo * vAlbedo * 2.2, uLampSat) : vAlbedo;
-    col += E[i] * (alb * ndl / 3.14159265 + spec * ndl);
+    col += E[i] * (alb * ndl3 / 3.14159265 + spec * ndl);
   }
   gl_FragColor = vec4(col * uExposure * uOutScale * uGain, 1.0);
 }
@@ -276,7 +278,7 @@ export class DriftGrains {
         uLightPos: su.uLightPos, uLightCol: su.uLightCol, uLightR2: su.uLightR2, uSpotDir: su.uSpotDir, uSpotCos: su.uSpotCos,
         uCursorPos: su.uCursorPos, uCursorCol: { value: new THREE.Vector3() }, uCursorReach: su.uCursorReach,
         uExposure: su.uExposure, uOutScale: su.uOutScale, uWrap: su.uWrap,
-        uSpec: su.uSpec, uLampSat: su.uLampSat,   // the sand's calibrated sheen and lamp colour
+        uSpec: su.uSpec, uGloss: su.uGloss, uSSS: su.uSSS, uLampSat: su.uLampSat,   // the sand's calibrated sheen and lamp colour
         uGain: { value: 1 },
         uShutter: { value: 1 / 60 },
         // the sand's shadows: its own uniforms, shared (its volumes swap as it compacts)

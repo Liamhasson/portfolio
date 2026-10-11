@@ -76,6 +76,24 @@ uniform sampler2D uTex;
 void main() { gl_FragColor = texture(uTex, vUv); }
 `;
 
+/** The haze: the air lit by the key, rendered alone in Blender (blender/lookdev/cinematic_variants.py CINE_PLATE=1),
+ *  screened over the frame like light scattered in front of and behind the grains. Display values, stored boosted
+ *  (x 1/uScale) and dithered against banding. */
+const HAZE_FRAGMENT = /* glsl */ `
+precision highp float;
+out highp vec4 pc_fragColor;
+#define gl_FragColor pc_fragColor
+in vec2 vUv;
+uniform sampler2D uTex;
+uniform float uScale;
+uniform float uAmount;
+void main() {
+  vec3 h = texture(uTex, vUv).rgb * uScale * uAmount;
+  float n = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
+  gl_FragColor = vec4(max(h + n / 255.0 * step(1e-4, h.r + h.g + h.b), 0.0), 1.0);
+}
+`;
+
 export class SandComposite {
   private readonly rt: THREE.WebGLRenderTarget;
   private readonly blurRt: THREE.WebGLRenderTarget;
@@ -103,6 +121,17 @@ export class SandComposite {
   defocus = 0;
   /** And how far it falls into shadow, so the light is on the grains (0..1). */
   deskDim = 0;
+  /** The hero's haze (texture, decode scale) and how much of it shows (0..1; it belongs to the hero's light). */
+  haze: { texture: THREE.Texture; scale: number } | null = null;
+  hazeAmount = 0;
+  private readonly hazeScene = new THREE.Scene();
+  private readonly hazeMat = new THREE.ShaderMaterial({
+    glslVersion: THREE.GLSL3, vertexShader: VERTEX, fragmentShader: HAZE_FRAGMENT,
+    depthTest: false, depthWrite: false, toneMapped: false, transparent: true,
+    // screen: dst + src (1 - dst), on display values
+    blending: THREE.CustomBlending, blendSrc: THREE.OneMinusDstColorFactor, blendDst: THREE.OneFactor,
+    uniforms: { uTex: { value: null }, uScale: { value: 1 }, uAmount: { value: 0 } },
+  });
   /** The filter's width at the render's resolution (1600 px wide), in its pixels. Fitted against the renders. */
   sigma = 0.55;
 
@@ -134,6 +163,9 @@ export class SandComposite {
     const rawQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.raw);
     rawQuad.frustumCulled = false;
     this.rawScene.add(rawQuad);
+    const hazeQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.hazeMat);
+    hazeQuad.frustumCulled = false;
+    this.hazeScene.add(hazeQuad);
   }
 
   /** The desk drawn into a target (display values, as drawn), for the passage's defocus. */
@@ -151,7 +183,7 @@ export class SandComposite {
   /** Compiles its own passes' shaders and makes its targets now, not on the frame each is first needed (stalls of up
    *  to 200 ms mid-scroll). */
   async warm(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): Promise<void> {
-    await Promise.all([this.scene, this.rawScene, this.discScene].map((sc) => renderer.compileAsync(sc, this.ortho)));
+    await Promise.all([this.scene, this.rawScene, this.discScene, this.hazeScene].map((sc) => renderer.compileAsync(sc, this.ortho)));
     // and drawn once each way (the GPU builds its pipelines on a shader's first draw into each kind of target)
     const d = this.defocus;
     for (const v of [0, 4]) {
@@ -202,6 +234,11 @@ export class SandComposite {
     camera.layers.mask = mask;
     renderer.autoClear = false;
     renderer.render(this.scene, this.ortho);
+    if (this.haze && this.hazeAmount > 0.002) {
+      const hu = this.hazeMat.uniforms;
+      hu.uTex.value = this.haze.texture; hu.uScale.value = this.haze.scale; hu.uAmount.value = this.hazeAmount;
+      renderer.render(this.hazeScene, this.ortho);
+    }
     renderer.autoClear = autoClear;
   }
 
@@ -212,6 +249,7 @@ export class SandComposite {
     this.raw.dispose();
     this.disc.dispose();
     this.material.dispose();
+    this.hazeMat.dispose();
     this.quad.geometry.dispose();
   }
 }

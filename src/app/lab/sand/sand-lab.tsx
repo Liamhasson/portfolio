@@ -13,6 +13,7 @@ import { burstAt } from "@/three/sand/attempts";
 import { BakedDesk } from "@/three/sand/baked-desk";
 import { revealAt } from "@/three/sand/screen-reveal";
 import { DriftGrains, type StreamCurve } from "@/three/sand/drift-grains";
+import { FilmGrade } from "./film-grade";
 import { SAND_ENCODE, SAND_LAYER, SandComposite } from "@/three/sand/sand-composite";
 import { Pullback } from "@/three/sand/pullback";
 import * as THREE from "three";
@@ -118,6 +119,8 @@ export function SandLab() {
   const [split, setSplit] = useState(50);
   // ?hero: the hero's front layer over the sand (the lab's status line hidden)
   const [hero] = useState(() => new URLSearchParams(window.location.search).has("hero"));
+  // the final grade over the scene (film-grade.tsx); ?grade=0: the raw frame
+  const [gradeOn] = useState(() => new URLSearchParams(window.location.search).get("grade") !== "0");
   const compactRef = useRef(0);
   const progressRef = useRef(0);   // damped scroll progress 0..1
   // the hero copy: in the lab's compaction mode it leaves as the ball forms; on the hero page, as the pull-back begins
@@ -177,6 +180,8 @@ export function SandLab() {
       // the filter's width follows the grains' size on screen (fitted against the renders): chaos 0.5, ball 0.28,
       // the far desk view 0.525
       let composite: SandComposite | null = null;
+      const hazeOn = new URLSearchParams(window.location.search).get("haze") !== "0";
+      const dofOn = new URLSearchParams(window.location.search).get("dof") !== "0";
       const FILTER = { chaos: 0.5, ball: 0.28, desk: 0.525 };
       if (filterParam !== "0") {
         const comp = new SandComposite();
@@ -187,6 +192,16 @@ export function SandLab() {
         stage.camera.layers.enable(SAND_LAYER);
         stage.renderFrame = (r, sc, cam) => comp.render(r, sc, cam);
         (window as unknown as { __sandFilter?: (s: number) => void }).__sandFilter = (s) => { comp.sigma = s; };
+        // the hero's haze: its key lighting the air (blender/lookdev/cinematic_variants.py CINE_PLATE=1); ?haze=0: none
+        if (hazeOn) {
+          Promise.all([
+            new THREE.TextureLoader().loadAsync(`${SAND_BASE}/haze-hero.png`),
+            fetch(`${SAND_BASE}/haze-hero.json`).then((r) => r.json() as Promise<{ scale: number }>),
+          ]).then(([texture, { scale }]) => {
+            texture.colorSpace = THREE.NoColorSpace;   // display values, as rendered
+            comp.haze = { texture, scale };
+          }).catch(() => {});
+        }
       }
       // the desk: a real 3D object by default; ?plates draws the rendered frames instead (for comparison)
       const usePlates = new URLSearchParams(window.location.search).has("plates");
@@ -793,6 +808,10 @@ export function SandLab() {
           const chaosR = 0.5 * Math.min(cs.x, cs.y, cs.z);
           const ballR = field!.material.uniforms.uBallR.value as number;
           const pg = progressRef.current;
+          // the hero's haze goes with the hero's light, as the camera pulls back to the desk
+          if (composite) composite.hazeAmount = hazeOn ? (hero ? 1 - ease(pg, TL.pullback) : 1) : 0;
+          // and its lens: the lit front in focus, the rest softening (?dof=0: sharp throughout)
+          field!.setDof(dofOn ? (hero ? 1 - ease(pg, TL.pullback) : 1) : 0);
           const formed = ease(state.compact, [0.5, 0.92]);   // none around the formed ball (Liam, 2026-10-10)
           const density = (!hero ? DRIFT.hero
             : THREE.MathUtils.lerp(DRIFT.hero, DRIFT.desk, ease(pg, TL.pullback)) * (1 - ease(pg, [TL.build[1] - 0.02, TL.build[1]]))) * (1 - formed);   // none once the dive begins
@@ -919,6 +938,7 @@ export function SandLab() {
     <>
     <div ref={pageRef} className="relative bg-black" style={{ height: hero ? `${PAGE_VH}vh` : "400vh" }}>
       <canvas ref={canvasRef} className="fixed inset-0 h-screen w-screen" data-testid="sand-canvas" />
+      {gradeOn && <FilmGrade />}
       {/* the nav's Projects (/#projects) lands where the index has settled (once this page is the home) */}
       {hero && <div id="projects" aria-hidden className="pointer-events-none absolute left-0 w-px" style={{ top: `${PAGE_VH - 100}vh`, height: 1 }} />}
       {hero && <WorkIndex bind={bindIndex} />}

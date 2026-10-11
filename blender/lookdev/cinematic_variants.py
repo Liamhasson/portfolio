@@ -12,7 +12,7 @@ lights and the camera, untouched; this changes them per variant and renders):
      faint haze lit by the key, shallow focus on the lit front
   C  further: B with denser haze, shallower focus, harder contrast
 
-Env: VARIANT (A/B/C), CINE_RES "w,h" (1600,1000), CINE_SAMPLES (128), CINE_EXPOSURE (overrides the variant's).
+Env: VARIANT (A/B/C), ROSE (B with more rose), CINE_PLATE (the haze alone), CINE_TAG, CINE_RES "w,h" (1600,1000), CINE_SAMPLES (128), CINE_EXPOSURE (overrides the variant's).
 Writes blender/lookdev/renders/cinematic-<V>.png (raw). The grade (warm lifted black ~#0b0908, slight vignette, fine
 grain: the site's final pass, previewed) is applied after, to B and C:
 
@@ -122,6 +122,12 @@ if V != "A":
             except TypeError:
                 continue
 
+# CINE_PLATE=1: the haze alone (no grains, no wordmark), for the live hero to lay over its sand (public/lab/sand/haze-hero.png)
+if os.environ.get("CINE_PLATE"):
+    for name in ("chaos", "wordmark"):
+        if name in bpy.data.objects:
+            bpy.data.objects[name].hide_render = True
+    scene.render.image_settings.color_depth = "16"   # its values are low: 8 bits would band
 out = os.path.abspath(os.path.join("blender/lookdev/renders", f"cinematic-{V}{os.environ.get('CINE_TAG', '')}.png"))
 scene.render.filepath = out
 bpy.ops.render.render(write_still=True)

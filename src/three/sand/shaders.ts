@@ -115,8 +115,8 @@ uniform vec3 uLightCol[3];   // colour * power, calibrated
 uniform vec3 uSpotDir;       // light 0 as a spot (the desk lamp): its direction, and the cone's cosines (outer, inner)
 uniform vec2 uSpotCos;
 uniform vec3 uLightR2;       // each light's radius squared: a sized light can't blow up at close range (0 = point)
-uniform vec3 uRamp[4];
-uniform vec4 uRampAt;
+uniform vec3 uRamp[5];
+uniform float uRampAt[5];
 uniform vec3 uCursorPos;     // the cursor as a light (Lusion model), on a plane through the sand
 uniform vec3 uCursorCol;     // colour * intensity (fades with the pointer)
 uniform float uCursorReach;  // world units: how far its light carries
@@ -139,6 +139,9 @@ uniform vec3 uBallCPrev;
 uniform float uBallPosMaxPrev;
 uniform float uFrameDt;      // seconds between those two frames
 uniform vec2 uMotionBlur;    // strength (0 = off), longest streak in grain lengths
+// depth of field (the cinematic look: Ducky's lit front sharp, the rest softening): the thin lens's blur per unit of
+// focal length in pixels, A / (s - f) (aperture A = f / N, focus s; 0 = off), and the focus distance s
+uniform vec2 uDof;
 
 out vec3 vAlbedo;
 out vec3 vL0; out vec3 vL1; out vec3 vL2; out vec3 vL3;   // light directions, view space (3 = cursor)
@@ -158,9 +161,7 @@ ${SIMPLEX}
 // Blender's ColorRamp, linear interpolation between the stops
 vec3 ramp(float h) {
   vec3 c = uRamp[0];
-  c = mix(c, uRamp[1], clamp((h - uRampAt.x) / (uRampAt.y - uRampAt.x), 0.0, 1.0));
-  c = mix(c, uRamp[2], clamp((h - uRampAt.y) / (uRampAt.z - uRampAt.y), 0.0, 1.0));
-  c = mix(c, uRamp[3], clamp((h - uRampAt.z) / (uRampAt.w - uRampAt.z), 0.0, 1.0));
+  for (int i = 1; i < 5; i++) c = mix(c, uRamp[i], clamp((h - uRampAt[i - 1]) / max(uRampAt[i] - uRampAt[i - 1], 1e-4), 0.0, 1.0));
   return c;
 }
 
@@ -397,11 +398,19 @@ void main() {
     px *= k;
   }
   vEll = vec4(squash, cos(ang), sin(ang));
+  // out of focus, a grain spreads into a soft disc of the lens's blur, as faint as it is wider (its light conserved)
+  float coc = uDof.x > 0.0 ? min(uPointScale * uDof.x * abs(-mv.z - uDof.y) / -mv.z, 14.0) : 0.0;
+  float dofK = 1.0;
+  if (coc > 0.3 && px > 0.0) {
+    float pd = sqrt(px * px + coc * coc);
+    dofK = (px * px) / (pd * pd);
+    px = pd;
+  }
   // below a minimum the grain keeps its area through coverage, so it never shimmers
-  vAlpha = clamp((px * px) / (uMinPx * uMinPx), 0.0, 1.0);
+  vAlpha = clamp((px * px) / (uMinPx * uMinPx), 0.0, 1.0) * dofK;
   gl_PointSize = max(px, uMinPx);
   vPx = gl_PointSize;
-  vEdgePx = mix(uEdge.x, uEdge.y, t);
+  vEdgePx = max(mix(uEdge.x, uEdge.y, t), coc * 0.5);
 }
 `;
 
@@ -425,7 +434,9 @@ in float vEdgePx;
 
 uniform float uExposure;
 uniform float uOutScale;   // 1 on screen; 1/4 into the filtered sand layer (see sand-composite.ts)
-uniform float uSpec;
+uniform float uSpec;     // the grain's reflectance at normal incidence (Cycles: specular IOR level 0.5 = F0 0.04)
+uniform float uGloss;    // its highlight's tightness (normalised Blinn exponent): roughness 0.22 broadened by the key's size
+uniform float uSSS;      // subsurface (Cycles: weight 0.6, radius 1 / 0.45 / 0.45): red light wraps further past the terminator
 uniform float uWrap;     // light reaching past the terminator: grains are lit by the bounce off their neighbours
 uniform float uGapFill;  // how much of it reaches the grains in the gaps (inter-reflection)
 uniform float uRough;    // Oren-Nayar roughness (radians): a rough grain's edge stays as bright as its middle (Liam,
@@ -454,8 +465,12 @@ void main() {
   vec3 L[4] = vec3[4](vL0, vL1, vL2, vL3);
   vec3 E[4] = vec3[4](vE0, vE1, vE2, vE3);
   vec3 col = vec3(0.0);
+  float glossNorm = (uGloss + 8.0) / (8.0 * 3.14159265);
+  vec3 wrap3 = vec3(uWrap) + uSSS * vec3(1.0, 0.45, 0.45);
   for (int i = 0; i < 4; i++) {
     float ndl = max((dot(n, L[i]) + uWrap) / (1.0 + uWrap), 0.0);
+    // the subsurface glow: the wrap per channel (a lit grain glows warm at its edge)
+    vec3 ndl3 = max((vec3(dot(n, L[i])) + wrap3) / (1.0 + wrap3), 0.0);
     // Oren-Nayar: the rough surface's retro-reflection lifts the grain's limb where lambert alone darkens it
     float nl = max(dot(n, L[i]), 0.0), nv = max(n.z, 1e-3);
     float s2 = uRough * uRough;
@@ -464,11 +479,13 @@ void main() {
     float cphi = max(dot(lp, vp) / max(length(lp) * length(vp), 1e-4), 0.0);
     float ai = acos(clamp(nl, 0.0, 1.0)), ar = acos(clamp(nv, 0.0, 1.0));
     float on = onA + onB * cphi * sin(max(ai, ar)) * tan(min(min(ai, ar), 1.4));
-    ndl *= mix(1.0, on, step(0.001, uRough));
+    float onK = mix(1.0, on, step(0.001, uRough));
+    ndl *= onK; ndl3 *= onK;
     vec3 h = normalize(L[i] + v);
-    float spec = pow(max(dot(n, h), 0.0), 12.0) * uSpec;
+    // glossy (Liam, 2026-10-11, the cinematic look: Ducky's grains catch a highlight each)
+    float spec = pow(max(dot(n, h), 0.0), uGloss) * glossNorm * uSpec;
     vec3 alb = i == 0 ? mix(albedo, albedo * albedo * 2.2, uLampSat) : albedo;
-    col += E[i] * (alb * ndl / 3.14159265 + spec * ndl + albedo * albedo * uBounce * vBounceW);
+    col += E[i] * (alb * ndl3 / 3.14159265 + spec * ndl + albedo * albedo * uBounce * vBounceW);
   }
   // the desk below: grains facing down see a broad warm surface (no single ray, so the ball doesn't block it)
   float down = clamp(0.5 - 0.5 * dot(n, uUpView), 0.0, 1.0);
@@ -478,7 +495,7 @@ void main() {
   col += albedo * albedo * vFillE * uGapFill / 3.14159265;
   // (Liam, 2026-10-11: in the cloud the light is on the grains from the front, not on the desk)
   vec3 albK = mix(albedo, albedo * albedo * 2.2, uLampSat);
-  col += albK * uFrontKey * (0.3 + 0.7 * max(n.z, 0.0)) + uFrontKey * pow(max(n.z, 0.0), 12.0) * uSpec;
+  col += albK * uFrontKey * (0.3 + 0.7 * max(n.z, 0.0)) + uFrontKey * pow(max(n.z, 0.0), uGloss) * glossNorm * uSpec;
   col *= uExposure * uOutScale;
   gl_FragColor = vec4(col, vAlpha * edge);
   #include <tonemapping_fragment>
