@@ -24,8 +24,11 @@ const settledOn = (page: Page, screen: number) =>
     const st = window.__pulseProto.state();
     return st.screen === s && st.settled;
   }, screen);
+/** Back, Skip and the progress bar: one layer over the screens that stays put while they slide. */
+const chrome = (page: Page) => proto(page).locator(".pa-chrome");
 const btn = (page: Page, name: string | RegExp) =>
-  current(page).getByRole("button", typeof name === "string" ? { name, exact: true } : { name });
+  proto(page).locator(".pa-screen.is-current, .pa-chrome")
+    .getByRole("button", typeof name === "string" ? { name, exact: true } : { name });
 const tap = async (page: Page, name: string | RegExp, screen: number) => {
   await btn(page, name).click();
   await settledOn(page, screen);
@@ -42,8 +45,7 @@ const walkTo = async (page: Page, to: number) => {
   const from = (await state(page)).screen;
   for (const [n, s] of steps) { if (s > to) return; if (s > from) await tap(page, n, s); }
   if (to < 6) return;
-  await btn(page, "HIIT").click();
-  await tap(page, "Continue", 6);
+  await tap(page, "HIIT", 6);
   if (to < 7) return;
   await tap(page, /^Burn Club/, 7);
   if (to < 8) return;
@@ -169,25 +171,79 @@ test.describe("pulse onboarding prototype", () => {
     await tap(page, "Continue", 4);
   });
 
-  test("a workout has to be picked before Continue", async ({ page }) => {
+  test("tapping a workout is the step forward: no Continue, straight to the studios", async ({ page }) => {
     await openProto(page);
     await walkTo(page, 5);
-    const cont = btn(page, "Continue");
-    await expect(cont).toBeDisabled();
-    await btn(page, "Hyrox").click();
-    await expect(btn(page, "Hyrox")).toHaveAttribute("aria-pressed", "true");
-    await btn(page, "Crossfit").click();
-    await expect(btn(page, "Crossfit")).toHaveAttribute("aria-pressed", "true");
-    await expect(btn(page, "Hyrox")).toHaveAttribute("aria-pressed", "false");
-    await expect(cont).toBeEnabled();
+    await expect(btn(page, "Continue")).toHaveCount(0);
+    await tap(page, "Crossfit", 6);
     expect((await state(page)).choices.workout).toBe("Crossfit");
+    await expect(current(page)).toContainText("Crossfit classes near you");
+    await tap(page, "Back", 5);
+    await expect(btn(page, "Crossfit")).toHaveAttribute("aria-pressed", "true"); // the pick is kept on the way back
+    await btn(page, "Hyrox").press("Enter");
+    await settledOn(page, 6);
+    await expect(current(page)).toContainText("Hyrox classes near you");
+  });
+
+  test("Back, Skip and the progress bar stay put while the screen slides", async ({ page }) => {
+    await openProto(page);
+    await tap(page, "Get Started", 2);
+    await expect(proto(page).locator(".pa-back")).toHaveCount(1);
+    await expect(proto(page).locator(".pa-skip")).toHaveCount(1);
+    await expect(proto(page).locator(".pa-progress")).toHaveCount(1);
+    const drift = await page.evaluate(async () => {
+      const q = (s: string) => document.querySelector(`[data-proto] ${s}`)!;
+      const parts = [".pa-back", ".pa-skip", ".pa-progress"].map(q);
+      const start = parts.map((el) => el.getBoundingClientRect().x);
+      const incoming = q('.pa-screen[data-screen="3"]');
+      (q('.pa-screen[data-screen="2"] .pa-cta') as HTMLElement).click();
+      let worst = 0, slid = 0;
+      for (let i = 0; i < 20; i++) {
+        await new Promise((r) => requestAnimationFrame(r));
+        parts.forEach((el, k) => { worst = Math.max(worst, Math.abs(el.getBoundingClientRect().x - start[k])); });
+        slid = Math.max(slid, incoming.getBoundingClientRect().x - q(".proto-screen").getBoundingClientRect().x);
+      }
+      return { worst, slid };
+    });
+    expect(drift.slid).toBeGreaterThan(20); // the screen itself did slide
+    expect(drift.worst).toBeLessThan(0.5);  // the chrome did not
+    await settledOn(page, 3);
+    await tap(page, "Continue", 4);
+    await expect(btn(page, "Skip")).toHaveCount(0); // 04 has no Skip in the file
+    await expect(btn(page, "Back")).toBeVisible();
+  });
+
+  test("the progress bar fills a step on every screen from 2 to 8, screen 4 included", async ({ page }) => {
+    await openProto(page);
+    const bar = chrome(page).getByRole("progressbar", { name: "Onboarding progress" });
+    await expect(bar).toBeHidden();
+    const seen: number[] = [];
+    const read = async () => {
+      await expect(bar).toBeVisible();
+      await page.waitForTimeout(500); // the fill eases with the slide
+      const fill = await bar.evaluate((b) => {
+        const r = b.getBoundingClientRect(), f = b.querySelector("i")!.getBoundingClientRect();
+        return (Math.min(f.right, r.right) - r.left) / r.width;
+      });
+      seen.push(fill);
+    };
+    await tap(page, "Get Started", 2); await read();
+    await tap(page, "Continue", 3); await read();
+    await tap(page, "Continue", 4); await read();
+    await tap(page, "Continue", 5); await read();
+    await tap(page, "HIIT", 6); await read();
+    await tap(page, /^Burn Club/, 7); await read();
+    await tap(page, /^Maya Thompson/, 8); await read();
+    for (let i = 1; i < seen.length; i++) expect(seen[i]).toBeGreaterThan(seen[i - 1] + 0.05);
+    expect(seen[seen.length - 1]).toBeGreaterThan(0.97);
+    await tap(page, "Book now", 9);
+    await expect(bar).toBeHidden();
   });
 
   test("the choices carry through to the studio, time, confirmation and booked screens", async ({ page }) => {
     await openProto(page);
     await walkTo(page, 5);
-    await btn(page, "Hyrox").click();
-    await tap(page, "Continue", 6);
+    await tap(page, "Hyrox", 6);
     await expect(current(page)).toContainText("Hyrox classes near you");
     await tap(page, /^Iron Yard/, 7);
     await expect(current(page)).toContainText("Iron Yard · Hyrox");
@@ -217,6 +273,8 @@ test.describe("pulse onboarding prototype", () => {
       await expect(btn(page, name)).toHaveAttribute("tabindex", "-1");
     }
     await expect(btn(page, /^Maya Thompson/)).toBeEnabled();
+    await expect(btn(page, /^Maya Thompson/)).toContainText("1 spot left");
+    await expect(current(page)).not.toContainText("1 spots left");
     const screen = proto(page).locator(".proto-screen");
     const box = (await screen.boundingBox())!;
     await page.mouse.click(box.x + box.width / 2, box.y + box.height * ((280 + 38) / 852)); // Mark Adams, fully booked

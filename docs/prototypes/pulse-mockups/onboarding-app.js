@@ -40,7 +40,7 @@ const SLOTS = [
   ["Maya Thompson", "11:00–11:45", "spots"], ["Leon Smith", "12:00–12:45", "open"], ["Mark Anderson", "13:00–13:45", "open"],
   ["Mark Anderson", "14:00–14:45", "open"],
 ];
-const BADGE = { full: "Fully booked", spots: "1 spots left", open: "Available" };
+const BADGE = { full: "Fully booked", spots: "1 spot left", open: "Available" };
 
 const INITIAL = () => ({
   goals: ["Get stronger", "Stay active"], activities: ["HIIT", "Hyrox"], open: 0,
@@ -52,9 +52,21 @@ const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 const img = (f, cls = "") => `<img src="${A(f)}" alt=""${cls ? ` class="${cls}"` : ""} loading="lazy" decoding="async" draggable="false">`;
 const status = (solid) => `<div aria-hidden="true"><span class="pa-time">9:41</span><span class="pa-batt${solid ? " is-solid" : ""}"></span></div>`;
 const home = (cls = "") => `<div class="pa-home ${cls}" aria-hidden="true"></div>`;
-const back = `<button type="button" class="pa-back pa-glass pa-hit" data-act="back" aria-label="Back">${img("ic-back.svg")}</button>`;
-const skip = (to) => `<button type="button" class="pa-skip pa-hit" data-act="go" data-to="${to}">Skip</button>`;
-const progress = (w) => `<div class="pa-progress" aria-hidden="true"><i style="width:${w}px"></i></div>`;
+/* Back, Skip and the progress bar sit in one layer over the screens, as an app's navigation bar does: they stay still
+   while the screens slide under them, Back and Skip fade only where a screen has none, and the bar eases to its new
+   fill. Per screen: where Skip goes, and the bar's fill in px of 220 (the file's own fills; 04 has no bar in the file,
+   so its step is the midpoint between 03 and 05, keeping the bar on from 02 to 08). */
+const CHROME = {
+  2: { back: true, skip: 3, bar: 35 }, 3: { back: true, skip: 4, bar: 70 }, 4: { back: true, bar: 103 },
+  5: { back: true, bar: 136 }, 6: { back: true, bar: 172 }, 7: { back: true, bar: 202 }, 8: { back: true, bar: 220 },
+  10: { back: true },
+};
+const BAR = 220;
+const CHROME_HTML = `<div class="pa-chrome">
+  <button type="button" class="pa-back pa-glass pa-hit" data-act="back" aria-label="Back">${img("ic-back.svg")}</button>
+  <button type="button" class="pa-skip pa-hit" data-act="go">Skip</button>
+  <div class="pa-progress" role="progressbar" aria-label="Onboarding progress" aria-valuemin="0" aria-valuemax="100"><i></i></div>
+</div>`;
 const cta = (label, to, { top = 716, glow = false, act = "go", extra = "" } = {}) =>
   `<button type="button" class="pa-cta pa-hit${glow ? " is-glow" : ""}" style="top:${top}px" data-act="${act}"${to ? ` data-to="${to}"` : ""}${extra}>${label}</button>`;
 const head = (title, sub, top = 128, bind = "") =>
@@ -78,15 +90,15 @@ const SCREENS = [
     ${home("is-dim is-low")}`),
 
   // 02_GoalFraming
-  screen(2, "What brings you here?", `${bg(1)}${status()}${back}${skip(3)}
+  screen(2, "What brings you here?", `${bg(1)}${status()}
     ${head("What brings you here?", "Pick the goals that matter most to you")}
     <div class="pa-list" role="group" aria-label="Goals">${GOALS.map((g) =>
       `<button type="button" class="pa-goal pa-hit" data-act="goal" data-goal="${esc(g)}" aria-pressed="false"><span>${esc(g)}</span><span class="pa-tick" aria-hidden="true">${img("ic-check.svg")}</span></button>`).join("")}</div>
     ${cta("Continue", 3, { extra: ' data-need="goals"' })}
-    ${progress(35)}${home()}`),
+    ${home()}`),
 
   // 03_Preferences
-  screen(3, "What do you love?", `${bg(3)}${status()}${back}${skip(4)}
+  screen(3, "What do you love?", `${bg(3)}${status()}
     ${head("What do you love?", "Choose the activities to personalise your plan")}
     <div class="pa-list">${CATS.map((c, i) => `
       <div class="pa-cat pa-glass" data-cat="${i}">
@@ -99,10 +111,10 @@ const SCREENS = [
         </div>
       </div>`).join("")}</div>
     ${cta("Continue", 4)}
-    ${progress(70)}${home()}`),
+    ${home()}`),
 
   // 04_CoreFlow
-  screen(4, "Book your first workout", `${bg(2)}${status(true)}${back}
+  screen(4, "Book your first workout", `${bg(2)}${status(true)}
     <div class="pa-hero pa-tile" aria-hidden="true">${img("ic-fitness-lg.svg")}</div>
     <div class="pa-center" style="top:270px;gap:10px"><h2 class="pa-display">Book your first workout</h2><p class="pa-body" style="width:320px">Every workout in Pulse is free. <br>Want to book your first one now?</p></div>
     <ul class="pa-perks">
@@ -114,31 +126,30 @@ const SCREENS = [
     ${home("is-dim is-low")}`),
 
   // 05_ChooseWorkout
-  screen(5, "Choose a workout", `${glow("glow-workout.svg")}${status()}${back}
+  screen(5, "Choose a workout", `${glow("glow-workout.svg")}${status()}
     ${head("Choose a workout", "The best matches to your chosen activities")}
     <div class="pa-grid" role="group" aria-label="Workouts">${WORKOUTS.map(([w, f]) =>
       `<button type="button" class="pa-workout pa-hit" data-act="workout" data-workout="${esc(w)}" aria-pressed="false"><span class="ph" aria-hidden="true">${img(f)}</span><span>${esc(w)}</span><span class="pa-tick" aria-hidden="true">${img("ic-check.svg")}</span></button>`).join("")}</div>
-    ${cta("Continue", 6, { extra: ' data-need="workout"' })}
-    ${home()}${progress(136)}`),
+    ${home()}`),
 
   // 06_ChooseStudio
-  screen(6, "Choose a studio", `${glow()}${status()}${back}${home()}
+  screen(6, "Choose a studio", `${glow()}${status()}${home()}
     ${head("Choose a studio", "HIIT classes near you", 128, "classes")}
     <div class="pa-studios">${STUDIOS.map(([n, where, r, f]) =>
       `<button type="button" class="pa-studio pa-glass pa-hit" data-act="studio" data-studio="${esc(n)}"><span class="logo" aria-hidden="true">${img(f)}</span><span class="txt"><span class="pa-card-title">${esc(n)}</span><span class="where">${esc(where)}</span><span class="rating">${esc(r)}</span></span><span class="go" aria-hidden="true">${img("ic-chevron.svg")}</span></button>`).join("")}</div>
-    ${progress(172)}`),
+    `),
 
   // 07_ChooseTime
-  screen(7, "Pick a time", `${glow()}${status()}${back}${home()}
+  screen(7, "Pick a time", `${glow()}${status()}${home()}
     ${head("Pick a time", "Burn Club · HIIT", 128, "studioWorkout")}
     <div class="pa-days" role="group" aria-label="Day">${DAYS.map((d) =>
       `<button type="button" class="pa-day pa-hit" data-act="day" data-day="${esc(d.date)}" aria-pressed="false"><span class="d">${d.d}</span>${d.n ? `<span class="n">${d.n}</span>` : ""}</button>`).join("")}</div>
     <div class="pa-slots" role="group" aria-label="Classes">${SLOTS.map(([who, time, st], i) =>
       `<button type="button" class="pa-slot pa-glass pa-hit" data-act="slot" data-slot="${i}"${st === "full" ? ' aria-disabled="true" tabindex="-1"' : ""}><span class="who"><b>${esc(who)}</b><span>${time}</span></span><span class="state"><span class="pa-badge ${st}">${BADGE[st]}</span></span></button>`).join("")}</div>
-    ${progress(202)}`),
+    `),
 
   // 08_BookingConfirmation
-  screen(8, "Confirm booking", `${glow()}${status()}${back}
+  screen(8, "Confirm booking", `${glow()}${status()}
     <div class="pa-confirm">
       <div class="pa-head" style="position:static">${`<h2 class="pa-display">Confirm booking</h2><p class="pa-body">Review your session details</p>`}</div>
       <div class="pa-summary pa-glass">
@@ -150,7 +161,7 @@ const SCREENS = [
       <p class="pa-note">Free cancellation up to 12 hours before</p>
     </div>
     <button type="button" class="pa-slider pa-glass pa-hit" data-act="book"><span class="pa-fill" aria-hidden="true"></span><span class="pa-slide-label">Book now</span><span class="pa-knob" aria-hidden="true">${img("ic-arrow.svg")}</span></button>
-    ${home()}${progress(220)}`),
+    ${home()}`),
 
   // 09_YoureBooked
   screen(9, "You're booked!", `${bg(1)}${status()}
@@ -160,7 +171,7 @@ const SCREENS = [
     ${home()}`),
 
   // 10_Orientation
-  screen(10, "You're all set", `${bg(2)}${status(true)}${home("is-dim")}${back}
+  screen(10, "You're all set", `${bg(2)}${status(true)}${home("is-dim")}
     ${head("You're all set", "Here’s what you can do with Pulse", 120)}
     <ul class="pa-feats">${[
       ["ic-heart.svg", "Book in seconds", "Browse, book and save favorite classes"],
@@ -188,7 +199,7 @@ const SCREENS = [
  */
 export function createApp(root, shell) {
   const { gsap, reduce } = shell;
-  root.innerHTML = SCREENS.join("");
+  root.innerHTML = SCREENS.join("") + CHROME_HTML;
   const screens = [...root.querySelectorAll(".pa-screen")];
   const $ = (sel, n) => screens[n - 1].querySelector(sel);
   const $$ = (sel) => [...root.querySelectorAll(sel)];
@@ -213,7 +224,7 @@ export function createApp(root, shell) {
     $$("[data-workout]").forEach((b) => b.setAttribute("aria-pressed", String(s.workout === b.dataset.workout)));
     $$("[data-day]").forEach((b) => b.setAttribute("aria-pressed", String(s.day === b.dataset.day)));
     $$("[data-need]").forEach((b) => {
-      const ok = b.dataset.need === "goals" ? s.goals.length > 0 : !!s.workout;
+      const ok = s.goals.length > 0;
       if (ok) b.removeAttribute("aria-disabled"); else b.setAttribute("aria-disabled", "true");
     });
     const workout = s.workout || "HIIT", studio = s.studio || "Burn Club";
@@ -336,7 +347,15 @@ export function createApp(root, shell) {
     if (act === "goal") s.goals = toggle(s.goals, el.dataset.goal);
     else if (act === "chip") s.activities = toggle(s.activities, el.dataset.chip);
     else if (act === "cat") { const i = Number(el.dataset.cat); if (i !== s.open) setOpen(i, true); return; }
-    else if (act === "workout") s.workout = el.dataset.workout;
+    else if (act === "workout") {
+      // A pick-one screen: the tapped tile lights up for a beat, then the studios slide in.
+      if (!shell.isSettled()) return;
+      s.workout = el.dataset.workout; sync();
+      if (reduce) { shell.navigate(6); return; }
+      shell.busy(true);
+      gsap.delayedCall(0.18, () => { shell.busy(false); shell.navigate(6); });
+      return;
+    }
     else if (act === "day") s.day = el.dataset.day;
     else if (act === "studio") { if (!shell.isSettled()) return; s.studio = el.dataset.studio; sync(); shell.navigate(7); return; }
     else if (act === "slot") { if (!shell.isSettled()) return; s.slot = Number(el.dataset.slot); sync(); shell.navigate(8); return; }
@@ -349,6 +368,32 @@ export function createApp(root, shell) {
     }
     sync();
   });
+
+  /* ------------------------------ the fixed layer: Back, Skip, the bar ------------------------------ */
+  const ch = root.querySelector(".pa-chrome");
+  const cBack = ch.querySelector(".pa-back"), cSkip = ch.querySelector(".pa-skip"), cBar = ch.querySelector(".pa-progress"), cFill = cBar.querySelector("i");
+  let barW = 0;
+  const showPart = (el, on, animate) => {
+    el.inert = !on;
+    gsap.killTweensOf(el, "opacity,visibility");
+    if (!animate) gsap.set(el, { autoAlpha: on ? 1 : 0 });
+    else gsap.to(el, { autoAlpha: on ? 1 : 0, duration: on ? 0.3 : 0.2, ease: "power2.out" });
+  };
+  const chromeFor = (n, animate) => {
+    const c = CHROME[n] || {};
+    showPart(cBack, !!c.back, animate);
+    showPart(cSkip, !!c.skip, animate);
+    if (c.skip) cSkip.dataset.to = String(c.skip);
+    showPart(cBar, c.bar != null, animate);
+    if (c.bar == null) return;
+    cBar.setAttribute("aria-valuenow", String(Math.round((c.bar / BAR) * 100)));
+    // The fill is the full bar slid left; the track's rounded clip shapes its start. Transform only.
+    const from = barW || c.bar;
+    barW = c.bar;
+    gsap.killTweensOf(cFill);
+    if (!animate || from === c.bar) gsap.set(cFill, { x: c.bar - BAR });
+    else gsap.fromTo(cFill, { x: from - BAR }, { x: c.bar - BAR, duration: 0.42, ease: "power3.out" });
+  };
 
   const reset = () => {
     s = INITIAL();
@@ -363,7 +408,7 @@ export function createApp(root, shell) {
     screens,
     choices,
     reset,
-    /** Called by the shell when a screen comes on. */
-    enter(n) { if (n === 8) resetSlider(); },
+    /** Called by the shell when a screen comes on; animate when it slides in. */
+    enter(n, animate = false) { if (n === 8) resetSlider(); chromeFor(n, animate && !reduce); },
   };
 }

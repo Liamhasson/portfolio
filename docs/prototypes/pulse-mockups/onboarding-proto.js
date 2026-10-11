@@ -51,7 +51,7 @@ function mount() {
     screen = to;
     render();
     mark(to);
-    app.enter(to);
+    app.enter(to, from !== to);
     const out = screens[from - 1], inn = screens[to - 1];
     // Focus follows the screen, as VoiceOver moves to the top of a pushed view.
     if (hadFocus || document.activeElement === document.body) inn.focus({ preventScroll: true });
@@ -96,6 +96,7 @@ function mount() {
     screen = n;
     screens.forEach((el, i) => { gsap.set(el, { autoAlpha: i === n - 1 ? 1 : 0, xPercent: 0, zIndex: 0 }); gsap.set(shade(el), { opacity: 0 }); });
     mark(n);
+    app.enter(n);
     render();
     settled = true;
   };

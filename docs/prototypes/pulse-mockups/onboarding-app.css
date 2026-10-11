@@ -63,8 +63,11 @@
 .pa-cta[aria-disabled="true"] { opacity: .4; cursor: default; } /* Button · Primary · Disabled */
 .pa-pill { position: absolute; left: 24px; width: 345px; height: 56px; border-radius: 999px; display: flex; align-items: center; justify-content: center;
   font: 700 16px/20px var(--mr); letter-spacing: .2px; white-space: nowrap; }
-.pa-progress { position: absolute; left: 86.5px; top: 810px; width: 220px; height: 6px; border-radius: 999px; background: var(--inset); overflow: hidden; z-index: 5; }
-.pa-progress i { position: absolute; left: 0; top: 0; height: 6px; border-radius: 999px; background: var(--grad); }
+/* the fixed layer over the screens (Back, Skip, the bar): it holds still while the screens slide beneath it */
+.pa-chrome { position: absolute; inset: 0; z-index: 10; pointer-events: none; }
+.pa-chrome > * { pointer-events: auto; visibility: hidden; opacity: 0; }
+.pa-progress { position: absolute; left: 86.5px; top: 810px; width: 220px; height: 6px; border-radius: 999px; background: var(--inset); overflow: hidden; }
+.pa-progress i { position: absolute; left: 0; top: 0; width: 220px; height: 6px; border-radius: 999px; background: var(--grad); will-change: transform; }
 .pa-iconbox { flex: none; width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; box-shadow: inset 0 0 0 1px var(--gbs); background: var(--gf);
   -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
 .pa-tile { flex: none; border-radius: 14px; display: grid; place-items: center; background: var(--grad); }
@@ -221,7 +224,7 @@
 
 /* ---------- a tap that misses: where the controls are ---------- */
 .pa-hit { transition: outline-color 200ms ease; }
-.proto-screen.is-hinting .pa-screen.is-current .pa-hit:not([aria-disabled="true"]) { outline: 2px solid rgba(51,208,231,.9); outline-offset: 2px; }
+.proto-screen.is-hinting :is(.pa-screen.is-current, .pa-chrome) .pa-hit:not([aria-disabled="true"]) { outline: 2px solid rgba(51,208,231,.9); outline-offset: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
   .pa *, .pa *::before, .pa *::after { transition: none !important; }
