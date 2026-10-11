@@ -2,8 +2,9 @@ import * as THREE from "three";
 import type { SandMeta } from "./data";
 
 /**
- * LIAM HASSON behind the sand: on load filled with light, handing over to the outline as the copy rises (Liam,
- * 2026-10-11); then heavy Geist letters as dark outlines in the void, light travelling through their strokes
+ * LIAM HASSON behind the sand: heavy Geist letters as dark outlines in the void, light travelling through their strokes
+ * and glowing softly inside the letters where it passes (Liam, 2026-10-12: no filled letters; a glow like the nav pills'
+ * light, never a flat fill)
  * (reference: the outlined titles on lusion.co/about). Approved by Liam 2026-10-09: heavy weight, dark fill, light on the
  * stroke paths, the sand's own colours (not Lusion's RGB), and both kinds of light:
  *   - an ambient wave of light that spreads through the strokes from a different spot each time: it comes in, takes
@@ -30,10 +31,12 @@ export const WORDMARK = {
   waveBand: 1.9, // how wide the lit band is (name heights): each letter stays lit ~3s as it passes
   waveGain: 1.1,
   cursorGain: 1.6,
-  /** The letters filled with light (the approved hero render's "light in the haze": emission (1, 0.86, 0.8) x 0.55, at
-   *  the cinematic look's exposure), handed over to the outline as "Hi, I'm Liam." rises (Liam, 2026-10-11). */
-  fillColor: [1.0, 0.86, 0.8] as [number, number, number],
-  fillStrength: 0.65,
+  /** Inside the letters, the outline's own light as a soft glow (the nav pills' light: faint, brightest where the rim
+   *  catches it, fading inward): its strength against the stroke's, and how far in from the rim it fades (screen px). */
+  innerGlow: 0.16,
+  innerEdgePx: 22,
+  /** The pills' light is a pale veil: a warm white, not the outline's dusky ramp (which reads brown when faint). */
+  innerColor: [1.0, 0.9, 0.84] as [number, number, number],
 };
 
 const SDF_RANGE = 24; // texels encoded either side of the edge
@@ -127,7 +130,7 @@ void main() {
 }
 `;
 
-const FRAGMENT = /* glsl */ `
+export const WORDMARK_FRAGMENT = /* glsl */ `
 precision highp float;
 out highp vec4 pc_fragColor;
 #define gl_FragColor pc_fragColor
@@ -150,7 +153,9 @@ uniform float uCursorGain;
 uniform vec3 uRamp[4];
 uniform float uDpr;
 uniform float uFade;         // the camera pulling away (pull-back): the name dims out
-uniform vec3 uFill;          // the letters' fill (colour x strength x how much of it is left)
+uniform float uInner;        // the glow inside the letters, against the stroke's light
+uniform float uInnerEdge;    // screen px in from the rim over which it fades to its faint middle
+uniform vec3 uInnerCol;      // its colour: a pale warm white, as the pills' light
 uniform float uBlurPx;       // the lens's blur at the name (screen px): its edges spread over it
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -178,10 +183,14 @@ void main() {
   // out of focus, an edge spreads over the lens's blur (its light kept: the stroke dims as it widens)
   float b = max(uBlurPx * 0.5, 0.5);
   float stroke = (1.0 - smoothstep(uStrokePx - b + 0.5, uStrokePx + b + 0.5, dist)) * min(1.0, (uStrokePx + 0.5) / b);
-  // inside the letters: the fill, its edge antialiased over a pixel (or the lens's blur)
+  // inside the letters (antialiased over a pixel), brightest just in from the rim, as a pill's light catches its edge
   float inLetter = 1.0 - smoothstep(-b, b, sd * pxPerTexel);
-  vec3 fill = uFill * inLetter;
-  if (stroke <= 0.0 && max(fill.r, max(fill.g, fill.b)) <= 0.0) discard;
+  if (stroke <= 0.0 && inLetter <= 0.0) discard;
+  // (in texels, with the texture's own scale: the distance field saturates deep in the strokes, where px measured
+  // from it drew ridges; the fade ends well inside the field's range)
+  float texPerPx = length(fwidth(vUv * uTexSize)) * 0.7071;
+  float inTex = max(-sd, 0.0), edgeTex = min(uInnerEdge * texPerPx, uRange * 0.4);
+  float rimK = 0.15 + 0.85 * exp(-inTex / max(edgeTex, 0.5));
 
   // the ambient wave: light spreading from a point like water, its edge bent by slowly flowing noise
   vec2 p = vec2(vUv.x * uAspect, vUv.y);
@@ -203,7 +212,9 @@ void main() {
 
   float light = clamp(wave + cursor, 0.0, 1.6);
   vec3 col = glow(min(light, 1.0)) * light * 2.2 + vec3(0.18, 0.1, 0.12) * uBase;
-  gl_FragColor = vec4((col * stroke + fill) * uFade, 1.0);
+  // the glow inside: only where the light is (dark letters at rest), the outline's own colours, faint
+  vec3 inner = uInnerCol * min(light, 1.2) * uInner * inLetter * rimK;
+  gl_FragColor = vec4((col * stroke + inner * (1.0 - stroke)) * uFade, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }
@@ -226,7 +237,7 @@ export class Wordmark {
     const material = new THREE.ShaderMaterial({
       glslVersion: THREE.GLSL3,
       vertexShader: VERTEX,
-      fragmentShader: FRAGMENT,
+      fragmentShader: WORDMARK_FRAGMENT,
       transparent: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
@@ -251,7 +262,9 @@ export class Wordmark {
         uRamp: { value: meta.ramp.map(([, c]) => new THREE.Vector3(...c)) },
         uDpr: { value: 1 },
         uFade: { value: 1 },
-        uFill: { value: new THREE.Vector3(...WORDMARK.fillColor).multiplyScalar(WORDMARK.fillStrength) },
+        uInner: { value: WORDMARK.innerGlow },
+        uInnerEdge: { value: WORDMARK.innerEdgePx },
+        uInnerCol: { value: new THREE.Vector3(...WORDMARK.innerColor) },
         uBlurPx: { value: 0 },
       },
     });
@@ -259,16 +272,6 @@ export class Wordmark {
     mesh.position.set(...WORDMARK.position);
     mesh.renderOrder = -1;   // before the sand, which then covers it where it passes in front
     return new Wordmark(mesh, material);
-  }
-
-  /** How much of the letters' fill is left (1 filled .. 0 the outline alone). */
-  setFill(f: number): void {
-    (this.material.uniforms.uFill.value as THREE.Vector3).set(...WORDMARK.fillColor).multiplyScalar(WORDMARK.fillStrength * f);
-  }
-
-  /** The lens's blur at the name, screen px (Liam, 2026-10-11: soft while filled, sharp as it becomes the outline). */
-  setBlur(px: number): void {
-    this.material.uniforms.uBlurPx.value = px;
   }
 
   /** Its distance from the camera (world units), for the lens. */

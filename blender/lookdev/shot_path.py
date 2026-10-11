@@ -3,9 +3,9 @@ laptop's screen, in desk metres (Blender z-up). Pure Python (no bpy): run with a
 
   frames   0-39   ease   the hero framing easing in 4% toward the ball while it forms
           39-79   tilt   in place, down until the ball has left the frame above and the desk fills it
-          79-149  glide  down and forward, low past the note "Who is this product for?" (it reads: Liam, 2026-10-11), the lid
-                         opening and the screen waking on the way, to the approved tail's frame 171
-         149-188  tail   shot-src/through-camera.json (the old flight's, public/lab/through) frames 171-210, verbatim (the push into the screen)
+          79-188  glide + tail: one smooth movement straight into the screen (Liam, 2026-10-12: no turn to the sticky note),
+                         eased once over the whole scroll from the desk to the screen; the lid opens and the screen wakes
+                         on the way; it lands on the approved last frame (shot-src/through-camera.json frame 210)
 
   python3 blender/lookdev/shot_path.py            # writes public/lab/shot/camera.json
   python3 blender/lookdev/shot_path.py --check    # and asserts the joins, the direction and the ball leaving the frame
@@ -27,14 +27,13 @@ BALL_R = 0.11                        # (its radius 1.1: 47% of the hero's height
 EASE_IN = 0.04                       # the ease-in: 4% of the way to the ball
 TILT_AT = (0.0, 0.16, 0.0)           # where the tilt ends looking: ~26.5 degrees down, the frame's bottom edge just on the desk's
                                      # front edge (steeper showed the void in front of it), the ball just clear of the top
-JOIN = 170                           # the tail's index joined (its frame 171: low enough that the glide can pass the note and
-                                     # only ever fall; the lid open, the screen awake)
+JOIN = 170                           # the old tail's frame 171: its lid fully open (the opening is read from its frames 136-171)
 BEATS = {"ease": (0, 39), "tilt": (39, 79), "glide": (79, 149), "tail": (149, 188)}
-LID = (0.6, 1.0)                     # the glide's share over which the lid opens (the tail's own opening, its frames 137-171)
-WAKE_K = 154                         # the tail's wake (its frame 155)
-NOTE = (0.075, -0.095, 0.0008)       # "Who is this product for?" (lookdev.py sticky_hero), 7.6 cm
-NOTE_SIZE = 0.076
-BLEND = 15                           # the glide's last frames turn from the look-at to the tail's own orientation
+LID_SCROLL = (2.88, 3.2)              # the screens of scroll over which the lid opens (as before: the old glide's last 40%)
+WAKE_SCROLL = 3.06                   # where the screen wakes (as before)
+APPROACH = 0.25                      # metres: the last stretch arrives along the line of sight to the screen
+AIM = 0.85                           # the share of the move over which the eye turns from the desk onto the screen
+ROLL_FROM = 0.6                      # from here the orientation settles onto the last frame's own (its slight roll)
 
 
 def add(a, b): return tuple(x + y for x, y in zip(a, b))
@@ -45,6 +44,7 @@ def cross(a, b): return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a
 def norm(a): return mul(a, 1.0 / math.sqrt(dot(a, a)))
 def lerp(a, b, t): return add(a, mul(sub(b, a), t))
 def smoother(t): t = min(max(t, 0.0), 1.0); return t * t * t * (t * (t * 6 - 15) + 10)
+def smooth(t): t = min(max(t, 0.0), 1.0); return t * t * (3 - 2 * t)
 
 
 def look_quat(pos, at):
@@ -84,21 +84,50 @@ def rotate(q, v):
     return add(add(v, mul(t, w)), cross(u, t))
 
 
+SCROLL = {"glide": (2.4, 3.2), "tail": (3.2, 4.2)}   # the beats' screens of scroll (src/three/sand/story-timeline.ts BEATS)
+
+
+def scroll_at(i, beats):
+    """A frame's place in the scroll (screens), as the page maps them (story-timeline.ts shotFrame), from the glide on."""
+    for k in ("glide", "tail"):
+        f0, f1 = beats[k]
+        if i <= f1:
+            p0, p1 = SCROLL[k]
+            return p0 + (p1 - p0) * (i - f0) / (f1 - f0)
+    return SCROLL["tail"][1]
+
+
 def bezier(p0, p1, p2, p3, t):
     a, b, c = lerp(p0, p1, t), lerp(p1, p2, t), lerp(p2, p3, t)
     return lerp(lerp(a, b, t), lerp(b, c, t), t)
 
 
+def lid_at(tp, sp):
+    """The lid's angle at a scroll position: the tail's own opening (its frames 136-171) over the same scroll as before."""
+    x = (sp - LID_SCROLL[0]) / (LID_SCROLL[1] - LID_SCROLL[0])
+    if x <= 0: return 0.0
+    kf = 136 + (JOIN - 136) * min(x, 1.0)
+    k0 = min(int(kf), JOIN - 1)
+    return max(tp[k0]["lid_open_deg"] + (tp[k0 + 1]["lid_open_deg"] - tp[k0]["lid_open_deg"]) * (kf - k0), 0.0)
+
+
 def build():
     th = json.load(open(THROUGH))
     tp = th["path"]
-    j = tp[JOIN]
-    j_pos, j_q, j_lens = tuple(j["position"]), tuple(j["quaternion"]), j["lens_mm"]
-    j_fwd = rotate(j_q, (0.0, 0.0, -1.0))
-    j_at = add(j_pos, mul(j_fwd, 0.5))
+    e = tp[209]                                   # where it ends: the screen filling the frame (the approved last frame)
+    e_pos, e_q, e_lens = tuple(e["position"]), tuple(e["quaternion"]), e["lens_mm"]
+    sc = e["screen_corners"]
+    screen = mul(add(add(sc[0], sc[1]), add(sc[2], sc[3])), 0.25)
+    e_fwd = norm(sub(screen, e_pos))
     p1 = lerp(HERO_POS, BALL, EASE_IN)
+    # one curve from the tilt's end into the screen: leaving toward the laptop, arriving along the line of sight to the
+    # screen (its height only ever falls, it only ever goes forward: the control points sit in order between the ends)
+    c2 = sub(e_pos, mul(e_fwd, APPROACH))
+    c1 = lerp(p1, c2, 0.45)
     frames = []
-    for i in range(BEATS["glide"][1] + 1):
+    g0, g1 = BEATS["glide"][0], BEATS["tail"][1]
+    for i in range(g1 + 1):
+        lid = 0.0
         if i <= BEATS["ease"][1]:
             t = smoother(i / BEATS["ease"][1])
             pos, at, lens = lerp(HERO_POS, p1, t), HERO_AT, 45.0
@@ -106,39 +135,28 @@ def build():
             t = smoother((i - BEATS["tilt"][0]) / (BEATS["tilt"][1] - BEATS["tilt"][0]))
             pos, at, lens = p1, lerp(HERO_AT, TILT_AT, t), 45.0
         else:
-            t = smoother((i - BEATS["glide"][0]) / (BEATS["glide"][1] - BEATS["glide"][0]))
-            # down and forward, low past the note: the height only ever falls (control points between the ends)
-            pos = bezier(p1, (0.0, -0.75, 0.40), (0.03, -0.45, 0.34), j_pos, t)
-            # the eye: the note at mid-glide, then the laptop (the tail's own line of sight)
-            at = lerp(TILT_AT, NOTE, smoother(t / 0.5)) if t < 0.5 else lerp(NOTE, j_at, smoother((t - 0.5) / 0.5))
-            lens = 45.0 + 10.0 * smoother(t / 0.5) if t < 0.5 else 55.0 + (j_lens - 55.0) * smoother((t - 0.5) / 0.5)
+            # eased once over the whole scroll from the desk to the screen (not per beat: one movement); a cubic ease: from
+            # rest after the tilt, but under way at once (the quintic held it still for a third of a screen)
+            sp = scroll_at(i, BEATS)
+            u = smooth((sp - SCROLL["glide"][0]) / (SCROLL["tail"][1] - SCROLL["glide"][0]))
+            pos = bezier(p1, c1, c2, e_pos, u)
+            # the eye: from where the tilt left it, turning steadily onto the screen
+            at = lerp(TILT_AT, screen, smoother(min(u / AIM, 1.0)))
+            lens = 45.0 + (e_lens - 45.0) * u
+            lid = lid_at(tp, sp)
         q = look_quat(pos, at)
-        if i > BEATS["glide"][1] - BLEND:
-            q = slerp(q, j_q, smoother((i - (BEATS["glide"][1] - BLEND)) / BLEND))
-        # the lid: shut, then the tail's own opening (its frames 137-171) over the glide's last 40%
-        lid = 0.0
-        if i > BEATS["ease"][1] and i > BEATS["tilt"][1]:
-            tg = (i - BEATS["glide"][0]) / (BEATS["glide"][1] - BEATS["glide"][0])
-            if tg > LID[0]:
-                kf = 136 + (JOIN - 136) * (tg - LID[0]) / (LID[1] - LID[0])
-                k0 = min(int(kf), JOIN - 1)
-                lid = tp[k0]["lid_open_deg"] + (tp[k0 + 1]["lid_open_deg"] - tp[k0]["lid_open_deg"]) * (kf - k0)
+        if i > g0:
+            # (onto the approved last frame's own orientation, its slight roll included, over the approach)
+            u = smooth((scroll_at(i, BEATS) - SCROLL["glide"][0]) / (SCROLL["tail"][1] - SCROLL["glide"][0]))
+            q = slerp(q, e_q, smoother(max(u - ROLL_FROM, 0.0) / (1.0 - ROLL_FROM)))
         frames.append({"frame": i + 1, "position": list(pos), "quaternion": list(q), "lens_mm": lens, "sensor_mm": 36,
-                       "lid_open_deg": max(lid, 0.0), "focus_m": math.sqrt(dot(sub(at, pos), sub(at, pos)))})
-    frames[-1].update(position=list(j_pos), quaternion=list(j_q), lens_mm=j_lens, lid_open_deg=tp[JOIN]["lid_open_deg"])
-    for k in range(JOIN + 1, th["frames"]):
-        e = tp[k]
-        # (the focus on the screen as the camera closes in: a fixed 0.5 m blew the grains near the lens into burrs)
-        sc = e.get("screen_corners")
-        focus = math.sqrt(dot(sub(mul(add(add(sc[0], sc[1]), add(sc[2], sc[3])), 0.25), e["position"]), sub(mul(add(add(sc[0], sc[1]), add(sc[2], sc[3])), 0.25), e["position"]))) if sc else frames[-1]["focus_m"]
-        frames.append({"frame": len(frames) + 1, "position": e["position"], "quaternion": e["quaternion"], "lens_mm": e["lens_mm"],
-                       "sensor_mm": 36, "lid_open_deg": e["lid_open_deg"], "focus_m": focus})
-    g0, g1 = BEATS["glide"]
-    at_k = lambda k: g0 + (g1 - g0) * (LID[0] + (LID[1] - LID[0]) * (k - 136) / (JOIN - 136))   # tail index -> glide frame
+                       "lid_open_deg": lid, "focus_m": math.sqrt(dot(sub(at, pos), sub(at, pos)))})
+    frames[-1].update(position=list(e_pos), quaternion=list(e_q), lens_mm=e_lens, lid_open_deg=e["lid_open_deg"])
+    frame_of = lambda sp: next(i for i in range(g0, g1 + 1) if scroll_at(i, BEATS) >= sp)
     return {
         "move": "shot", "fps": 24, "frames": len(frames), "units": "metres", "up": "z",
         "chaos_center": th["chaos_center"], "chaos_scale": th["chaos_scale"], "plate_overscan": 1.0,
-        "wake_frame": round(at_k(WAKE_K)) + 1, "screen_from": round(at_k(136)),
+        "wake_frame": frame_of(WAKE_SCROLL) + 1, "screen_from": frame_of(LID_SCROLL[0]),
         "beats": {k: list(v) for k, v in BEATS.items()},
         "lights": json.load(open(PULLBACK))["lights"],
         "path": frames,
@@ -150,8 +168,9 @@ def check(d):
     assert d["frames"] == 189 and len(P) == 189, d["frames"]
     assert max(abs(a - b) for a, b in zip(P[0]["position"], HERO_POS)) < 1e-9, "starts on the hero framing"
     th = json.load(open(THROUGH))["path"]
-    for i, k in ((149, JOIN), (150, JOIN + 1), (188, 209)):
-        assert max(abs(a - b) for a, b in zip(P[i]["position"], th[k]["position"])) < 1e-9, ("joins the tail", i)
+    # it lands on the approved last frame: the screen filling it
+    assert max(abs(a - b) for a, b in zip(P[188]["position"], th[209]["position"])) < 1e-9, "lands on the last frame"
+    assert max(abs(a - b) for a, b in zip(P[188]["quaternion"], th[209]["quaternion"])) < 1e-9, "lands on the last frame"
     # forward and down: from the tilt on, the camera never climbs or backs away (0.5 cm tolerance: the tail's wobble)
     for i in range(BEATS["tilt"][0], d["frames"] - 1):
         assert P[i + 1]["position"][2] <= P[i]["position"][2] + 0.005, ("climbs", i)
@@ -166,18 +185,29 @@ def check(d):
     bot = rotate(q, norm((0.0, -tan_v, -1.0)))
     t_hit = -pos[2] / bot[2]
     assert bot[2] < 0 and pos[1] + bot[1] * t_hit >= -0.3, ("the void below the desk's front edge in frame", pos[1] + bot[1] * t_hit)
-    # the note reads on the way past (Liam, 2026-10-11): "Who is this product for?" fills a quarter of the frame's height
-    # somewhere in the glide, well inside the frame (its central 60%)
-    best = 0.0
-    for i in range(d["beats"]["glide"][0], d["beats"]["glide"][1] + 1):
+    # one smooth movement from the table into the screen (Liam, 2026-10-12: "it aims at the sticky note … just go straight
+    # into the computer. one smooth movement"): per screen of scroll, the camera's speed and its turn never jump from one
+    # frame to the next, and from the tilt's end on it only ever turns toward the screen
+    g0, end = d["beats"]["glide"][0], d["frames"] - 1
+    sp, tu = [], []
+    for i in range(g0, end):
+        dp = scroll_at(i + 1, d["beats"]) - scroll_at(i, d["beats"])
+        sp.append(math.sqrt(dot(sub(P[i + 1]["position"], P[i]["position"]), sub(P[i + 1]["position"], P[i]["position"]))) / dp)
+        qa, qb = tuple(P[i]["quaternion"]), tuple(P[i + 1]["quaternion"])
+        tu.append(2 * math.acos(min(1.0, abs(dot(qa, qb)))) / dp)
+    top_s, top_t = max(sp), max(tu)
+    for k in range(1, len(sp)):
+        assert abs(sp[k] - sp[k - 1]) <= 0.12 * top_s, ("the speed jumps", g0 + k, round(sp[k - 1], 3), round(sp[k], 3))
+        assert abs(tu[k] - tu[k - 1]) <= 0.12 * top_t, ("the turn jumps", g0 + k, round(tu[k - 1], 3), round(tu[k], 3))
+    sc = json.load(open(THROUGH))["path"][209]["screen_corners"]
+    screen = mul(add(add(sc[0], sc[1]), add(sc[2], sc[3])), 0.25)
+    off = []
+    for i in range(g0, end + 1):
         q, pos = tuple(P[i]["quaternion"]), tuple(P[i]["position"])
-        c = rotate((q[0], -q[1], -q[2], -q[3]), sub(NOTE, pos))
-        if c[2] >= 0:
-            continue
-        tv = 18.0 / P[i]["lens_mm"] / 1.6
-        if abs(c[0] / -c[2]) < tv * 1.6 * 0.6 and abs(c[1] / -c[2]) < tv * 0.6:
-            best = max(best, NOTE_SIZE / -c[2] / (2 * tv))
-    assert best >= 0.25, ("the note too small to read on the way past", round(best, 3))
+        f = rotate(q, (0.0, 0.0, -1.0))
+        off.append(math.acos(max(-1.0, min(1.0, dot(f, norm(sub(screen, pos)))))))
+    for k in range(1, len(off)):
+        assert off[k] <= off[k - 1] + 0.004, ("turns away from the screen (the note)", g0 + k, round(math.degrees(off[k - 1]), 1), round(math.degrees(off[k]), 1))
     print("shot ok:", d["frames"], "frames; wake", d["wake_frame"], "; screen from", d["screen_from"])
 
 
