@@ -242,6 +242,51 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
 .er-frame { position: absolute; left: calc(var(--u) * 640); top: calc(var(--u) * 72); width: calc(var(--u) * 728); height: calc(var(--u) * 560); border-radius: calc(var(--u) * 20); overflow: hidden; background: #f2f1ec; box-shadow: 0 0 0 calc(var(--u) * 1) #e6e4de; }
 .er-frame img { width: 100%; height: 100%; object-fit: cover; object-position: 0 0; display: block; }
 
+
+/* ------------------------------ the button that opens the clickable prototype ------------------------------ */
+.ob-try { align-self: flex-start; display: inline-flex; align-items: center; gap: calc(var(--u) * 10); height: calc(var(--u) * 48); padding: 0 calc(var(--u) * 22); border: 0; border-radius: 999px; cursor: pointer; font: 500 calc(var(--u) * 15)/1 var(--sans); color: var(--ink); background: linear-gradient(var(--void), var(--void)) padding-box, var(--grad) border-box; border: calc(var(--u) * 1.5) solid transparent; transition: transform 160ms var(--settle), box-shadow 320ms var(--settle); }
+.ob-try:hover { box-shadow: 0 0 calc(var(--u) * 28) rgba(51,208,231,.25); }
+.ob-try:active { transform: scale(.97); }
+.ob-try:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
+.ob-try .ic { width: calc(var(--u) * 16); height: calc(var(--u) * 16); }
+.m-ob .ob-try { height: calc(var(--u) * 44); font-size: calc(var(--u) * 14); padding: 0 calc(var(--u) * 18); }
+
+/* ------------------------------ the prototype overlay (real px: it sits over the whole page) ------------------------------ */
+.proto { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; font-family: var(--sans); color: var(--ink); }
+.proto[hidden] { display: none; }
+.proto-backdrop { position: absolute; inset: 0; background: rgba(3,6,12,.84); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.proto-body { --ph: min(84vh, 780px); position: relative; display: flex; align-items: center; gap: 64px; padding: 24px; }
+.proto-side { width: 300px; display: flex; flex-direction: column; gap: 18px; }
+.proto-eyebrow { margin: 0; font: 400 12px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.proto-count { margin: 0; font: 400 14px/1 var(--mono); letter-spacing: .08em; color: var(--ink-3); }
+.proto-caps { position: relative; min-height: 96px; margin: 0; padding: 0; list-style: none; }
+.proto-cap { position: absolute; inset: 0 0 auto; font-size: 30px; line-height: 1.15; letter-spacing: -.015em; opacity: 0; transition: opacity 140ms ease-in; }
+.proto-cap.is-on { opacity: 1; transition: opacity 300ms var(--settle) 140ms; }
+.proto-note { margin: 0; font-size: 14px; line-height: 1.55; color: var(--ink-2); }
+.proto-actions { display: flex; gap: 10px; }
+.proto-btn { height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid var(--hair-2); background: transparent; color: var(--ink); font: 500 14px/1 var(--sans); cursor: pointer; }
+.proto-btn:hover { background: rgba(238,243,250,.06); }
+.proto-btn:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
+.proto-phone { height: var(--ph); aspect-ratio: 393 / 852; border-radius: calc(var(--ph) * .07); padding: calc(var(--ph) * .01); background: #0a0f19; box-shadow: inset 0 0 0 1px rgba(220,232,250,.18), 0 30px 90px -20px rgba(31,128,238,.35); }
+.proto-screen { position: relative; width: 100%; height: 100%; border-radius: calc(var(--ph) * .06); overflow: hidden; background: #060b14; cursor: pointer; }
+.proto-shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; visibility: hidden; }
+.proto-hots { position: absolute; inset: 0; z-index: 5; }
+.hot { position: absolute; padding: 0; margin: 0; border: 0; border-radius: 14px; background: transparent; cursor: pointer; transition: background-color 200ms ease, box-shadow 200ms ease; -webkit-tap-highlight-color: transparent; }
+.hot:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.proto-screen.is-hinting .hot { background: rgba(51,208,231,.16); box-shadow: inset 0 0 0 2px rgba(51,208,231,.85); }
+/* the slide-to-book control, re-drawn only while it slides */
+.proto-track { position: absolute; left: calc(24 / 393 * 100%); top: calc(716 / 852 * 100%); width: calc(345 / 393 * 100%); height: calc(56 / 852 * 100%); z-index: 4; pointer-events: none; }
+.proto-knob { position: absolute; left: 3%; top: 8%; height: 84%; aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(135deg, #1f80ee, #33d0e7); box-shadow: 0 0 18px rgba(51,208,231,.55); opacity: 0; visibility: hidden; }
+.proto-knob svg { width: 44%; height: 44%; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+@media (max-width: 760px) {
+  .proto-body { --ph: min(70vh, 640px); flex-direction: column-reverse; gap: 16px; }
+  .proto-side { width: min(90vw, 360px); gap: 10px; }
+  .proto-caps { min-height: 60px; }
+  .proto-cap { font-size: 20px; }
+  .proto-note { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .proto-cap, .proto-cap.is-on, .hot { transition: none; } }
+
 /* ------------------------------ mobile frame ------------------------------ */
 .phone-row { display: grid; grid-template-columns: 390px minmax(0, 1fr); gap: 56px; max-width: 1440px; margin: 0 auto; align-items: start; }
 .phone-row .frame { max-width: 390px; width: 100%; margin: 0; }
@@ -371,6 +416,7 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
               <div class="ob-stage"><i></i><span>First booking</span></div>
               <div class="ob-stage"><i></i><span>Tour &amp; close</span></div>
             </div>
+            <button type="button" class="ob-try" data-proto-open>Tap through it yourself<svg class="ic" aria-hidden="true"><use href="#i-arrow-right"/></svg></button>
           </div>
           <div class="phone ob-phone"><div class="phone-screen">
             <figure class="ob-screen"><img src="pulse-mockups/onb-01.jpg" alt="Onboarding screen 1: Welcome"><figcaption>01 · What Pulse is for, in three lines.</figcaption></figure>
@@ -511,6 +557,25 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
   </div>
 </section>
 
+
+<!-- ============================== CLICKABLE PROTOTYPE (overlay) ============================== -->
+<div class="proto" data-proto role="dialog" aria-modal="true" aria-label="Pulse onboarding prototype" hidden>
+  <div class="proto-backdrop"></div>
+  <div class="proto-body">
+    <div class="proto-side">
+      <p class="proto-eyebrow">Pulse · onboarding prototype</p>
+      <p class="proto-count" data-proto-count>01 / 12</p>
+      <ol class="proto-caps"><li class="proto-cap is-on">What Pulse is for, in three lines.</li><li class="proto-cap">Pick the goals that matter to you.</li><li class="proto-cap">Choose the activities; the plan follows.</li><li class="proto-cap">Your first booking, free to cancel.</li><li class="proto-cap">The best matches for your activities.</li><li class="proto-cap">Studios near you, with ratings.</li><li class="proto-cap">A slot that fits, with what's still free.</li><li class="proto-cap">Everything in one place before you book.</li><li class="proto-cap">Booked, and one tap to your calendar.</li><li class="proto-cap">What else Pulse does, in four lines.</li><li class="proto-cap">Notifications, asked for with a reason.</li><li class="proto-cap">In.</li></ol>
+      <p class="proto-note">Tap the screen as you would in the app. Screens from the Figma file; only its real controls respond.</p>
+      <div class="proto-actions"><button type="button" class="proto-btn" data-proto-restart>Restart</button><button type="button" class="proto-btn" data-proto-close>Close</button></div>
+    </div>
+    <div class="proto-phone"><div class="proto-screen">
+      <img class="proto-shot" src="pulse-mockups/proto/p-01.jpg" alt="Screen 1: Welcome"><img class="proto-shot" src="pulse-mockups/proto/p-02.jpg" alt="Screen 2: What brings you here?" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-03.jpg" alt="Screen 3: What do you love?" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-04.jpg" alt="Screen 4: Book your first workout" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-05.jpg" alt="Screen 5: Choose a workout" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-06.jpg" alt="Screen 6: Choose a studio" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-07.jpg" alt="Screen 7: Pick a time" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-08.jpg" alt="Screen 8: Confirm booking" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-09.jpg" alt="Screen 9: You're booked!" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-10.jpg" alt="Screen 10: You're all set" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-11.jpg" alt="Screen 11: Stay in the loop" loading="lazy"><img class="proto-shot" src="pulse-mockups/proto/p-12.jpg" alt="Screen 12: Welcome to Pulse" loading="lazy">
+      <div class="proto-track" aria-hidden="true"><span class="proto-knob"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></span></div>
+      <div class="proto-hots"></div>
+    </div></div>
+  </div>
+</div>
 </main>
 <script>
 /* Nav motion: pointer light (rAF-throttled, rect cached per hover), sliding active pill, replay. */
@@ -588,5 +653,6 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
 <script type="module" src="pulse-mockups/onboarding-story.js"></script>
+<script type="module" src="pulse-mockups/onboarding-proto.js"></script>
 </body>
 </html>
