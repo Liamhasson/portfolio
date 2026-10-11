@@ -1,6 +1,6 @@
 # The new scene order: the ball forms in the hero, one forward shot down to the desk and into the screen
 
-**Status:** agreed with Liam in chat, 2026-10-11, for review as written (revision 2: the camera only ever moves forward,
+**Status:** agreed with Liam in chat, 2026-10-11, approved by Liam 2026-10-11 (revision 2: the camera only ever moves forward,
 the critical pass's changes folded in). Supersedes the chapter 1 to 2.3 flow in `2026-10-07-portfolio-concept-v3.md`
 and the scroll timeline in `src/app/lab/sand/sand-lab.tsx`. The loader (chapter 0) is a separate piece with its own
 design, planned after this one. The quality bar stands: Awwwards/Lusion level, Cycles renders as the reference for the
@@ -48,21 +48,16 @@ Every beat is driven by scroll and reverses when scrolling back (except the risi
 2. *Down and forward over the desk (~2.4 to 3.2).*
    - The camera glides low past the handwritten notes, framed so "Who is this product for?" reads on the way.
    - The rising sand runs throughout.
-   - The desk headline arrives lower left as the desk is revealed and leaves before the laptop. It's headline only; today's "From chaos to product." and its second line are removed. Its words are chosen in section 4.
+   - The desk headline arrives lower left as the desk is revealed and leaves before the laptop. It's headline only; today's "From chaos to product." and its second line are removed. Its words: section 4.
 3. *The laptop and the screen (~3.2 to 4.3).* Shut as the desk is revealed; as the camera closes in, the lid opens and the screen wakes (the existing behaviour, from the current shot's tail). Then the push through the glass; the live index takes over and settles.
 
 **Page length:** about 4.5 to 5 screens to the index (from about 10).
 
 ## 4. The desk headline
 
-The desk passage tells "how I work". Its headline must add to the hero line, never repeat it: the hero already says
-"I build ambiguous ideas into products where design and user needs meet", so a second "into products" is out. Liam's
-draft was "From shapes into products people believe in". Options, for Liam to choose or rewrite:
-
-- "Tested until people believe in it." (keeps his words; says the how)
-- "It starts with the questions nobody asked."
-- "Questions first. Then the shape. Then the product."
-- "Every product starts on a desk like this."
+**"Tested until people believe in it."** (Liam, 2026-10-11, from his draft "From shapes into products people believe
+in": it keeps his words and says the how, without repeating the hero's "into products".) Headline only, lower left
+over the desk, with the existing scrim.
 
 ## 5. The rising sand (endless, like Lusion's)
 
@@ -83,7 +78,7 @@ It never runs out.
 - **The rise:**
   - A grain leaves the desk slowly, speeds up as it climbs, and drifts a little sideways on the same flow noise as the cloud.
   - It leaves the frame upward, toward the ball.
-  - It then reappears at rest at another spot outside the view, so nothing pops in where it can be seen, and the desk never looks emptied.
+  - It then grows back in at rest a short way from where it left (from nothing, over about 1.5 s), so nothing pops in where it can be seen, and the desk never looks emptied. (Planning note, 2026-10-11: choosing a spot outside the view would break the waves' spatial coherence, since the wave timing is tied to where a grain lives.)
 - **Look:**
   - One system with the rest of the sand: the same points, the same shader (SAND_FRAGMENT), the same palette, size range and gloss.
   - Lit by the lamp; darker inside the ball's shadow.
@@ -149,7 +144,7 @@ The code paths and assets for these come out of the live page: the settle, rise 
 5. **The rising sand:** a points system sharing the sand's uniforms and fragment shader, its rest positions exported from the look-dev spill (section 5).
 6. **The copy:**
    - `hero-overlay.tsx`: the hero copy is visible from the first frame and its exit is tied to compaction.
-   - The desk line is replaced by the chosen headline (section 4).
+   - The desk line is replaced by "Tested until people believe in it." (section 4).
 7. **The nav:** the pills' targets on the story page (section 6), Projects' fast-forward jump, and its active state.
 8. **The timeline:** `TL` and `SCROLL_KEYS` in `sand-lab.tsx` are rewritten for the new beats; the page's length follows.
 9. **The pallet desk bake** finishes first (shut, open and lit with the new wood), since the desk is in every frame of the shot.
@@ -178,6 +173,5 @@ The code paths and assets for these come out of the live page: the settle, rise 
 
 ## 11. Open items
 
-- The desk headline's words (section 4): Liam chooses.
 - The loader: its own design, next.
 - The shot's exact framing over the notes, set by the preview render (Liam approves before the live wiring).
