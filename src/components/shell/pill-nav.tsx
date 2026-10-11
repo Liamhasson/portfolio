@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
 import { useActiveSection } from "@/hooks/use-active-section";
 import { dur, ease } from "@/lib/motion";
+import { STORY_HREF, STORY_PATH } from "@/lib/story";
 
 const ITEMS = [
   { id: "projects", label: "Projects" },
@@ -19,7 +20,8 @@ const PILL =
 
 export function PillNav() {
   const pathname = usePathname();
-  const isHome = pathname === "/";
+  // the story is the home (spec 2026-10-11 §6): its sections are in-page anchors there; elsewhere the pills lead into it
+  const isHome = pathname === STORY_PATH;
   const activeSection = useActiveSection(SECTION_IDS, pathname);
   const active = isHome ? activeSection : null;
 
@@ -35,7 +37,7 @@ export function PillNav() {
       <div className="relative flex gap-2 rounded-full p-1">
         {ITEMS.map((item) => {
           const isActive = active === item.id;
-          const href = `/#${item.id}`;
+          const href = isHome ? `#${item.id}` : `${STORY_HREF}#${item.id}`;
           const content = (
             <>
               {isActive && (

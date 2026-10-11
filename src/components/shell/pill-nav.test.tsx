@@ -25,12 +25,20 @@ beforeEach(() => {
 });
 
 describe("PillNav", () => {
-  test("links to the three home sections from any page", () => {
+  test("on the story page the pills are in-page anchors", () => {
+    pathname.mockReturnValue("/lab/sand");
     render(<PillNav />);
     expect(screen.getByRole("navigation", { name: "Primary" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Projects" })).toHaveAttribute("href", "/#projects");
-    expect(screen.getByRole("link", { name: "About" })).toHaveAttribute("href", "/#about");
-    expect(screen.getByRole("link", { name: "Contact" })).toHaveAttribute("href", "/#contact");
+    expect(screen.getByRole("link", { name: "Projects" })).toHaveAttribute("href", "#projects");
+    expect(screen.getByRole("link", { name: "About" })).toHaveAttribute("href", "#about");
+    expect(screen.getByRole("link", { name: "Contact" })).toHaveAttribute("href", "#contact");
+  });
+
+  test("from any other page they lead into the story", () => {
+    pathname.mockReturnValue("/cyvore");
+    render(<PillNav />);
+    expect(screen.getByRole("link", { name: "Projects" })).toHaveAttribute("href", "/lab/sand?hero#projects");
+    expect(screen.getByRole("link", { name: "Contact" })).toHaveAttribute("href", "/lab/sand?hero#contact");
   });
 
   test("tracks the home sections and re-subscribes per page", () => {
@@ -40,6 +48,7 @@ describe("PillNav", () => {
   });
 
   test("marks the active section on home", () => {
+    pathname.mockReturnValue("/lab/sand");
     useActiveSection.mockReturnValue("about");
     render(<PillNav />);
     expect(screen.getByRole("link", { name: "About" })).toHaveAttribute("aria-current", "location");
@@ -61,7 +70,8 @@ describe("PillNav", () => {
     expect(screen.getByRole("link", { name: "About" })).not.toHaveAttribute("aria-current");
   });
 
-  test("home uses plain anchors, other pages use next/link", () => {
+  test("the story uses plain anchors, other pages use next/link", () => {
+    pathname.mockReturnValue("/lab/sand");
     const { unmount } = render(<PillNav />);
     for (const name of ["Projects", "About", "Contact"]) {
       expect(screen.getByRole("link", { name })).not.toHaveAttribute("data-next-link");
@@ -75,6 +85,7 @@ describe("PillNav", () => {
   });
 
   test("active link holds exactly one decorative highlight", () => {
+    pathname.mockReturnValue("/lab/sand");
     useActiveSection.mockReturnValue("about");
     render(<PillNav />);
     expect(screen.getByRole("link", { name: "About" }).querySelectorAll('[aria-hidden="true"]')).toHaveLength(1);
