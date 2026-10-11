@@ -143,6 +143,9 @@ export function SandLab() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    // the page's own clock from mount: the copy's rise starts with it (hero-overlay.tsx: "Hi, I'm Liam." at 0.35 s)
+    const mountedAt = performance.now();
+    let wordmarkSeenAt = -1;
     let disposed = false;
     let stage: Stage | null = null;
     let field: SandField | null = null;
@@ -853,6 +856,14 @@ export function SandLab() {
         }
         wordmark?.setPaint(reduced ? null : paint!.texture, canvas.width, canvas.height);
         wordmark?.update(dt, reduced || still);
+        // the name's fill hands over to the outline as "Hi, I'm Liam." rises, on load only; never before the name has
+        // been on screen a moment (the sand can arrive after the copy, online)
+        if (wordmark && hero) {
+          const now = (performance.now() - mountedAt) / 1000;
+          if (wordmarkSeenAt < 0) wordmarkSeenAt = now;
+          const from = Math.max(0.35, wordmarkSeenAt + 0.5), x = Math.min(Math.max((now - from) / 1.4, 0), 1);
+          wordmark.setFill(reduced ? 0 : 1 - x * x * (3 - 2 * x));
+        }
         if (composite && !filterParam && !calibrating) {
           const toDesk = pullback ? THREE.MathUtils.smoothstep(span(progressRef.current, TL.pullback), 0.15, 0.85) : 0;
           const chaos = FILTER.chaos + (FILTER.desk - FILTER.chaos) * toDesk;
