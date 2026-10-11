@@ -826,11 +826,21 @@ export function SandLab() {
           if (composite) composite.hazeAmount = hazeOn ? (hero ? (heroLight ? 1 - ease(state.compact, [0.0, 0.6]) : 1 - ease(pg, TL.pullback)) : 1) : 0;
           // and its lens: the lit front in focus, the rest softening (?dof=0: sharp throughout)
           {
-            const lensK = dofOn ? (hero ? 1 - ease(pg, TL.pullback) : 1) : 0;
-            // the lens pass in the compositor (its blur overlaps into a soft mass); per grain only without it
+            // focus as clarity (Liam, 2026-10-11): dreamy in the chaos (f/0.35 on the lit front), the lens opening to
+            // f/0.18 as the pull-back reveals how small it is (Liam's desk test), stopping down to ~f/2 as the lamp
+            // comes on and the ball forms (the idea becomes clear); off into 2.3's passage, which has its own focus
+            const pb = hero ? ease(pg, TL.pullback) : 0;
+            const clear = hero ? ease(state.compact, [0.0, 0.6]) : 0;
+            const fstop = Math.exp(THREE.MathUtils.lerp(THREE.MathUtils.lerp(Math.log(SAND_LOOK.dofFstop), Math.log(0.18), pb), Math.log(2.0), clear));
+            const lensK = dofOn ? (hero ? 1 - ease(pg, [TL.build[1], TL.rush[0] + 0.02]) : 1) : 0;
+            // the focus follows the subject: the cloud's lit front (its centre less a third of its radius), then the ball
+            const cs0 = field!.material.uniforms.uChaosSize.value as THREE.Vector3;
+            const r0 = THREE.MathUtils.lerp(0.5 * Math.min(cs0.x, cs0.y, cs0.z), (field!.material.uniforms.uBallR.value as number) * 1.05, state.compact);
+            const toFocus = stage!.camera.position.distanceTo(focus) - 0.35 * r0;
             if (composite) {
-              composite.lens.amount = lensK; composite.lens.focus = SAND_LOOK.dofFocus;
-              composite.lens.fstop = SAND_LOOK.dofFstop; composite.lens.lensMm = SAND_LOOK.dofLensMm;
+              composite.lens.amount = lensK; composite.lens.focus = Math.max(toFocus, 0.5);
+              composite.lens.fstop = fstop; composite.lens.lensMm = SAND_LOOK.dofLensMm;
+              composite.lens.desk = lensK * pb;   // the desk in the same lens, as it comes into view
               field!.setDof(0);
             } else field!.setDof(lensK);
           }

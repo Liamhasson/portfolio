@@ -96,6 +96,29 @@ void main() {
 }
 `;
 
+/** The desk through the lens: sharp where it's in focus, the gathered blur where it isn't, and in shadow by uDim. */
+const DESK_LENS_FRAGMENT = /* glsl */ `
+precision highp float;
+out highp vec4 pc_fragColor;
+#define gl_FragColor pc_fragColor
+in vec2 vUv;
+uniform sampler2D uTex;
+uniform sampler2D uBlur;
+uniform sampler2D uDepth;
+uniform vec4 uDofP;
+uniform float uDofMax;
+uniform float uDim;
+float cocAt(vec2 uv) {
+  float d = texture(uDepth, uv).r;
+  float z = uDofP.z * uDofP.w / (uDofP.w - d * (uDofP.w - uDofP.z));
+  return min(uDofP.x * abs(z - uDofP.y) / z, uDofMax);
+}
+void main() {
+  vec4 c = mix(texture(uTex, vUv), texture(uBlur, vUv), smoothstep(0.8, 2.5, cocAt(vUv)));
+  gl_FragColor = vec4(c.rgb * (1.0 - uDim), 1.0);
+}
+`;
+
 const DISC_FRAGMENT = /* glsl */ `
 precision highp float;
 out highp vec4 pc_fragColor;
@@ -173,7 +196,14 @@ export class SandComposite {
   deskDim = 0;
   /** The lens: focus distance (world units), f-number, focal length (mm, the hero camera's 45), how much of it (0 =
    *  sharp throughout). Set each frame. */
-  lens = { amount: 0, focus: 8.4, fstop: 0.35, lensMm: 45 };
+  lens = { amount: 0, focus: 8.4, fstop: 0.35, lensMm: 45, desk: 0 };
+  private readonly dofBgRt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
+  private readonly deskLensScene = new THREE.Scene();
+  private readonly deskLensMat = new THREE.ShaderMaterial({
+    glslVersion: THREE.GLSL3, vertexShader: VERTEX, fragmentShader: DESK_LENS_FRAGMENT,
+    depthTest: false, depthWrite: false, toneMapped: false, blending: THREE.NoBlending,
+    uniforms: { uTex: { value: null }, uBlur: { value: null }, uDepth: { value: null }, uDofP: { value: new THREE.Vector4() }, uDofMax: { value: 24 }, uDim: { value: 0 } },
+  });
   private readonly dofRt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
   private readonly dofScene = new THREE.Scene();
   private readonly dofMat = new THREE.ShaderMaterial({
@@ -234,6 +264,9 @@ export class SandComposite {
     const dofQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.dofMat);
     dofQuad.frustumCulled = false;
     this.dofScene.add(dofQuad);
+    const deskLensQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.deskLensMat);
+    deskLensQuad.frustumCulled = false;
+    this.deskLensScene.add(deskLensQuad);
     const dimQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.dimMat);
     dimQuad.frustumCulled = false;
     this.dimScene.add(dimQuad);
@@ -247,6 +280,7 @@ export class SandComposite {
     if (!this.bg || this.bg.width !== size.x || this.bg.height !== size.y) {
       this.bg?.dispose();
       this.bg = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.UnsignedByteType, samples: 4, depthBuffer: true });
+      this.bg.depthTexture = new THREE.DepthTexture(size.x, size.y);   // for the lens on the desk
       this.bg.texture.colorSpace = THREE.NoColorSpace;   // the desk writes display values already: stored as they are
       this.bg.texture.generateMipmaps = false;
       this.bg.texture.minFilter = THREE.LinearFilter;
@@ -257,7 +291,7 @@ export class SandComposite {
   /** Compiles its own passes' shaders and makes its targets now, not on the frame each is first needed (stalls of up
    *  to 200 ms mid-scroll). */
   async warm(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): Promise<void> {
-    await Promise.all([this.scene, this.rawScene, this.discScene, this.hazeScene, this.dimScene, this.dofScene].map((sc) => renderer.compileAsync(sc, this.ortho)));
+    await Promise.all([this.scene, this.rawScene, this.discScene, this.hazeScene, this.dimScene, this.dofScene, this.deskLensScene].map((sc) => renderer.compileAsync(sc, this.ortho)));
     // and drawn once each way (the GPU builds its pipelines on a shader's first draw into each kind of target)
     const d = this.defocus;
     for (const v of [0, 4]) {
@@ -318,6 +352,25 @@ export class SandComposite {
       du.uDim.value = this.deskDim;
       (du.uTexel.value as THREE.Vector2).set(1 / size.x, 1 / size.y);
       renderer.render(this.discScene, this.ortho);
+    } else if (lens.desk > 0.002 && dofP.x > 0) {
+      // the desk through the same lens: into its target with its depth, the gather at half size, then to the screen
+      const bg = this.background(size);
+      renderer.setRenderTarget(bg);
+      renderer.render(scene, camera);
+      const hw = Math.max(1, Math.round(size.x / 2)), hh = Math.max(1, Math.round(size.y / 2));
+      if (this.dofBgRt.width !== hw || this.dofBgRt.height !== hh) this.dofBgRt.setSize(hw, hh);
+      const du = this.dofMat.uniforms;
+      du.uSand.value = bg.texture; du.uDepth.value = bg.depthTexture;
+      (du.uTexel.value as THREE.Vector2).set(1 / size.x, 1 / size.y);
+      const deskP = (du.uDofP.value as THREE.Vector4).copy(dofP);
+      deskP.x *= lens.desk / Math.max(lens.amount, 1e-3);   // (dofP carries the sand's amount)
+      renderer.setRenderTarget(this.dofBgRt);
+      renderer.render(this.dofScene, this.ortho);
+      renderer.setRenderTarget(null);
+      const lu = this.deskLensMat.uniforms;
+      lu.uTex.value = bg.texture; lu.uBlur.value = this.dofBgRt.texture; lu.uDepth.value = bg.depthTexture;
+      (lu.uDofP.value as THREE.Vector4).copy(deskP); lu.uDim.value = this.deskDim;
+      renderer.render(this.deskLensScene, this.ortho);
     } else {
       renderer.render(scene, camera);
       if (this.deskDim > 0.002) {
@@ -350,6 +403,8 @@ export class SandComposite {
     this.dimMat.dispose();
     this.dofMat.dispose();
     this.dofRt.dispose();
+    this.dofBgRt.dispose();
+    this.deskLensMat.dispose();
     this.quad.geometry.dispose();
   }
 }
