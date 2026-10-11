@@ -10,7 +10,7 @@ import { Outcome } from "./outcome";
 /** Spec §2: shared top, the project's own middle, shared ending. */
 export function CaseStudyPage({ study, Middle }: { study: CaseStudy; Middle: ComponentType }) {
   return (
-    <article data-world={study.slug}>
+    <article data-world={study.slug} className="cs">
       <BackButton slug={study.slug} />
       <CaseHero study={study} />
       <AtAGlance data={study.atAGlance} />

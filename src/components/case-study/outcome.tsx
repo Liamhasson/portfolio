@@ -4,7 +4,7 @@ import type { Outcome as Data } from "@/lib/case-studies/types";
 export function Outcome({ outcome }: { outcome: Data }) {
   const headingId = useId();
   return (
-    <section aria-labelledby={headingId} className="px-[5vw] py-[10vh]">
+    <section aria-labelledby={headingId} className="f px-[5vw] py-[10vh]">
       <h2 id={headingId} className="text-[clamp(2rem,4vw,3.6rem)] font-normal leading-[1.15]">
         Impact
       </h2>

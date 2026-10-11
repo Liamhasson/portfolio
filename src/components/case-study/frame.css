@@ -1,0 +1,25 @@
+/* The boards are drawn in --u: 1/1440 of the frame at desktop, 1/390 in the phone frames. The page keeps that:
+   ≥ 1100px the board's desktop layout, fluid; below, the board's phone layout in a centred column (max 1.6× the
+   phone frame, so tablets read it comfortably). */
+.cs { container-type: inline-size; display: block; }
+.cs .f { --u: calc(100cqw / 1440); position: relative; overflow: clip; }
+@container (max-width: 1099px) {
+  .cs .f { --u: min(calc(100cqw / 390), 1.6px);
+    padding-inline: max(0px, calc((100cqw - var(--u) * 390) / 2)); }
+}
+.cs .f p { margin: 0; }
+.cs .f :is(h1, h2, h3) { margin: 0; font-weight: 400; }
+.cs .f a { color: inherit; text-decoration: none; }
+
+/* Liam's type, with the floors (Part C plan, Global Constraints). Board sizes in --u, never under the floor. */
+.cs .label { font: 400 max(11px, calc(var(--u) * 12))/1.15 var(--font-geist-mono), ui-monospace, monospace; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
+.cs .title { font-size: max(40px, calc(var(--u) * 72)); line-height: .95; letter-spacing: -.025em; }
+.cs .display { font-size: max(26px, calc(var(--u) * 48)); line-height: 1.16; letter-spacing: -.018em; }
+.cs .display em { font-style: italic; }
+.cs .body { font-size: max(15px, calc(var(--u) * 18)); line-height: 1.55; color: var(--ink-2); max-width: 46ch; }
+.cs .quiet { color: var(--ink-3); }
+.cs .g12 { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: calc(var(--u) * 24); padding: 0 calc(var(--u) * 72); }
+@container (max-width: 1099px) {
+  .cs .g12 { grid-template-columns: minmax(0, 1fr); padding: 0 calc(var(--u) * 16); }
+  .cs .g12 > * { grid-column: 1 / -1 !important; }
+}
