@@ -88,6 +88,7 @@ export const SAND_LOOK = {
   dofFocus: 8.4,
   dofFstop: 3.2,
   dofLensMm: 45,
+  hueJitter: 0.32,   // the formed ball's colours mixed grain by grain (Liam picked the render's mottled ball, 2026-10-11)
   motionBlur: 0.5,
   motionBlurMax: 1.0,
 };
@@ -225,6 +226,7 @@ export class SandField {
         uFrameDt: { value: 1 / 60 },
         uMotionBlur: { value: new THREE.Vector2(SAND_LOOK.motionBlur, SAND_LOOK.motionBlurMax) },
         uDof: { value: new THREE.Vector2(0, SAND_LOOK.dofFocus) },
+        uHueJitter: { value: SAND_LOOK.hueJitter },
       },
     });
     this.points = new THREE.Points(geo, this.material);
@@ -428,6 +430,7 @@ export class SandField {
     (u.uShadowK.value as THREE.Vector2).set(l.shadowKChaos, l.shadowK);
     u.uSpec.value = l.spec;
     u.uGloss.value = l.gloss;
+    u.uHueJitter.value = l.hueJitter;
     u.uSSS.value = l.sss;
     u.uCursorReach.value = l.cursorReach;
     u.uPaintScale.value = l.paintScale;

@@ -142,6 +142,7 @@ uniform vec2 uMotionBlur;    // strength (0 = off), longest streak in grain leng
 // depth of field (the cinematic look: Ducky's lit front sharp, the rest softening): the thin lens's blur per unit of
 // focal length in pixels, A / (s - f) (aperture A = f / N, focus s; 0 = off), and the focus distance s
 uniform vec2 uDof;
+uniform float uHueJitter;   // the formed ball's per-grain spread of hue
 
 out vec3 vAlbedo;
 out vec3 vL0; out vec3 vL1; out vec3 vL2; out vec3 vL3;   // light directions, view space (3 = cursor)
@@ -357,7 +358,9 @@ void main() {
   vL3 = normalize((viewMatrix * vec4(uCursorPos, 1.0)).xyz - mv.xyz);
   float dc = distance(p, uCursorPos) / uCursorReach;
   vE3 = uCursorCol / (1.0 + dc * dc * dc * dc) * cavity;
-  vAlbedo = ramp(mix(aAttr.x, aAttr.y, t));
+  // the formed ball's colours mix grain by grain, as the render's (its hue map is smooth: with the bright end of the
+  // cinematic palette it read as blotches)
+  vAlbedo = ramp(mix(aAttr.x, aAttr.y, t) + (hash(aPosB + 2.3) - 0.5) * uHueJitter * t);
 
   gl_Position = projectionMatrix * mv;
   // the cursor's drift: a push in screen space from the paint field, which decays on its own

@@ -284,10 +284,15 @@ export function SandLab() {
       // scripts/lab/fit_desk_light.py). The lamp's cone is wider and softer than its Blender settings suggest (116°,
       // blend 1): Cycles lit the whole cloud. The desk bounce adds nothing in Cycles, so it is off.
       let desk = pullback?.deskLights(g.wattsToIrradiance, [0.244, 1.0, 0], { radii: [0.573, 1.2, 3.0], spotDeg: 116, blend: 1.0 });
-      const DESK_LOOK = { shadowKChaos: 0.602, wrap: 0.375, bounce: 0.12, localOcclusion: 0.016, spec: 0.016, radScaleChaos: 1.44 };
+      const DESK_LOOK = { exposure: 0.38, shadowKChaos: 0.602, wrap: 0.375, bounce: 0.12, localOcclusion: 0.016, spec: 0.016, radScaleChaos: 1.44 };
+      (window as unknown as { __deskLook?: (l: Partial<typeof DESK_LOOK>) => void }).__deskLook = (l) => Object.assign(DESK_LOOK, l);   // calibration
       // the formed ball on the desk, fitted against the Cycles target at the settle's end (scripts/lab/fit_ball.py):
       // a slightly stronger lamp, and the lamp-lit desk below as a broad light (setGround)
-      const BALL_LOOK = { shadowK: 0.571, cavity: 0.3, cavityDepth: 0.071, wrap: 0.375, bounce: 0.12, spec: 0.064, radScale: 1.0 };
+      // the cinematic look on the desk (Liam, 2026-10-11, picked blender/lookdev/renders/cinematic-set-settle-new.png):
+      // the lamp's own light and shadow on the formed ball, fitted live to it (ball p50 0.19 vs 0.14, saturation 0.72 vs
+      // 0.71; the new palette is lighter, so the desk takes a lower exposure)
+      const BALL_LOOK = { shadowK: 0.571, cavity: 0.3, cavityDepth: 0.071, wrap: 0.15, bounce: 0.06, spec: 0.15, radScale: 1.0 };
+      (window as unknown as { __ballLook?: (l: Partial<typeof BALL_LOOK>) => void }).__ballLook = (l) => Object.assign(BALL_LOOK, l);   // calibration
       const deskBall = pullback?.deskLights(g.wattsToIrradiance, [0.305, 1.0, 0], { radii: [0.573, 1.2, 3.0], spotDeg: 116, blend: 1.0 });
       // lab calibration: ?pbframe=N holds the camera on a path frame; __pbGains sets the desk lights' gains
       let lampSat = 0.2;
@@ -295,7 +300,7 @@ export function SandLab() {
       (window as unknown as { __pbGround?: (g: number, c: number) => void }).__pbGround = (g, c) => { groundCol.set(1.0, c, c * 0.58).multiplyScalar(g); };
       // the cloud's underside and shadowed front over the desk (Liam, 2026-10-10: never in the dark): the desk's bounce
       // reaches the loose sand near it, and a soft warm fill from the viewer's side lifts what the lamp misses
-      const LIFT = { fill: 0.06, reach: 1.2, ground: 4.0, groundBall: 2.0 };
+      const LIFT = { fill: 0.06, reach: 1.2, ground: 4.0, groundBall: 0.3 };   // groundBall 2.0 -> 0.3: the formed ball in the lamp's shadows (the cinematic look)
       const fillCol = new THREE.Vector3(1.0, 0.78, 0.6);
       (window as unknown as { __lift?: (l: Partial<typeof LIFT>) => void }).__lift = (l) => Object.assign(LIFT, l);
       (window as unknown as { __frontKey?: (k: number) => void }).__frontKey = (k) => { FRONT_KEY = k; };
@@ -756,7 +761,7 @@ export function SandLab() {
           }
           field!.setPointScale(stage!.bufferHeight, THREE.MathUtils.degToRad(stage!.camera.fov));
           const h = THREE.MathUtils.smoothstep(t, 0.15, 0.85);
-          field!.setGround(groundCol.clone().multiplyScalar(THREE.MathUtils.lerp(LIFT.ground * h, LIFT.groundBall, state.compact)), stage!.camera, fillCol.clone().multiplyScalar(LIFT.fill * h),
+          field!.setGround(groundCol.clone().multiplyScalar(THREE.MathUtils.lerp(LIFT.ground * h, LIFT.groundBall, state.compact)), stage!.camera, fillCol.clone().multiplyScalar(LIFT.fill * h * (1 - state.compact)),   // the loose cloud's lift; the formed ball takes the lamp's own shadows (Liam, 2026-10-11: the render's ball)
             deskTop ? deskTop.y : -1e3, LIFT.reach);
           field!.setLights(
             heroLights.map((l, i) => {
