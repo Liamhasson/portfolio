@@ -76,6 +76,7 @@ out float vBounceW;
 out float vPx;
 out float vEdgePx;
 out float vBlur;
+out float vBig;
 vec3 ramp(float h) {
   vec3 c = uRamp[0];
   for (int i = 1; i < 5; i++) c = mix(c, uRamp[i], clamp((h - uRampAt[i - 1]) / max(uRampAt[i] - uRampAt[i - 1], 1e-4), 0.0, 1.0));
@@ -149,6 +150,7 @@ void main() {
   vPx = gl_PointSize;
   vEdgePx = uEdge.x;
   vBlur = 0.0;
+  vBig = 0.0;
   vAlbedo = ramp(iSizeHue.y);
   vL0 = normalize((viewMatrix * vec4(uLightPos[0], 1.0)).xyz - mv.xyz); vE0 = E[0];
   vL1 = normalize((viewMatrix * vec4(uLightPos[1], 1.0)).xyz - mv.xyz); vE1 = E[1];

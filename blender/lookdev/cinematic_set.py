@@ -114,10 +114,23 @@ if look == "new":
         q[:, 1] += 0.03
         keep = (np.abs(q[:, 0]) < 0.58) & (np.abs(q[:, 1]) < 0.28) & (rng.uniform(0, 1, n2) < patchy(q) ** 2.5)
         q = q[keep]; r2 = rng.uniform(0.0003, 0.0006, len(q))
-        p2 = np.stack([q[:, 0], q[:, 1], r2 + 0.0014], 1)   # (a paper's height: grains rest on them too)
+        # resting on the desk, or on a paper where one lies (each sheet's footprint, from its object: a ray down)
+        zz = np.zeros(len(q))
+        papers = [o for o in bpy.data.objects if o.type == "MESH" and o.name.split(".")[0] in ("card_a", "card_b", "sticky_hero", "sticky_b", "sticky_c", "blank")]
+        bpy.context.view_layer.update()
+        for o in papers:
+            inv = o.matrix_world.inverted()
+            for k in range(len(q)):
+                lp = inv @ V3((q[k, 0], q[k, 1], 0.05))
+                hit, loc, _n, _i = o.ray_cast(lp, inv.to_3x3() @ V3((0, 0, -1)))
+                if hit:
+                    zz[k] = max(zz[k], (o.matrix_world @ loc).z)
+        p2 = np.stack([q[:, 0], q[:, 1], r2 + zz], 1)
+        print("CINE spill on papers", int((zz > 0).sum()))
         pts = np.vstack([p1, p2]).astype(np.float32)
         r1, r2 = r1, r2
-        grains("spill", pts, rng.choice(hh, len(pts)).astype(np.float32), np.concatenate([r1, r2]).astype(np.float32))
+        hh_spill = hh[hh > 0.3] if (hh > 0.3).any() else hh   # (the palette above its dark plum end)
+        grains("spill", pts, rng.choice(hh_spill, len(pts)).astype(np.float32), np.concatenate([r1, r2]).astype(np.float32))
         print("CINE spilled sand", len(pts))
         # the set graded into the palette
         def tint(name, rgb):
