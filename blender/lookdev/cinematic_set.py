@@ -70,6 +70,114 @@ if os.environ.get("SET_LIGHTS") == "hero":
         cam.data.dof.aperture_fstop = float(os.environ["SET_FSTOP"])
         print("CINE focus", round(cam.data.dof.focus_distance, 3), "m at f/", cam.data.dof.aperture_fstop)
 
+# SET_DESK=pallet (Liam, 2026-10-11, from a vintage pallet table: the wood only, in the sand's tones, a notch calmer
+# than the reference, procedural): three long pine planks with gaps, a stain rubbed back to pale wood along the grain,
+# knots, fine scratches, a few nail holes. The desk's old material (scanned oak as walnut) stays in lookdev.py
+def pallet_wood():
+    m = bpy.data.materials.new("pallet_wood"); m.use_nodes = True
+    nt = m.node_tree; N = nt.nodes; L = nt.links
+    b = N["Principled BSDF"]
+    tc = N.new("ShaderNodeTexCoord")
+    sep = N.new("ShaderNodeSeparateXYZ"); L.new(tc.outputs["Object"], sep.inputs[0])
+    def op(kind, a, bv=None, c=None):
+        n = N.new("ShaderNodeMath"); n.operation = kind
+        for k, v in enumerate((a, bv, c)):
+            if v is None:
+                continue
+            if isinstance(v, (int, float)):
+                n.inputs[k].default_value = v
+            else:
+                L.new(v, n.inputs[k])
+        return n.outputs[0]
+    def mr(v, fmin, fmax, tmin=0.0, tmax=1.0, smooth=True):
+        n = N.new("ShaderNodeMapRange"); n.interpolation_type = "SMOOTHSTEP" if smooth else "LINEAR"
+        n.inputs["From Min"].default_value, n.inputs["From Max"].default_value = fmin, fmax
+        n.inputs["To Min"].default_value, n.inputs["To Max"].default_value = tmin, tmax
+        L.new(v, n.inputs["Value"]); return n.outputs["Result"]
+    # the planks: three across the desk's depth (0.6 m), running its length; u in plank widths
+    u = op("MULTIPLY", op("ADD", sep.outputs["Y"], 0.3), 1 / 0.2)
+    plank = op("FLOOR", u)
+    fv = op("FRACT", u)
+    edge = op("MULTIPLY", op("MINIMUM", fv, op("SUBTRACT", 1.0, fv)), 0.2)            # metres to the plank's edge
+    gap = mr(edge, 0.0045, 0.003)                                                       # ~8 mm gaps
+    wn = N.new("ShaderNodeTexWhiteNoise"); wn.noise_dimensions = "1D"; L.new(plank, wn.inputs["W"])
+    rnd = wn.outputs["Value"]                                                           # each plank its own
+    # where on the plank: its own coordinates, offset per plank (no two planks with the same grain)
+    cmb = N.new("ShaderNodeCombineXYZ")
+    L.new(op("ADD", sep.outputs["X"], op("MULTIPLY", rnd, 3.7)), cmb.inputs[0]); L.new(sep.outputs["Y"], cmb.inputs[1]); L.new(op("MULTIPLY", rnd, 9.1), cmb.inputs[2])
+    P = cmb.outputs[0]
+    def mapped(scale, rot_z=0.0):
+        mp = N.new("ShaderNodeMapping"); mp.inputs["Scale"].default_value = scale; mp.inputs["Rotation"].default_value = (0, 0, rot_z)
+        L.new(P, mp.inputs["Vector"]); return mp.outputs["Vector"]
+    # pine grain: long lines along the plank, gently wavy
+    wave = N.new("ShaderNodeTexWave"); wave.wave_type = "BANDS"; wave.bands_direction = "Y"
+    wave.inputs["Scale"].default_value = 34.0; wave.inputs["Distortion"].default_value = 5.0
+    wave.inputs["Detail"].default_value = 4.0; wave.inputs["Detail Scale"].default_value = 1.2
+    L.new(mapped((0.35, 1.0, 1.0)), wave.inputs["Vector"])
+    grain = op("MULTIPLY", mr(wave.outputs["Fac"], 0.62, 0.9), 0.35)   # (faint: even bands read as corduroy)
+    fine = N.new("ShaderNodeTexNoise"); fine.inputs["Scale"].default_value = 1.0; fine.inputs["Detail"].default_value = 8.0
+    L.new(mapped((1.6, 110.0, 1.0)), fine.inputs["Vector"])
+    grain = op("MAXIMUM", grain, mr(fine.outputs["Fac"], 0.52, 0.7))   # irregular grain lines
+    # knots: a few dark ovals
+    vor = N.new("ShaderNodeTexVoronoi"); vor.inputs["Scale"].default_value = 3.2; L.new(mapped((0.55, 1.6, 1.0)), vor.inputs["Vector"])
+    knot = mr(vor.outputs["Distance"], 0.07, 0.035)
+    # the stain rubbed back along the grain (a notch calmer than the reference), more toward the plank's edges
+    wear_n = N.new("ShaderNodeTexNoise"); wear_n.inputs["Scale"].default_value = 1.0; wear_n.inputs["Detail"].default_value = 7.0; wear_n.inputs["Roughness"].default_value = 0.62
+    L.new(mapped((1.4, 60.0, 1.0)), wear_n.inputs["Vector"])   # (long streaks along the grain)
+    edge_wear = mr(edge, 0.03, 0.006)
+    wear = mr(op("ADD", wear_n.outputs["Fac"], op("MULTIPLY", edge_wear, 0.14)), 0.6, 0.72)
+    # fine scratches, two ways
+    def scratches(rot, lo):
+        n = N.new("ShaderNodeTexNoise"); n.inputs["Scale"].default_value = 1.0; n.inputs["Detail"].default_value = 2.0
+        L.new(mapped((700.0, 5.0, 1.0), rot), n.inputs["Vector"]); return mr(n.outputs["Fac"], lo, lo + 0.035)
+    scratch = op("MAXIMUM", scratches(0.08, 0.725), scratches(-0.5, 0.74))
+    # nail holes: small dark dots near the planks' ends
+    nv = N.new("ShaderNodeTexVoronoi"); nv.inputs["Scale"].default_value = 22.0; L.new(P, nv.inputs["Vector"])
+    ends = mr(op("ABSOLUTE", sep.outputs["X"]), 0.5, 0.54)
+    nail = op("MULTIPLY", mr(nv.outputs["Distance"], 0.03, 0.018), ends)
+    # colour, in the sand's tones
+    def mixc(a, col, fac, amount=1.0):
+        mx = N.new("ShaderNodeMix"); mx.data_type = "RGBA"
+        L.new(op("MULTIPLY", fac, amount), mx.inputs["Factor"])
+        if isinstance(a, tuple):
+            mx.inputs[6].default_value = a
+        else:
+            L.new(a, mx.inputs[6])
+        if isinstance(col, tuple):
+            mx.inputs[7].default_value = col
+        else:
+            L.new(col, mx.inputs[7])
+        return mx.outputs[2]
+    def deep(hex_, k):
+        c = srgb(hex_); return (c[0] * k, c[1] * k, c[2] * k, 1.0)
+    # the stain: rose-gold and champagne, deepened to read as wood under the close lamp (the walnut sat at ~8% albedo)
+    rose, champ = deep("#8a5442", 0.42), deep("#986a44", 0.42)
+    base = mixc(rose, champ, rnd)
+    col = mixc(base, deep("#4f2e29", 0.4), grain, 0.75)       # the grain: plum-brown
+    col = mixc(col, deep("#3b2220", 0.45), knot, 0.85)
+    col = mixc(col, deep("#d9c2a4", 0.68), wear, 0.85)          # rubbed back to pale wood (toward bone)
+    col = mixc(col, deep("#e3d6c6", 0.7), scratch, 0.5)
+    col = mixc(col, srgb("#1c1012"), nail, 0.9)
+    col = mixc(col, srgb("#160d0e"), gap, 1.0)           # the gaps
+    L.new(col, b.inputs["Base Color"])
+    rough = mr(wear, 0.0, 1.0, 0.48, 0.78, smooth=False)
+    L.new(op("MAXIMUM", rough, op("MULTIPLY", gap, 0.92)), b.inputs["Roughness"])
+    b.inputs["Specular IOR Level"].default_value = 0.4
+    bump = N.new("ShaderNodeBump"); bump.inputs["Strength"].default_value = 0.35; bump.inputs["Distance"].default_value = 0.002
+    L.new(op("SUBTRACT", op("ADD", op("MULTIPLY", grain, 0.25), op("MULTIPLY", scratch, -0.3)), op("MULTIPLY", gap, 1.0)), bump.inputs["Height"])
+    L.new(bump.outputs["Normal"], b.inputs["Normal"])
+    return m
+
+
+if os.environ.get("SET_DESK") == "pallet":
+    pw = pallet_wood()
+    for o in bpy.data.objects:
+        for slot in getattr(o, "material_slots", []):
+            if slot.material and slot.material.name.startswith("walnut"):
+                slot.material = pw
+                print("CINE desk wood", o.name)
+
+
 # SET_LAMP "watts,cone deg,blend,aim height" (Liam, 2026-10-11: the lamp brighter and tighter on the cloud, so the cloud
 # keeps the hero's pop while the desk stays in the same light): aimed at the cloud, its beam carries on to the desk
 if os.environ.get("SET_LAMP") and "lamp" in bpy.data.objects:
@@ -183,7 +291,8 @@ if look == "new":
                 mix.inputs[6].default_value = inp.default_value
             nt.links.new(mix.outputs[2], inp)
             print("CINE tint", name)
-        tint("walnut", (0.78, 0.66, 0.68))
+        if os.environ.get("SET_DESK") != "pallet":
+            tint("walnut", (0.78, 0.66, 0.68))
         for n in ("blank_m", "card_a_m", "card_b_m"):
             tint(n, (0.78, 0.72, 0.71))
         for n in ("sticky_hero_m", "sticky_b_m", "sticky_c_m"):
