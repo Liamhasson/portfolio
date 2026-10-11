@@ -45,12 +45,16 @@ def aim(ob, target):
 
 if V != "A":
     C = V == "C"
+    # ROSE=1 (Liam, 2026-10-11: "B with more rose"): rose carries the cloud, bone only its brightest few, a rosier key
+    ROSE = bool(os.environ.get("ROSE"))
     # ---- the palette: same hues, more natural (bone on ~25% of the grains: at 45% the cloud read beige, not rose)
     chaos = bpy.data.objects["chaos"]
     hue = np.empty(len(chaos.data.vertices), dtype=np.float32)
     chaos.data.attributes["hue"].data.foreach_get("value", hue)
     q = lambda p: float(np.quantile(hue, p))
     stops = [(q(0.0), "#26161a"), (q(0.15), "#94626c"), (q(0.42), "#bf8a78"), (q(0.62), "#c4a47e"), (q(0.76), "#e3d6c6"), (1.0, "#e3d6c6")]
+    if ROSE:
+        stops = [(q(0.0), "#26161a"), (q(0.1), "#94626c"), (q(0.5), "#bf8a78"), (q(0.76), "#c4a47e"), (q(0.88), "#e3d6c6"), (1.0, "#e3d6c6")]
     m = bpy.data.materials["sand"]
     nt = m.node_tree
     ramp = next(n for n in nt.nodes if n.type == "VALTORGB")
@@ -66,7 +70,7 @@ if V != "A":
     bsdf.inputs["Roughness"].default_value = 0.22
     bsdf.inputs["Specular IOR Level"].default_value = 0.5
     bsdf.inputs["Subsurface Weight"].default_value = 0.6
-    bsdf.inputs["Subsurface Radius"].default_value = (1.0, 0.55, 0.4)
+    bsdf.inputs["Subsurface Radius"].default_value = (1.0, 0.45, 0.45) if ROSE else (1.0, 0.55, 0.4)
     bsdf.inputs["Subsurface Scale"].default_value = 0.004   # a grain is ~0.004-0.009 across
     # ---- the light: one raking key from the side, the fills about an eighth of it, the rose rim kept
     key = bpy.data.objects["key"]
@@ -74,7 +78,7 @@ if V != "A":
     aim(key, (-0.5, 0.3, 0.2))
     key.data.size = 3.5
     key.data.energy = 5200 if C else 4200
-    key.data.color = srgb("#ffe8d4")[:3]
+    key.data.color = srgb("#ffdccf" if ROSE else "#ffe8d4")[:3]
     fill = bpy.data.objects["fill"]
     fill.data.energy = 30 if C else 45
     fill.data.color = srgb("#8a93a8")[:3]
@@ -89,7 +93,7 @@ if V != "A":
     hnt = hm.node_tree
     hnt.nodes.remove(hnt.nodes["Principled BSDF"])
     vol = hnt.nodes.new("ShaderNodeVolumePrincipled")
-    vol.inputs["Color"].default_value = srgb("#e9d9cc")
+    vol.inputs["Color"].default_value = srgb("#e8d0cc" if ROSE else "#e9d9cc")
     vol.inputs["Density"].default_value = 0.002 if C else 0.0013
     vol.inputs["Anisotropy"].default_value = 0.45
     hnt.links.new(vol.outputs[0], hnt.nodes["Material Output"].inputs["Volume"])
