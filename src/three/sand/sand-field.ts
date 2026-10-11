@@ -86,8 +86,9 @@ export const SAND_LOOK = {
   // reference has a light blur, a full 1/60 s read as rice), and its streak at most this many grain lengths longer
   // depth of field (the cinematic look, Blender's hero camera): f/3.2 on the cloud's lit front, the hero's 45 mm lens
   dofFocus: 8.4,
-  dofFstop: 3.2,
+  dofFstop: 0.35,   // Liam, 2026-10-11: the dreamy hero (f/0.18 = the desk test's softness at the hero's scale; 0.35 keeps the shape)
   dofLensMm: 45,
+  dofDense: 0.15,   // how dense the sand must be for its blurred grains to stay solid (they overlap into a soft mass)
   hueJitter: 0.32,   // the formed ball's colours mixed grain by grain (Liam picked the render's mottled ball, 2026-10-11)
   motionBlur: 0.5,
   motionBlurMax: 1.0,
@@ -227,6 +228,7 @@ export class SandField {
         uMotionBlur: { value: new THREE.Vector2(SAND_LOOK.motionBlur, SAND_LOOK.motionBlurMax) },
         uDof: { value: new THREE.Vector2(0, SAND_LOOK.dofFocus) },
         uHueJitter: { value: SAND_LOOK.hueJitter },
+        uDofDense: { value: SAND_LOOK.dofDense },
       },
     });
     this.points = new THREE.Points(geo, this.material);
@@ -431,6 +433,7 @@ export class SandField {
     u.uSpec.value = l.spec;
     u.uGloss.value = l.gloss;
     u.uHueJitter.value = l.hueJitter;
+    u.uDofDense.value = l.dofDense;
     u.uSSS.value = l.sss;
     u.uCursorReach.value = l.cursorReach;
     u.uPaintScale.value = l.paintScale;

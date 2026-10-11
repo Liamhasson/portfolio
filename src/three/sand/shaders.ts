@@ -142,7 +142,8 @@ uniform vec2 uMotionBlur;    // strength (0 = off), longest streak in grain leng
 // depth of field (the cinematic look: Ducky's lit front sharp, the rest softening): the thin lens's blur per unit of
 // focal length in pixels, A / (s - f) (aperture A = f / N, focus s; 0 = off), and the focus distance s
 uniform vec2 uDof;
-uniform float uHueJitter;   // the formed ball's per-grain spread of hue
+uniform float uHueJitter;
+uniform float uDofDense;   // local density at which a blurred grain stays solid   // the formed ball's per-grain spread of hue
 
 out vec3 vAlbedo;
 out vec3 vL0; out vec3 vL1; out vec3 vL2; out vec3 vL3;   // light directions, view space (3 = cursor)
@@ -155,7 +156,8 @@ out float vBounceW;
 out float vPx;
 out float vEdgePx;
 out float vGround;   // how much of the desk below this grain sees (surface grains of the formed ball)
-out vec4 vEll;      // grain shape: squash x, squash y, cos, sin of its turn (Blender: random squash +-22%, random rotation)
+out vec4 vEll;
+out float vBlur;    // how much of its disc is the lens's blur (0 sharp): a blurred grain is its average colour, spread      // grain shape: squash x, squash y, cos, sin of its turn (Blender: random squash +-22%, random rotation)
 
 ${SIMPLEX}
 
@@ -402,18 +404,22 @@ void main() {
   }
   vEll = vec4(squash, cos(ang), sin(ang));
   // out of focus, a grain spreads into a soft disc of the lens's blur, as faint as it is wider (its light conserved)
-  float coc = uDof.x > 0.0 ? min(uPointScale * uDof.x * abs(-mv.z - uDof.y) / -mv.z, 14.0) : 0.0;
-  float dofK = 1.0;
+  float coc = uDof.x > 0.0 ? min(uPointScale * uDof.x * abs(-mv.z - uDof.y) / -mv.z, 24.0) : 0.0;
+  float dofK = 1.0, dofK0 = 1.0;
   if (coc > 0.3 && px > 0.0) {
     float pd = sqrt(px * px + coc * coc);
-    dofK = (px * px) / (pd * pd);
+    dofK0 = (px * px) / (pd * pd);
+    // as faint as it is wider where it stands alone; where the sand is dense the discs overlap into one soft mass, so
+    // there it stays solid (a faint disc would hide the grains behind it and leave holes)
+    dofK = mix((px * px) / (pd * pd), 1.0, 1.0 - exp(-rho * uDofDense));
     px = pd;
   }
   // below a minimum the grain keeps its area through coverage, so it never shimmers
   vAlpha = clamp((px * px) / (uMinPx * uMinPx), 0.0, 1.0) * dofK;
   gl_PointSize = max(px, uMinPx);
   vPx = gl_PointSize;
-  vEdgePx = max(mix(uEdge.x, uEdge.y, t), coc * 0.5);
+  vEdgePx = max(mix(uEdge.x, uEdge.y, t), coc * 0.15);
+  vBlur = coc > 0.3 ? 1.0 - sqrt(dofK0) : 0.0;
 }
 `;
 
@@ -434,6 +440,7 @@ in float vGround;
 in float vBounceW;
 in float vPx;
 in float vEdgePx;
+in float vBlur;
 
 uniform float uExposure;
 uniform float uOutScale;   // 1 on screen; 1/4 into the filtered sand layer (see sand-composite.ts)
@@ -484,6 +491,9 @@ void main() {
     float on = onA + onB * cphi * sin(max(ai, ar)) * tan(min(min(ai, ar), 1.4));
     float onK = mix(1.0, on, step(0.001, uRough));
     ndl *= onK; ndl3 *= onK;
+    // out of focus: the grain's average over its lit face, the same across the disc (not a big shaded sphere)
+    float avgL = 0.6667 * (0.5 + 0.5 * dot(L[i], v));
+    ndl = mix(ndl, avgL, vBlur); ndl3 = mix(ndl3, vec3(avgL), vBlur);
     vec3 h = normalize(L[i] + v);
     // glossy (Liam, 2026-10-11, the cinematic look: Ducky's grains catch a highlight each)
     float spec = pow(max(dot(n, h), 0.0), uGloss) * glossNorm * uSpec;

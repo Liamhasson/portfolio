@@ -27,6 +27,15 @@ in vec2 vUv;
 uniform sampler2D uSand;
 uniform vec2 uTexel;
 uniform float uSigma;   // device px
+uniform sampler2D uDofTex;   // the sand through the lens (half size; DOF_FRAGMENT), and its depth
+uniform sampler2D uDepth;
+uniform vec4 uDofP;          // the lens: blur scale (device px), focus distance, near, far (0 scale = no lens)
+uniform float uDofMax;
+float cocAt(vec2 uv) {
+  float d = texture(uDepth, uv).r;
+  float z = uDofP.z * uDofP.w / (uDofP.w - d * (uDofP.w - uDofP.z));
+  return min(uDofP.x * abs(z - uDofP.y) / z, uDofMax);
+}
 void main() {
   // a small Gaussian of width uSigma in five reads: the centre, and four bilinear reads at (+-d, +-d) (each averaging
   // 2x2 texels). Per axis the four reads spread with variance ~d^2 + 1/4; mixing in the centre scales that down.
@@ -36,6 +45,8 @@ void main() {
   vec4 ring = 0.25 * (texture(uSand, vUv + vec2(-d, -d) * uTexel) + texture(uSand, vUv + vec2(d, -d) * uTexel)
                     + texture(uSand, vUv + vec2(-d, d) * uTexel) + texture(uSand, vUv + vec2(d, d) * uTexel));
   vec4 acc = mix(texture(uSand, vUv), ring, w);
+  // where the lens blurs, the sand through it (in focus, the full-size filtered sand stays)
+  if (uDofP.x > 0.0) acc = mix(acc, texture(uDofTex, vUv), smoothstep(0.8, 2.5, cocAt(vUv)));
   // alpha-to-coverage writes the fragment's alpha into the samples it covers, so the resolved alpha is ~alpha x coverage
   // (~coverage^2) while the colour is ~colour x coverage (premultiplied): the coverage is the root of the alpha
   float a = clamp(sqrt(acc.a), 0.0, 1.0);
@@ -43,6 +54,45 @@ void main() {
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
   gl_FragColor = vec4(gl_FragColor.rgb * a, a);   // premultiplied, over the scene
+}
+`;
+
+/**
+ * The lens (the cinematic look's depth of field; Liam, 2026-10-11: f/0.35 in the hero, focus as clarity): every grain is
+ * drawn sharp with its depth, then each pixel gathers the sand around it by each sample's own blur (a sample counts
+ * where its disc reaches this pixel, weighted by its disc's area, so its light is spread, not added). Out-of-focus sand
+ * overlaps into a soft mass as Cycles' does, which a per-grain disc can't (a see-through grain hides those behind it).
+ * Half size, 48 taps on a golden-angle spiral turned per pixel; the filter pass keeps the full-size sand in focus.
+ */
+const DOF_FRAGMENT = /* glsl */ `
+precision highp float;
+out highp vec4 pc_fragColor;
+#define gl_FragColor pc_fragColor
+in vec2 vUv;
+uniform sampler2D uSand;
+uniform sampler2D uDepth;
+uniform vec2 uTexel;     // one full-size pixel
+uniform vec4 uDofP;
+uniform float uDofMax;
+float cocAt(vec2 uv) {
+  float d = texture(uDepth, uv).r;
+  float z = uDofP.z * uDofP.w / (uDofP.w - d * (uDofP.w - uDofP.z));
+  return min(uDofP.x * abs(z - uDofP.y) / z, uDofMax);
+}
+void main() {
+  vec4 sum = vec4(0.0);
+  float wsum = 0.0;
+  float turn = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) * 6.2831853;
+  for (int i = 0; i < 48; i++) {
+    float r = sqrt((float(i) + 0.5) / 48.0) * uDofMax * 0.5;   // radius, full-size px
+    float a = float(i) * 2.39996 + turn;
+    vec2 uv = vUv + vec2(cos(a), sin(a)) * r * uTexel;
+    float c = max(cocAt(uv) * 0.5, 0.5);                       // that sample's disc radius
+    float w = clamp(c - r + 1.0, 0.0, 1.0) / (c * c);          // it reaches here; its light spread over its disc
+    sum += texture(uSand, uv) * w;
+    wsum += w;
+  }
+  gl_FragColor = wsum > 0.0 ? sum / wsum : vec4(0.0);
 }
 `;
 
@@ -121,6 +171,16 @@ export class SandComposite {
   defocus = 0;
   /** And how far it falls into shadow, so the light is on the grains (0..1). */
   deskDim = 0;
+  /** The lens: focus distance (world units), f-number, focal length (mm, the hero camera's 45), how much of it (0 =
+   *  sharp throughout). Set each frame. */
+  lens = { amount: 0, focus: 8.4, fstop: 0.35, lensMm: 45 };
+  private readonly dofRt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
+  private readonly dofScene = new THREE.Scene();
+  private readonly dofMat = new THREE.ShaderMaterial({
+    glslVersion: THREE.GLSL3, vertexShader: VERTEX, fragmentShader: DOF_FRAGMENT,
+    depthTest: false, depthWrite: false, toneMapped: false, blending: THREE.NoBlending,
+    uniforms: { uSand: { value: null }, uDepth: { value: null }, uTexel: { value: new THREE.Vector2() }, uDofP: { value: new THREE.Vector4() }, uDofMax: { value: 24 } },
+  });
   /** The hero's haze (texture, decode scale) and how much of it shows (0..1; it belongs to the hero's light). */
   haze: { texture: THREE.Texture; scale: number } | null = null;
   hazeAmount = 0;
@@ -142,6 +202,8 @@ export class SandComposite {
     // 8-bit sRGB-encoded (half the bandwidth of half float; the hardware encodes and blends in linear), with the sand
     // written at 1/ENCODE so its highlights (scene values up to ~4) don't clip
     this.rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.UnsignedByteType, samples: 4, depthBuffer: true, colorSpace: THREE.SRGBColorSpace });
+    // its depth, resolved, for the lens
+    this.rt.depthTexture = new THREE.DepthTexture(1, 1);
     // the desk's defocus reads a quarter-size copy of it (made only while it's on)
     this.blurRt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.UnsignedByteType, depthBuffer: false });
     this.material = new THREE.ShaderMaterial({
@@ -155,7 +217,10 @@ export class SandComposite {
       depthTest: false,
       depthWrite: false,
       toneMapped: true,
-      uniforms: { uSand: { value: this.rt.texture }, uTexel: { value: new THREE.Vector2() }, uSigma: { value: 1 } },
+      uniforms: {
+        uSand: { value: this.rt.texture }, uTexel: { value: new THREE.Vector2() }, uSigma: { value: 1 },
+        uDofTex: { value: this.dofRt.texture }, uDepth: { value: this.rt.depthTexture }, uDofP: { value: new THREE.Vector4() }, uDofMax: { value: 24 },
+      },
     });
     this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.material);
     this.quad.frustumCulled = false;
@@ -166,6 +231,9 @@ export class SandComposite {
     const rawQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.raw);
     rawQuad.frustumCulled = false;
     this.rawScene.add(rawQuad);
+    const dofQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.dofMat);
+    dofQuad.frustumCulled = false;
+    this.dofScene.add(dofQuad);
     const dimQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.dimMat);
     dimQuad.frustumCulled = false;
     this.dimScene.add(dimQuad);
@@ -189,7 +257,7 @@ export class SandComposite {
   /** Compiles its own passes' shaders and makes its targets now, not on the frame each is first needed (stalls of up
    *  to 200 ms mid-scroll). */
   async warm(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): Promise<void> {
-    await Promise.all([this.scene, this.rawScene, this.discScene, this.hazeScene, this.dimScene].map((sc) => renderer.compileAsync(sc, this.ortho)));
+    await Promise.all([this.scene, this.rawScene, this.discScene, this.hazeScene, this.dimScene, this.dofScene].map((sc) => renderer.compileAsync(sc, this.ortho)));
     // and drawn once each way (the GPU builds its pipelines on a shader's first draw into each kind of target)
     const d = this.defocus;
     for (const v of [0, 4]) {
@@ -213,6 +281,22 @@ export class SandComposite {
     renderer.clear();
     camera.layers.set(SAND_LAYER);
     renderer.render(scene, camera);
+    // the lens, from the sand's colour and depth (half size)
+    const lens = this.lens;
+    const dofP = this.material.uniforms.uDofP.value as THREE.Vector4;
+    if (lens.amount > 0.001 && (camera as THREE.PerspectiveCamera).isPerspectiveCamera) {
+      const cam = camera as THREE.PerspectiveCamera;
+      const f = lens.lensMm / 1000, pointScale = size.y / (2 * Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2));
+      dofP.set(pointScale * ((f / lens.fstop) / Math.max(lens.focus - f, 1e-3)) * lens.amount, lens.focus, cam.near, cam.far);
+      const hw = Math.max(1, Math.round(size.x / 2)), hh = Math.max(1, Math.round(size.y / 2));
+      if (this.dofRt.width !== hw || this.dofRt.height !== hh) this.dofRt.setSize(hw, hh);
+      const du = this.dofMat.uniforms;
+      du.uSand.value = this.rt.texture; du.uDepth.value = this.rt.depthTexture;
+      (du.uTexel.value as THREE.Vector2).set(1 / size.x, 1 / size.y);
+      (du.uDofP.value as THREE.Vector4).copy(dofP);
+      renderer.setRenderTarget(this.dofRt);
+      renderer.render(this.dofScene, this.ortho);
+    } else dofP.set(0, 0, 0, 0);
     renderer.setRenderTarget(null);
     renderer.setClearColor(clear, clearA);
     camera.layers.mask = mask;
@@ -264,6 +348,8 @@ export class SandComposite {
     this.material.dispose();
     this.hazeMat.dispose();
     this.dimMat.dispose();
+    this.dofMat.dispose();
+    this.dofRt.dispose();
     this.quad.geometry.dispose();
   }
 }

@@ -151,6 +151,7 @@ uniform vec3 uRamp[4];
 uniform float uDpr;
 uniform float uFade;         // the camera pulling away (pull-back): the name dims out
 uniform vec3 uFill;          // the letters' fill (colour x strength x how much of it is left)
+uniform float uBlurPx;       // the lens's blur at the name (screen px): its edges spread over it
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float vnoise(vec2 p) {
@@ -174,9 +175,11 @@ void main() {
   float sd = (texture(uSdf, vUv).r - 0.5) * 2.0 * uRange;     // texels, > 0 outside
   float pxPerTexel = 1.0 / max(fwidth(sd), 1e-4);             // screen px per texel
   float dist = abs(sd) * pxPerTexel;                          // screen px from the outline
-  float stroke = 1.0 - smoothstep(uStrokePx, uStrokePx + 1.0, dist);
-  // inside the letters: the fill, its edge antialiased over a pixel
-  float inLetter = 1.0 - smoothstep(-0.5, 0.5, sd * pxPerTexel);
+  // out of focus, an edge spreads over the lens's blur (its light kept: the stroke dims as it widens)
+  float b = max(uBlurPx * 0.5, 0.5);
+  float stroke = (1.0 - smoothstep(uStrokePx - b + 0.5, uStrokePx + b + 0.5, dist)) * min(1.0, (uStrokePx + 0.5) / b);
+  // inside the letters: the fill, its edge antialiased over a pixel (or the lens's blur)
+  float inLetter = 1.0 - smoothstep(-b, b, sd * pxPerTexel);
   vec3 fill = uFill * inLetter;
   if (stroke <= 0.0 && max(fill.r, max(fill.g, fill.b)) <= 0.0) discard;
 
@@ -249,6 +252,7 @@ export class Wordmark {
         uDpr: { value: 1 },
         uFade: { value: 1 },
         uFill: { value: new THREE.Vector3(...WORDMARK.fillColor).multiplyScalar(WORDMARK.fillStrength) },
+        uBlurPx: { value: 0 },
       },
     });
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), material);
@@ -260,6 +264,16 @@ export class Wordmark {
   /** How much of the letters' fill is left (1 filled .. 0 the outline alone). */
   setFill(f: number): void {
     (this.material.uniforms.uFill.value as THREE.Vector3).set(...WORDMARK.fillColor).multiplyScalar(WORDMARK.fillStrength * f);
+  }
+
+  /** The lens's blur at the name, screen px (Liam, 2026-10-11: soft while filled, sharp as it becomes the outline). */
+  setBlur(px: number): void {
+    this.material.uniforms.uBlurPx.value = px;
+  }
+
+  /** Its distance from the camera (world units), for the lens. */
+  get distanceFrom(): (p: THREE.Vector3) => number {
+    return (p) => this.mesh.position.distanceTo(p);
   }
 
   setFade(f: number): void {

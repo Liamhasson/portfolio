@@ -825,7 +825,15 @@ export function SandLab() {
           // (it stays with the hero's light: until the lamp comes on, or with the pull-back when the light moves with it)
           if (composite) composite.hazeAmount = hazeOn ? (hero ? (heroLight ? 1 - ease(state.compact, [0.0, 0.6]) : 1 - ease(pg, TL.pullback)) : 1) : 0;
           // and its lens: the lit front in focus, the rest softening (?dof=0: sharp throughout)
-          field!.setDof(dofOn ? (hero ? 1 - ease(pg, TL.pullback) : 1) : 0);
+          {
+            const lensK = dofOn ? (hero ? 1 - ease(pg, TL.pullback) : 1) : 0;
+            // the lens pass in the compositor (its blur overlaps into a soft mass); per grain only without it
+            if (composite) {
+              composite.lens.amount = lensK; composite.lens.focus = SAND_LOOK.dofFocus;
+              composite.lens.fstop = SAND_LOOK.dofFstop; composite.lens.lensMm = SAND_LOOK.dofLensMm;
+              field!.setDof(0);
+            } else field!.setDof(lensK);
+          }
           const formed = ease(state.compact, [0.5, 0.92]);   // none around the formed ball (Liam, 2026-10-10)
           const density = (!hero ? DRIFT.hero
             : THREE.MathUtils.lerp(DRIFT.hero, DRIFT.desk, ease(pg, TL.pullback)) * (1 - ease(pg, [TL.build[1] - 0.02, TL.build[1]]))) * (1 - formed);   // none once the dive begins
@@ -868,7 +876,14 @@ export function SandLab() {
           const now = (performance.now() - mountedAt) / 1000;
           if (wordmarkSeenAt < 0) wordmarkSeenAt = now;
           const from = Math.max(0.35, wordmarkSeenAt + 0.5), x = Math.min(Math.max((now - from) / 1.4, 0), 1);
-          wordmark.setFill(reduced ? 0 : 1 - x * x * (3 - 2 * x));
+          const fill = reduced ? 0 : 1 - x * x * (3 - 2 * x);
+          wordmark.setFill(fill);
+          // the lens on the name while it's filled; sharp as it becomes the outline
+          if (composite && composite.lens.amount > 0) {
+            const L = composite.lens, f = L.lensMm / 1000, d = wordmark.distanceFrom(stage!.camera.position);
+            const pointScale = stage!.bufferHeight / (2 * Math.tan(THREE.MathUtils.degToRad(stage!.camera.fov) / 2));
+            wordmark.setBlur(Math.min(pointScale * ((f / L.fstop) / (L.focus - f)) * Math.abs(d - L.focus) / d, 24) * L.amount * fill);
+          } else wordmark.setBlur(0);
         }
         if (composite && !filterParam && !calibrating) {
           const toDesk = pullback ? THREE.MathUtils.smoothstep(span(progressRef.current, TL.pullback), 0.15, 0.85) : 0;
