@@ -185,6 +185,7 @@ export function SandLab() {
       let composite: SandComposite | null = null;
       const hazeOn = new URLSearchParams(window.location.search).get("haze") !== "0";
       const dofOn = new URLSearchParams(window.location.search).get("dof") !== "0";
+      const heroLight = new URLSearchParams(window.location.search).get("herolight") !== "0";
       const FILTER = { chaos: 0.5, ball: 0.28, desk: 0.525 };
       if (filterParam !== "0") {
         const comp = new SandComposite();
@@ -484,7 +485,11 @@ export function SandLab() {
         compactRef.current = state.compact;
         if (pullback && desk) {
           const deskNow = desk;
-          const hl = THREE.MathUtils.smoothstep(span(progressRef.current, TL.pullback), 0.15, 0.85);
+          // the lamp comes on as the ball forms (Liam, 2026-10-11: the cloud keeps the hero's light through the pull-back,
+          // the desk darker, it isn't the subject yet); ?herolight=0: the light moves to the lamp with the pull-back
+          const lampOn = heroLight ? ease(state.compact, [0.0, 0.6]) : 1;
+          const hl = THREE.MathUtils.smoothstep(span(progressRef.current, TL.pullback), 0.15, 0.85) * lampOn;
+          const deskDark = heroLight ? 0.6 * THREE.MathUtils.smoothstep(span(progressRef.current, TL.pullback), 0.15, 0.85) * (1 - lampOn) : 0;
           // the desk lamp is close and soft: the sand's own shading softens with it (shadow strength, wrap)
           if (!calibrating) {
             const mixLook: Record<string, number> = {};
@@ -739,13 +744,13 @@ export function SandLab() {
               // in the cloud the focus is on the grains: they stay sharp and solid, the desk behind goes softly out of
               // focus (Liam, 2026-10-10)
               const passage = ease(fr, [58, 72]) * (1 - ease(fr, [100, 118]));
-              if (composite) { composite.defocus = 9 * (stage!.bufferHeight / 900) * passage; composite.deskDim = 0.45 * passage; }
+              if (composite) { composite.defocus = 9 * (stage!.bufferHeight / 900) * passage; composite.deskDim = Math.max(0.45 * passage, deskDark); }
               // the light comes from the front, onto the grains (Liam, 2026-10-11): a warm key from the camera
               field!.setFrontKey(fillCol.clone().multiplyScalar(FRONT_KEY * passage));
             } else {
               cloudK = 0;
               field!.setCloud(0, 0, cloudAxis, 0, 0, 0, 1e9, 1e9, 1, 0, 1);
-              if (composite) { composite.defocus = 0; composite.deskDim = 0; }
+              if (composite) { composite.defocus = 0; composite.deskDim = deskDark; }
               field!.setFrontKey(new THREE.Vector3());
             }
           }
@@ -763,7 +768,7 @@ export function SandLab() {
             else shadow.update(ballC, ballR, deskNow.lights[0].pos, shadowK[0], k);
           }
           field!.setPointScale(stage!.bufferHeight, THREE.MathUtils.degToRad(stage!.camera.fov));
-          const h = THREE.MathUtils.smoothstep(t, 0.15, 0.85);
+          const h = THREE.MathUtils.smoothstep(t, 0.15, 0.85) * lampOn;
           field!.setGround(groundCol.clone().multiplyScalar(THREE.MathUtils.lerp(LIFT.ground * h, LIFT.groundBall, state.compact)), stage!.camera, fillCol.clone().multiplyScalar(LIFT.fill * h * (1 - state.compact)),   // the loose cloud's lift; the formed ball takes the lamp's own shadows (Liam, 2026-10-11: the render's ball)
             deskTop ? deskTop.y : -1e3, LIFT.reach);
           field!.setLights(
@@ -817,7 +822,8 @@ export function SandLab() {
           const ballR = field!.material.uniforms.uBallR.value as number;
           const pg = progressRef.current;
           // the hero's haze goes with the hero's light, as the camera pulls back to the desk
-          if (composite) composite.hazeAmount = hazeOn ? (hero ? 1 - ease(pg, TL.pullback) : 1) : 0;
+          // (it stays with the hero's light: until the lamp comes on, or with the pull-back when the light moves with it)
+          if (composite) composite.hazeAmount = hazeOn ? (hero ? (heroLight ? 1 - ease(state.compact, [0.0, 0.6]) : 1 - ease(pg, TL.pullback)) : 1) : 0;
           // and its lens: the lit front in focus, the rest softening (?dof=0: sharp throughout)
           field!.setDof(dofOn ? (hero ? 1 - ease(pg, TL.pullback) : 1) : 0);
           const formed = ease(state.compact, [0.5, 0.92]);   // none around the formed ball (Liam, 2026-10-10)

@@ -125,6 +125,9 @@ export class SandComposite {
   haze: { texture: THREE.Texture; scale: number } | null = null;
   hazeAmount = 0;
   private readonly hazeScene = new THREE.Scene();
+  /** The desk in shadow without its blur (the lamp still off: the cloud keeps the hero's light). */
+  private readonly dimScene = new THREE.Scene();
+  private readonly dimMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0, depthTest: false, depthWrite: false, toneMapped: false });
   private readonly hazeMat = new THREE.ShaderMaterial({
     glslVersion: THREE.GLSL3, vertexShader: VERTEX, fragmentShader: HAZE_FRAGMENT,
     depthTest: false, depthWrite: false, toneMapped: false, transparent: true,
@@ -163,6 +166,9 @@ export class SandComposite {
     const rawQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.raw);
     rawQuad.frustumCulled = false;
     this.rawScene.add(rawQuad);
+    const dimQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.dimMat);
+    dimQuad.frustumCulled = false;
+    this.dimScene.add(dimQuad);
     const hazeQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.hazeMat);
     hazeQuad.frustumCulled = false;
     this.hazeScene.add(hazeQuad);
@@ -183,7 +189,7 @@ export class SandComposite {
   /** Compiles its own passes' shaders and makes its targets now, not on the frame each is first needed (stalls of up
    *  to 200 ms mid-scroll). */
   async warm(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): Promise<void> {
-    await Promise.all([this.scene, this.rawScene, this.discScene, this.hazeScene].map((sc) => renderer.compileAsync(sc, this.ortho)));
+    await Promise.all([this.scene, this.rawScene, this.discScene, this.hazeScene, this.dimScene].map((sc) => renderer.compileAsync(sc, this.ortho)));
     // and drawn once each way (the GPU builds its pipelines on a shader's first draw into each kind of target)
     const d = this.defocus;
     for (const v of [0, 4]) {
@@ -230,6 +236,13 @@ export class SandComposite {
       renderer.render(this.discScene, this.ortho);
     } else {
       renderer.render(scene, camera);
+      if (this.deskDim > 0.002) {
+        this.dimMat.opacity = this.deskDim;
+        const ac = renderer.autoClear;
+        renderer.autoClear = false;
+        renderer.render(this.dimScene, this.ortho);
+        renderer.autoClear = ac;
+      }
     }
     camera.layers.mask = mask;
     renderer.autoClear = false;
@@ -250,6 +263,7 @@ export class SandComposite {
     this.disc.dispose();
     this.material.dispose();
     this.hazeMat.dispose();
+    this.dimMat.dispose();
     this.quad.geometry.dispose();
   }
 }
