@@ -1,6 +1,10 @@
 /* Pulse onboarding story on the mockup board.
    The phone pins; scroll picks the screen; each change plays itself (a slide, like the app's own
-   navigation, forward or back) so nothing rests half-transitioned. Same pattern as the Cyvore story. */
+   navigation, forward or back) so nothing rests half-transitioned. Same pattern as the Cyvore story.
+   The screens are the coded app (onboarding-app.js), played by a scripted user: within a screen's
+   scroll its taps are scrubbed, each at its own point, and scrolling back undoes them. */
+
+import { mountStoryScreens } from "./onboarding-app.js";
 
 const { gsap, ScrollTrigger } = window;
 gsap.registerPlugin(ScrollTrigger);
@@ -13,8 +17,12 @@ export const STAGES = [
   { from: 3, to: 8 },  // the first booking
   { from: 9, to: 11 }, // tour, permissions, close
 ];
-/** Pinned scroll per screen, as a share of the viewport height. */
-const UNIT_VH = 0.33;
+/** Pinned scroll per unit of weight, as a share of the viewport height. */
+const UNIT_VH = 0.55;
+/** Each screen's share of the scroll: room for its taps (02 and 03 have three, 07 two, 08 the slide). */
+const WEIGHTS = [1, 1.6, 1.6, 1, 1, 1, 1.4, 1.4, 1, 1, 1, 1];
+const STARTS = WEIGHTS.map((_, i) => WEIGHTS.slice(0, i).reduce((a, b) => a + b, 0));
+const TOTAL = STARTS[SCREENS - 1] + WEIGHTS[SCREENS - 1];
 
 export const stageOf = (beat) => STAGES.findIndex((s) => beat >= s.from && beat <= s.to);
 
@@ -35,6 +43,7 @@ function mountStory(root, name) {
   const fills = [...root.querySelectorAll(".ob-stage i")];
   const stages = [...root.querySelectorAll(".ob-stage")];
   const count = root.querySelector("[data-count]");
+  const app = mountStoryScreens(root.querySelector(".phone-screen"), { gsap, still: false });
 
   let beat = -1;
   let settled = true;
@@ -44,7 +53,7 @@ function mountStory(root, name) {
   const pinTop = () => Math.max(16, (innerHeight - pin.offsetHeight) / 2);
   const layout = () => {
     root.style.setProperty("--pin-top", `${pinTop()}px`);
-    track.style.height = `${pin.offsetHeight + SCREENS * UNIT_VH * innerHeight}px`;
+    track.style.height = `${pin.offsetHeight + TOTAL * UNIT_VH * innerHeight}px`;
   };
   layout();
 
@@ -60,6 +69,7 @@ function mountStory(root, name) {
     // A new change takes over from whatever is on screen: nothing snaps to full, nothing stacks.
     if (tl) { tl.kill(); tl = null; }
     setCaption(b);
+    app.chrome(b + 1, !(instant || reduce || beat < 0)); // Back, Skip and the bar hold still; the bar eases to its fill
     const inn = screens[b];
     if (instant || reduce || beat < 0) {
       screens.forEach((s, i) => gsap.set(s, { autoAlpha: i === b ? 1 : 0, xPercent: 0 }));
@@ -83,10 +93,16 @@ function mountStory(root, name) {
   };
 
   const update = (progress, dir) => {
-    const p = Math.min(Math.max(progress, 0), 1) * SCREENS;
-    const b = Math.min(SCREENS - 1, Math.floor(p));
-    const within = Math.min(p - b, 1);
-    if (b !== beat) goTo(b, dir || (b > beat ? 1 : -1));
+    const u = Math.min(Math.max(progress, 0), 1) * TOTAL;
+    let b = SCREENS - 1;
+    while (b > 0 && u < STARTS[b]) b--;
+    const within = Math.min((u - STARTS[b]) / WEIGHTS[b], 1);
+    if (b !== beat) {
+      // the screen it leaves rests as the user left it: all done going on, untouched going back
+      if (beat >= 0) app.step(beat + 1, b > beat ? 1 : 0);
+      goTo(b, dir || (b > beat ? 1 : -1));
+    }
+    app.step(b + 1, within);
     lastFills = stageFills(b, within);
     fills.forEach((f, i) => f.style.setProperty("--fill", lastFills[i].toFixed(3)));
   };
@@ -108,14 +124,16 @@ function mountStory(root, name) {
     state: () => ({
       beat, settled, caption: caps.findIndex((c) => c.classList.contains("is-on")), stage: stageOf(beat), fills: lastFills,
       visible: screens.flatMap((s, i) => (opacity(s) > 0.01 ? [i] : [])),
+      step: app.info(beat + 1),
     }),
-    scrollToBeat: (b, within = 0.5) => window.scrollTo(0, st.start + ((b + within) / SCREENS) * (st.end - st.start)),
+    scrollToBeat: (b, within = 0.5) => window.scrollTo(0, st.start + ((STARTS[b] + within * WEIGHTS[b]) / TOTAL) * (st.end - st.start)),
   };
 }
 
 /** Reduced motion: no pin; the twelve screens as a still grid, each with its caption. */
 function mountStatic(root, name) {
   root.classList.add("is-static");
+  mountStoryScreens(root.querySelector(".phone-screen"), { gsap, still: true }); // each screen as it ends
   root.querySelectorAll(".ob-screen").forEach((s) => gsap.set(s, { autoAlpha: 1, xPercent: 0 }));
   (window.__pulseStories ||= {})[name] = { state: () => ({ static: true, screens: root.querySelectorAll(".ob-screen").length }) };
 }

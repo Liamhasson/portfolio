@@ -184,7 +184,9 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
 .ob-stage i::after { content: ""; position: absolute; inset: 0; background: var(--grad); transform-origin: 0 50%; transform: scaleX(var(--fill, 0)); }
 .ob-phone { --w: calc(var(--u) * 340); }
 .ob-screen { position: absolute; inset: 0; margin: 0; opacity: 0; visibility: hidden; }
-.ob-screen img { display: block; width: 100%; height: 100%; object-fit: cover; }
+/* each screen is the coded app (onboarding-app.js), display only; one Back / Skip / bar layer sits over them all */
+.ob-app { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.ob-chrome { position: absolute; inset: 0; z-index: 3; overflow: hidden; pointer-events: none; }
 .ob-screen figcaption { display: none; }
 /* reduced motion: the twelve screens as a still grid, each with its caption */
 .ob.is-static .ob-track { height: auto !important; }
@@ -193,7 +195,8 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
 .ob.is-static .ob-phone { width: auto; aspect-ratio: auto; padding: 0; background: none; box-shadow: none; border-radius: 0; }
 .ob.is-static .phone-screen { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: calc(var(--u) * 32) calc(var(--u) * 20); height: auto; overflow: visible; background: none; border-radius: 0; }
 .ob.is-static .ob-screen { position: static; opacity: 1; visibility: visible; }
-.ob.is-static .ob-screen img { border-radius: calc(var(--u) * 20); box-shadow: inset 0 0 0 1px var(--hair-2); aspect-ratio: 1179 / 2556; height: auto; }
+.ob.is-static .ob-app { position: relative; inset: auto; aspect-ratio: 393 / 852; border-radius: calc(var(--u) * 20); background: #060b14; }
+.ob.is-static .ob-app::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--hair-2); pointer-events: none; }
 .ob.is-static .ob-screen figcaption { display: block; margin-top: calc(var(--u) * 12); font-size: calc(var(--u) * 14); line-height: 1.4; color: var(--ink-2); }
 
 /* ------------------------------ 5 how it works ------------------------------ */
@@ -414,18 +417,18 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
             <button type="button" class="ob-try" data-proto-open>Tap through it yourself<svg class="ic" aria-hidden="true"><use href="#i-arrow-right"/></svg></button>
           </div>
           <div class="phone ob-phone"><div class="phone-screen">
-            <figure class="ob-screen"><img src="pulse-mockups/onb-01.jpg" alt="Onboarding screen 1: Welcome"><figcaption>01 · What Pulse is for, in three lines.</figcaption></figure>
-            <figure class="ob-screen"><img src="pulse-mockups/onb-02.jpg" alt="Onboarding screen 2: What brings you here?"><figcaption>02 · Pick the goals that matter to you.</figcaption></figure>
-            <figure class="ob-screen"><img src="pulse-mockups/onb-03.jpg" alt="Onboarding screen 3: What do you love?" loading="lazy"><figcaption>03 · Choose the activities; the plan follows.</figcaption></figure>
-            <figure class="ob-screen"><img src="pulse-mockups/onb-04.jpg" alt="Onboarding screen 4: Book your first workout" loading="lazy"><figcaption>04 · Your first booking, free to cancel.</figcaption></figure>
-            <figure class="ob-screen"><img src="pulse-mockups/onb-05.jpg" alt="Onboarding screen 5: Choose a workout" loading="lazy"><figcaption>05 · The best matches for your activities.</figcaption></figure>
-            <figure class="ob-screen"><img src="pulse-mockups/onb-06.jpg" alt="Onboarding screen 6: Choose a studio" loading="lazy"><figcaption>06 · Studios near you, with ratings.</figcaption></figure>
-            <figure class="ob-screen"><img src="pulse-mockups/onb-07.jpg" alt="Onboarding screen 7: Pick a time" loading="lazy"><figcaption>07 · A slot that fits, with what's still free.</figcaption></figure>
-            <figure class="ob-screen"><img src="pulse-mockups/onb-08.jpg" alt="Onboarding screen 8: Confirm booking" loading="lazy"><figcaption>08 · Everything in one place before you book.</figcaption></figure>
-            <figure class="ob-screen"><img src="pulse-mockups/onb-09.jpg" alt="Onboarding screen 9: You're booked!" loading="lazy"><figcaption>09 · Booked, and one tap to your calendar.</figcaption></figure>
-            <figure class="ob-screen"><img src="pulse-mockups/onb-10.jpg" alt="Onboarding screen 10: You're all set" loading="lazy"><figcaption>10 · What else Pulse does, in four lines.</figcaption></figure>
-            <figure class="ob-screen"><img src="pulse-mockups/onb-11.jpg" alt="Onboarding screen 11: Stay in the loop" loading="lazy"><figcaption>11 · Notifications, asked for with a reason.</figcaption></figure>
-            <figure class="ob-screen"><img src="pulse-mockups/onb-12.jpg" alt="Onboarding screen 12: Welcome to Pulse" loading="lazy"><figcaption>12 · In.</figcaption></figure>
+            <figure class="ob-screen"><div class="ob-app" role="img" aria-label="Onboarding screen 1: Welcome"></div><figcaption>01 · What Pulse is for, in three lines.</figcaption></figure>
+            <figure class="ob-screen"><div class="ob-app" role="img" aria-label="Onboarding screen 2: What brings you here?"></div><figcaption>02 · Pick the goals that matter to you.</figcaption></figure>
+            <figure class="ob-screen"><div class="ob-app" role="img" aria-label="Onboarding screen 3: What do you love?"></div><figcaption>03 · Choose the activities; the plan follows.</figcaption></figure>
+            <figure class="ob-screen"><div class="ob-app" role="img" aria-label="Onboarding screen 4: Book your first workout"></div><figcaption>04 · Your first booking, free to cancel.</figcaption></figure>
+            <figure class="ob-screen"><div class="ob-app" role="img" aria-label="Onboarding screen 5: Choose a workout"></div><figcaption>05 · The best matches for your activities.</figcaption></figure>
+            <figure class="ob-screen"><div class="ob-app" role="img" aria-label="Onboarding screen 6: Choose a studio"></div><figcaption>06 · Studios near you, with ratings.</figcaption></figure>
+            <figure class="ob-screen"><div class="ob-app" role="img" aria-label="Onboarding screen 7: Pick a time"></div><figcaption>07 · A slot that fits, with what's still free.</figcaption></figure>
+            <figure class="ob-screen"><div class="ob-app" role="img" aria-label="Onboarding screen 8: Confirm booking"></div><figcaption>08 · Everything in one place before you book.</figcaption></figure>
+            <figure class="ob-screen"><div class="ob-app" role="img" aria-label="Onboarding screen 9: You're booked!"></div><figcaption>09 · Booked, and one tap to your calendar.</figcaption></figure>
+            <figure class="ob-screen"><div class="ob-app" role="img" aria-label="Onboarding screen 10: You're all set"></div><figcaption>10 · What else Pulse does, in four lines.</figcaption></figure>
+            <figure class="ob-screen"><div class="ob-app" role="img" aria-label="Onboarding screen 11: Stay in the loop"></div><figcaption>11 · Notifications, asked for with a reason.</figcaption></figure>
+            <figure class="ob-screen"><div class="ob-app" role="img" aria-label="Onboarding screen 12: Welcome to Pulse"></div><figcaption>12 · In.</figcaption></figure>
           </div></div>
         </div>
       </div>
