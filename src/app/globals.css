@@ -3,7 +3,7 @@
 /* z-index scale: page 0 · shell (nav, back button) 50 · loader/transition overlays 80 · skip link 100 */
 @theme static {
   /* Color: measured from liamhasson.figma.site (2026-10-01) */
-  --color-bg: #000000;
+  --color-bg: #0b0908;   /* the cinematic look's warm near-black (2026-10-11): the 3D scene's graded black (film-grade.tsx) */
   --color-surface: #14161a;
   --color-surface-2: #0f0f0f;
   --color-rule: #25282e;

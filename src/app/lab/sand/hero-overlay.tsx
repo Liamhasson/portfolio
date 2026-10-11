@@ -89,12 +89,13 @@ export function HeroOverlay({
       </div>
       {/* the front name and the line, lower left over the void's edge */}
       <div className="absolute bottom-[96px] left-[4.9vw] max-w-[min(92vw,44rem)] md:bottom-[clamp(96px,11vw,150px)]">
-        {/* legibility: the sand thins out behind the copy, a soft falloff, never a box */}
+        {/* legibility: the sand thins out behind the copy, a soft falloff, never a box; in the graded black (#0b0908),
+            never darker than the background (it sits above the grade) */}
         <div
           aria-hidden
           data-exit="0"
           className="absolute -bottom-[30%] -left-[12vw] -right-[18%] -top-[45%] -z-10"
-          style={{ background: "radial-gradient(ellipse 60% 55% at 35% 55%, rgba(0,0,0,0.72), rgba(0,0,0,0.45) 45%, transparent 75%)" }}
+          style={{ background: "radial-gradient(ellipse 60% 55% at 35% 55%, rgba(11,9,8,0.72), rgba(11,9,8,0.45) 45%, transparent 75%)" }}
         />
         <div data-exit="0" className="mb-4 font-mono text-[11px] uppercase tracking-[0.08em] text-white/60 md:hidden">
           <Line delay={200}>Product Designer</Line>
@@ -120,7 +121,7 @@ export function HeroOverlay({
           aria-hidden
           data-scrim
           className="absolute inset-x-0 bottom-0 h-[34vh] opacity-0"
-          style={{ background: "linear-gradient(to top, rgba(0,0,0,0.62), rgba(0,0,0,0.3) 45%, transparent)" }}
+          style={{ background: "linear-gradient(to top, rgba(11,9,8,0.62), rgba(11,9,8,0.3) 45%, transparent)" }}
         />
       )}
       {enter && (
