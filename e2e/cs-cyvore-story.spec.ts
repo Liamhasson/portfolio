@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-/** The board's test hook (docs/prototypes/cyvore-mockups/story-board.js). */
+/** The story's test hook (src/components/case-study/cyvore/story-engine.ts, from the board's story-board.js). */
 type StoryApi = {
   state(): State & Partial<{ static: boolean; copies: number }>;
   scrollToBeat(beat: number, within?: number): void;
@@ -13,7 +13,7 @@ const site = (page: Page) => page.locator('.story[data-story="desktop"] .site');
 
 test.describe("markup", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/cyvore-mockups.html");
+    await page.goto("/cyvore");
   });
 
   test("all four chapters of the shipped site are there", async ({ page }) => {
@@ -54,7 +54,7 @@ test.describe("markup", () => {
   test("refined type (version C): descriptions in Inter 15px, headings and column names stay Michroma", async ({ page }) => {
     const t = await page.evaluate(() => {
       const site = document.querySelector('.story[data-story="desktop"] .site') as HTMLElement;
-      const u = (site.closest(".frame") as HTMLElement).getBoundingClientRect().width / 1440;
+      const u = (site.closest(".f") as HTMLElement).getBoundingClientRect().width / 1440;
       const font = (sel: string) => getComputedStyle(site.querySelector(sel)!).fontFamily.split(",")[0].replace(/"/g, "");
       const desc = site.querySelector(".pan-desc") as HTMLElement;
       return {
@@ -75,16 +75,16 @@ test.describe("markup", () => {
     expect(glows).toBe(1);
   });
 
-  test("the pin can stick: sticky pin, frames clip instead of hiding overflow", async ({ page }) => {
+  test("the pin can stick: sticky pin, the section clips instead of hiding overflow", async ({ page }) => {
     const styles = await page.evaluate(() => {
       const pin = document.querySelector('.story[data-story="desktop"] .story-pin') as HTMLElement;
       return {
         pin: getComputedStyle(pin).position,
-        frame: getComputedStyle(pin.closest(".frame")!).overflow,
+        page: getComputedStyle(pin.closest("article")!).overflow,
         f: getComputedStyle(pin.closest(".f")!).overflow,
       };
     });
-    expect(styles).toEqual({ pin: "sticky", frame: "clip", f: "clip" });
+    expect(styles).toEqual({ pin: "sticky", page: "visible", f: "clip" });
   });
 });
 
@@ -107,7 +107,7 @@ const story = (page: Page, name = "desktop") => ({
 
 test.describe("beats", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/cyvore-mockups.html", { waitUntil: "load" });
+    await page.goto("/cyvore", { waitUntil: "load" });
     await page.waitForFunction(() => window.__cyvoreStories?.desktop);
   });
 
@@ -176,7 +176,7 @@ test.describe("beats", () => {
 
 test.describe("handovers", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/cyvore-mockups.html", { waitUntil: "load" });
+    await page.goto("/cyvore", { waitUntil: "load" });
     await page.waitForFunction(() => window.__cyvoreStories?.desktop);
   });
 
@@ -255,8 +255,9 @@ test.describe("handovers", () => {
 
 test.describe("attack and engines", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/cyvore-mockups.html", { waitUntil: "load" });
+    await page.goto("/cyvore", { waitUntil: "load" });
     await page.waitForFunction(() => window.__cyvoreStories?.desktop);
+    await story(page).go(0); // the clip loads as the story nears the screen
     await page.waitForFunction(() => {
       const v = document.querySelector('.story[data-story="desktop"] [data-chapter="attack"] video') as HTMLVideoElement;
       return v.dataset.scrub === "ready" && v.readyState >= 2;
@@ -335,12 +336,12 @@ test.describe("reduced motion", () => {
   test.use({ reducedMotion: "reduce" });
 
   test("four still screens, one per chapter, nothing pinned", async ({ page }) => {
-    await page.goto("/cyvore-mockups.html", { waitUntil: "load" });
+    await page.goto("/cyvore", { waitUntil: "load" });
     await page.waitForFunction(() => window.__cyvoreStories?.desktop);
     const s = await page.evaluate(() => window.__cyvoreStories.desktop.state());
     expect(s).toEqual({ static: true, copies: 4 });
     const story = page.locator('.story[data-story="desktop"]');
-    await expect(story.locator(".site")).toHaveCount(4);
+    await expect(story.locator(".site[data-copy]")).toHaveCount(4); // React's original stays, hidden
     expect(await story.locator(".story-pin").evaluate((el) => getComputedStyle(el).position)).toBe("static");
     await expect(story.locator('.site [data-chapter="risk"].is-on .stat-num').first()).toHaveText("2,535%");
     const lit = await story.locator('.site [data-chapter="powers"].is-on .eng').evaluateAll((els) =>
@@ -351,23 +352,25 @@ test.describe("reduced motion", () => {
 });
 
 test.describe("phone", () => {
+  // The page has one story; below 1100px it is the board's phone version.
   test.beforeEach(async ({ page }) => {
-    await page.goto("/cyvore-mockups.html", { waitUntil: "load" });
-    await page.waitForFunction(() => window.__cyvoreStories?.phone);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/cyvore", { waitUntil: "load" });
+    await page.waitForFunction(() => window.__cyvoreStories?.desktop);
   });
 
   test("the phone tells the same story, stacked", async ({ page }) => {
-    await story(page, "phone").go(3);
-    expect((await story(page, "phone").state()).open.why).toBe(2);
-    const dir = await page.$eval('.story[data-story="phone"] [data-chapter="why"] .panels', (el) => getComputedStyle(el).flexDirection);
+    await story(page).go(3);
+    expect((await story(page).state()).open.why).toBe(2);
+    const dir = await page.$eval('.story[data-story="desktop"] [data-chapter="why"] .panels', (el) => getComputedStyle(el).flexDirection);
     expect(dir).toBe("column");
-    await story(page, "phone").go(5);
-    expect((await story(page, "phone").state()).visible).toEqual(["risk"]);
+    await story(page).go(5);
+    expect((await story(page).state()).visible).toEqual(["risk"]);
   });
 
   test("the phone's chapter bar is a 2 × 2 grid of 44px-or-taller tabs", async ({ page }) => {
-    const tabs = await page.$$eval('.story[data-story="phone"] .chap', (els) => els.map((e) => e.getBoundingClientRect().height));
-    const frame = await page.$eval('.story[data-story="phone"]', (el) => el.closest(".frame")!.getBoundingClientRect().width / 390);
+    const tabs = await page.$$eval('.story[data-story="desktop"] .chap', (els) => els.map((e) => e.getBoundingClientRect().height));
+    const frame = await page.$eval('.story[data-story="desktop"]', (el) => el.closest(".f")!.getBoundingClientRect().width / 390);
     expect(tabs).toHaveLength(4);
     for (const h of tabs) expect(h / frame).toBeGreaterThanOrEqual(44);
   });
@@ -375,14 +378,14 @@ test.describe("phone", () => {
 
 test.describe("page", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/cyvore-mockups.html", { waitUntil: "load" });
+    await page.goto("/cyvore", { waitUntil: "load" });
     await page.waitForFunction(() => window.__cyvoreStories?.desktop);
   });
 
   test("How it works no longer repeats the attack video; it shows the shipped CTA motion", async ({ page }) => {
     const how = page.locator(".f.how");
     await expect(how.locator(".mission")).toHaveCount(0);
-    await expect(how.locator('video[src$="cta-hover.mp4"]')).toHaveCount(1);
+    await expect(how.locator('video[data-src$="cta-hover.mp4"]')).toHaveCount(1); // lazy: its src is set near the screen
     await expect(how).toContainText("Motion with a job.");
     await expect(how).toContainText("A 7-second sequence tells the product's mission: a phishing link lands in a video call, and Cyvore blocks it.");
     await expect(how.locator(".ds")).toHaveCount(1);
@@ -390,7 +393,7 @@ test.describe("page", () => {
 
   test("what is seen stays within 8 screens (pinned scroll not counted)", async ({ page }) => {
     const screens = await page.evaluate(() => {
-      const frames = [...document.querySelectorAll(".f")].filter((f) => !f.classList.contains("m") && !f.classList.contains("demo"));
+      const frames = [...document.querySelectorAll("article.cs .f")];
       const u = frames[0].getBoundingClientRect().width / 1440;
       const track = document.querySelector('.story[data-story="desktop"] .story-track') as HTMLElement;
       const pin = document.querySelector('.story[data-story="desktop"] .story-pin') as HTMLElement;
@@ -411,7 +414,7 @@ test.describe("page", () => {
 
 test.describe("final review", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/cyvore-mockups.html", { waitUntil: "load" });
+    await page.goto("/cyvore", { waitUntil: "load" });
     await page.waitForFunction(() => window.__cyvoreStories?.desktop);
   });
 
@@ -484,5 +487,32 @@ test.describe("final review", () => {
       await page.waitForTimeout(30);
     }
     expect((await story(page).state()).open.why).toBe(2);
+  });
+});
+
+test.describe("page", () => {
+  test("without JavaScript the story's first screen and its chapter bar are there", async ({ browser }) => {
+    const ctx = await browser.newContext({ javaScriptEnabled: false });
+    const page = await ctx.newPage();
+    await page.goto("http://localhost:3101/cyvore");
+    const story = page.getByRole("region", { name: "Solution" });
+    await expect(story.getByText("SECURITY IN EVERY PART OF YOUR WORKPLACE")).toBeVisible();
+    await expect(story.getByRole("tab", { name: "Why it matters" })).toBeVisible();
+    await ctx.close();
+  });
+
+  test("resizing across 1100px while pinned keeps one chapter and no errors", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+    await page.goto("/cyvore", { waitUntil: "load" });
+    await page.waitForFunction(() => window.__cyvoreStories?.desktop);
+    await story(page).go(4);
+    await page.setViewportSize({ width: 820, height: 900 });
+    await page.waitForTimeout(600);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.waitForTimeout(600);
+    expect((await story(page).state()).visible).toHaveLength(1);
+    expect(errors).toEqual([]);
   });
 });

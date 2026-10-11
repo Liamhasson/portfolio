@@ -19,5 +19,5 @@ export function LazyVideo({ src, poster, label, className, loop = true }: { src:
     seen.observe(v);
     return () => { near.disconnect(); seen.disconnect(); v.pause(); };
   }, [src]);
-  return <video ref={ref} className={className} poster={poster} muted playsInline loop={loop} preload="none" aria-label={label} />;
+  return <video ref={ref} className={className} poster={poster} muted playsInline loop={loop} preload="none" aria-label={label} data-src={src} />;
 }

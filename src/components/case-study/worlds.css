@@ -13,7 +13,6 @@
   --ink: #f1edf9; --ink-2: rgba(241,237,249,.74); --ink-3: rgba(241,237,249,.56);
   --v1: #8a38f5; --v2: #9c83fb; --v3: #51218f; --v4: #411f6e; --v5: #43246c; --v6: #2c1747; --v7: #160b23;
   --site: #0c0e12; --tab: #1a1230; --cta-grey: #d1d5dc; --pulse: #06122a; --settle: cubic-bezier(0.22, 1, 0.36, 1);
-  --mich: var(--font-michroma), var(--sans); --ice: var(--font-iceland), var(--mono); --ui: var(--font-inter), var(--sans);
   background: var(--void); color: var(--ink);
 }
 [data-world="cyvore"] .f { background: var(--void); color: var(--ink); }

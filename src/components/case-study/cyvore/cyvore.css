@@ -1,5 +1,7 @@
 /* cyvore: the board's CSS (docs/prototypes/cyvore-mockups.html), scoped to the cyvore case study (Part C port):
    board chrome and mock shell dropped, selectors under [data-world="cyvore"], Liam's text floored (Part C plan). */
+/* the replica's type, declared where its next/font variables are (the story and How it works sections) */
+[data-world="cyvore"] :is(.solution, .how) { --mich: var(--font-michroma), var(--sans); --ice: var(--font-iceland), var(--mono); --ui: var(--font-inter), var(--sans); }
 /* ------------------------------ Liam's type (Geist 400) ------------------------------ */
 [data-world="cyvore"] .label { font: 400 max(11px, calc(var(--u) * 12))/1.15 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
 [data-world="cyvore"] .title { font-size: calc(var(--u) * 72); line-height: .95; letter-spacing: -.025em; }
@@ -321,3 +323,27 @@
   [data-world="cyvore"] :is(.er-frame, .cy-frame) { position: relative; left: auto; top: auto; width: 100%; height: calc(var(--u) * 240); margin-top: calc(var(--u) * 28); }
   [data-world="cyvore"] .pu-phone { position: relative; left: auto; top: auto; width: calc(var(--u) * 200); margin: calc(var(--u) * 28) auto 0; }
 }
+
+/* ------------------------------ middle on phones (board frame "Phone") ------------------------------ */
+@container (max-width: 1099px) {
+  [data-world="cyvore"] .problem { padding: calc(var(--u) * 64) 0 calc(var(--u) * 56); }
+  [data-world="cyvore"] .problem .display { font-size: calc(var(--u) * 28); margin-top: calc(var(--u) * 24) !important; }
+  [data-world="cyvore"] .problem .g12 + .g12 { margin-top: calc(var(--u) * 32) !important; row-gap: calc(var(--u) * 28); }
+  [data-world="cyvore"] .fig-num { font-size: calc(var(--u) * 120); }
+  [data-world="cyvore"] .pitch { font-size: calc(var(--u) * 28); }
+  [data-world="cyvore"] .solution { padding: calc(var(--u) * 64) 0 calc(var(--u) * 72); }
+  [data-world="cyvore"] .solution > .g12:first-of-type .body { margin-top: calc(var(--u) * 18); font-size: max(15px, calc(var(--u) * 16)); }
+  [data-world="cyvore"] .story { margin: calc(var(--u) * 28) calc(var(--u) * 16) 0; }
+  [data-world="cyvore"] .rep-anno { display: none; }
+  [data-world="cyvore"] .sol-foot { margin-top: calc(var(--u) * 40); row-gap: calc(var(--u) * 16); }
+  [data-world="cyvore"] .how { padding: calc(var(--u) * 64) 0 calc(var(--u) * 56); }
+  [data-world="cyvore"] .how > .g12:first-child .body { margin-top: calc(var(--u) * 18); }
+  [data-world="cyvore"] .cta-clip { margin: calc(var(--u) * 28) calc(var(--u) * 16) 0; padding: calc(var(--u) * 12); border-radius: calc(var(--u) * 20); }
+  [data-world="cyvore"] .how > .g12 + .cta-clip + .g12 { margin-top: calc(var(--u) * 32) !important; }
+  [data-world="cyvore"] .ds { grid-template-columns: minmax(0, 1fr); margin: calc(var(--u) * 20) calc(var(--u) * 16) 0; }
+  [data-world="cyvore"] .ds > div { padding: calc(var(--u) * 20); }
+  [data-world="cyvore"] .spec-a { font-size: calc(var(--u) * 30); }
+  [data-world="cyvore"] .spec-b { font-size: calc(var(--u) * 34); }
+}
+/* the annotations above the replica are Liam's words: floored like every label */
+[data-world="cyvore"] .rep-anno span { font-size: max(11px, calc(var(--u) * 12)); }
