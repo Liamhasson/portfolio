@@ -91,6 +91,12 @@ export function deskGltfLoader(): GLTFLoader {
 
 /** The desk's files, downloaded (BakedDesk.fetch) and not yet built: the download can start during the loader, the GPU
  *  work waits until it's done. */
+/** Gives a download's files back (its object URLs); safe to call twice. Built or not (the page left first). */
+export function releaseDesk(files: DeskDownload): void {
+  for (const u of files.urls.values()) URL.revokeObjectURL(u);
+  files.urls.clear();
+}
+
 export interface DeskDownload {
   base: string;
   meta: BakedDeskMeta;
@@ -674,14 +680,24 @@ export class BakedDesk {
     return BakedDesk.build(renderer, await BakedDesk.fetch(base));
   }
 
-  /** Builds the desk from its downloaded files. `renderer` prefilters the probe (PMREM). */
+  /** Builds the desk from its downloaded files, then gives them back (built or failed). `renderer` prefilters the probe
+   *  (PMREM). */
   static async build(renderer: THREE.WebGLRenderer, files: DeskDownload): Promise<BakedDesk> {
-    const { meta, base } = files;
-    const url = (f: string) => files.urls.get(f) ?? `${base}/${f}`;
-    const tl = new THREE.TextureLoader();
     // the lighting bakes are GPU-compressed KTX2 (scripts/lab/desk3d-ktx2.py), transcoded off the main thread to what
     // this GPU reads (BC on desktops, ETC or ASTC on phones)
     const kl = new KTX2Loader().setTranscoderPath("/lab/basis/").detectSupport(renderer);
+    try {
+      return await BakedDesk.assemble(renderer, files, kl);
+    } finally {
+      kl.dispose();   // (its transcoding workers)
+      releaseDesk(files);   // (every image is in, or it failed: the textures hold what they need)
+    }
+  }
+
+  private static async assemble(renderer: THREE.WebGLRenderer, files: DeskDownload, kl: KTX2Loader): Promise<BakedDesk> {
+    const { meta, base } = files;
+    const url = (f: string) => files.urls.get(f) ?? `${base}/${f}`;
+    const tl = new THREE.TextureLoader();
     const loaded: THREE.Texture[] = [];
     const cache = new Map<string, Promise<THREE.Texture>>();   // (identical bakes are one file: one texture)
     const tex = (file: string, color: boolean) => {
@@ -898,8 +914,6 @@ export class BakedDesk {
     d.setState(0, 0);
     d.setScreen(null);
     d.textures = [...loaded, lut];
-    kl.dispose();   // (its transcoding workers)
-    for (const u of files.urls.values()) URL.revokeObjectURL(u);   // (every image is in: the textures hold them)
     const [cx, cy, cz] = meta.chaos_center; // Blender, z up
     d.group.scale.setScalar(1 / k);
     d.group.position.set(-cx / k, -cz / k, cy / k);

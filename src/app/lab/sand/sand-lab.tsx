@@ -7,7 +7,7 @@ import { CURSOR_WARM, SAND_LOOK, SandField, type SandState } from "@/three/sand/
 import { PaintField } from "@/three/sand/paint";
 import { HeroOverlay } from "./hero-overlay";
 import { WorkIndex, WorkList, type WorkIndexHandle } from "./work-index";
-import { BakedDesk, type DeskDownload } from "@/three/sand/baked-desk";
+import { BakedDesk, releaseDesk, type DeskDownload } from "@/three/sand/baked-desk";
 import { revealAt } from "@/three/sand/screen-reveal";
 import { DriftGrains } from "@/three/sand/drift-grains";
 import { vortexOnBall } from "@/three/sand/hero-layout";
@@ -120,6 +120,8 @@ export function SandLab({ hero }: { hero: boolean }) {
     let stage: Stage | null = null;
     let field: SandField | null = null;
     let paint: PaintField | null = null;
+    // the desk's download, and whether the build took it (else unmounting gives its files back)
+    let deskFiles: Promise<DeskDownload> | null = null, deskTaken = false;
     const listeners: [string, EventListener][] = [];
     // the loader (spec 2026-10-12-loader-design.md): its mode from the boot script (page.tsx); the brief grows from first
     // paint with the hero's files, on its own frames (the stage isn't there yet)
@@ -198,6 +200,13 @@ export function SandLab({ hero }: { hero: boolean }) {
         ballScreen = { cx: ((p0.x + 1) / 2) * W, cy: ((1 - p0.y) / 2) * H, r: (Math.abs(p1.x - p0.x) / 2) * W };
       };
       stage.onSettings(placeBrief);
+      // a frame threw (its loop has stopped): the stills and the plain projects, the page unlocked (final review #3)
+      stage.onCrash((err) => {
+        if (disposed) return;
+        setStatus(String(err));
+        setFallback(true);
+        fail();
+      });
       const data = await loadSandParts(meta, settingsFor(tier, window.devicePixelRatio || 1).grains, SAND_BASE, progress);
       if (disposed) return;
       field = new SandField(data);
@@ -288,7 +297,8 @@ export function SandLab({ hero }: { hero: boolean }) {
       // untouched); its loading line counts them (pre-launch audit, 2026-10-12)
       const deskProgress = new LoadProgress();
       let deskDownload: Promise<DeskDownload> | null = null;
-      const startDesk = () => (deskDownload ??= BakedDesk.fetch("/lab/desk3d", deskProgress));
+      let deskDone = false;   // (downloaded: what's left is local work)
+      const startDesk = () => (deskDownload ??= deskFiles = BakedDesk.fetch("/lab/desk3d", deskProgress).then((d) => { deskDone = true; return d; }));
       // the desk failed or stalled: the story stops waiting for it (the index shows on its own)
       let deskGaveUp = false;
       // the desk, then the rising sand: textures uploaded and shaders compiled before they join the scene (no hitch as
@@ -297,7 +307,10 @@ export function SandLab({ hero }: { hero: boolean }) {
       const loadDesk = async () => {
         if (!shot) return;
         const st = stage!;
-        const d = await BakedDesk.build(st.renderer, await startDesk());
+        const files = await startDesk();
+        if (disposed) return;
+        deskTaken = true;
+        const d = await BakedDesk.build(st.renderer, files);
         if (disposed) return;
         const queue = [...d.textures];
         await new Promise<void>((res) => {
@@ -450,7 +463,6 @@ export function SandLab({ hero }: { hero: boolean }) {
       // the wait for the desk (story-timeline.ts deskWait): whether it's holding; a jump to the projects (the nav's
       // Projects, Lenis's 1.5 s anchor glide) isn't held; the desk's loading, to notice a stall
       let deskWaiting = false, jumpingSince = -1, deskSeen = -1, deskStill = 0;
-      const smooth = () => document.documentElement.classList.contains("lenis");
       // the page runs on past the story by the index's own overflow (measured every 20 frames)
       const fitIndex = (ix: WorkIndexHandle) => {
         if (++spacerTick % 20 !== 0 || !spacerRef.current) return;
@@ -557,20 +569,22 @@ export function SandLab({ hero }: { hero: boolean }) {
         // (story-timeline.ts deskWait; Liam, 2026-10-12: hold before the tilt)
         if (hero && shot) {
           const jumping = jumpingSince >= 0 && performance.now() - jumpingSince < 2500 && rawP < BEATS.takeover[0];
-          if (deskProgress.value !== deskSeen) { deskSeen = deskProgress.value; deskStill = 0; } else if (deskWaiting) deskStill += dt;
-          if (deskWaiting && deskStill > 15) deskGaveUp = true;   // (stalled: like the loader, it gives up rather than trap the page)
+          // (stalled: no bytes for 15 s while downloading, like the loader, it gives up rather than hold the page; the
+          // build and the uploads after it are local work, never a stall)
+          const got = deskProgress.received;
+          if (got !== deskSeen || deskDone) { deskSeen = got; deskStill = 0; } else if (deskWaiting) deskStill += dt;
+          if (deskWaiting && deskStill > 15) deskGaveUp = true;
           const ready = deskLoaded !== null || deskGaveUp;
           const wall = deskWait({ ready, p: rawP, prevP: lastRawP, end: storyEnd, jumping });
           if (wall !== null) { wallAt(wall); rawP = DESK_WAIT; }
           const waiting = wall !== null || (deskWaiting && !ready && !jumping && rawP >= DESK_WAIT - 0.05);
           if (waiting !== deskWaiting) {
             deskWaiting = waiting;
-            // (touch: no smooth scroller to hold the wall, so the page itself stops, as under the loader)
-            if (waiting && !smooth()) document.documentElement.dataset.deskWait = "";
-            else delete document.documentElement.dataset.deskWait;
-            if (!waiting) briefRef.current?.wait(null);
+            if (waiting) placeBrief();
+            else briefRef.current?.wait(null);
           }
-          if (deskWaiting) { briefRef.current?.wait(deskProgress.value); briefRef.current?.announce(deskProgress.value); }
+          // (only the way down is walled: scrolling back up stays free, touch and reduced motion too)
+          if (deskWaiting) { briefRef.current?.wait(deskProgress.value, ballScreen); briefRef.current?.announce(deskProgress.value); }
         }
         // very close to the screen, scrolling down: the page carries the user in, onto the projects (none of them can be
         // clicked on the laptop's screen); the way back out is long (story-timeline.ts SCREEN_HOLD)
@@ -927,16 +941,21 @@ export function SandLab({ hero }: { hero: boolean }) {
       disposed = true;
       stopBrief();
       if (playing && !released) releaseHold();   // (never leave the next page locked)
-      delete document.documentElement.dataset.deskWait;
       for (const [type, fn] of listeners) {
         if (type === "__leave") document.documentElement.removeEventListener("mouseleave", fn);
         else window.removeEventListener(type, fn);
       }
+      if (deskFiles && !deskTaken) deskFiles.then(releaseDesk).catch(() => {});
       paint?.dispose();
       field?.dispose();
       stage?.dispose();
     };
   }, [compare, hero, gradeOn, loaderMode]);
+
+  // the fallback, arriving at #projects (Back from a case study): on the projects
+  useEffect(() => {
+    if (fallback && hero && window.location.hash === "#projects") document.getElementById("projects")?.scrollIntoView();
+  }, [fallback, hero]);
 
   useEffect(() => {
     if (!fallback) return;

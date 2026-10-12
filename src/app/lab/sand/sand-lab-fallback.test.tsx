@@ -22,3 +22,12 @@ test("without WebGL the home page still has the copy and every project, under a 
   expect(document.querySelector('#projects a[href="/about"]')).not.toBeNull();   // (the pull on to About)
   expect(document.documentElement.dataset.loader).toBeUndefined();   // (never locked)
 });
+
+test("without WebGL, arriving at /#projects (Back from a case study) lands on the projects, not the top (final review #7)", async () => {
+  window.history.replaceState(null, "", "/#projects");
+  const seen: string[] = [];
+  Element.prototype.scrollIntoView = function (this: Element) { seen.push(this.id); };
+  render(<SandLab hero />);
+  await waitFor(() => expect(seen).toContain("projects"));
+  window.history.replaceState(null, "", "/");
+});

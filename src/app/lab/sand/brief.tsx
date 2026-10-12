@@ -15,8 +15,9 @@ export type BriefHandle = {
   update(o: { cx: number; cy: number; r: number; alpha: number; dash: number; squares: number[]; round?: number }): void;
   announce(p: number | "ready"): void;
   /** The wait for the desk (story-timeline.ts deskWait): a thin line under the brief filling with its loading, 0..1;
-   *  null: gone. */
-  wait(k: number | null): void;
+   *  null: gone. `ball`: where the ball is (else the brief's last place). Drawn on its own layer: it shows even when the
+   *  brief is faded out (reduced motion). */
+  wait(k: number | null, ball?: { cx: number; cy: number; r: number }): void;
 };
 
 /** The brief (spec 2026-10-12-loader-design.md §2): an SVG over the canvas, under the copy. Hairlines, no glow. */
@@ -26,8 +27,9 @@ export const Brief = forwardRef<BriefHandle>(function Brief(_, ref) {
   const lastPct = useRef(-1);
   const lastBox = useRef<{ x: number; y: number; s: number } | null>(null);
   const waitK = useRef<number | null>(null);
+  const waitSvg = useRef<SVGSVGElement>(null);
   const drawWait = () => {
-    const el = svg.current, b = lastBox.current, k = waitK.current;
+    const el = waitSvg.current, b = lastBox.current, k = waitK.current;
     if (!el) return;
     const fill = el.querySelector("[data-brief='wait']"), track = el.querySelector("[data-brief='wait-track']");
     if (!fill || !track) return;
@@ -69,8 +71,9 @@ export const Brief = forwardRef<BriefHandle>(function Brief(_, ref) {
       lastPct.current = pct;
       status.current.textContent = `Loading, ${Math.round(p * 100)}%`;
     },
-    wait(k) {
+    wait(k, ball) {
       waitK.current = k;
+      if (ball) { const s = briefShapes(ball.cx, ball.cy, Math.max(ball.r, 0), 1); lastBox.current = { x: s.box.x, y: s.box.y, s: s.box.s }; }
       drawWait();
     },
   }));
@@ -85,8 +88,10 @@ export const Brief = forwardRef<BriefHandle>(function Brief(_, ref) {
         {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => <line key={i} data-brief="handle" strokeWidth={0.7} />)}
         {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => <circle key={i} data-brief="end" r={BRIEF.dot} fill={line} stroke="none" />)}
         {Array.from({ length: 13 }, (_, i) => <rect key={i} data-brief="anchor" fill="#0b0908" strokeWidth={0.8} />)}
-        <line data-brief="wait-track" opacity={0} strokeWidth={1} />
-        <line data-brief="wait" opacity={0} strokeWidth={1} />
+      </svg>
+      <svg ref={waitSvg} aria-hidden className="pointer-events-none fixed left-0 top-0 h-screen w-screen" style={{ zIndex: 5 }} fill="none" stroke={line} strokeWidth={1}>
+        <line data-brief="wait-track" opacity={0} />
+        <line data-brief="wait" opacity={0} />
       </svg>
       <p ref={status} role="status" aria-live="polite" className="sr-only" />
     </>

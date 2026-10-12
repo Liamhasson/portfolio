@@ -18,6 +18,8 @@ export class LoadProgress {
   compile(f: number): void { this.compiled = Math.min(Math.max(f, this.compiled), 1); this.emit(); }
 
   get value(): number { return this.shown; }
+  /** Bytes received so far: keeps moving while the shown value holds (a stall check watches this). */
+  get received(): number { let n = 0; for (const g of this.got.values()) n += g; return n; }
 
   private emit(): void {
     let t = 0, g = 0;

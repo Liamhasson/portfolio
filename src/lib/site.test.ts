@@ -33,3 +33,13 @@ test("each page names its own canonical address; a case study shares its own pic
   expect(cyvore.alternates?.canonical).toBe("/cyvore");
   expect(JSON.stringify(cyvore.openGraph?.images)).toContain("/case-studies/cyvore/peek.jpg");
 });
+
+test("every page's link preview keeps the site's picture and name: a page's own openGraph replaces the root's whole (final review #1)", () => {
+  for (const m of [about, contact]) {
+    expect(m.openGraph).toMatchObject({ siteName: "Liam Hasson", type: "website", locale: "en_US" });
+    expect(JSON.stringify(m.openGraph?.images)).toContain("/opengraph-image.jpg");
+    expect(JSON.stringify(m.twitter)).toContain("/twitter-image.jpg");
+  }
+  expect(cyvore.openGraph).toMatchObject({ siteName: "Liam Hasson", locale: "en_US" });
+  expect(JSON.stringify(cyvore.twitter?.images)).toContain("/case-studies/cyvore/peek.jpg");
+});

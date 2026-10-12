@@ -76,4 +76,16 @@ describe("the desk's files (pre-launch audit, 2026-10-12)", () => {
   test("the transcoder three needs for KTX2 is published with the site", () => {
     for (const f of ["basis_transcoder.js", "basis_transcoder.wasm"]) expect(existsSync(`public/lab/basis/${f}`), f).toBe(true);
   });
+
+  test("a download never built (the page left first) gives its files back: every object URL revoked, once (final review #6)", async () => {
+    const { releaseDesk } = await import("./baked-desk");
+    const revoked: string[] = [];
+    const orig = URL.revokeObjectURL;
+    URL.revokeObjectURL = (u: string) => { revoked.push(u); };
+    const dl = { base: "", meta, glb: new ArrayBuffer(0), lut: new ArrayBuffer(0), urls: new Map([["a.ktx2", "blob:a"], ["b.jpg", "blob:b"]]) };
+    releaseDesk(dl);
+    releaseDesk(dl);
+    URL.revokeObjectURL = orig;
+    expect(revoked).toEqual(["blob:a", "blob:b"]);
+  });
 });

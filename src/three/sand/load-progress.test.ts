@@ -60,3 +60,12 @@ describe("honest from the first byte (final review I1: it latched at 90% when sa
     ]);
   });
 });
+
+test("the bytes received keep counting while the shown progress holds (a file declared late): a stall check watches these (final review #5)", () => {
+  const p = new LoadProgress();
+  p.expect("a", 100); p.add("a", 90);
+  const shown = p.value;
+  p.expect("b", 10_000); p.add("b", 50);
+  expect(p.value).toBe(shown);
+  expect(p.received).toBe(140);
+});

@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { stepFrame } from "./stage-frame";
 import { GrainGovernor } from "./quality";
 import { settingsFor, type QualityTier, type TierSettings } from "./tier";
 
@@ -111,6 +112,13 @@ export class Stage {
     return this.renderer.domElement.height;
   }
 
+  private readonly crashes = new Set<(err: unknown) => void>();
+  /** A frame threw: the loop has stopped (stage-frame.ts). */
+  onCrash(cb: (err: unknown) => void): () => void {
+    this.crashes.add(cb);
+    return () => this.crashes.delete(cb);
+  }
+
   onFrame(cb: FrameCallback): () => void {
     this.frames.add(cb);
     return () => this.frames.delete(cb);
@@ -143,8 +151,13 @@ export class Stage {
           this.resize();
         } else this.tierChanges.forEach((cb) => cb(this.settings));
       }
-      this.frames.forEach((cb) => cb(dt, now / 1000));
-      this.draw();
+      const err = stepFrame(this.frames, dt, now / 1000, () => this.draw());
+      if (err) {
+        this.stop();
+        console.error("stage: a frame failed", err);
+        this.crashes.forEach((cb) => cb(err));
+        return;
+      }
       this.raf = requestAnimationFrame(loop);
     };
     this.raf = requestAnimationFrame(loop);

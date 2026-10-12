@@ -50,3 +50,15 @@ test("waiting for the desk: a thin line under the brief fills with its loading; 
   expect(fill.getAttribute("opacity")).toBe("0");
   expect(track.getAttribute("opacity")).toBe("0");
 });
+
+test("the loading line shows on its own, even with the brief faded out (reduced motion crossfades it away), at the ball it's given (final review #2)", () => {
+  const ref = createRef<BriefHandle>();
+  const { container } = render(<Brief ref={ref} />);
+  ref.current!.update({ cx: 400, cy: 300, r: 100, alpha: 0, dash: 0, squares: Array(9).fill(1) });
+  ref.current!.wait(0.5, { cx: 600, cy: 300, r: 100 });
+  const fill = container.querySelector("line[data-brief='wait']")!;
+  expect(fill.closest("svg")!.style.opacity).not.toBe("0");
+  expect(Number(fill.getAttribute("x1"))).toBeCloseTo(500);   // (under the ball given: 600 - 100)
+  ref.current!.wait(null);
+  expect(fill.getAttribute("opacity")).toBe("0");
+});
