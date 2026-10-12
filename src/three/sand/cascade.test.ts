@@ -1,6 +1,6 @@
 // src/three/sand/cascade.test.ts
 import { describe, expect, test } from "vitest";
-import { CASCADE, anchorsWorld, cascadeAt, cascadeEnd, type V3 } from "./cascade";
+import { CASCADE, anchorsWorld, cascadeAt, cascadeEnd, type V3, ballRestOf } from "./cascade";
 
 const N = 9 * 1024;
 const anchors = anchorsWorld([0, 0.1, 0], 1.1, [1, 0, 0], [0, 1, 0]);
@@ -41,5 +41,21 @@ describe("the cascade (spec §5.2): the anchors' grains split into the cloud", (
     const a = 9 * 5 + 2, b = 9 * 6 + 2;   // nodes 5 and 6 of anchor 2: siblings
     let t = 0; while (!cascadeAt(b, t, anchors, rest).born || !cascadeAt(a, t, anchors, rest).born) t += 0.001;
     expect(dist(cascadeAt(a, t + 0.2, anchors, rest).pos, cascadeAt(b, t + 0.2, anchors, rest).pos)).toBeGreaterThan(0.1);
+  });
+});
+
+
+describe("the cascade can end on the ball (Contact, spec 2026-10-12 §4)", () => {
+  const pack = (ox: number, oy: number, dist: number) => ((Math.round(((ox + 1) / 2) * 4095)) | (Math.round(((oy + 1) / 2) * 4095) << 12) | (dist << 24)) >>> 0;
+  test("a grain's ball spot: its octahedral direction from the centre, at its distance (the shader's own decoding)", () => {
+    const c: [number, number, number] = [1, 2, 3];
+    const front = ballRestOf(pack(0, 0, 255), c, 0.5);
+    expect(front[0]).toBeCloseTo(1, 2); expect(front[1]).toBeCloseTo(2, 2); expect(front[2]).toBeCloseTo(3.5, 2);
+    const side = ballRestOf(pack(1, 0, 128), c, 0.5);
+    expect(side[0] - 1).toBeCloseTo((128 / 255) * 0.5, 2);
+    // the back half folds: a direction with z < 0
+    const back = ballRestOf(pack(0.5, 0.6, 255), c, 0.5);
+    expect(back[2]).toBeLessThan(3);
+    expect(Math.hypot(back[0] - 1, back[1] - 2, back[2] - 3)).toBeCloseTo(0.5, 2);
   });
 });

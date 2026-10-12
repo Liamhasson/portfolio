@@ -206,12 +206,20 @@ float hash(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 4
 // (neighbours move together: sheets, not static), its domain warped as Blender's distortion warps it
 ${SWIRL_GLSL}
 ${PARALLAX_GLSL}
-uniform highp usampler2D uRestWords;   // every grain's packed chaos word (the cascade reads its ancestors')
-uniform vec3 uCascade;                 // x: seconds since 100% (the loader), y: 1 while it runs
+uniform highp usampler2D uRestWords;   // every grain's packed words, chaos and ball (the cascade reads its ancestors')
+uniform vec3 uCascade;                 // x: seconds since 100% (the loader), y: 1 while it runs, z: 1 to end on the ball
 vec3 cascadeRest(int i) {
   int w = textureSize(uRestWords, 0).x;
-  uint word = texelFetch(uRestWords, ivec2(i - (i / w) * w, i / w), 0).r;
-  vec3 A0 = uChaosLo + vec3(float(word & 2047u) / 2047.0, float((word >> 11) & 1023u) / 1023.0, float(word >> 21) / 2047.0) * uChaosSize;
+  uvec2 word = texelFetch(uRestWords, ivec2(i - (i / w) * w, i / w), 0).rg;
+  if (uCascade.z > 0.5) {
+    // its place on the ball (Contact): the same decoding as main()'s B
+    vec2 oc = vec2(float(word.y & 4095u), float((word.y >> 12) & 4095u)) / 4095.0 * 2.0 - 1.0;
+    vec3 dir = vec3(oc, 1.0 - abs(oc.x) - abs(oc.y));
+    float fold = max(-dir.z, 0.0);
+    dir.xy -= sign(dir.xy) * fold;
+    return uBallC + uBallRot * (normalize(dir) * (float(word.y >> 24) / 255.0 * uBallPosMax));
+  }
+  vec3 A0 = uChaosLo + vec3(float(word.x & 2047u) / 2047.0, float((word.x >> 11) & 1023u) / 1023.0, float(word.x >> 21) / 2047.0) * uChaosSize;
   return uChaosC + uChaosShift + uChaosRot * (A0 - uChaosC);
 }
 ${CASCADE_GLSL}

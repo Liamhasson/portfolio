@@ -22,3 +22,9 @@ test("the grains build the vortex as they arrive (Liam, 2026-10-12: they formed 
   expect(cascade).toBeLessThan(swirl);
   expect(SAND_VERTEX).not.toMatch(/heroOff/);   // (no second shape blended in afterwards)
 });
+
+test("the cascade's rest spot can be the grain's place on the ball (Contact): the ball word sits beside the chaos word", () => {
+  expect(SAND_VERTEX).toMatch(/uvec2 word = texelFetch\(uRestWords/);
+  expect(SAND_VERTEX).toMatch(/if \(uCascade\.z > 0\.5\)/);
+  expect(SAND_VERTEX).toMatch(/uBallC \+ uBallRot \* \(normalize\(dir\)/);
+});

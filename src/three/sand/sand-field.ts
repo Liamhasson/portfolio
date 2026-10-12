@@ -167,7 +167,7 @@ export class SandField {
         uChaosShift: { value: new THREE.Vector3() },
         uParallax: { value: new THREE.Vector3(0, 0, PARALLAX.back) },
         uRestWords: { value: this.restWords(data) },
-        uCascade: { value: new THREE.Vector3(0, 0, 1) },
+        uCascade: { value: new THREE.Vector3(0, 0, 0) },
         uAnchors: { value: Array.from({ length: 9 }, () => new THREE.Vector3()) },
         uLightK: { value: 1 },
         uParallaxC: { value: new THREE.Vector4(0, 0, 0, 1) },
@@ -388,24 +388,26 @@ export class SandField {
     this.material.uniforms.uCountScale.value = Math.pow(this.data.meta.count / n, 0.35);
   }
 
-  /** Every grain's packed chaos word in an integer texture (the cascade reads its ancestors'). */
+  /** Every grain's packed words, chaos and ball, in an integer texture (the cascade reads its ancestors' rest spots:
+   *  in the cloud for the loader, on the ball for Contact). */
   private restWords(data: SandData): THREE.DataTexture {
     const W = 2048, H = Math.ceil(data.count / W);
-    const buf = new Uint32Array(W * H);
-    for (let i = 0; i < data.count; i++) buf[i] = data.words[i * 2];
-    const tex = new THREE.DataTexture(buf, W, H, THREE.RedIntegerFormat, THREE.UnsignedIntType);
-    tex.internalFormat = "R32UI";
+    const buf = new Uint32Array(W * H * 2);
+    for (let i = 0; i < data.count; i++) { buf[i * 2] = data.words[i * 2]; buf[i * 2 + 1] = data.words[i * 2 + 1]; }
+    const tex = new THREE.DataTexture(buf, W, H, THREE.RGIntegerFormat, THREE.UnsignedIntType);
+    tex.internalFormat = "RG32UI";
     tex.minFilter = tex.magFilter = THREE.NearestFilter;
     tex.needsUpdate = true;
     return tex;
   }
 
-  /** The loader's cascade (cascade.ts): seconds since 100% (null: off, the hero as it is), and the brief's anchors. */
-  setCascade(clock: number | null, anchors?: THREE.Vector3[]): void {
+  /** The loader's cascade (cascade.ts): seconds since 100% (null: off, the hero as it is), the brief's anchors, and
+   *  where the grains end: the cloud (the loader) or the ball (Contact). */
+  setCascade(clock: number | null, anchors?: THREE.Vector3[], target: "cloud" | "ball" = "cloud"): void {
     const u = this.material.uniforms;
     if (anchors) anchors.forEach((a, i) => (u.uAnchors.value[i] as THREE.Vector3).copy(a));
-    if (clock === null) { (u.uCascade.value as THREE.Vector3).set(0, 0, 1); return; }
-    (u.uCascade.value as THREE.Vector3).set(clock, 1, 1);
+    if (clock === null) { (u.uCascade.value as THREE.Vector3).set(0, 0, 0); return; }
+    (u.uCascade.value as THREE.Vector3).set(clock, 1, target === "ball" ? 1 : 0);
     (u.uMotionBlur.value as THREE.Vector2).x = 0;   // (no streaks while it runs: its paths aren't the blur's)
   }
 

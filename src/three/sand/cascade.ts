@@ -91,3 +91,14 @@ vec4 cascadeAt(int i, float t) {
   return vec4(cascadeRest(i), 1.0);
 }
 `;
+
+/** A grain's spot on the ball from its packed ball word (the vertex shader's decoding, unrotated): octahedral direction
+ *  12+12 bits, distance 8 bits of `posMax`. Contact's cascade ends here (spec 2026-10-12-about-contact-design.md §4). */
+export function ballRestOf(wordB: number, ballC: V3, posMax: number): V3 {
+  const ox = ((wordB & 4095) / 4095) * 2 - 1, oy = (((wordB >>> 12) & 4095) / 4095) * 2 - 1;
+  let x = ox, y = oy;
+  const z = 1 - Math.abs(ox) - Math.abs(oy), fold = Math.max(-z, 0);
+  x -= Math.sign(x) * fold; y -= Math.sign(y) * fold;
+  const l = Math.hypot(x, y, z) || 1, d = ((wordB >>> 24) / 255) * posMax;
+  return [ballC[0] + (x / l) * d, ballC[1] + (y / l) * d, ballC[2] + (z / l) * d];
+}
