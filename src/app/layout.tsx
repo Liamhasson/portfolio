@@ -3,6 +3,7 @@ import { fontVariables } from "./fonts";
 import { MotionPreferences } from "@/components/providers/motion-preferences";
 import { SmoothScroll } from "@/components/providers/smooth-scroll";
 import { PillNav } from "@/components/shell/pill-nav";
+import { NavName } from "@/components/shell/nav-name";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <MotionPreferences>
           <SmoothScroll>
             <main id="main" tabIndex={-1} className="outline-none">{children}</main>
+            <NavName />
             <PillNav />
           </SmoothScroll>
         </MotionPreferences>

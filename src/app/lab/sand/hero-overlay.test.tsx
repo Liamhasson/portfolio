@@ -25,4 +25,9 @@ describe("HeroOverlay", () => {
     expect(driftOut(0.4, 0).opacity).toBeLessThan(driftOut(0.4, 2).opacity);   // the first line leaves first
     expect(driftOut(0.5, 1).y).toBeLessThan(0);                                 // upward
   });
+  test("no Product Designer label of its own: the name lives in the nav now (Liam, 2026-10-12)", () => {
+    render(<HeroOverlay exit={() => 0} scrolled={() => 0} />);
+    expect(screen.queryByText("Product Designer")).toBeNull();
+  });
 });
+

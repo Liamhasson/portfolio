@@ -78,3 +78,30 @@ html[data-nav-tone="dark"] .sh-back:focus-visible, html[data-nav-tone="dark"] .s
   .sh-back svg { transition: none; transform: none !important; }
   .sh-nav .hl, .sh-nav .hl i, .sh-back, .sh-pill { transition: none; }
 }
+
+/* the name, top left (nav-name.tsx; Liam, 2026-10-12): the mono label, each letter a slot that rolls to the next */
+.sh-name {
+  display: flex; align-items: center; height: 44px; text-decoration: none;
+  font: 500 12px/1 var(--font-geist-mono), ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase;
+  color: rgba(244, 239, 233, .72); transition: color 320ms var(--nav-settle);
+}
+html[data-nav-tone="light"] .sh-name { color: var(--nav-ink); }
+.sh-name:hover, .sh-name:focus-visible { color: #f4efe9; outline: none; }
+html[data-nav-tone="light"] .sh-name:hover { opacity: .7; }
+.nm-letters { display: flex; }
+.nm-slot { display: inline-block; height: 1em; overflow: hidden; }
+.nm-pair { display: flex; flex-direction: column; will-change: transform; }
+.nm-pair > span { display: block; height: 1em; }
+/* phones: the name and the pills share one row (still 44px tall, for touch) */
+@media (max-width: 480px) {
+  .sh-name { font-size: 10px; letter-spacing: .02em; }
+  .sh-nav { gap: 4px; }
+  .sh-pill { padding: 0 12px; font-size: 13px; }
+}
+@media (max-width: 380px) {
+  .sh-name { font-size: 9px; letter-spacing: 0; }
+  .sh-pill { padding: 0 9px; font-size: 12.5px; }
+}
+
+/* Back as a pill with its label (back-button.tsx; Liam, 2026-10-12) */
+.sh-back.sh-back-pill { display: flex; gap: 8px; width: auto; padding: 0 20px 0 14px; border-radius: 999px; font: 500 14px/1 var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif; }

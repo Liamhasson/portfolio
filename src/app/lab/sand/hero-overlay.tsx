@@ -6,6 +6,7 @@
  * Ours in Geist. Lines rise in from a mask, staggered (approved). Copy from the production plan §5.1.
  */
 import { useEffect, useRef } from "react";
+import { nameRoll } from "@/lib/name-roll";
 
 const RISE = "hero-rise";
 
@@ -46,6 +47,8 @@ export function HeroOverlay({ exit, scrolled }: { exit: () => number; scrolled: 
     let raf = 0;
     const tick = () => {
       const e = exit();
+      // the name in the nav rolls over into LIAM HASSON as "Hi, I'm Liam." leaves (nav-name.tsx; Liam, 2026-10-12)
+      nameRoll.set(1 - driftOut(e, 0).opacity);
       const el = root.current;
       if (el) {
         el.querySelectorAll<HTMLElement>("[data-exit]").forEach((line) => {
@@ -69,10 +72,6 @@ export function HeroOverlay({ exit, scrolled }: { exit: () => number; scrolled: 
         .${RISE} { animation: ${RISE} 1.1s cubic-bezier(0.22, 1, 0.36, 1) both; }
         @media (prefers-reduced-motion: reduce) { .${RISE} { animation: none; } }
       `}</style>
-      {/* desktop: top left, as Lusion's logo position (on phones it sits above the name, the menu needs the top) */}
-      <div data-exit="0" className="absolute left-[4.9vw] top-[clamp(20px,4.4vw,64px)] hidden font-mono text-[12px] uppercase tracking-[0.08em] text-white/60 md:block">
-        <Still>Product Designer</Still>
-      </div>
       {/* the front name and the line, lower left over the void's edge */}
       <div className="absolute bottom-[96px] left-[4.9vw] max-w-[min(92vw,44rem)] md:bottom-[clamp(96px,11vw,150px)]">
         {/* legibility: the sand thins out behind the copy, a soft falloff, never a box; in the graded black (#0b0908),
@@ -83,9 +82,6 @@ export function HeroOverlay({ exit, scrolled }: { exit: () => number; scrolled: 
           className="absolute -bottom-[30%] -left-[12vw] -right-[18%] -top-[45%] -z-10"
           style={{ background: "radial-gradient(ellipse 60% 55% at 35% 55%, rgba(11,9,8,0.72), rgba(11,9,8,0.45) 45%, transparent 75%)" }}
         />
-        <div data-exit="0" className="mb-4 font-mono text-[11px] uppercase tracking-[0.08em] text-white/60 md:hidden">
-          <Still>Product Designer</Still>
-        </div>
         <h1 data-exit="0" className="text-[clamp(40px,7.2vw,104px)] font-normal leading-[1.02] tracking-[-0.02em]">
           <Still>Hi, I&rsquo;m Liam.</Still>
         </h1>
