@@ -4,12 +4,10 @@ import { MotionPreferences } from "@/components/providers/motion-preferences";
 import { SmoothScroll } from "@/components/providers/smooth-scroll";
 import { PillNav } from "@/components/shell/pill-nav";
 import { NavName } from "@/components/shell/nav-name";
+import { rootMetadata } from "@/lib/site";
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title: { default: "Liam Hasson | Product Designer", template: "%s | Liam Hasson" },
-  description: "Product designer who researches, prototypes and ships products people trust.",
-};
+export const metadata: Metadata = rootMetadata;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

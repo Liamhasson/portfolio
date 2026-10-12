@@ -2,7 +2,7 @@
 import type { Metadata } from "next";
 import { AboutTrack } from "./about-track";
 
-export const metadata: Metadata = { title: "About", description: "Liam Hasson, product designer: how I work, what people say, what I do." };
+export const metadata: Metadata = { title: "About", description: "Liam Hasson, product designer: how I work, what people say, what I do.", alternates: { canonical: "/about" }, openGraph: { url: "/about" } };
 
 export default function AboutPage() {
   return <AboutTrack />;
