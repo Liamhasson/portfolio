@@ -2,7 +2,8 @@
 ETC1S KTX2 with their mips. As JPEGs they took 683 MB of GPU memory (a phone's tab can die of it); ETC1S is about an
 eighth, at about the JPEGs' download. Identical bakes become one file (one download, one upload). The normal and roughness
 maps and the screen's design stay JPEG (ETC1S can't hold them). Run after desk3d-publish.py (it calls this).
-Needs KTX-Software's `ktx` (env KTX, else on PATH) and ffmpeg.
+Needs KTX-Software's `ktx` (env KTX, else on PATH: installed at ~/.local/opt/ktx-software-4.4.2, linked from
+~/.local/bin, 2026-10-13) and ffmpeg.
   python3 scripts/lab/desk3d-ktx2.py"""
 import hashlib, json, os, subprocess, tempfile
 DST = "public/lab/desk3d"

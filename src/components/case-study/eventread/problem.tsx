@@ -12,7 +12,7 @@ export function EventreadProblem({ kind, title }: { kind: "problem"; title: stri
         </p>
       </div>
       <div className="g12 problem-cols" style={{ marginTop: "calc(var(--u) * 80)", alignItems: "start" }}>
-        <p className="body" style={{ gridColumn: "1/5" }}>Eventread is built for the two people I worked with for ten years: artists and managers picking a date, and promoters and agents filling a room. Both pick a date and hope: ticketing platforms show their own events, and nobody shows the whole night.</p>
+        <p className="body" style={{ gridColumn: "1/5" }}>Eventread is built for the two people I worked with for eight years: artists and managers picking a date, and promoters and agents filling a room. Both pick a date and hope: ticketing platforms show their own events, and nobody shows the whole night.</p>
         <p className="body" style={{ gridColumn: "5/9" }}>Live Nation alone puts on 54,000 shows a year, about 150 every night. Every independent show gets booked around that calendar, usually without seeing it. Prism.fm, TourSmart and ChatGPT each answer part of the question; none checks a date against everything happening that night.</p>
         <div className="fig" style={{ gridColumn: "9/13", paddingLeft: "calc(var(--u) * 24)" }}>
           <div className="fig-num" aria-hidden="true">150</div>

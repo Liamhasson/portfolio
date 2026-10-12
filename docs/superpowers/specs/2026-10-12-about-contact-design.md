@@ -48,7 +48,7 @@ sentence per screen, sliding up.
 ### 3.1 The track, in order
 
 1. "I'm Liam. I love crafting products where design and user needs meet."
-2. "Before design, I spent ten years managing two rock bands and creative projects across a few industries: small
+2. "Before design, I spent eight years managing two rock bands and creative projects across a few industries: small
    teams of specialists making something out of nothing."
 3. "That's still how I work. I go looking for problems nobody pointed at, check whether I'm actually right, and
    build it."
@@ -82,7 +82,7 @@ rest in the darker tone; no italic (Liam, 2026-10-12). Quotes slightly smaller (
 | Sentence | In white |
 |---|---|
 | 1 | "I'm Liam. I love crafting products" |
-| 2 | "ten years managing two rock bands" … "making something out of nothing" |
+| 2 | "eight years managing two rock bands" … "making something out of nothing" |
 | 3 | "That's still how I work." … "problems nobody pointed at" |
 | Yoav's quote | "we closed our first funding round." |
 | 6 | "I'd like to hear about it." |

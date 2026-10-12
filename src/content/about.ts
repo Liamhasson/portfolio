@@ -16,7 +16,7 @@ export const ABOUT = {
   lines: [
     [{ t: "I’m Liam. I love crafting products", hi: true }, { t: " where design and user needs meet." }],
     [
-      { t: "Before design, I spent " }, { t: "ten years managing two rock bands", hi: true },
+      { t: "Before design, I spent " }, { t: "eight years managing two rock bands", hi: true },
       { t: " and creative projects across a few industries: small teams of specialists " },
       { t: "making something out of nothing", hi: true }, { t: "." },
     ],
