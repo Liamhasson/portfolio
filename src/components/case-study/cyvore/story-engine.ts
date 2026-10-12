@@ -7,6 +7,7 @@
    markup instead of replacing it. */
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { mountAttackPhone } from "./attack-phone";
 import {
   BEATS, CHAPTERS, TOTAL_WEIGHT, beatAt, beatStart, firstBeatOf, chapterFill,
   STATS, formatStat, captionAt, scrubTime, type ChapterId,
@@ -291,6 +292,7 @@ export function mountCyvoreStory(story: HTMLElement, name: string): () => void {
   video.addEventListener("canplaythrough", onReady);
   cleanups.push(() => { video.removeEventListener("loadeddata", onDecoded); video.removeEventListener("canplaythrough", onReady); });
   if (video.readyState >= 2) video.dataset.decoded = "1"; // it may have loaded before we listened
+  cleanups.push(mountAttackPhone(video));   // (a phone's tall frame: the call above its chat, attack-phone.ts)
   // The clip loads whole once the story is near, so scrubbing seeks without waiting.
   const near = new IntersectionObserver(([e]) => {
     if (!e.isIntersecting) return;

@@ -347,3 +347,8 @@
 }
 /* the annotations above the replica are Liam's words: floored like every label */
 [data-world="cyvore"] .rep-anno span { font-size: max(11px, calc(var(--u) * 12)); }
+
+/* the real-world attack on a phone: the call above its chat, redrawn from the one video (attack-phone.ts) */
+[data-world="cyvore"] .attack .attack-phone { position: absolute; inset: 0; width: 100%; height: 100%; display: none; mix-blend-mode: lighten; }
+[data-world="cyvore"] .attack[data-phone="1"] .attack-phone { display: block; }
+[data-world="cyvore"] .attack[data-phone="1"] video { opacity: 0; }
