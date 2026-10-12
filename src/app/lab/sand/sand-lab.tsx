@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Stage } from "@/three/stage";
-import { loadSand, SAND_BASE } from "@/three/sand/data";
+import { loadSandMeta, loadSandParts, SAND_BASE } from "@/three/sand/data";
 import { CURSOR_WARM, SAND_LOOK, SandField, type SandState } from "@/three/sand/sand-field";
 import { PaintField } from "@/three/sand/paint";
 import { Wordmark } from "@/three/sand/wordmark";
@@ -13,6 +13,12 @@ import { revealAt } from "@/three/sand/screen-reveal";
 import { DriftGrains } from "@/three/sand/drift-grains";
 import { vortexOnBall } from "@/three/sand/hero-layout";
 import { stepParallax } from "@/three/sand/parallax";
+import { Brief, type BriefHandle, briefReturn, briefSize } from "./brief";
+import { LOADER, loaderAt } from "./loader-timeline";
+import { markSeen, releaseHold, showCopy } from "./loader-mode";
+import { LoadProgress } from "@/three/sand/load-progress";
+import { anchorsWorld } from "@/three/sand/cascade";
+import { holdScroll } from "@/lib/smooth-scroll";
 import { ballKeyPos } from "@/three/sand/ball-light";
 import { SAND_ENCODE, SAND_LAYER, SandComposite } from "@/three/sand/sand-composite";
 import { Pullback } from "@/three/sand/pullback";
@@ -84,6 +90,7 @@ export function SandLab({ hero }: { hero: boolean }) {
   const veilRef = useRef<HTMLDivElement>(null);
   const projectsRef = useRef<HTMLDivElement>(null);
   const spacerRef = useRef<HTMLDivElement>(null);
+  const briefRef = useRef<BriefHandle>(null);
   const bindIndex = useCallback((h: WorkIndexHandle) => { indexRef.current = h; }, []);
   const [status, setStatus] = useState("loading sand");
   // no WebGL2 (or the sand failed to load): the approved renders as stills, chaos then ball with scroll
@@ -99,18 +106,42 @@ export function SandLab({ hero }: { hero: boolean }) {
     let paint: PaintField | null = null;
     let wordmark: Wordmark | null = null;
     const listeners: [string, EventListener][] = [];
+    // the loader (spec 2026-10-12-loader-design.md): its mode from the boot script (page.tsx); the brief grows from first
+    // paint with the hero's files, on its own frames (the stage isn't there yet)
+    const mode = (document.documentElement.dataset.loader ?? "none") as "play" | "reduced" | "fade" | "none";
+    const playing = hero && (mode === "play" || mode === "reduced");
+    const progress = new LoadProgress();
+    let size = 0, sinceMount = 0, briefLast = performance.now(), briefOn = playing, briefRaf = 0;
+    let onFullSize: (() => void) | null = null;
+    let ballScreen = { cx: window.innerWidth / 2, cy: window.innerHeight / 2, r: 0 };
+    const briefLoop = (now: number) => {
+      const dt = Math.min((now - briefLast) / 1000, 0.1);
+      briefLast = now; sinceMount += dt;
+      holdScroll(true);   // (each frame: the smooth scroller registers after this component mounts)
+      size = briefSize(size, progress.value, sinceMount, dt);
+      briefRef.current?.update({ ...ballScreen, r: ballScreen.r * size, alpha: 1, dash: 0, squares: Array(9).fill(1) });
+      briefRef.current?.announce(progress.value);
+      if (size >= 0.999 && onFullSize) { const f = onFullSize; onFullSize = null; f(); }
+      if (briefOn) briefRaf = requestAnimationFrame(briefLoop);
+    };
+    if (briefOn) briefRaf = requestAnimationFrame(briefLoop);
+    // done or failed: the brief stops, the nav and copy show, scrolling is free (never left locked)
+    const stopBrief = () => { briefOn = false; cancelAnimationFrame(briefRaf); };
+    const fail = () => { stopBrief(); briefRef.current?.update({ ...ballScreen, alpha: 0, dash: 0, squares: Array(9).fill(1) }); releaseHold(); };
+    let loaderClock: number | null = null, waitingForBrief = false, cascadeOn = false, released = false, loaderLight = 1, fadeClock: number | null = null;
 
     (async () => {
       // the tier first: it decides how much sand to download
       const probe = document.createElement("canvas").getContext("webgl2");
       if (!probe || new URLSearchParams(window.location.search).has("nogl")) {
         setFallback(true);
+        fail();
         return;
       }
       const tier = pickTier(readSignals(probe), parseTierOverride(window.location.search));
-      const data = await loadSand(settingsFor(tier, window.devicePixelRatio || 1).grains, SAND_BASE);
+      const meta = await loadSandMeta(SAND_BASE, progress);
       if (disposed) return;
-      const { camera } = data.meta;
+      const { camera } = meta;
       stage = new Stage(
         canvas,
         {
@@ -123,6 +154,21 @@ export function SandLab({ hero }: { hero: boolean }) {
         tier,
         compare !== null,
       );
+      // the brief on the ball: its projected centre and radius (the ball forms in the centre, unshifted), on every resize
+      const ballAt = new THREE.Vector3(...meta.ball.center);
+      const camRight = new THREE.Vector3(), camUp = new THREE.Vector3();
+      const placeBrief = () => {
+        const cam = stage!.camera;
+        cam.updateMatrixWorld();
+        camRight.setFromMatrixColumn(cam.matrixWorld, 0).normalize();
+        camUp.setFromMatrixColumn(cam.matrixWorld, 1).normalize();
+        const p0 = ballAt.clone().project(cam), p1 = ballAt.clone().addScaledVector(camRight, meta.ball.radius).project(cam);
+        const W = window.innerWidth, H = window.innerHeight;
+        ballScreen = { cx: ((p0.x + 1) / 2) * W, cy: ((1 - p0.y) / 2) * H, r: (Math.abs(p1.x - p0.x) / 2) * W };
+      };
+      stage.onSettings(placeBrief);
+      const data = await loadSandParts(meta, settingsFor(tier, window.devicePixelRatio || 1).grains, SAND_BASE, progress);
+      if (disposed) return;
       field = new SandField(data);
       stage.scene.add(field.points);
       // the sand through a pixel filter like Cycles' (?filter=0 draws it plain, for comparison)
@@ -143,7 +189,8 @@ export function SandLab({ hero }: { hero: boolean }) {
         stage.renderFrame = (r, sc, cam) => comp.render(r, sc, cam);
         // the film grade, in WebGL (film-grade-pass.ts; ?grade=0: the raw frame)
         if (gradeOn) {
-          new THREE.TextureLoader().loadAsync("/lab/grain.png").then((t) => {
+          progress.expect("/lab/grain.png", 1);
+          new THREE.TextureLoader().loadAsync("/lab/grain.png").finally(() => progress.done("/lab/grain.png")).then((t) => {
             if (disposed) return;
             comp.grade = new FilmGradePass(t);
             comp.gradeStill = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -152,8 +199,9 @@ export function SandLab({ hero }: { hero: boolean }) {
         (window as unknown as { __sandFilter?: (s: number) => void }).__sandFilter = (s) => { comp.sigma = s; };
         // the hero's haze: its key lighting the air (blender/lookdev/cinematic_variants.py CINE_PLATE=1); ?haze=0: none
         if (hazeOn) {
+          progress.expect("haze", 1);
           Promise.all([
-            new THREE.TextureLoader().loadAsync(`${SAND_BASE}/haze-hero.png`),
+            new THREE.TextureLoader().loadAsync(`${SAND_BASE}/haze-hero.png`).finally(() => progress.done("haze")),
             fetch(`${SAND_BASE}/haze-hero.json`).then((r) => r.json() as Promise<{ scale: number }>),
           ]).then(([texture, { scale }]) => {
             texture.colorSpace = THREE.NoColorSpace;   // display values, as rendered
@@ -162,7 +210,9 @@ export function SandLab({ hero }: { hero: boolean }) {
         }
       }
       // the story's one shot (blender/lookdev/shot_path.py), over the 3D desk
+      progress.expect(`${SHOT_BASE}/camera.json`, 1);
       const shot = hero && !compare ? await Pullback.load(SHOT_BASE, false) : null;
+      progress.done(`${SHOT_BASE}/camera.json`);
       const shotMeta = shot?.data as unknown as ShotMeta | undefined;
       if (shotMeta) WAKE_FRAME = shotMeta.wake_frame - 1;
       if (disposed) return;
@@ -266,7 +316,9 @@ export function SandLab({ hero }: { hero: boolean }) {
       const params = new URLSearchParams(window.location.search);
       if (params.get("wordmark") !== "0" && !compare) {
         const weight = { bold: "Bold", black: "Black", ultrablack: "UltraBlack" }[params.get("weight") ?? "black"] ?? "Black";
+        progress.expect("wordmark-font", 1);
         wordmark = await Wordmark.create(data.meta, `/lab/fonts/Geist-${weight}.ttf`);
+        progress.done("wordmark-font");
         if (disposed) return;
         stage.scene.add(wordmark.mesh);
         // ?wm=bottom: Lusion's placement, the name across the full width at the bottom (behind the sand)
@@ -361,16 +413,19 @@ export function SandLab({ hero }: { hero: boolean }) {
         }
         st.renderer.setRenderTarget(null);
         tmp.dispose();
+        progress.compile(0.5);
         await composite?.warm(st.renderer, st.scene, st.camera).catch(() => {});
         for (const o of hidden) o.visible = false;
         for (const o of culled) o.frustumCulled = true;
       }
+      progress.compile(1);
       const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       // ?still: no ambient motion (drift, spin), so a test isolates what the cursor does
       const still = new URLSearchParams(window.location.search).has("still");
       let lastScroll = window.scrollY;
       // the snap into the screen: carrying the page in (Liam, 2026-10-11), and the progress a frame ago (its direction)
       let snapping = false, lastRawP = 0;
+      let briefReturnA = 0;   // the brief's return on scroll, last frame (only redrawn while it shows)
       let cursorLean: [number, number] = [0, 0];   // the vortex's lean toward the cursor (NDC, parallax.ts)
       let spinVel = 0;
 
@@ -427,6 +482,32 @@ export function SandLab({ hero }: { hero: boolean }) {
       stage.onFrame((dt) => {
         const desk3d = deskLoaded, rising = risingLoaded;
         chaosC.addVectors(chaosC0, chaosShift);
+        // the loader (loader-timeline.ts): seconds since 100% from frame time (a hidden tab pauses it)
+        if (loaderClock !== null) {
+          loaderClock += dt;
+          const L = loaderAt(loaderClock);
+          if (cascadeOn) {
+            briefRef.current?.update({ ...ballScreen, alpha: L.briefAlpha, dash: L.dash, squares: L.squares });
+            field!.setLightK(L.lightK);
+            loaderLight = L.light;
+            if (L.copy > 0) showCopy();
+            if (L.unlocked && !released) { released = true; releaseHold(); markSeen(window.sessionStorage); briefRef.current?.announce("ready"); }
+          } else {
+            // reduced motion: a crossfade, no cascade
+            const k = Math.min(loaderClock / LOADER.reducedFade, 1);
+            briefRef.current?.update({ ...ballScreen, alpha: 1 - k, dash: 0, squares: Array(9).fill(1) });
+            canvas.style.opacity = String(k);
+            field!.setLightK(1); loaderLight = 1;
+            if (k >= 1 && !released) { released = true; releaseHold(); markSeen(window.sessionStorage); briefRef.current?.announce("ready"); loaderClock = null; }
+          }
+        }
+        // a later arrival: a short fade from black
+        if (fadeClock !== null && !reduced) {
+          fadeClock += dt;
+          const k = Math.min(fadeClock / LOADER.fadeIn, 1);
+          if (veilRef.current) veilRef.current.style.opacity = String(1 - k * k * (3 - 2 * k));
+          if (k >= 1) fadeClock = null;
+        }
         // (the story's own length: past it, the page runs on through the index's projects)
         const max = Math.max(1, (pageRef.current?.offsetHeight ?? document.documentElement.scrollHeight) - window.innerHeight);
         const progress = Math.min(window.scrollY / max, 1);
@@ -630,7 +711,7 @@ export function SandLab({ hero }: { hero: boolean }) {
             (calibrating ? lampSat : lampSat + (0.05 - lampSat) * state.compact) * h,
           );
           // the name leaves the frame with the ball (it is a plane in the world behind it); faded once it has gone
-          wordmark?.setFade(1 - ease(p, [BEATS.tilt[0] + 0.3, BEATS.tilt[1]]));
+          wordmark?.setFade((1 - ease(p, [BEATS.tilt[0] + 0.3, BEATS.tilt[1]])) * loaderLight);
           // the rising sand: on once the desk is coming into view, off inside the screen (its clock: ambient; frozen, so still,
           // under reduced motion)
           const um = field!.material.uniforms;
@@ -665,7 +746,7 @@ export function SandLab({ hero }: { hero: boolean }) {
         // the vortex leans toward the cursor in depth (parallax.ts): the front follows it, the back a little
         {
           const cs = field!.material.uniforms.uChaosSize.value as THREE.Vector3;
-          const on = pointer.active && !reduced && !still;
+          const on = pointer.active && !reduced && !still && loaderClock === null && !waitingForBrief;   // (waits for the loader)
           cursorLean = stepParallax(cursorLean, on ? [(pointer.x / canvas.clientWidth) * 2 - 1, -((pointer.y / canvas.clientHeight) * 2 - 1)] : null, dt);
           field!.setParallax(cursorLean[0], cursorLean[1], chaosC, 0.5 * Math.max(cs.x, cs.z));
         }
@@ -676,7 +757,7 @@ export function SandLab({ hero }: { hero: boolean }) {
           const ballR = field!.material.uniforms.uBallR.value as number;
           const pg = progressRef.current;
           // the hero's haze goes with the hero's light: gone as the camera tilts onto the lamp-lit desk
-          if (composite) composite.hazeAmount = hazeOn ? (hero ? 1 - ease(pg, BEATS.tilt) : 1) : 0;
+          if (composite) composite.hazeAmount = (hazeOn ? (hero ? 1 - ease(pg, BEATS.tilt) : 1) : 0) * loaderLight;   // (the loader: it comes up with the light)
           // and its lens: the lit front in focus, the rest softening (?dof=0: sharp throughout)
           {
             // focus as clarity (Liam, 2026-10-11): dreamy in the chaos (f/0.35 on the lit front), stopping down to ~f/2 as
@@ -710,7 +791,7 @@ export function SandLab({ hero }: { hero: boolean }) {
           const grainR = (um.uRadMax.value as number) * (um.uCountScale.value as number) * 0.7
             * THREE.MathUtils.lerp((um.uRadScale.value as THREE.Vector2).x, (um.uRadScale.value as THREE.Vector2).y, state.compact);
           // the cursor at full strength on these (Lusion's and Oryzo's loose particles): a warm light, and a push
-          drift.update(state.time, reduced || still ? 0 : dt, focus, r, reduced ? density * 0.5 : density, r * 3.5, grainR,
+          drift.update(state.time, reduced || still ? 0 : dt, focus, r, (reduced ? density * 0.5 : density) * loaderLight, r * 3.5, grainR,
             pointer.active && !reduced ? cursorWorld : null, dir, 0.45,
             new THREE.Vector3(...CURSOR_WARM).multiplyScalar(5.0 * cursorI), cam);
           // (the formed ball no longer sprays its grains under the cursor: Liam, 2026-10-11, "the normal hover reaction is
@@ -728,10 +809,46 @@ export function SandLab({ hero }: { hero: boolean }) {
           composite.sigma = chaos + (FILTER.ball - chaos) * state.compact;
         }
         field!.update(state);
+        if (waitingForBrief) field!.setCascade(-1);   // (nothing born yet: the brief is still growing)
+        else if (loaderClock !== null && cascadeOn) {
+          field!.setCascade(loaderClock);
+          if (field!.cascadeDone(loaderClock)) { field!.setCascade(null); loaderClock = null; }
+        }
+        // the brief returns for a beat as the ball locks in (spec §2.4)
+        if (hero && !reduced && loaderClock === null && !waitingForBrief) {
+          const a = briefReturn(state.compact);
+          if (a > 0 || briefReturnA > 0) {
+            if (a > 0) placeBrief();
+            briefRef.current?.update({ ...ballScreen, alpha: a * 0.9, dash: 0, squares: Array(9).fill(1) });
+          }
+          briefReturnA = a;
+        }
       });
+      // the loader: nothing of the hero shows until the brief is whole; then its points become the sand
+      if (playing) {
+        waitingForBrief = true;
+        placeBrief();
+        field.setCascade(-1, anchorsWorld([ballAt.x, ballAt.y, ballAt.z], meta.ball.radius, [camRight.x, camRight.y, camRight.z], [camUp.x, camUp.y, camUp.z]).map((a) => new THREE.Vector3(...a)));
+        field.setLightK(LOADER.lightFloor);
+        loaderLight = 0;
+        if (mode === "reduced") canvas.style.opacity = "0";
+      } else if (hero) {
+        fadeClock = 0;
+        if (veilRef.current && !reduced) veilRef.current.style.opacity = "1";
+        releaseHold();
+      }
       stage.start();
       (window as unknown as { __sand?: unknown }).__sand = { stage, field, state, drift, rising: null, composite };   // lab debugging
       loadDesk().catch(() => {});
+      if (playing) {
+        await new Promise<void>((res) => { if (size >= 0.999) res(); else onFullSize = res; });
+        if (disposed) return;
+        stopBrief();
+        placeBrief();
+        waitingForBrief = false;
+        cascadeOn = mode === "play";
+        loaderClock = 0;
+      }
       // arriving with a section's hash (the nav from a case study, a shared link): the anchor didn't exist when the browser
       // looked for it (the story is client-only), so go there now
       const hash = window.location.hash.slice(1);
@@ -744,10 +861,12 @@ export function SandLab({ hero }: { hero: boolean }) {
     })().catch((err) => {
       setStatus(String(err));
       setFallback(true);
+      fail();
     });
 
     return () => {
       disposed = true;
+      stopBrief();
       for (const [type, fn] of listeners) {
         if (type === "__leave") document.documentElement.removeEventListener("mouseleave", fn);
         else window.removeEventListener(type, fn);
@@ -826,6 +945,7 @@ export function SandLab({ hero }: { hero: boolean }) {
       {/* the nav's Projects (/#projects) lands where the index has settled (once this page is the home) */}
       {hero && <div ref={projectsRef} id="projects" aria-hidden className="pointer-events-none absolute left-0 w-px" style={{ top: `${PAGE_VH - 100}vh`, height: "100vh" }} />}
       {hero && <WorkIndex bind={bindIndex} />}
+      {hero && <Brief ref={briefRef} />}
       {hero ? (
         <HeroOverlay exit={readExit} scrolled={readScrolled} />
       ) : (

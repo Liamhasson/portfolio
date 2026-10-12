@@ -78,3 +78,9 @@ html.lenis body {
     scroll-behavior: auto !important;
   }
 }
+
+/* the loader's hold (src/app/lab/sand/loader-mode.ts): the nav and the hero's copy wait, scrolling is locked */
+html[data-loader="play"], html[data-loader="reduced"], html[data-loader="arriving"] { overflow: hidden; }
+html[data-loader="play"] .sh-nav, html[data-loader="reduced"] .sh-nav,
+html[data-loader="play"] [data-testid="hero-overlay"], html[data-loader="reduced"] [data-testid="hero-overlay"] { opacity: 0; pointer-events: none; }
+.sh-nav, [data-testid="hero-overlay"] { transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1); }

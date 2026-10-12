@@ -12,7 +12,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={fontVariables}>
+    // (suppressHydrationWarning: the story's loader sets html[data-loader] before first paint, src/app/lab/sand/loader-mode.ts)
+    <html lang="en" className={fontVariables} suppressHydrationWarning>
       <body>
         <a
           href="#main"

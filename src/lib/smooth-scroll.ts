@@ -8,6 +8,8 @@ export function shouldUseSmoothScroll(matches: MediaMatcher): boolean {
 /** The page's smooth scroller (Lenis), when there is one: the provider registers it. */
 interface Scroller {
   scrollTo(target: number, options: { duration: number; lock: boolean; onComplete: () => void; easing?: (t: number) => number }): void;
+  stop?(): void;
+  start?(): void;
 }
 let scroller: Scroller | null = null;
 
@@ -28,4 +30,9 @@ export function glideTo(y: number, seconds: number, done: () => void, instant = 
   }
   window.scrollTo({ top: y, behavior: instant ? "instant" : "smooth" });
   if (instant) done();
+}
+
+/** The loader's hold on scrolling: the smooth scroller stopped (keys and wheel), released at the unlock. */
+export function holdScroll(on: boolean): void {
+  if (on) scroller?.stop?.(); else scroller?.start?.();
 }
