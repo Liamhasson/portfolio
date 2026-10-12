@@ -1,6 +1,6 @@
 // src/app/lab/sand/loader-mode.test.ts
 import { describe, expect, test, vi } from "vitest";
-import { LOADER_BOOT, loaderMode, readLoaderMode } from "./loader-mode";
+import { LOADER_BOOT, loaderMode, readLoaderMode, storyStarted } from "./loader-mode";
 
 describe("when the loader plays (spec §3; Liam, 2026-10-12: every fresh page load)", () => {
   test("every fresh page load of the hero plays it; under reduced motion: reduced", () => {
@@ -66,5 +66,30 @@ describe("the boot script's safety net (pre-launch audit, 2026-10-12)", () => {
     expect(document.documentElement.dataset.loader).toBeTruthy();
     delete document.documentElement.dataset.loader;
     vi.useRealTimers();
+  });
+});
+
+describe("the plain page, when the story never starts (Liam, 2026-10-13)", () => {
+  test("the net shows it, and its projects become the nav's #projects", () => {
+    vi.useFakeTimers();
+    delete (window as unknown as { __storyMounted?: boolean }).__storyMounted;
+    document.body.innerHTML = '<div data-story-fallback><div data-projects></div></div>';
+    window.history.replaceState(null, "", "/");
+    new Function(LOADER_BOOT)();
+    vi.advanceTimersByTime(20100);
+    expect(document.documentElement).toHaveAttribute("data-story-failed");
+    expect(document.querySelector("[data-projects]")!.id).toBe("projects");
+    vi.useRealTimers();
+    delete document.documentElement.dataset.storyFailed;
+    document.body.innerHTML = "";
+  });
+  test("a story that starts late takes the page back: the plain one hides, its anchor goes to the story", () => {
+    document.body.innerHTML = '<div data-story-fallback><div data-projects id="projects"></div></div>';
+    document.documentElement.dataset.storyFailed = "";
+    storyStarted();
+    expect(document.documentElement).not.toHaveAttribute("data-story-failed");
+    expect(document.querySelector("[data-projects]")!.id).toBe("");
+    expect((window as unknown as { __storyMounted?: boolean }).__storyMounted).toBe(true);
+    document.body.innerHTML = "";
   });
 });

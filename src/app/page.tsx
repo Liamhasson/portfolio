@@ -1,5 +1,6 @@
 import { LOADER_BOOT } from "./lab/sand/loader-mode";
 import { SandLabLoader } from "./lab/sand/sand-lab-loader";
+import { StoryFallback } from "./story-fallback";
 import type { Metadata } from "next";
 
 // (its own address here, not in the root's metadata: a 404 inherited it and named itself the home page)
@@ -15,18 +16,10 @@ export default function Home() {
     <>
       <script dangerouslySetInnerHTML={{ __html: LOADER_BOOT }} />
       <SandLabLoader hero />
+      {/* the home page in plain HTML: shown if the story never starts (the boot net), and without JavaScript */}
+      <StoryFallback />
       <noscript>
-        <div style={{ padding: "18vh 6vw", maxWidth: 760, color: "#f4efe9" }}>
-          <h1 style={{ fontSize: 48, fontWeight: 400, margin: 0 }}>Hi, I&rsquo;m Liam.</h1>
-          <p style={{ fontSize: 20, opacity: 0.8 }}>I build ambiguous ideas into products where design and user needs meet.</p>
-          <ul style={{ fontSize: 20, lineHeight: 1.8, paddingLeft: 18 }}>
-            <li><a href="/eventread">Eventread</a></li>
-            <li><a href="/cyvore">Cyvore</a></li>
-            <li><a href="/pulse">Pulse</a></li>
-            <li><a href="/about">About</a></li>
-            <li><a href="/contact">Contact</a></li>
-          </ul>
-        </div>
+        <style>{".story-fallback{display:block}"}</style>
       </noscript>
     </>
   );

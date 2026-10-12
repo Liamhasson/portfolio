@@ -14,7 +14,7 @@ import { vortexOnBall } from "@/three/sand/hero-layout";
 import { stepParallax } from "@/three/sand/parallax";
 import { Brief, type BriefHandle, BriefGrowth, briefReturn } from "./brief";
 import { LOADER, loaderAt, loaderRunning } from "./loader-timeline";
-import { readLoaderMode, releaseHold, showCopy } from "./loader-mode";
+import { readLoaderMode, releaseHold, showCopy, storyStarted } from "./loader-mode";
 import { LoadProgress } from "@/three/sand/load-progress";
 import { anchorsWorld } from "@/three/sand/cascade";
 import { holdScroll, wallAt } from "@/lib/smooth-scroll";
@@ -115,7 +115,7 @@ export function SandLab({ hero }: { hero: boolean }) {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    (window as unknown as { __storyMounted?: boolean }).__storyMounted = true;   // (the boot script's safety net stands down)
+    storyStarted();   // (the boot script's safety net stands down)
     let disposed = false;
     let stage: Stage | null = null;
     let field: SandField | null = null;

@@ -16,8 +16,9 @@ export function loaderMode({ hash, reduced, replay = false }: { hash: string; re
 }
 
 /** Runs inline before first paint (page.tsx): the nav and copy stay hidden, and scrolling locked, from the first frame.
- *  Its safety net: if the story never starts (its code failed to load), the page is released after 20 s. */
-export const LOADER_BOOT = `(function(){try{var deep=${JSON.stringify(DEEP)}.indexOf(location.hash)>=0;var replay=new URLSearchParams(location.search).has("loader");var r=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;var m=(!replay&&deep)?"fade":(r?"reduced":"play");window.__loaderMode=m;document.documentElement.dataset.loader=m;setTimeout(function(){if(!window.__storyMounted)delete document.documentElement.dataset.loader},20000)}catch(e){}})();`;
+ *  Its safety net: if the story never starts (its code failed to load), after 20 s the page is released and its plain
+ *  version shown (story-fallback.tsx), its projects the nav's #projects. */
+export const LOADER_BOOT = `(function(){try{var deep=${JSON.stringify(DEEP)}.indexOf(location.hash)>=0;var replay=new URLSearchParams(location.search).has("loader");var r=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;var m=(!replay&&deep)?"fade":(r?"reduced":"play");window.__loaderMode=m;document.documentElement.dataset.loader=m;setTimeout(function(){if(window.__storyMounted)return;var d=document.documentElement;delete d.dataset.loader;d.dataset.storyFailed="";var p=document.querySelector("[data-story-fallback] [data-projects]");if(p){p.id="projects";if(location.hash==="#projects")p.scrollIntoView()}},20000)}catch(e){}})();`;
 
 /**
  * The mode the boot script chose, read once by the story. Kept in a value React can't touch: a browser extension that
@@ -42,4 +43,13 @@ export function releaseHold(): void {
 /** The copy and nav arrive (the loader's 2.8 s), scrolling still held until the release. */
 export function showCopy(): void {
   if (document.documentElement.dataset.loader) document.documentElement.dataset.loader = "arriving";
+}
+
+/** The story has started: the boot net stands down; if it had already given up (a script over 20 s late), the story
+ *  takes the page back from the plain version. */
+export function storyStarted(): void {
+  (window as unknown as { __storyMounted?: boolean }).__storyMounted = true;
+  delete document.documentElement.dataset.storyFailed;
+  const p = document.querySelector("[data-story-fallback] [data-projects]");
+  if (p) p.removeAttribute("id");
 }
