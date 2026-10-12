@@ -133,7 +133,7 @@ One screen, no scroll.
 | Andrada Popan-Dorca | "Exceptional talent, a strong aesthetic sense, and an in-depth ability to make inquiries about the problems he is trying to solve." UX Mentor, CareerFoundry (from the live portfolio; in white: "an in-depth ability … to solve.") |
 | Emil (Nordic Logic) | later |
 | Portrait | **owed by Liam:** a photo; graded to the site |
-| Resume | the current PDF link from the live site; replaced when Liam's new resume arrives |
+| Resume | `/Liam-Hasson-Resume.pdf`, hosted on the site (Liam's new resume, 2026-10-12) |
 | Contact | Liamhasson@gmail.com · linkedin.com/in/liamhasson · +49 160 771 0652 |
 
 All of it in one typed content module (like `src/content/case-studies/*`): a quote, the resume or a detail is a

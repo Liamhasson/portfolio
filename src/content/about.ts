@@ -70,7 +70,8 @@ export const ABOUT = {
       ],
     },
   ] as Verb[],
-  resume: { href: "https://drive.google.com/file/d/1WyoDYw5Zarn3N2031RGNSLrdmAiR0yJS/view?usp=sharing", label: "View resume" },
+  // (hosted on the site: Liam's new resume, 2026-10-12; replacing it later is one file swap)
+  resume: { href: "/Liam-Hasson-Resume.pdf", label: "View resume" },
   closing: [{ t: "If you’re working on something that really matters to people, " }, { t: "I’d like to hear about it.", hi: true }] as Line,
   // (Liam's photo, graded to the site, when he sends it: { src: "/about/portrait.jpg", alt, width, height })
   portrait: null as { src: string; alt: string; width: number; height: number } | null,

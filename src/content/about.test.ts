@@ -1,5 +1,5 @@
 // src/content/about.test.ts
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { ABOUT, CONTACT, plain } from "./about";
@@ -48,7 +48,9 @@ describe("About and Contact content (spec 2026-10-12-about-contact-design.md)", 
     expect(ABOUT.opening).not.toHaveProperty("href");   // (plain text: Liam, 2026-10-12)
   });
   test("the resume and the contact details, verbatim", () => {
-    expect(ABOUT.resume.href).toBe("https://drive.google.com/file/d/1WyoDYw5Zarn3N2031RGNSLrdmAiR0yJS/view?usp=sharing");
+    // the new resume, hosted on the site (Liam, 2026-10-12)
+    expect(ABOUT.resume.href).toBe("/Liam-Hasson-Resume.pdf");
+    expect(existsSync(join(process.cwd(), "public/Liam-Hasson-Resume.pdf"))).toBe(true);
     expect(CONTACT).toEqual({ headline: "Got something on your mind?", email: "Liamhasson@gmail.com", linkedin: "https://www.linkedin.com/in/liamhasson/", phone: "+49 160 771 0652" });
   });
 });
