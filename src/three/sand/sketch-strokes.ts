@@ -41,9 +41,10 @@ export function circle(cx: number, cy: number, r: number, n = 40): Stroke[] {
 
 const len = (s: Stroke) => s.reduce((a, p, k) => (k ? a + Math.hypot(p[0] - s[k - 1][0], p[1] - s[k - 1][1]) : 0), 0);
 
-/** Each stroke's [start, end] in the sketch's 0..1 reveal: in order, by length, a `pause` share between strokes. */
-export function strokeTimes(strokes: Stroke[], pause = 0.08): [number, number][] {
-  const lens = strokes.map(len), total = lens.reduce((a, b) => a + b, 0) || 1;
+/** Each stroke's [start, end] in the sketch's 0..1 reveal: in order, by length (times its weight, if given: guides draw
+ *  quicker), a `pause` share between strokes. */
+export function strokeTimes(strokes: Stroke[], pause = 0.08, weights?: number[]): [number, number][] {
+  const lens = strokes.map((s, k) => len(s) * (weights?.[k] ?? 1)), total = lens.reduce((a, b) => a + b, 0) || 1;
   const gap = strokes.length > 1 ? pause / (strokes.length - 1) : 0, draw = 1 - pause * (strokes.length > 1 ? 1 : 0);
   let t = 0;
   return lens.map((l, k) => { const a = t, b = a + (l / total) * draw; t = b + (k < strokes.length - 1 ? gap : 0); return [a, k === strokes.length - 1 ? 1 : b]; });
@@ -51,11 +52,15 @@ export function strokeTimes(strokes: Stroke[], pause = 0.08): [number, number][]
 
 const wob = (n: number) => { const x = Math.sin(n * 91.345 + 13.7) * 43758.5453; return (x - Math.floor(x)) * 2 - 1; };
 
+/** How far into a stroke (units) its pressure builds up, and how far from its end it lifts off. */
+const TAPER = 6;
+
 /** A stroke as a strip: per point, two vertices (its centre twice: the shader pushes them apart by `side`), its normal,
- *  and its reveal time (the stroke's [start, end] spread along its length). `seed`: the hand's wobble. */
-export function strokeStrip(s: Stroke, [t0, t1]: [number, number], seed: number) {
+ *  its reveal time (the stroke's [start, end] spread along its length), and its strength (`alpha`, lighter at its ends
+ *  where the pencil lands and lifts). `seed`: the hand's wobble. */
+export function strokeStrip(s: Stroke, [t0, t1]: [number, number], seed: number, alpha = 1) {
   const L = len(s) || 1;
-  const positions: number[] = [], normals: number[] = [], sides: number[] = [], times: number[] = [];
+  const positions: number[] = [], normals: number[] = [], sides: number[] = [], times: number[] = [], alphas: number[] = [];
   let acc = 0;
   s.forEach((p, k) => {
     if (k) acc += Math.hypot(p[0] - s[k - 1][0], p[1] - s[k - 1][1]);
@@ -65,7 +70,9 @@ export function strokeStrip(s: Stroke, [t0, t1]: [number, number], seed: number)
     // the hand: a slow, small sideways drift along the stroke
     const w = 0.35 * (wob(seed * 17 + acc * 0.05) * 0.6 + wob(seed * 31 + acc * 0.013) * 0.4);
     const x = p[0] + nx * w, y = p[1] + ny * w, t = t0 + (t1 - t0) * (acc / L);
-    for (const side of [-1, 1]) { positions.push(x, y); normals.push(nx, ny); sides.push(side); times.push(t); }
+    const edge = Math.min(acc, L - acc, L / 2) / Math.min(TAPER, L / 2);
+    const strength = alpha * (0.35 + 0.65 * Math.min(edge, 1)) * (0.85 + 0.15 * wob(seed * 7 + acc * 0.09));
+    for (const side of [-1, 1]) { positions.push(x, y); normals.push(nx, ny); sides.push(side); times.push(t); alphas.push(strength); }
   });
-  return { positions, normals, sides, times };
+  return { positions, normals, sides, times, alphas };
 }

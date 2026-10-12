@@ -36,4 +36,17 @@ describe("the sketches' strokes: hand-drawn hairlines that draw themselves on", 
     const again = strokeStrip([[0, 0], [10, 0], [20, 0]], [0.2, 0.6], 7);
     expect(again.positions).toEqual(st.positions);   // (deterministic)
   });
+  test("a weighted stroke takes its share of the time by its weighted length (guides draw quicker)", () => {
+    const t = strokeTimes([[[0, 0], [10, 0]], [[0, 0], [10, 0]]], 0, [0.25, 1]);
+    expect(t[1][1] - t[1][0]).toBeCloseTo(4 * (t[0][1] - t[0][0]), 6);
+  });
+  test("a strip carries its stroke's strength, tapering at its ends like a pencil lifting", () => {
+    const st = strokeStrip([[0, 0], [10, 0], [20, 0], [30, 0], [40, 0]], [0, 1], 3, 0.6);
+    expect(st.alphas).toHaveLength(st.times.length);
+    expect(Math.max(...st.alphas)).toBeLessThanOrEqual(0.6 + 1e-9);
+    expect(st.alphas[0]).toBeLessThan(st.alphas[4]);           // (the start lighter than the middle)
+    expect(st.alphas.at(-1)!).toBeLessThan(st.alphas[4]);      // (and the end)
+    expect(Math.min(...st.alphas)).toBeGreaterThan(0.1);
+  });
 });
+

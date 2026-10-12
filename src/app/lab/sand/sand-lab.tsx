@@ -256,6 +256,7 @@ export function SandLab({ hero }: { hero: boolean }) {
       const lean = new THREE.Vector2();     // the eased lean, -1..1 each way
       let spacerTick = 0;
       let riseClock = 0;
+      let sketchClock = 0;   // the sketches' float (desk-sketches.ts): runs while they are on screen, restarts after
       // the desk's top as a rectangle in the hero's units (x, z) and its height, for keeping the top view inside it
       let deskTop: { min: THREE.Vector2; max: THREE.Vector2; y: number } | null = null;
       // the sketches of the work behind the desk, seen through the tilt (desk-sketches.ts; Liam, 2026-10-12)
@@ -748,7 +749,8 @@ export function SandLab({ hero }: { hero: boolean }) {
           );
           // the name leaves the frame with the ball (it is a plane in the world behind it); faded once it has gone
           wordmark?.setFade((1 - ease(p, [BEATS.tilt[0] + 0.3, BEATS.tilt[1]])) * loaderLight);
-          sketches?.update(p, reduced);
+          sketchClock = sketches?.showing ? sketchClock + (reduced || still ? 0 : dt) : 0;
+          sketches?.update(p, reduced, sketchClock);
           // the rising sand: on once the desk is coming into view, off inside the screen (its clock: ambient; frozen, so still,
           // under reduced motion)
           const um = field!.material.uniforms;
