@@ -52,11 +52,12 @@ sentence per screen, sliding up.
    teams of specialists making something out of nothing."
 3. "That's still how I work. I go looking for problems nobody pointed at, check whether I'm actually right, and
    build it."
+   Then *"End to end, from the problem to the shipped product"* (links to Eventread) as its own slide: the story's
+   conclusion (Liam, 2026-10-12: it read disconnected before What I do).
 4. **The quotes**, one slide each, as the proof of that claim: Yoav Rotem (CTO, Cyvore), Andrada Popan-Dorca (UX Mentor,
    CareerFoundry), later Emil (Nordic Logic). The quote large, an opening quote mark hung in the margin, name and role
    below in Geist Mono caps. Built for 2 to 4 quotes: adding one is a content change.
-5. **What I do:** an opening line, *"End to end, from the problem to the shipped product"* (links to Eventread), then
-   one slide per verb. Each skill: a small hollow square (the brief's anchor), its name, and one short proof line in
+5. **What I do:** one slide per verb. Each skill: a small hollow square (the brief's anchor), its name, and one short proof line in
    the darker tone that links to its case study.
    - **Find the problem:** User research (*Pulse: what 5 of 6 testers expected reshaped the onboarding*) · Market &
      competitor research (*Eventread: Prism.fm, TourSmart, ChatGPT each answer part; none checks the whole night*) ·
@@ -129,7 +130,7 @@ One screen, no scroll.
 |---|---|
 | About text | `docs/copy/about.md` (approved 2026-10-08), verbatim |
 | Yoav Rotem | "We weren't looking for a designer. Liam reached us and thanks to his work, we closed our first funding round." CTO, Cyvore |
-| Andrada Popan-Dorca | **owed by Liam:** the full quote (the live site truncates it); cut only at sentence boundaries, approved by Liam. UX Mentor, CareerFoundry |
+| Andrada Popan-Dorca | "Exceptional talent, a strong aesthetic sense, and an in-depth ability to make inquiries about the problems he is trying to solve." UX Mentor, CareerFoundry (from the live portfolio; in white: "an in-depth ability … to solve.") |
 | Emil (Nordic Logic) | later |
 | Portrait | **owed by Liam:** a photo; graded to the site |
 | Resume | the current PDF link from the live site; replaced when Liam's new resume arrives |

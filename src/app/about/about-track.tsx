@@ -70,13 +70,14 @@ export function AboutTrack() {
           <div className="ab-clip">
             <div ref={track} className="ab-track">
               {ABOUT.lines.map((l, i) => <p key={i} className="ab-slide ab-big"><Words line={l} /></p>)}
+              {/* End to end, straight after "That's still how I work…": the story's conclusion (Liam, 2026-10-12) */}
+              <p className="ab-slide ab-big"><Link href={ABOUT.opening.href} className="ab-open"><Words line={ABOUT.opening.text} /></Link></p>
               {ABOUT.quotes.map((q) => (
                 <figure key={q.name} className="ab-slide ab-quote">
                   <blockquote><Words line={q.text} /></blockquote>
                   <figcaption className="ab-mono">{q.name} · {q.role}</figcaption>
                 </figure>
               ))}
-              <p className="ab-slide ab-big"><Link href={ABOUT.opening.href} className="ab-open"><Words line={ABOUT.opening.text} /></Link></p>
               {ABOUT.verbs.map((v, i) => (
                 <div key={v.title} className="ab-slide ab-verb">
                   <div className="ab-mono">What I do · {i + 1} of {ABOUT.verbs.length}</div>

@@ -19,6 +19,12 @@ describe("About and Contact content (spec 2026-10-12-about-contact-design.md)", 
     expect(his(ABOUT.quotes[0].text)).toEqual(["we closed our first funding round."]);
     expect(his(ABOUT.closing)).toEqual(["I’d like to hear about it."]);
   });
+  test("Andrada's quote, verbatim from the live portfolio, the problems part in white (Liam, 2026-10-12)", () => {
+    const q = ABOUT.quotes[1];
+    expect(plain(q.text)).toBe("Exceptional talent, a strong aesthetic sense, and an in-depth ability to make inquiries about the problems he is trying to solve.");
+    expect(q.text.filter((s) => s.hi).map((s) => s.t)).toEqual(["an in-depth ability to make inquiries about the problems he is trying to solve."]);
+    expect(q).toMatchObject({ name: "Andrada Popan-Dorca", role: "UX Mentor, CareerFoundry" });
+  });
   test("the quotes: Yoav's verbatim; room for up to four", () => {
     expect(plain(ABOUT.quotes[0].text)).toBe("We weren't looking for a designer. Liam reached us and thanks to his work, we closed our first funding round.");
     expect(ABOUT.quotes[0]).toMatchObject({ name: "Yoav Rotem", role: "CTO, Cyvore" });

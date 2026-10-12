@@ -91,3 +91,11 @@ test("the track's first line slides in on arrival, and the ground carries the si
   expect(css).toMatch(/@keyframes ab-in/);
   expect(css).toMatch(/url\("?\/lab\/grain\.png"?\)/);
 });
+
+test("End to end follows \"That's still how I work…\", before the quotes (Liam, 2026-10-12)", () => {
+  render(<AboutTrack />);
+  const text = document.body.textContent!;
+  const how = text.indexOf("That’s still how I work."), end = text.indexOf("End to end"), quote = text.indexOf("We weren't looking");
+  expect(how).toBeLessThan(end);
+  expect(end).toBeLessThan(quote);
+});

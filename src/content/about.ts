@@ -25,12 +25,18 @@ export const ABOUT = {
       { t: ", check whether I’m actually right, and build it." },
     ],
   ] as Line[],
-  // (Andrada Popan-Dorca's and, later, Emil's: added here when Liam sends them; up to four)
+  // (Emil's, from Nordic Logic, added here when it comes; up to four)
   quotes: [
     {
       text: [{ t: "We weren't looking for a designer. Liam reached us and thanks to his work, " }, { t: "we closed our first funding round.", hi: true }],
       name: "Yoav Rotem",
       role: "CTO, Cyvore",
+    },
+    {
+      // (verbatim from the live portfolio, liamhasson.figma.site; Liam, 2026-10-12)
+      text: [{ t: "Exceptional talent, a strong aesthetic sense, and " }, { t: "an in-depth ability to make inquiries about the problems he is trying to solve.", hi: true }],
+      name: "Andrada Popan-Dorca",
+      role: "UX Mentor, CareerFoundry",
     },
   ] as Quote[],
   opening: { text: [{ t: "End to end", hi: true }, { t: ", from the problem to the shipped product." }] as Line, href: "/eventread" },
