@@ -39,7 +39,8 @@ export const ABOUT = {
       role: "UX Mentor, CareerFoundry",
     },
   ] as Quote[],
-  opening: { text: [{ t: "End to end", hi: true }, { t: ", from the problem to the shipped product." }] as Line, href: "/eventread" },
+  // (plain text, not a link: it didn't read as clickable; Liam, 2026-10-12)
+  opening: { text: [{ t: "End to end", hi: true }, { t: ", from the problem to the shipped product." }] as Line },
   verbs: [
     {
       title: "Find the problem.",

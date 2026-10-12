@@ -8,8 +8,6 @@
 .ab-track { display: flex; align-items: center; gap: 7vw; height: 100%; width: max-content; padding: 0 12vw 0 6vw; will-change: transform; }
 .ab-slide { flex: 0 0 auto; margin: 0; max-width: 52vw; }
 .ab-big { font-size: clamp(28px, 4vw, 72px); line-height: 1.15; letter-spacing: -0.01em; }
-.ab-open { color: inherit; text-decoration: none; }
-.ab-open:hover .hi, .ab-open:focus-visible .hi { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.15em; }
 .ab-quote { max-width: 58vw; }
 .ab-quote blockquote { margin: 0; font-size: clamp(24px, 3.1vw, 56px); line-height: 1.2; position: relative; }
 .ab-quote blockquote::before { content: "\201C"; position: absolute; left: -0.6em; color: #f4efe9; opacity: 0.45; }

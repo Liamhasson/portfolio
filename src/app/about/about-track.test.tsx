@@ -99,3 +99,8 @@ test("End to end follows \"That's still how I work…\", before the quotes (Liam
   expect(how).toBeLessThan(end);
   expect(end).toBeLessThan(quote);
 });
+
+test("End to end is plain text, not a link: it didn't read as clickable, so a click by accident took people away (Liam, 2026-10-12)", () => {
+  render(<AboutTrack />);
+  expect(screen.getByText("End to end").closest("a")).toBeNull();
+});

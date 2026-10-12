@@ -45,7 +45,7 @@ describe("About and Contact content (spec 2026-10-12-about-contact-design.md)", 
       if (s.href) expect(["/eventread", "/cyvore", "/pulse"]).toContain(s.href);
     }
     expect(skills.find((s) => s.name === "3D modeling")!.href).toBeUndefined();
-    expect(ABOUT.opening.href).toBe("/eventread");
+    expect(ABOUT.opening).not.toHaveProperty("href");   // (plain text: Liam, 2026-10-12)
   });
   test("the resume and the contact details, verbatim", () => {
     expect(ABOUT.resume.href).toBe("https://drive.google.com/file/d/1WyoDYw5Zarn3N2031RGNSLrdmAiR0yJS/view?usp=sharing");

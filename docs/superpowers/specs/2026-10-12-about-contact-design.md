@@ -52,7 +52,7 @@ sentence per screen, sliding up.
    teams of specialists making something out of nothing."
 3. "That's still how I work. I go looking for problems nobody pointed at, check whether I'm actually right, and
    build it."
-   Then *"End to end, from the problem to the shipped product"* (links to Eventread) as its own slide: the story's
+   Then *"End to end, from the problem to the shipped product"* (plain text, not a link: Liam, 2026-10-12) as its own slide: the story's
    conclusion (Liam, 2026-10-12: it read disconnected before What I do).
 4. **The quotes**, one slide each, as the proof of that claim: Yoav Rotem (CTO, Cyvore), Andrada Popan-Dorca (UX Mentor,
    CareerFoundry), later Emil (Nordic Logic). The quote large, an opening quote mark hung in the margin, name and role
