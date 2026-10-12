@@ -758,7 +758,8 @@ export function SandLab({ hero }: { hero: boolean }) {
           // the name leaves the frame with the ball (it is a plane in the world behind it); faded once it has gone
           wordmark?.setFade((1 - ease(p, [BEATS.tilt[0] + 0.3, BEATS.tilt[1]])) * loaderLight);
           sketchClock = sketches?.showing ? sketchClock + (reduced || still ? 0 : dt) : 0;
-          sketches?.update(p, reduced, sketchClock);
+          // (the hover lights the part of a sketch under a mouse: Liam, 2026-10-12)
+          sketches?.update(p, reduced, sketchClock, { x: (pointer.x / canvas.clientWidth) * 2 - 1, y: 1 - (pointer.y / canvas.clientHeight) * 2, on: pointer.active && !pointer.touch });
           // the rising sand: on once the desk is coming into view, off inside the screen (its clock: ambient; frozen, so still,
           // under reduced motion)
           const um = field!.material.uniforms;

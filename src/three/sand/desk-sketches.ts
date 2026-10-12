@@ -20,8 +20,8 @@ export const SKETCH_TIMES = {
   stagger: 0.07,   // each next one later by this
   draw: 0.3,       // screens each takes to draw
   drawnBy: 2.4,    // all drawn by the tilt's end
-  fadeFrom: 2.5,
-  gone: 2.8,
+  fadeFrom: 3.45,  // they stay in the background through the glide (Liam, 2026-10-12), and fade as the camera
+  gone: 3.85,      // goes into the screen
 } as const;
 
 export const SKETCH_LOOK = {
@@ -67,6 +67,24 @@ export function sketchFloat(time: number, i: number, reduced: boolean) {
   };
 }
 
+/** The hover (Liam, 2026-10-12: "add an opacity 30%+ upon hover, not evenly on the whole sketch, only on the hovered
+ *  part"): a soft disc around the cursor lifts what's under it, `lift` more at its centre (30% → 60%), nothing past its
+ *  edge. Radius in units of the screen's half-height (NDC); `follow`: how fast it comes and goes. */
+export const SKETCH_HOVER = { lift: 1, radius: 0.3, inner: 0.35, follow: 6 } as const;
+
+const smoothstep = (a: number, b: number, x: number) => { const t = Math.min(Math.max((x - a) / (b - a), 0), 1); return t * t * (3 - 2 * t); };
+/** The lift at distance `d` (NDC, aspect-corrected) from the cursor, with the hover's presence `k` (0..1). */
+export const sketchHover = (d: number, k: number) => 1 + SKETCH_HOVER.lift * k * (1 - smoothstep(SKETCH_HOVER.radius * SKETCH_HOVER.inner, SKETCH_HOVER.radius, d));
+
+const HOVER_GLSL = /* glsl */ `
+uniform vec4 uHover;   // the cursor (NDC x, y), the screen's aspect, its presence
+in vec2 vNdc;
+float hoverLift() {
+  float d = length((vNdc - uHover.xy) * vec2(uHover.z, 1.0));
+  return 1.0 + ${SKETCH_HOVER.lift.toFixed(3)} * uHover.w * (1.0 - smoothstep(${(SKETCH_HOVER.radius * SKETCH_HOVER.inner).toFixed(4)}, ${SKETCH_HOVER.radius.toFixed(4)}, d));
+}
+`;
+
 const VERT = /* glsl */ `
 in vec2 aNormal;
 in float aSide;
@@ -76,30 +94,34 @@ in float aWidth;   // its layer's width (guides and hatching finer)
 uniform float uWidth;   // in the sketch's units
 out float vTime;
 out float vAlpha;
+out vec2 vNdc;
 void main() {
   vTime = aTime;
   vAlpha = aAlpha;
   vec3 p = vec3(position.xy + aNormal * aSide * uWidth * aWidth * 0.5, 0.0);
   gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+  vNdc = gl_Position.xy / gl_Position.w;
 }
 `;
 const FRAG = /* glsl */ `
 precision highp float;
 in float vTime;
 in float vAlpha;
+${HOVER_GLSL}
 uniform float uReveal;
 uniform float uOpacity;
 uniform vec3 uColor;
 out vec4 outColor;
 void main() {
   if (vTime > uReveal) discard;
-  outColor = vec4(uColor, uOpacity * vAlpha);
+  outColor = vec4(uColor, uOpacity * vAlpha * hoverLift());
   #include <colorspace_fragment>
 }
 `.replace("#include <colorspace_fragment>", "outColor = linearToOutputTexel(outColor);");
 const NOTE_FRAG = /* glsl */ `
 precision highp float;
 in vec2 vUv;
+${HOVER_GLSL}
 uniform sampler2D uMap;
 uniform float uReveal;
 uniform float uOpacity;
@@ -108,12 +130,13 @@ out vec4 outColor;
 void main() {
   float a = texture(uMap, vUv).a * smoothstep(uReveal * 1.15, uReveal * 1.15 - 0.15, vUv.x);   // written left to right
   if (a <= 0.001) discard;
-  outColor = linearToOutputTexel(vec4(uColor, a * uOpacity));
+  outColor = linearToOutputTexel(vec4(uColor, a * uOpacity * hoverLift()));
 }
 `;
 const TONE_FRAG = /* glsl */ `
 precision highp float;
 in vec2 vUv;
+${HOVER_GLSL}
 uniform sampler2D uMap;
 uniform float uOpacity;
 uniform vec3 uColor;
@@ -121,12 +144,13 @@ out vec4 outColor;
 void main() {
   float a = texture(uMap, vUv).a;
   if (a <= 0.001) discard;
-  outColor = linearToOutputTexel(vec4(uColor, a * uOpacity));
+  outColor = linearToOutputTexel(vec4(uColor, a * uOpacity * hoverLift()));
 }
 `;
 const NOTE_VERT = /* glsl */ `
 out vec2 vUv;
-void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+out vec2 vNdc;
+void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); vNdc = gl_Position.xy / gl_Position.w; }
 `;
 
 type Built = {
@@ -140,6 +164,10 @@ const PPU = 4;
 export class DeskSketches {
   readonly group = new THREE.Group();
   private readonly built: Built[] = [];
+  /** One uniform shared by every sketch material: the cursor, the aspect, the hover's presence. */
+  private readonly hover = { value: new THREE.Vector4(0, 0, 1, 0) };
+  private hoverK = 0;
+  private hoverAt = 0;
 
   constructor(fontFamily: string) {
     const color = new THREE.Color(SKETCH_LOOK.color);
@@ -163,7 +191,7 @@ export class DeskSketches {
       geo.setAttribute("aWidth", new THREE.Float32BufferAttribute(width, 1));
       geo.setIndex(index);
       const lines = new THREE.ShaderMaterial({ ...common, vertexShader: VERT, fragmentShader: FRAG,
-        uniforms: { uReveal: { value: 0 }, uOpacity: { value: 0 }, uColor: { value: color }, uWidth: { value: 1 } } });
+        uniforms: { uReveal: { value: 0 }, uOpacity: { value: 0 }, uColor: { value: color }, uWidth: { value: 1 }, uHover: this.hover } });
       // the tone and the notes: each drawn into a texture over the sketch's box
       const [bx, by, bw, bh] = box;
       const canvas = () => { const cv = document.createElement("canvas"); cv.width = Math.ceil(bw * PPU); cv.height = Math.ceil(bh * PPU); return cv; };
@@ -181,9 +209,9 @@ export class DeskSketches {
       }
       const texture = (cv: HTMLCanvasElement) => { const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.NoColorSpace; return t; };
       const tone = new THREE.ShaderMaterial({ ...common, vertexShader: NOTE_VERT, fragmentShader: TONE_FRAG,
-        uniforms: { uMap: { value: texture(toneCv) }, uOpacity: { value: 0 }, uColor: { value: color } } });
+        uniforms: { uMap: { value: texture(toneCv) }, uOpacity: { value: 0 }, uColor: { value: color }, uHover: this.hover } });
       const notes = new THREE.ShaderMaterial({ ...common, vertexShader: NOTE_VERT, fragmentShader: NOTE_FRAG,
-        uniforms: { uMap: { value: texture(notesCv) }, uReveal: { value: 0 }, uOpacity: { value: 0 }, uColor: { value: color } } });
+        uniforms: { uMap: { value: texture(notesCv) }, uReveal: { value: 0 }, uOpacity: { value: 0 }, uColor: { value: color }, uHover: this.hover } });
       const plane = (m: THREE.ShaderMaterial) => {
         const mesh = new THREE.Mesh(new THREE.PlaneGeometry(bw, bh), m);
         mesh.position.set(bx + bw / 2, by + bh / 2, 0);
@@ -206,6 +234,7 @@ export class DeskSketches {
   /** Placed from the tilt's last frame: each at its spot on screen, `distance` along its line of sight, facing the camera. */
   place(camera: THREE.PerspectiveCamera, distance: number, bufferHeight: number): void {
     camera.updateMatrixWorld();
+    this.hover.value.z = camera.aspect;
     const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
     for (const b of this.built) {
       const [ax, ay] = b.sketch.at;
@@ -221,8 +250,14 @@ export class DeskSketches {
     }
   }
 
-  /** Each frame: story progress `p` (screens), and the float's clock `time` (seconds). */
-  update(p: number, reduced: boolean, time = 0): void {
+  /** Each frame: story progress `p` (screens), the float's clock `time` (seconds), and the cursor (NDC; `on` only for a
+   *  mouse over the page: a finger has no hover). */
+  update(p: number, reduced: boolean, time = 0, cursor?: { x: number; y: number; on: boolean }): void {
+    const now = performance.now() / 1000, dt = Math.min(Math.max(now - (this.hoverAt || now), 0), 0.1);
+    this.hoverAt = now;
+    this.hoverK += ((cursor?.on ? 1 : 0) - this.hoverK) * (1 - Math.exp(-SKETCH_HOVER.follow * dt));
+    if (cursor) this.hover.value.set(cursor.x, cursor.y, this.hover.value.z, this.hoverK);
+    else this.hover.value.w = this.hoverK;
     this.built.forEach((b, i) => {
       const s = sketchState(p, i, reduced);
       b.place.visible = s.opacity > 0.001;

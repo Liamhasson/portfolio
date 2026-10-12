@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { SKETCH_FLOAT, SKETCH_TIMES, sketchFloat, sketchState } from "./desk-sketches";
+import { SKETCH_FLOAT, SKETCH_HOVER, SKETCH_TIMES, sketchFloat, sketchHover, sketchState } from "./desk-sketches";
 import { SKETCHES } from "./sketch-data";
 
 describe("the sketches behind the desk (Liam, 2026-10-12): drawn during the tilt, light 3D motion while drawing", () => {
@@ -64,6 +64,19 @@ describe("the sketches behind the desk (Liam, 2026-10-12): drawn during the tilt
   });
   test("reduced motion: they hold still", () => {
     expect(sketchFloat(12.3, 2, true)).toEqual({ x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 });
+  });
+  test("they stay in the background through the glide, until the camera goes into the screen (Liam, 2026-10-12)", () => {
+    for (const p of [2.6, 3.0, 3.3]) expect(sketchState(p, 1, false).opacity).toBe(1);
+    expect(sketchState(SKETCH_TIMES.gone, 1, false).opacity).toBe(0);
+    expect(SKETCH_TIMES.gone).toBeGreaterThan(3.6);
+  });
+  test("hover lifts only the part under the cursor: about double at its centre (30% → 60%), nothing past its edge", () => {
+    expect(sketchHover(0, 1)).toBeCloseTo(1 + SKETCH_HOVER.lift, 6);
+    expect(SKETCH_HOVER.lift * 0.3).toBeGreaterThanOrEqual(0.3 - 1e-9);   // (+30% or more on the 30% base)
+    expect(sketchHover(SKETCH_HOVER.radius, 1)).toBe(1);
+    expect(sketchHover(SKETCH_HOVER.radius * 0.6, 1)).toBeGreaterThan(1);
+    expect(sketchHover(SKETCH_HOVER.radius * 0.6, 1)).toBeLessThan(sketchHover(SKETCH_HOVER.radius * 0.3, 1));
+    expect(sketchHover(0, 0)).toBe(1);   // (no cursor, or a finger: as it is)
   });
 });
 
