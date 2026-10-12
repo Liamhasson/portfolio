@@ -40,3 +40,23 @@ describe("the loader's progress (spec §4): bytes 90%, the compile 10%, never ba
     vi.unstubAllGlobals();
   });
 });
+
+describe("honest from the first byte (final review I1: it latched at 90% when sand.json arrived, then froze)", () => {
+  test("declared sizes hold when a response has no Content-Length, so a small first file is a small step", async () => {
+    const p = new LoadProgress();
+    p.expect("small", 100); p.expect("big", 9900);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(new Uint8Array(100))));   // (no Content-Length: compressed)
+    await fetchTracked("/small", "small", p);
+    vi.unstubAllGlobals();
+    expect(p.value).toBeCloseTo(0.9 * 100 / 10000, 6);
+  });
+  test("the sand's files are declared at their real sizes before any byte arrives", async () => {
+    const { sandFiles } = await import("./data");
+    const meta = { parts: [{ file: "sand_0.bin", start: 0, count: 60000 }, { file: "sand_1.bin", start: 60000, count: 100000 }, { file: "sand_2.bin", start: 160000, count: 240000 }], volume: { res: [64, 48, 64] } };
+    const files = sandFiles(meta as never, 160000);
+    expect(files).toEqual([
+      ["vol_chaos.bin", 64 * 48 * 64], ["vol_mid.bin", 64 * 48 * 64], ["vol_ball.bin", 64 * 48 * 64],
+      ["sand_0.bin", 60000 * 12], ["sand_1.bin", 100000 * 12],
+    ]);
+  });
+});

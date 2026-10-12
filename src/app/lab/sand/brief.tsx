@@ -43,7 +43,7 @@ export const Brief = forwardRef<BriefHandle>(function Brief(_, ref) {
   const line = `rgb(${BRIEF.rgb})`;
   return (
     <>
-      <svg ref={svg} aria-hidden className="pointer-events-none fixed inset-0 h-full w-full" style={{ zIndex: 5 }} fill="none" stroke={line} strokeWidth={1} vectorEffect="non-scaling-stroke">
+      <svg ref={svg} aria-hidden className="pointer-events-none fixed left-0 top-0 h-screen w-screen" style={{ zIndex: 5 }} fill="none" stroke={line} strokeWidth={1} vectorEffect="non-scaling-stroke">
         <line data-brief="gh" strokeDasharray="2 4" />
         <line data-brief="gv" strokeDasharray="2 4" />
         <circle data-brief="circle" cx={0} cy={0} r={0} strokeOpacity={0.85} />

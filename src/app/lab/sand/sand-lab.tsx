@@ -91,6 +91,8 @@ export function SandLab({ hero }: { hero: boolean }) {
   const projectsRef = useRef<HTMLDivElement>(null);
   const spacerRef = useRef<HTMLDivElement>(null);
   const briefRef = useRef<BriefHandle>(null);
+  // the loader's mode, read once per instance (a StrictMode remount keeps it; the boot script's value is used up)
+  const [loaderMode] = useState(() => (hero ? readLoaderMode() : "none"));
   const bindIndex = useCallback((h: WorkIndexHandle) => { indexRef.current = h; }, []);
   const [status, setStatus] = useState("loading sand");
   // no WebGL2 (or the sand failed to load): the approved renders as stills, chaos then ball with scroll
@@ -108,9 +110,14 @@ export function SandLab({ hero }: { hero: boolean }) {
     const listeners: [string, EventListener][] = [];
     // the loader (spec 2026-10-12-loader-design.md): its mode from the boot script (page.tsx); the brief grows from first
     // paint with the hero's files, on its own frames (the stage isn't there yet)
-    const mode = hero ? readLoaderMode() : "none";
-    const playing = hero && (mode === "play" || mode === "reduced");
+    const mode = loaderMode;
+    if (mode === "play" || mode === "reduced") document.documentElement.dataset.loader = mode;   // (re-applied: a remount)
+    // a later arrival: black from the first frame, then a fade (the copy never shows over the black first)
+    if (hero && mode !== "play" && mode !== "reduced" && veilRef.current && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) veilRef.current.style.opacity = "1";
+    let playing = hero && (mode === "play" || mode === "reduced");
     const progress = new LoadProgress();
+    // the hero's other files, declared at about their sizes so none of them reads as a jump
+    for (const [id, size] of [["/lab/grain.png", 60e3], ["haze", 90e3], ["/lab/shot/camera.json", 60e3], ["wordmark-font", 110e3]] as const) progress.expect(id, size);
     let size = 0, sinceMount = 0, briefLast = performance.now(), briefOn = playing, briefRaf = 0;
     let onFullSize: (() => void) | null = null;
     let ballScreen = { cx: window.innerWidth / 2, cy: window.innerHeight / 2, r: 0 };
@@ -118,6 +125,8 @@ export function SandLab({ hero }: { hero: boolean }) {
       const dt = Math.min((now - briefLast) / 1000, 0.1);
       briefLast = now; sinceMount += dt;
       holdScroll(true);   // (each frame: the smooth scroller registers after this component mounts)
+      if (progress.value !== lastProgress) { lastProgress = progress.value; stalledFor = 0; } else stalledFor += dt;
+      if (stalledFor > 15 && progress.value < 1) { giveUp(); return; }
       size = briefSize(size, progress.value, sinceMount, dt);
       briefRef.current?.update({ ...ballScreen, r: ballScreen.r * size, alpha: 1, dash: 0, squares: Array(9).fill(1) });
       briefRef.current?.announce(progress.value);
@@ -129,6 +138,13 @@ export function SandLab({ hero }: { hero: boolean }) {
     const stopBrief = () => { briefOn = false; cancelAnimationFrame(briefRaf); };
     const fail = () => { stopBrief(); briefRef.current?.update({ ...ballScreen, alpha: 0, dash: 0, squares: Array(9).fill(1) }); releaseHold(); };
     let loaderClock: number | null = null, waitingForBrief = false, cascadeOn = false, released = false, loaderLight = 1, fadeClock: number | null = null;
+    let lastProgress = -1, stalledFor = 0;
+    // the loader gives up (a load stalled, not failed): the page is freed now, and when the hero does arrive it simply shows
+    const giveUp = () => {
+      playing = false; waitingForBrief = false; loaderClock = null; loaderLight = 1;
+      fail();
+      field?.setCascade(null); field?.setLightK(1); canvas.style.opacity = "1";
+    };
 
     (async () => {
       // the tier first: it decides how much sand to download
@@ -139,7 +155,7 @@ export function SandLab({ hero }: { hero: boolean }) {
         return;
       }
       const tier = pickTier(readSignals(probe), parseTierOverride(window.location.search));
-      const meta = await loadSandMeta(SAND_BASE, progress);
+      const meta = await loadSandMeta(SAND_BASE);   // (not counted: small, and alone it would read as most of the load)
       if (disposed) return;
       const { camera } = meta;
       stage = new Stage(
@@ -163,7 +179,8 @@ export function SandLab({ hero }: { hero: boolean }) {
         camRight.setFromMatrixColumn(cam.matrixWorld, 0).normalize();
         camUp.setFromMatrixColumn(cam.matrixWorld, 1).normalize();
         const p0 = ballAt.clone().project(cam), p1 = ballAt.clone().addScaledVector(camRight, meta.ball.radius).project(cam);
-        const W = window.innerWidth, H = window.innerHeight;
+        // (the canvas's box, 100vh: on phones the visible viewport is shorter while the URL bar shows)
+        const W = canvas.clientWidth || window.innerWidth, H = canvas.clientHeight || window.innerHeight;
         ballScreen = { cx: ((p0.x + 1) / 2) * W, cy: ((1 - p0.y) / 2) * H, r: (Math.abs(p1.x - p0.x) / 2) * W };
       };
       stage.onSettings(placeBrief);
@@ -189,7 +206,6 @@ export function SandLab({ hero }: { hero: boolean }) {
         stage.renderFrame = (r, sc, cam) => comp.render(r, sc, cam);
         // the film grade, in WebGL (film-grade-pass.ts; ?grade=0: the raw frame)
         if (gradeOn) {
-          progress.expect("/lab/grain.png", 1);
           new THREE.TextureLoader().loadAsync("/lab/grain.png").finally(() => progress.done("/lab/grain.png")).then((t) => {
             if (disposed) return;
             comp.grade = new FilmGradePass(t);
@@ -199,7 +215,6 @@ export function SandLab({ hero }: { hero: boolean }) {
         (window as unknown as { __sandFilter?: (s: number) => void }).__sandFilter = (s) => { comp.sigma = s; };
         // the hero's haze: its key lighting the air (blender/lookdev/cinematic_variants.py CINE_PLATE=1); ?haze=0: none
         if (hazeOn) {
-          progress.expect("haze", 1);
           Promise.all([
             new THREE.TextureLoader().loadAsync(`${SAND_BASE}/haze-hero.png`).finally(() => progress.done("haze")),
             fetch(`${SAND_BASE}/haze-hero.json`).then((r) => r.json() as Promise<{ scale: number }>),
@@ -210,7 +225,6 @@ export function SandLab({ hero }: { hero: boolean }) {
         }
       }
       // the story's one shot (blender/lookdev/shot_path.py), over the 3D desk
-      progress.expect(`${SHOT_BASE}/camera.json`, 1);
       const shot = hero && !compare ? await Pullback.load(SHOT_BASE, false) : null;
       progress.done(`${SHOT_BASE}/camera.json`);
       const shotMeta = shot?.data as unknown as ShotMeta | undefined;
@@ -316,7 +330,6 @@ export function SandLab({ hero }: { hero: boolean }) {
       const params = new URLSearchParams(window.location.search);
       if (params.get("wordmark") !== "0" && !compare) {
         const weight = { bold: "Bold", black: "Black", ultrablack: "UltraBlack" }[params.get("weight") ?? "black"] ?? "Black";
-        progress.expect("wordmark-font", 1);
         wordmark = await Wordmark.create(data.meta, `/lab/fonts/Geist-${weight}.ttf`);
         progress.done("wordmark-font");
         if (disposed) return;
@@ -584,7 +597,7 @@ export function SandLab({ hero }: { hero: boolean }) {
           }
           // the lean: toward the cursor, eased; out as the index takes over
           {
-            const want = pointer.active
+            const want = pointer.active && loaderClock === null && !waitingForBrief   // (waits for the loader)
               ? new THREE.Vector2(Math.min(Math.max((pointer.x / W) * 2 - 1, -1), 1), Math.min(Math.max(1 - (pointer.y / H) * 2, -1), 1))
               : new THREE.Vector2();
             lean.lerp(reduced || calibrating ? new THREE.Vector2() : want, 1 - Math.exp(-LEAN_DAMP * dt));
@@ -843,7 +856,7 @@ export function SandLab({ hero }: { hero: boolean }) {
       if (!playing) loadDesk().catch(() => {});
       if (playing) {
         await new Promise<void>((res) => { if (size >= 0.999) res(); else onFullSize = res; });
-        if (disposed) return;
+        if (disposed || !playing) return;
         stopBrief();
         placeBrief();
         waitingForBrief = false;
@@ -862,6 +875,7 @@ export function SandLab({ hero }: { hero: boolean }) {
         });
       }
     })().catch((err) => {
+      if (disposed) return;   // (a disposed instance, e.g. StrictMode's first mount: the live one owns the hold)
       setStatus(String(err));
       setFallback(true);
       fail();
@@ -870,6 +884,7 @@ export function SandLab({ hero }: { hero: boolean }) {
     return () => {
       disposed = true;
       stopBrief();
+      if (playing && !released) releaseHold();   // (never leave the next page locked)
       for (const [type, fn] of listeners) {
         if (type === "__leave") document.documentElement.removeEventListener("mouseleave", fn);
         else window.removeEventListener(type, fn);
@@ -879,7 +894,7 @@ export function SandLab({ hero }: { hero: boolean }) {
       field?.dispose();
       stage?.dispose();
     };
-  }, [compare, hero, gradeOn]);
+  }, [compare, hero, gradeOn, loaderMode]);
 
   useEffect(() => {
     if (!fallback) return;

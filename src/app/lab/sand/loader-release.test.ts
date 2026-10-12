@@ -22,3 +22,10 @@ test("the copy arrives before the release: shown, scrolling still held", async (
   releaseHold();
   expect(document.documentElement.dataset.loader).toBeUndefined();
 });
+
+test("while held, the hidden nav and copy are out of reach: not focusable, not read (final review I7)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const css = readFileSync("src/app/globals.css", "utf8");
+  const rule = css.slice(css.indexOf('html[data-loader="play"] .sh-nav'));
+  expect(rule.slice(0, rule.indexOf("}"))).toMatch(/visibility:\s*hidden/);
+});

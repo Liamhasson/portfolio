@@ -66,9 +66,10 @@ export async function loadSandMeta(base = SAND_BASE, progress: LoadProgress | nu
 export async function loadSandParts(meta: SandMeta, grains: number, base = SAND_BASE, progress: LoadProgress | null = null): Promise<SandData> {
   const parts = meta.parts.filter((p) => p.start < grains);
   const n = parts.reduce((s, p) => s + p.count, 0);
-  const files = ["vol_chaos.bin", "vol_mid.bin", "vol_ball.bin", ...parts.map((p) => p.file)];
-  // (declared up front, so the progress knows the whole before the first byte)
-  files.forEach((f) => progress?.expect(`${base}/${f}`, 1));
+  // (declared up front at their real sizes, so the progress knows the whole before the first byte)
+  const declared = sandFiles(meta, grains);
+  declared.forEach(([f, size]) => progress?.expect(`${base}/${f}`, size));
+  const files = declared.map(([f]) => f);
   const [chaos, mid, ball, ...partBufs] = await Promise.all(files.map((f) => bytes(`${base}/${f}`, progress)));
   const words = new Uint32Array(n * 2);
   const attributes = new Uint8Array(n * 4);
@@ -84,6 +85,16 @@ export async function loadSandParts(meta: SandMeta, grains: number, base = SAND_
       ball: volumeTexture(new Uint8Array(ball), meta.volume.res),
     },
   };
+}
+
+/** The sand's files for `grains` and their sizes in bytes: the three volumes (a byte a voxel), then each part (12 bytes
+ *  a grain: two packed words, four attribute bytes). */
+export function sandFiles(meta: Pick<SandMeta, "parts" | "volume">, grains: number): [string, number][] {
+  const [w, h, d] = meta.volume.res, vol = w * h * d;
+  return [
+    ["vol_chaos.bin", vol], ["vol_mid.bin", vol], ["vol_ball.bin", vol],
+    ...meta.parts.filter((p) => p.start < grains).map((p) => [p.file, p.count * 12] as [string, number]),
+  ];
 }
 
 /** Loads the sand: only the parts needed to draw `grains` (the tier's count), and the density volumes. */

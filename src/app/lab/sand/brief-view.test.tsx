@@ -26,3 +26,11 @@ test("dissolving: the circle breaks into dashes and the squares shrink away", ()
   expect(container.querySelector("circle[data-brief='circle']")!.getAttribute("stroke-dasharray")).not.toBe("none");
   expect(container.querySelectorAll("rect[data-brief='anchor']")[0].getAttribute("width")).toBe("0");
 });
+
+test("the brief spans the canvas's box (100vh), not the visible viewport: on phones with the URL bar showing it stays on the ball (final review I3)", () => {
+  const { container } = render(<Brief />);
+  const cls = container.querySelector("svg")!.getAttribute("class")!;
+  expect(cls).toMatch(/\bh-screen\b/);
+  expect(cls).toMatch(/\bw-screen\b/);
+  expect(cls).not.toMatch(/\bh-full\b/);
+});

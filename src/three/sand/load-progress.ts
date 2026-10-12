@@ -13,6 +13,8 @@ export class LoadProgress {
   expect(id: string, bytes: number): void { this.total.set(id, Math.max(bytes, 1)); if (!this.got.has(id)) this.got.set(id, 0); this.emit(); }
   add(id: string, bytes: number): void { this.got.set(id, (this.got.get(id) ?? 0) + bytes); this.emit(); }
   done(id: string): void { const t = this.total.get(id) ?? Math.max(this.got.get(id) ?? 1, 1); this.total.set(id, t); this.got.set(id, t); this.emit(); }
+  /** Whether a file is declared (its size known). */
+  has(id: string): boolean { return this.total.has(id); }
   compile(f: number): void { this.compiled = Math.min(Math.max(f, this.compiled), 1); this.emit(); }
 
   get value(): number { return this.shown; }
@@ -31,7 +33,8 @@ export async function fetchTracked(url: string, id: string, progress: LoadProgre
   const res = await fetch(url);
   if (!res.ok) throw new Error(`loader: ${url} ${res.status}`);
   const len = Number(res.headers.get("Content-Length")) || 0;
-  if (progress) progress.expect(id, len || 1);
+  // (a size declared up front holds: a compressed response's Content-Length is not its body's)
+  if (progress && !progress.has(id)) progress.expect(id, len || 1);
   if (!res.body || !progress) { const buf = await res.arrayBuffer(); progress?.done(id); return new Response(buf, { headers: res.headers }); }
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
