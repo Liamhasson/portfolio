@@ -79,6 +79,8 @@ const CSS = `
 .wl .more { margin-top:32px; padding-top:14px; border-top:1px solid var(--rule); display:flex; gap:8px; font:400 10px/1 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; color:var(--dim); }
 .np-index { font-size: 1.15cqw; margin: 0 4cqw; }
 .np-index-list { font-size: 15px; margin: 0 20px; }
+.wl.wl-static { position:relative; inset:auto; overflow:visible; min-height:100vh; }
+@media (min-width: 768px) { .wl.wl-static .grid { grid-template-columns:1fr 1fr; gap:48px 4vw; } .wl.wl-static .np-index-list { margin:0; } }
 `;
 
 function Media({ c, playing }: { c: (typeof CARDS)[number]; playing: boolean }) {
@@ -245,6 +247,21 @@ export function WorkIndex({ bind }: { bind: (h: WorkIndexHandle) => void }) {
         <h2 className="title" style={{ opacity: 0 }}>Selected work</h2>
         <Cards playing={playing.list} itemRef={(el, i) => { listItems.current[i] = el; if (el && !el.style.opacity) el.style.opacity = "0"; }} />
         <NextPagePull href="/about" label="About" line="Keep scrolling" className="np-index np-index-list" active={playing.list} />
+      </section>
+    </>
+  );
+}
+
+/** Without WebGL (or after a scene error) the story has no index to fly into: the same cards as a plain page, still with
+ *  the pull on to About (pre-launch audit, 2026-10-12). The stills don't play. */
+export function WorkList() {
+  return (
+    <>
+      <style>{CSS}</style>
+      <section className="wl wl-static" aria-label="Selected work">
+        <h2 className="title">Selected work</h2>
+        <Cards playing={false} />
+        <NextPagePull href="/about" label="About" line="Keep scrolling" className="np-index np-index-list" />
       </section>
     </>
   );

@@ -15,8 +15,9 @@ export function loaderMode({ hash, reduced, replay = false }: { hash: string; re
   return reduced ? "reduced" : "play";
 }
 
-/** Runs inline before first paint (page.tsx): the nav and copy stay hidden, and scrolling locked, from the first frame. */
-export const LOADER_BOOT = `(function(){try{var deep=${JSON.stringify(DEEP)}.indexOf(location.hash)>=0;var replay=new URLSearchParams(location.search).has("loader");var r=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;var m=(!replay&&deep)?"fade":(r?"reduced":"play");window.__loaderMode=m;document.documentElement.dataset.loader=m}catch(e){}})();`;
+/** Runs inline before first paint (page.tsx): the nav and copy stay hidden, and scrolling locked, from the first frame.
+ *  Its safety net: if the story never starts (its code failed to load), the page is released after 20 s. */
+export const LOADER_BOOT = `(function(){try{var deep=${JSON.stringify(DEEP)}.indexOf(location.hash)>=0;var replay=new URLSearchParams(location.search).has("loader");var r=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;var m=(!replay&&deep)?"fade":(r?"reduced":"play");window.__loaderMode=m;document.documentElement.dataset.loader=m;setTimeout(function(){if(!window.__storyMounted)delete document.documentElement.dataset.loader},20000)}catch(e){}})();`;
 
 /**
  * The mode the boot script chose, read once by the story. Kept in a value React can't touch: a browser extension that

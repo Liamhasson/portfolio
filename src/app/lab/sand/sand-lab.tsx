@@ -6,7 +6,7 @@ import { loadSandMeta, loadSandParts, SAND_BASE } from "@/three/sand/data";
 import { CURSOR_WARM, SAND_LOOK, SandField, type SandState } from "@/three/sand/sand-field";
 import { PaintField } from "@/three/sand/paint";
 import { HeroOverlay } from "./hero-overlay";
-import { WorkIndex, type WorkIndexHandle } from "./work-index";
+import { WorkIndex, WorkList, type WorkIndexHandle } from "./work-index";
 import { BakedDesk } from "@/three/sand/baked-desk";
 import { revealAt } from "@/three/sand/screen-reveal";
 import { DriftGrains } from "@/three/sand/drift-grains";
@@ -70,6 +70,10 @@ function damp(current: number, target: number, lambda: number, dt: number): numb
   return current + (target - current) * (1 - Math.exp(-lambda * dt));
 }
 
+/** The fallback's hero (no WebGL): its copy leaves over the first 0.6 screen of scroll, the cue as soon as it moves. */
+const fallbackExit = () => Math.min(window.scrollY / (window.innerHeight * 0.6), 1);
+const fallbackScrolled = () => window.scrollY / Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+
 export function SandLab({ hero }: { hero: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [compare] = useState<CompareTarget | null>(() => {
@@ -111,6 +115,7 @@ export function SandLab({ hero }: { hero: boolean }) {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    (window as unknown as { __storyMounted?: boolean }).__storyMounted = true;   // (the boot script's safety net stands down)
     let disposed = false;
     let stage: Stage | null = null;
     let field: SandField | null = null;
@@ -891,12 +896,37 @@ export function SandLab({ hero }: { hero: boolean }) {
     if (!fallback) return;
     const onScroll = () => {
       const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
-      setStillBall(window.scrollY / max > 0.5);
+      // the story: the ball once the hero's copy has left; the lab: halfway down
+      setStillBall(hero ? window.scrollY > window.innerHeight * 0.5 : window.scrollY / max > 0.5);
     };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, [fallback]);
+  }, [fallback, hero]);
+
+  if (fallback && !compare && hero) {
+    // no WebGL or a scene error (pre-launch audit, 2026-10-12): the same story told in stills, chaos then the ball, under
+    // the hero's copy, then the work as a plain page: every project and the pull to About still there
+    return (
+      <div className="relative bg-black" data-testid="sand-fallback">
+        {(["chaos", "ball"] as const).map((k) => (
+          // eslint-disable-next-line @next/next/no-img-element -- the fallback's stills
+          <img
+            key={k}
+            src={`${SAND_BASE}/targets/${k}.jpg`}
+            alt=""
+            className="fixed inset-0 h-screen w-screen object-cover transition-opacity duration-700"
+            style={{ opacity: (k === "ball") === stillBall ? 1 : 0 }}
+          />
+        ))}
+        <HeroOverlay exit={fallbackExit} scrolled={fallbackScrolled} />
+        <div aria-hidden style={{ height: "200vh" }} />
+        <div id="projects" className="relative z-20 bg-black">
+          <WorkList />
+        </div>
+      </div>
+    );
+  }
 
   if (fallback && !compare) {
     return (
