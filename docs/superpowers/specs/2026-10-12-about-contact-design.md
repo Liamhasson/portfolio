@@ -14,7 +14,7 @@ Geist and Geist Mono, the motion is ours, the quality bar of Lusion and Oryzo.
 - **World:** past the index the camera goes forward, **through the screen**, into the dark with the sand. At Contact the
   sand gathers into the ball once more and the loader's brief is drawn around it: the site opens with a brief and ends
   asking for the next one.
-- **About carries:** the approved text (`docs/copy/about.md`), a portrait, the six skills, a resume link.
+- **About carries:** the approved text (`docs/copy/about.md`), a portrait, what Liam does (§2.2.5), a resume link.
 - **The quotes:** on About's sideways track, as the proof right after "That's still how I work…". No heading. Built for
   2 to 4 quotes (Emil's, from Nordic Logic, comes later: a content change only).
 - **Contact:** "Got something on your mind?", then Email (copies on click), LinkedIn, Phone. No location line.
@@ -34,7 +34,7 @@ The story's timeline (`story-timeline.ts`) runs on past the index: today it ends
   The switch from the laptop's camera to the void's camera happens while the sand fills the frame, so it never shows.
 - Scroll-driven and reversible: scrolling back closes the screen and the index returns.
 
-### 2.2 About (~3 screens)
+### 2.2 About (~3.5 screens)
 
 A pinned section. A horizontal track moves right to left with scroll (scrubbed, eased, never on its own clock). On the
 track, in order:
@@ -47,14 +47,37 @@ track, in order:
 4. The quotes, one slide each, in this order: Yoav Rotem (CTO, Cyvore), Andrada Popan-Dorca (UX Mentor, CareerFoundry),
    later Emil (Nordic Logic). The quote large, with an opening quote mark hung in the margin; the name and role below
    in Geist Mono caps.
-5. **What I do:** a Geist Mono label, then the six skills in two columns, each with a small hollow square (the brief's
-   anchor): Market research, User research, Streamlining workflows, Design systems, Interaction design, Rapid
-   prototyping. Below, a **View resume ↗** pill in the nav's style (opens the PDF in a new tab).
+5. **What I do** (Liam, 2026-10-12: grouped under his own three verbs, each skill with its proof, nothing he hasn't
+   shown). An opening line, *"End to end, from the problem to the shipped product"* (links to Eventread), then one slide
+   per verb. Each skill: its name, and one short proof line in the darker tone that links to its case study.
+   - **Find the problem:** User research (*Pulse: what 5 of 6 testers expected reshaped the onboarding*) · Market &
+     competitor research (*Eventread: Prism.fm, TourSmart, ChatGPT each answer part; none checks the whole night*) ·
+     Information architecture (*Cyvore: finding a section, 35s → 8s*).
+   - **Check I'm right:** Usability testing (*Pulse round 2: 6 of 6 completed every task*) · Data-informed decisions
+     (*Eventread: risk bands checked on 3,172 real listings*) · Stakeholder communication (*Cyvore: argued for a
+     7-second animation over the full video; it shipped*).
+   - **Build it:** Interaction & motion (*Cyvore: the mission animation, the CTA's states*) · Design systems
+     (*Eventread: one type family, three risk colours, a CI test*) · Web design (*Cyvore's investor site, and this one*)
+     · Branding (*Pulse: the brand and its promise*) · Prototyping in code (*Eventread: built and shipped in Next.js*)
+     · 3D modeling (*this site: the desk and the laptop, modelled and lit in Blender*; links nowhere).
+
+   Then a **View resume ↗** pill in the nav's style (opens the PDF in a new tab).
 6. "If you're working on something that really matters to people, I'd like to hear about it." As it leaves, the sand
    begins to gather (2.3).
 
-**Type:** Liam's sentences in Geist 400 at the display size (about 4vw, line height 1.15), emphasis in italic at lower
-opacity (the Lusion setting chosen for the site). Quotes slightly smaller (about 3.1vw).
+**Type:** Liam's sentences in Geist 400 at the display size (about 4vw, line height 1.15), in **two colours** (Liam,
+2026-10-12): the important part of each sentence in the near-white, the rest in the darker tone; no italic. Quotes
+slightly smaller (about 3.1vw), same two colours. The highlights:
+
+| Sentence | In white |
+|---|---|
+| 1 | "I'm Liam. I love crafting products" |
+| 2 | "ten years managing two rock bands" … "making something out of nothing" |
+| 3 | "That's still how I work." … "problems nobody pointed at" |
+| Yoav's quote | "we closed our first funding round." |
+| 6 | "I'd like to hear about it." |
+
+Andrada's and Emil's highlights are chosen with Liam when their quotes arrive.
 
 **The portrait:** right of the track, about 21vw wide, 4:5, holding still while the words pass on the left (the track is
 clipped before it). Graded into the scene: warm, dark, matched to the sand's palette. In with the first sentence, out
