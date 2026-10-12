@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { CASCADE, cascadeEnd } from "./cascade";
+import { cascadeEnd } from "./cascade";
 import { PARALLAX } from "./parallax";
 import type { SandData } from "./data";
 import { SAND_FRAGMENT, SAND_VERTEX } from "./shaders";
@@ -405,13 +405,12 @@ export class SandField {
     const u = this.material.uniforms;
     if (anchors) anchors.forEach((a, i) => (u.uAnchors.value[i] as THREE.Vector3).copy(a));
     if (clock === null) { (u.uCascade.value as THREE.Vector3).set(0, 0, 1); return; }
-    const settle = Math.min(Math.max((clock - cascadeEnd(this.drawn())) / CASCADE.settle, 0), 1);
-    (u.uCascade.value as THREE.Vector3).set(clock, 1, settle * settle * (3 - 2 * settle));
+    (u.uCascade.value as THREE.Vector3).set(clock, 1, 1);
     (u.uMotionBlur.value as THREE.Vector2).x = 0;   // (no streaks while it runs: its paths aren't the blur's)
   }
 
   cascadeDone(clock: number): boolean {
-    return clock >= cascadeEnd(this.drawn()) + CASCADE.settle;
+    return clock >= cascadeEnd(this.drawn());   // (every grain home, already in the vortex's motion: no settle)
   }
 
   /** The loader's light coming up: the sand's radiance scaled (0.35 .. 1). */

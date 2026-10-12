@@ -7,9 +7,10 @@ describe("the brief (spec §2.2, §2.4)", () => {
     const s = briefShapes(400, 300, 100);
     expect(s.anchors).toEqual([[400, 300], [400, 200], [500, 300], [400, 400], [300, 300], [300, 200], [500, 200], [500, 400], [300, 400]]);
     expect(s.box).toEqual({ x: 300, y: 200, s: 200 });
-    const [x1, y1, x2, y2] = s.handles[0];   // the top anchor's tangent
-    expect(y1).toBe(200); expect(y2).toBe(200);
-    expect(x2 - x1).toBeCloseTo(2 * BRIEF.handle * 100, 6);
+    // the top anchor's tangent: the two corners' handles that meet there, together 2 x 0.5523 r along the top edge
+    const top = s.handles.filter(([, y1, , y2]) => y1 === 200 && y2 === 200);
+    expect(top).toHaveLength(2);
+    expect(top.reduce((w, [x1, , x2]) => w + Math.abs(x2 - x1), 0)).toBeCloseTo(2 * BRIEF.handle * 100, 6);
   });
   test("it scales with the viewport (a resize mid-load re-projects it)", () => {
     const a = briefShapes(400, 300, 100), b = briefShapes(800, 600, 200);
@@ -33,5 +34,23 @@ describe("the brief (spec §2.2, §2.4)", () => {
     expect(briefReturn(0.75)).toBe(0);
     expect(briefReturn(0.88)).toBe(1);
     expect(briefReturn(1)).toBe(0);
+  });
+});
+
+describe("the square that rounds into a circle (Liam, 2026-10-12): a designer's corner radius, dragged from 0 to the full", () => {
+  test("at 0 it is the square: its path runs through the box's corners", () => {
+    const s = briefShapes(400, 300, 100, 0);
+    for (const [x, y] of [[300, 200], [500, 200], [500, 400], [300, 400]]) expect(s.path).toContain(`${x} ${y}`);
+  });
+  test("at 1 it is the circle: the eight corner ends meet in pairs at the edges' midpoints, the handles 0.5523 r", () => {
+    const s = briefShapes(400, 300, 100, 1);
+    const mids = [[400, 200], [500, 300], [400, 400], [300, 300]];
+    for (const [x, y] of s.ends) expect(mids.some(([mx, my]) => Math.hypot(x - mx, y - my) < 1e-9)).toBe(true);
+    for (const [x1, y1, x2, y2] of s.handles) expect(Math.hypot(x2 - x1, y2 - y1)).toBeCloseTo(BRIEF.handle * 100, 6);
+  });
+  test("in between, the corners open smoothly: each end moves along its edge as the radius grows", () => {
+    const a = briefShapes(400, 300, 100, 0.25), b = briefShapes(400, 300, 100, 0.5);
+    expect(b.ends[0][0]).toBeGreaterThan(a.ends[0][0]);   // (the top-left corner's top end moves right, toward the midpoint)
+    expect(b.ends[0]).toEqual([300 + 50, 200]);
   });
 });

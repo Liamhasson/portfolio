@@ -128,7 +128,7 @@ export function SandLab({ hero }: { hero: boolean }) {
       if (progress.value !== lastProgress) { lastProgress = progress.value; stalledFor = 0; } else stalledFor += dt;
       if (stalledFor > 15 && progress.value < 1) { giveUp(); return; }
       size = briefSize(size, progress.value, sinceMount, dt);
-      briefRef.current?.update({ ...ballScreen, r: ballScreen.r * size, alpha: 1, dash: 0, squares: Array(9).fill(1) });
+      briefRef.current?.update({ ...ballScreen, r: ballScreen.r * size, alpha: 1, dash: 0, squares: Array(9).fill(1), round: 0 });   // (the square grows)
       briefRef.current?.announce(progress.value);
       if (size >= 0.999 && onFullSize) { const f = onFullSize; onFullSize = null; f(); }
       if (briefOn) briefRaf = requestAnimationFrame(briefLoop);
@@ -500,7 +500,7 @@ export function SandLab({ hero }: { hero: boolean }) {
           loaderClock += dt;
           const L = loaderAt(loaderClock);
           if (cascadeOn) {
-            briefRef.current?.update({ ...ballScreen, alpha: L.briefAlpha, dash: L.dash, squares: L.squares });
+            briefRef.current?.update({ ...ballScreen, alpha: L.briefAlpha, dash: L.dash, squares: L.squares, round: L.round });   // (its corners round, then its points become sand)
             field!.setLightK(L.lightK);
             loaderLight = L.light;
             if (L.copy > 0) showCopy();
@@ -824,8 +824,9 @@ export function SandLab({ hero }: { hero: boolean }) {
         field!.update(state);
         if (waitingForBrief) field!.setCascade(-1);   // (nothing born yet: the brief is still growing)
         else if (loaderClock !== null && cascadeOn) {
-          field!.setCascade(loaderClock);
-          if (field!.cascadeDone(loaderClock)) { field!.setCascade(null); loaderClock = null; }
+          // (the cascade's clock starts as the circle closes: nothing is born while the square rounds)
+          field!.setCascade(loaderClock - LOADER.round);
+          if (field!.cascadeDone(loaderClock - LOADER.round)) { field!.setCascade(null); loaderClock = null; }
         }
         // the brief returns for a beat as the ball locks in (spec §2.4)
         if (hero && !reduced && loaderClock === null && !waitingForBrief) {

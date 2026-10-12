@@ -207,7 +207,7 @@ float hash(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 4
 ${SWIRL_GLSL}
 ${PARALLAX_GLSL}
 uniform highp usampler2D uRestWords;   // every grain's packed chaos word (the cascade reads its ancestors')
-uniform vec3 uCascade;                 // x: seconds since 100% (the loader), y: 1 while it runs, z: the hero's own motion (0..1, the settle)
+uniform vec3 uCascade;                 // x: seconds since 100% (the loader), y: 1 while it runs
 vec3 cascadeRest(int i) {
   int w = textureSize(uRestWords, 0).x;
   uint word = texelFetch(uRestWords, ivec2(i - (i / w) * w, i / w), 0).r;
@@ -247,6 +247,15 @@ void main() {
   // the chaos turns around itself; the ball spins; between them, the flow
   float t;
   vec3 p = pathAt(A, B - uBallC, uCompact, uBallC, uBallRot, uChaosRot, t);
+  // the loader's cascade (cascade.ts): while it runs the grain is where its lineage has carried it, and the hero's own
+  // motion (the drift, the flow, the vortex) acts on it from there: it flies inside the vortex and builds it as it arrives
+  // (Liam, 2026-10-12: they formed the plain cloud first, the vortex blended in after)
+  float caSize = 1.0;
+  if (uCascade.y > 0.5) {
+    vec4 ca = cascadeAt(gl_VertexID, uCascade.x);
+    p = ca.xyz;
+    caSize = ca.w;
+  }
   // ambient flow: slow, small; calmer once compacted
   float amp = uDrift * mix(1.0, 0.35, t);
   vec3 q = p * uDriftFreq + vec3(0.0, 0.0, uTime * uDriftSpeed);
@@ -268,15 +277,6 @@ void main() {
     swSize = mix(1.0, sw.w, swK);
   }
   p += swirl;
-  // the loader's cascade (cascade.ts): while it runs the grain is where its lineage has carried it; the hero's own motion
-  // (drift, flow, swirl, all of them offsets from the rest spot) comes back over the settle
-  float caSize = 1.0;
-  if (uCascade.y > 0.5) {
-    vec4 ca = cascadeAt(gl_VertexID, uCascade.x);
-    vec3 heroOff = p - (uChaosC + uChaosShift + uChaosRot * (A - uChaosC));
-    p = ca.xyz + heroOff * uCascade.z;
-    caSize = ca.w;
-  }
   // the same grain a frame ago, for its blur (only on a frame where something moved it: uMotionBlur.x is 0 otherwise);
   // the slow ambient drift barely moves in a frame, so it rides along as it is now
   vec3 pMoved = p, pPrev = p;
