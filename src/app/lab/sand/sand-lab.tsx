@@ -847,6 +847,8 @@ export function SandLab({ hero }: { hero: boolean }) {
         placeBrief();
         waitingForBrief = false;
         cascadeOn = mode === "play";
+        // (reduced motion: no cascade; every grain is home at once, the hero crossfades in)
+        if (!cascadeOn) field.setCascade(null);
         loaderClock = 0;
       }
       // arriving with a section's hash (the nav from a case study, a shared link): the anchor didn't exist when the browser
