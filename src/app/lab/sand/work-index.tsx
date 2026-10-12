@@ -14,7 +14,6 @@ import { useEffect, useId, useRef, useState } from "react";
 import { matrix3d, type Pt } from "@/three/sand/homography";
 import { holdLoop, loopVideo } from "@/three/sand/card-loops";
 import { NextPagePull } from "@/components/shell/next-page-pull";
-import { ABOUT, plain } from "@/content/about";
 
 /** The projects (copy and tags from the approved plan and the current portfolio). The three finished ones open their
  *  case studies; Nordic Logic is in progress (a still, not a link). */
@@ -237,14 +236,15 @@ export function WorkIndex({ bind }: { bind: (h: WorkIndexHandle) => void }) {
             <h2 className="title">Selected work</h2>
           </div>
           <Cards playing={playing.wide} />
-          {/* past the last project, About peeks in: the pull to its page (spec 2026-10-12-about-contact-design.md §2) */}
-          <NextPagePull href="/about" label="About" line={plain(ABOUT.lines[0])} className="np-index" active={playing.wide} />
+          {/* past the last project, About peeks in: the pull to its page (spec 2026-10-12-about-contact-design.md §2; its
+              line "Keep scrolling", Liam 2026-10-12) */}
+          <NextPagePull href="/about" label="About" line="Keep scrolling" className="np-index" active={playing.wide} />
         </div>
       </section>
       <section ref={listEl} className="wl z-[7]" style={{ visibility: "hidden", pointerEvents: "none" }} aria-label="Selected work">
         <h2 className="title" style={{ opacity: 0 }}>Selected work</h2>
         <Cards playing={playing.list} itemRef={(el, i) => { listItems.current[i] = el; if (el && !el.style.opacity) el.style.opacity = "0"; }} />
-        <NextPagePull href="/about" label="About" line={plain(ABOUT.lines[0])} className="np-index np-index-list" active={playing.list} />
+        <NextPagePull href="/about" label="About" line="Keep scrolling" className="np-index np-index-list" active={playing.list} />
       </section>
     </>
   );

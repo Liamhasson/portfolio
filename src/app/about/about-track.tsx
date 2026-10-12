@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { NextPagePull } from "@/components/shell/next-page-pull";
-import { ABOUT, CONTACT, type Line } from "@/content/about";
+import { ABOUT, type Line } from "@/content/about";
 import { sectionHeight, trackLayout, trackProgress, trackX } from "./track";
 import "./about.css";
 
@@ -87,7 +87,7 @@ export function AboutTrack() {
         </div>
       </section>
       <div className="ab-end">
-        <NextPagePull href="/contact" label="Contact" line={CONTACT.headline} />
+        <NextPagePull href="/contact" label="Contact" line="Keep scrolling" />
       </div>
     </>
   );

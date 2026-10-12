@@ -51,4 +51,5 @@ test("the resume opens in a new tab, safely; the pull leads to Contact", () => {
   expect(cv).toHaveAttribute("target", "_blank");
   expect(cv).toHaveAttribute("rel", "noopener noreferrer");
   expect(screen.getByRole("link", { name: "Next: Contact" })).toHaveAttribute("href", "/contact");
+  expect(screen.getByRole("link", { name: "Next: Contact" })).toHaveTextContent("Keep scrolling");   // (Liam, 2026-10-12)
 });
