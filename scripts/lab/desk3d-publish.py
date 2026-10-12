@@ -10,7 +10,11 @@ for f in glob.glob(os.path.join(DST, "bake_*")):
     os.remove(f)
 states = {s: json.load(open(os.path.join(SRC, s, "desk.json"))) for s in ("shut", "open", "lit")}
 shut, opn, lit = states["shut"], states["open"], states["lit"]
-shutil.copy(os.path.join(SRC, "open", "desk.glb"), DST)
+# the model, meshopt-compressed (9.8 MB -> ~1 MB; pre-launch audit 2026-10-12). -kv keeps the UVs and tangents (the GLB has
+# no materials, so gltfpack would drop them as unused); float positions and UVs keep the parts' own nodes and need no
+# texture transform (the site builds its own materials); 16 bits: within 10 um, 0.03 texel (src/three/sand/desk-files.test.ts)
+subprocess.run(["npx", "gltfpack", "-i", os.path.join(SRC, "open", "desk.glb"), "-o", os.path.join(DST, "desk.glb"),
+                "-cc", "-kn", "-km", "-ke", "-kv", "-vpf", "-vp", "16", "-vtf", "-vt", "16", "-vn", "12"], check=True)
 shutil.copy(os.path.join(SRC, "shut", "probe.exr"), DST)   # the room without the lights (the lights are real)
 if os.path.exists(os.path.join(DST, "probe_lit.exr")):
     os.remove(os.path.join(DST, "probe_lit.exr"))

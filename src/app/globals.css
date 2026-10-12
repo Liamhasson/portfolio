@@ -81,6 +81,8 @@ html.lenis body {
 
 /* the loader's hold (src/app/lab/sand/loader-mode.ts): the nav and the hero's copy wait, scrolling is locked */
 html[data-loader="play"], html[data-loader="reduced"], html[data-loader="arriving"] { overflow: hidden; }
+/* the story waiting for the desk, on touch (no smooth scroller to hold the wall): sand-lab.tsx */
+html[data-desk-wait] { overflow: hidden; }
 html[data-loader="play"] .sh-nav, html[data-loader="reduced"] .sh-nav,
 html[data-loader="play"] .sh-name, html[data-loader="reduced"] .sh-name,
 html[data-loader="play"] .sh-burger, html[data-loader="reduced"] .sh-burger,

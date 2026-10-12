@@ -7,7 +7,7 @@ export function shouldUseSmoothScroll(matches: MediaMatcher): boolean {
 
 /** The page's smooth scroller (Lenis), when there is one: the provider registers it. */
 interface Scroller {
-  scrollTo(target: number, options: { duration: number; lock: boolean; onComplete: () => void; easing?: (t: number) => number }): void;
+  scrollTo(target: number, options: { duration?: number; lock?: boolean; onComplete?: () => void; easing?: (t: number) => number; immediate?: boolean; force?: boolean }): void;
   stop?(): void;
   start?(): void;
 }
@@ -35,4 +35,12 @@ export function glideTo(y: number, seconds: number, done: () => void, instant = 
 /** The loader's hold on scrolling: the smooth scroller stopped (keys and wheel), released at the unlock. */
 export function holdScroll(on: boolean): void {
   if (on) scroller?.stop?.(); else scroller?.start?.();
+}
+
+/** A wall at `y` (px), for this frame: below it, the page is set back to it at once (the story's wait for the desk);
+ *  above it, nothing, so scrolling back up stays free. */
+export function wallAt(y: number): void {
+  if (window.scrollY <= y + 1) return;
+  if (scroller) scroller.scrollTo(y, { immediate: true, force: true });
+  else window.scrollTo({ top: y, behavior: "instant" });
 }

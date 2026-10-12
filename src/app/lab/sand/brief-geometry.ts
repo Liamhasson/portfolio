@@ -5,7 +5,7 @@ import { BEATS } from "@/three/sand/story-timeline";
  * ball's projected centre and radius. It grows from nothing as the hero's files load (dragged out from its centre, as in
  * a design tool), and returns for a beat as the ball locks in on scroll. Screen px.
  */
-export const BRIEF = { handle: 0.5523, square: 5, dot: 1.6, rgb: "230, 191, 174", guide: 0.3, minGrow: 1.2 } as const;
+export const BRIEF = { handle: 0.5523, square: 5, dot: 1.6, rgb: "230, 191, 174", guide: 0.3, minGrow: 1.2, waitGap: 18 } as const;
 
 export type BriefShapes = {
   cx: number; cy: number; r: number;

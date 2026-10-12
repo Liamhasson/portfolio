@@ -45,3 +45,22 @@ test("without one (touch, reduced motion), the browser's own scroll: smooth, or 
   expect(seen[1]).toEqual({ top: 600, behavior: "instant" });
   expect(done).toBe(1);   // the instant one is done at once; the smooth one when it lands (the caller watches)
 });
+
+test("a wall (the story's wait for the desk): below it, the page is set back to it at once; above it, nothing (pre-launch audit)", async () => {
+  const { registerScroller, wallAt } = await import("./smooth-scroll");
+  const calls: [number, object][] = [];
+  const off = registerScroller({ scrollTo: (y, o) => calls.push([y, o]) });
+  Object.defineProperty(window, "scrollY", { value: 900, configurable: true });
+  wallAt(800);
+  expect(calls).toEqual([[800, expect.objectContaining({ immediate: true, force: true })]]);
+  wallAt(1000);
+  expect(calls).toHaveLength(1);
+  off();
+  const seen: ScrollToOptions[] = [];
+  const orig = window.scrollTo;
+  window.scrollTo = ((o: ScrollToOptions) => { seen.push(o); }) as typeof window.scrollTo;
+  wallAt(800);
+  window.scrollTo = orig;
+  expect(seen).toEqual([{ top: 800, behavior: "instant" }]);
+  Object.defineProperty(window, "scrollY", { value: 0, configurable: true });
+});

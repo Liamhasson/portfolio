@@ -1,6 +1,6 @@
 // src/three/sand/story-timeline.test.ts
 import { describe, expect, test } from "vitest";
-import { BEATS, SCREEN_HOLD, SNAP_FROM, STORY_SCREENS, ease, pAtFrame, reducedStory, shotFrame, snapIn, span, storyProgress, type ShotBeats } from "./story-timeline";
+import { BEATS, DESK_WAIT, SCREEN_HOLD, SNAP_FROM, STORY_SCREENS, deskWait, ease, pAtFrame, reducedStory, shotFrame, snapIn, span, storyProgress, type ShotBeats } from "./story-timeline";
 
 const SHOT: ShotBeats = { ease: [0, 39], tilt: [39, 79], glide: [79, 149], tail: [149, 188] };   // public/lab/shot/camera.json
 
@@ -82,5 +82,27 @@ describe("story timeline", () => {
     expect(index.p).toBe(STORY_SCREENS);
     expect(ball.veil + desk.veil + index.veil).toBe(0);
     for (const cut of [0.9, 2.2, 3.5]) expect(reducedStory(cut).veil).toBeCloseTo(1);
+  });
+});
+
+describe("the wait for the desk (pre-launch audit; Liam, 2026-10-12: hold before the tilt)", () => {
+  const end = 5100;   // the index's anchor (px)
+  const wall = (DESK_WAIT / (STORY_SCREENS + SCREEN_HOLD)) * end;
+  test("it waits on the formed ball, at the hold's end, just before the camera tilts", () => {
+    expect(DESK_WAIT).toBe(BEATS.hold[1]);
+    expect(DESK_WAIT).toBeLessThanOrEqual(BEATS.tilt[0]);
+  });
+  test("scrolling down onto the tilt with the desk not in: held at the wall", () => {
+    expect(deskWait({ ready: false, p: 1.83, prevP: 1.79, end, jumping: false })).toBeCloseTo(wall, 6);
+    expect(deskWait({ ready: false, p: 1.84, prevP: DESK_WAIT, end, jumping: false })).toBeCloseTo(wall, 6);   // (still pushing)
+  });
+  test("never once the desk is in, nor above the wall (scrolling back up stays free)", () => {
+    expect(deskWait({ ready: true, p: 1.83, prevP: 1.79, end, jumping: false })).toBeNull();
+    expect(deskWait({ ready: false, p: 1.6, prevP: 1.7, end, jumping: false })).toBeNull();
+  });
+  test("a jump past it isn't held, the index shows on its own: the nav's Projects, a link to the projects, an arrival below it", () => {
+    expect(deskWait({ ready: false, p: 2.4, prevP: 1.7, end, jumping: true })).toBeNull();
+    expect(deskWait({ ready: false, p: 4.3, prevP: 0, end, jumping: false })).toBeNull();   // (more than a screen in a frame)
+    expect(deskWait({ ready: false, p: 3.1, prevP: 3.0, end, jumping: false })).toBeNull();   // (already past it)
   });
 });

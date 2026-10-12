@@ -29,6 +29,16 @@ export function storyProgress(scrollY: number, end: number): number {
   return Math.min((STORY_SCREENS + SCREEN_HOLD) * Math.min(Math.max(scrollY / end, 0), 1), STORY_SCREENS);
 }
 
+/** The desk not in yet (pre-launch audit; Liam, 2026-10-12: hold before the tilt): scrolling down, the story waits on the
+ *  formed ball at the hold's end, the brief and its loading line showing, until the desk is in. Returns the wall (px) to
+ *  hold the page at, or null. A jump isn't held (the nav's Projects, a link to the projects, more than a screen in one
+ *  frame, an arrival below it): there the index shows on its own. */
+export const DESK_WAIT = BEATS.hold[1];
+export function deskWait({ ready, p, prevP, end, jumping }: { ready: boolean; p: number; prevP: number; end: number; jumping: boolean }): number | null {
+  if (ready || jumping || p <= DESK_WAIT || prevP > DESK_WAIT + 0.02 || p - prevP > 1) return null;
+  return (DESK_WAIT / (STORY_SCREENS + SCREEN_HOLD)) * end;
+}
+
 /** Very close to the screen, scrolling down, the page carries the user in (Liam, 2026-10-11: snap into the screen, so
  *  nobody tries to click the projects while they're still on the laptop's screen). Never on the way back out. */
 export const SNAP_FROM = 3.8;

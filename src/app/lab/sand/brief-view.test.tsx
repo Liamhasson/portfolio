@@ -34,3 +34,19 @@ test("the brief spans the canvas's box (100vh), not the visible viewport: on pho
   expect(cls).toMatch(/\bw-screen\b/);
   expect(cls).not.toMatch(/\bh-full\b/);
 });
+
+test("waiting for the desk: a thin line under the brief fills with its loading; gone when it's in (pre-launch audit)", () => {
+  const ref = createRef<BriefHandle>();
+  const { container } = render(<Brief ref={ref} />);
+  ref.current!.update({ cx: 400, cy: 300, r: 100, alpha: 1, dash: 0, squares: Array(9).fill(1) });
+  ref.current!.wait(0.5);
+  const fill = container.querySelector("line[data-brief='wait']")!;
+  const track = container.querySelector("line[data-brief='wait-track']")!;
+  expect(Number(track.getAttribute("x2")) - Number(track.getAttribute("x1"))).toBeCloseTo(200);   // (the box's width)
+  expect(Number(fill.getAttribute("x2")) - Number(fill.getAttribute("x1"))).toBeCloseTo(100);
+  expect(Number(fill.getAttribute("y1"))).toBeGreaterThan(400);   // (below the box)
+  expect(fill.getAttribute("opacity")).not.toBe("0");
+  ref.current!.wait(null);
+  expect(fill.getAttribute("opacity")).toBe("0");
+  expect(track.getAttribute("opacity")).toBe("0");
+});

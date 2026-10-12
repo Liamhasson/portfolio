@@ -1,9 +1,11 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { EXRLoader } from "three/addons/loaders/EXRLoader.js";
 import { RectAreaLightUniformsLib } from "three/addons/lights/RectAreaLightUniformsLib.js";
 import { REVEAL, type RevealFrame } from "./screen-reveal";
 import { holdLoop, loopVideo } from "./card-loops";
+import { fetchTracked, type LoadProgress } from "./load-progress";
 
 /**
  * The desk as a real 3D object (lookdev.py --scene bakedesk), drawn the way Cycles drew the plates:
@@ -66,6 +68,35 @@ export interface BakedDeskMeta {
   screen?: string;
   /** The lid's parts hang under this node at the hinge, baked at this angle. */
   lid?: { pivot: string; baked_open_deg: number };
+}
+
+/** Every file the desk downloads after desk.json, once each (its loading line counts them all). */
+export function deskFiles(meta: BakedDeskMeta): string[] {
+  const out = new Set<string>(["desk.glb", meta.probe, meta.lut]);
+  if (meta.screen) out.add(meta.screen);
+  for (const m of Object.values(meta.materials)) {
+    if (m.screen) continue;
+    for (const f of typeof m.diff === "string" ? [m.diff] : Object.values(m.diff)) if (f) out.add(f);
+    if (m.rough) out.add(m.rough);
+    if (m.normal) out.add(m.normal);
+  }
+  return [...out];
+}
+
+/** The desk's model is meshopt-compressed (gltfpack, scripts/lab/desk3d-publish.py): 9.8 MB down to about 1 MB. */
+export function deskGltfLoader(): GLTFLoader {
+  return new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+}
+
+/** The desk's files, downloaded (BakedDesk.fetch) and not yet built: the download can start during the loader, the GPU
+ *  work waits until it's done. */
+export interface DeskDownload {
+  base: string;
+  meta: BakedDeskMeta;
+  glb: ArrayBuffer;
+  lut: ArrayBuffer;
+  /** each image and the probe, as an object URL (revoked once built) */
+  urls: Map<string, string>;
 }
 
 /**
@@ -506,6 +537,9 @@ export class BakedDesk {
   lut: THREE.Data3DTexture | null = null;
   /** Hero units per metre. */
   heroPerMetre = 10;
+  /** Every texture it loaded, the lighting states the shaders hold in their own uniforms included: uploaded ahead of the
+   *  tilt, one per frame (sand-lab.tsx), so none uploads mid-shot. */
+  textures: THREE.Texture[] = [];
   screen: { material: THREE.MeshPhysicalMaterial; emission: number; reveal: Record<string, THREE.IUniform> } | null = null;
   /** The cards' loops on the screen (played while it is awake). */
   media: string[] = [];
@@ -616,22 +650,48 @@ export class BakedDesk {
     for (const l of this.lights) if (!name || l.name === name) l.light.intensity = l.base * gain;
   }
 
-  /** `renderer` prefilters the probe (PMREM). */
-  static async load(renderer: THREE.WebGLRenderer, base = "/lab/desk3d"): Promise<BakedDesk> {
+  /** Downloads every file, counting their bytes into `progress`; no GPU work. */
+  static async fetch(base = "/lab/desk3d", progress: LoadProgress | null = null): Promise<DeskDownload> {
     const meta = (await (await fetch(`${base}/desk.json`)).json()) as BakedDeskMeta;
+    const urls = new Map<string, string>();
+    let glb: ArrayBuffer | null = null, lut: ArrayBuffer | null = null;
+    try {
+      await Promise.all(deskFiles(meta).map(async (f) => {
+        const res = await fetchTracked(`${base}/${f}`, f, progress);
+        if (f === "desk.glb") glb = await res.arrayBuffer();
+        else if (f === meta.lut) lut = await res.arrayBuffer();
+        else urls.set(f, URL.createObjectURL(await res.blob()));
+      }));
+    } catch (e) {
+      for (const u of urls.values()) URL.revokeObjectURL(u);
+      throw e;
+    }
+    return { base, meta, glb: glb!, lut: lut!, urls };
+  }
+
+  static async load(renderer: THREE.WebGLRenderer, base = "/lab/desk3d"): Promise<BakedDesk> {
+    return BakedDesk.build(renderer, await BakedDesk.fetch(base));
+  }
+
+  /** Builds the desk from its downloaded files. `renderer` prefilters the probe (PMREM). */
+  static async build(renderer: THREE.WebGLRenderer, files: DeskDownload): Promise<BakedDesk> {
+    const { meta, base } = files;
+    const url = (f: string) => files.urls.get(f) ?? `${base}/${f}`;
     const tl = new THREE.TextureLoader();
+    const loaded: THREE.Texture[] = [];
     const tex = (file: string, color: boolean) =>
-      tl.loadAsync(`${base}/${file}`).then((t) => {
+      tl.loadAsync(url(file)).then((t) => {
         t.colorSpace = color ? THREE.SRGBColorSpace : THREE.NoColorSpace;
         t.flipY = false; // glTF UV convention
         t.anisotropy = 8;
+        loaded.push(t);
         return t;
       });
-    const [gltf, probe, lutBuf] = await Promise.all([
-      new GLTFLoader().loadAsync(`${base}/desk.glb`),
-      new EXRLoader().loadAsync(`${base}/${meta.probe}`),
-      fetch(`${base}/${meta.lut}`).then((r) => r.arrayBuffer()),
+    const [gltf, probe] = await Promise.all([
+      deskGltfLoader().parseAsync(files.glb, `${base}/`),
+      new EXRLoader().loadAsync(url(meta.probe)),
     ]);
+    const lutBuf = files.lut;
     // the LUT: [b][g][r] RGB bytes -> RGBA 3D texture (r along x)
     const rgb = new Uint8Array(lutBuf);
     const rgba = new Uint8Array(LUT_N * LUT_N * LUT_N * 4);
@@ -826,6 +886,8 @@ export class BakedDesk {
     d.setLid(0);
     d.setState(0, 0);
     d.setScreen(null);
+    d.textures = [...loaded, lut];
+    for (const u of files.urls.values()) URL.revokeObjectURL(u);   // (every image is in: the textures hold them)
     const [cx, cy, cz] = meta.chaos_center; // Blender, z up
     d.group.scale.setScalar(1 / k);
     d.group.position.set(-cx / k, -cz / k, cy / k);
