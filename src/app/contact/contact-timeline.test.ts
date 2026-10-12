@@ -17,8 +17,8 @@ test("a stalled load gives up after 15 s, never while it still moves or once it'
   expect(contactStalled(30, 1)).toBe(false);
 });
 
-test("on a slow link the words don't wait for the sand: they're in by about 8 s whatever the load is doing (final review I1)", () => {
-  expect(wordsShown(2, 0)).toBe(0);
-  expect(wordsShown(CONTACT_T.wordsBy + 0.9, 0)).toBe(1);
-  expect(wordsShown(3, 0.4)).toBe(0.4);   // (the timeline's own words, when sooner)
+test("the words are there right away, a short arrival as the page opens, whatever the sand is doing (Liam, 2026-10-13)", () => {
+  expect(wordsShown(0, 0)).toBe(0);
+  expect(wordsShown(0.5, 0)).toBeGreaterThan(0.3);
+  expect(wordsShown(1.1, 0)).toBe(1);
 });
