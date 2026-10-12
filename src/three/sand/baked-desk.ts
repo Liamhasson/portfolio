@@ -454,6 +454,22 @@ function withBlenderView(material: THREE.Material, lut: THREE.Data3DTexture, ope
 const REV_N = REVEAL.elements.length;
 const MED_N = REVEAL.media.length;
 
+/** A card's loop as the laptop screen draws it: mipmapped, so from afar it's drawn from its own smaller levels (it was
+ *  faded into the screen's still there, and the still's Cyvore card was older than its loop: Liam, 2026-10-12). */
+export function screenMediaTexture(video: HTMLVideoElement): THREE.VideoTexture {
+  const t = new THREE.VideoTexture(video);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.flipY = false;   // the screen's UVs run top-down (glTF), as the still's
+  t.generateMipmaps = true;
+  t.minFilter = THREE.LinearMipmapLinearFilter;
+  return t;
+}
+
+/** Whether a card's loop shows yet: once it has a frame (until then, the still in its place: never a black card). */
+export function mediaOn(video: HTMLVideoElement | null): number {
+  return video && video.readyState >= 2 ? 1 : 0;
+}
+
 /**
  * The laptop screen plays the index's first reveal: drawn from the finished index (the still), each animated element
  * taken out of its place and drawn back at its current opacity, offset and blur (a blur by mip level), under the wake's
@@ -475,7 +491,7 @@ function withScreenReveal(material: THREE.Material, u: Record<string, THREE.IUni
         `vec3 screenAt(vec2 uv, float lod) {
         vec3 c = textureLod(emissiveMap, uv, lod).rgb;
         ${Array.from({ length: MED_N }, (_, i) => `if (uMedOn[${i}] > 0.0 && all(greaterThanEqual(uv, uMedBox[${i}].xy)) && all(lessThan(uv, uMedBox[${i}].zw)))
-          c = mix(c, texture(uMed${i}, (uv - uMedBox[${i}].xy) / (uMedBox[${i}].zw - uMedBox[${i}].xy)).rgb, uMedOn[${i}] * (1.0 - smoothstep(1.0, 3.0, lod)));`).join("\n        ")}
+          c = mix(c, textureLod(uMed${i}, (uv - uMedBox[${i}].xy) / (uMedBox[${i}].zw - uMedBox[${i}].xy), lod + log2(float(textureSize(uMed${i}, 0).x) / (float(textureSize(emissiveMap, 0).x) * (uMedBox[${i}].z - uMedBox[${i}].x)))).rgb, uMedOn[${i}]);`).join("\n        ")}
         return c;
       }\n` + "void main() {",
       ).replace(
@@ -551,6 +567,7 @@ export class BakedDesk {
   /** The cards' loops on the screen (played while it is awake). */
   media: string[] = [];
   private mediaPlaying = false;
+  private mediaTextures: (THREE.VideoTexture | null)[] = [];
   /** The lid on its hinge; its rectangle and the screen's, as corners (origin, along U, along V) in the pivot's frame. */
   private lid: { pivot: THREE.Object3D; q0: THREE.Quaternion; bakedDeg: number; corners: THREE.Vector3[]; screen: THREE.Vector3[] | null } | null = null;
   private readonly tmp = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
@@ -644,6 +661,8 @@ export class BakedDesk {
     // what the deck and keys mirror of it: the finished index at the reveal's light
     VIEW.uScrGain.value = f ? this.screen.emission * f.light : 0;
     if (!f) return;
+    const on = u.uMedOn.value as number[];
+    this.mediaTextures.forEach((t, i) => { on[i] = mediaOn((t?.image as HTMLVideoElement | undefined) ?? null); });
     const img = this.screen.material.emissiveMap?.image as { width?: number } | undefined;
     const texels = (img?.width ?? REVEAL.surface.width_px) / REVEAL.surface.width_px;   // the still's px per design px
     const anim = u.uRevAnim.value as THREE.Vector3[];
@@ -761,15 +780,13 @@ export class BakedDesk {
         // the cards' loops, playing on the screen once it wakes (shared with the live index: card-loops.ts)
         const media = REVEAL.media.map((m) => {
           if (!m.src) return null;
-          const t = new THREE.VideoTexture(loopVideo(m.src));
-          t.colorSpace = THREE.SRGBColorSpace;
-          t.flipY = false;   // the screen's UVs run top-down (glTF), as the still's
-          return { src: m.src, texture: t };
+          return { src: m.src, texture: screenMediaTexture(loopVideo(m.src)) };
         });
         d.media = media.flatMap((m) => (m ? [m.src] : []));
+        d.mediaTextures = media.map((m) => m?.texture ?? null);
         const reveal = {
           uMedBox: { value: REVEAL.media.map((m) => new THREE.Vector4(m.box[0], m.box[1], m.box[2], m.box[3])) },
-          uMedOn: { value: REVEAL.media.map((m) => (m.src ? 1 : 0)) },
+          uMedOn: { value: REVEAL.media.map(() => 0) },   // (each on once its loop has a frame: setScreen)
           ...Object.fromEntries(REVEAL.media.map((_, i) => [`uMed${i}`, { value: media[i]?.texture ?? null }])),
           uRevBox: { value: REVEAL.elements.map((e) => new THREE.Vector4(e.box[0], e.box[1], e.box[2], e.box[3])) },
           uRevAnim: { value: REVEAL.elements.map(() => new THREE.Vector3(0, 0, 0)) },

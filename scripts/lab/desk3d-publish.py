@@ -53,6 +53,7 @@ for name, m in opn["materials"].items():
 shutil.copy("blender/lookdev/textures-local/work-index-screen.png", os.path.join(DST, "screen.png"))
 subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", os.path.join(DST, "screen.png"), "-q:v", "2", os.path.join(DST, "screen.jpg")], check=True)
 os.remove(os.path.join(DST, "screen.png"))
+subprocess.run(["python3", "scripts/lab/desk3d-screen-posters.py"], check=True)   # (the cards' current posters)
 lights = dict(shut["lights"])
 for k in ("side_fill",):
     if k in opn["lights"]:
