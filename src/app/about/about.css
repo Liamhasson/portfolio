@@ -20,7 +20,7 @@
 .ab-skill::before { content: ""; display: inline-block; width: 0.32em; height: 0.32em; border: 1px solid rgba(230, 191, 174, 0.8); margin: 0 0.6em 0.15em 0; vertical-align: middle; }
 .ab-proof { display: block; margin: 0.35vw 0 0 0.95em; font-size: clamp(13px, 1.1vw, 18px); color: rgba(244, 239, 233, 0.45); text-decoration: none; }
 a.ab-proof:hover, a.ab-proof:focus-visible { color: #f4efe9; }
-.ab-pill { display: inline-block; margin-top: 3.2vw; padding: 0.85em 1.5em; border-radius: 99px; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(20, 16, 15, 0.7); color: #f4efe9; font-size: clamp(14px, 1.2vw, 18px); text-decoration: none; }
+.ab-pill { display: inline-block; padding: 0.85em 1.5em; border-radius: 99px; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(20, 16, 15, 0.7); color: #f4efe9; font-size: clamp(14px, 1.2vw, 18px); text-decoration: none; }
 .ab-portrait { position: absolute; right: 7vw; top: 22%; width: 21vw; height: auto; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 4px; }
 .ab-bar { position: absolute; left: 6vw; right: 6vw; bottom: 4.5vw; height: 1px; background: rgba(255, 255, 255, 0.1); }
 .ab-bar > span { position: absolute; inset: 0; background: rgba(230, 191, 174, 0.7); transform-origin: left; transform: scaleX(0); }
@@ -45,3 +45,10 @@ a.ab-proof:hover, a.ab-proof:focus-visible { color: #f4efe9; }
 @media (prefers-reduced-motion: reduce) {
   .ab[data-mode="stack"] .ab-slide { transform: none; transition: opacity 0.6s ease; }
 }
+/* View resume: centred, holding still for the whole of About (Liam, 2026-10-12) */
+.ab-resume { position: absolute; left: 50%; bottom: calc(4.5vw + 22px); transform: translateX(-50%); z-index: 2; white-space: nowrap; }
+.ab-resume:hover, .ab-resume:focus-visible { border-color: rgba(230, 191, 174, 0.6); outline: none; }
+/* stacked (phones, reduced motion): fixed at the bottom centre while About is on screen */
+.ab[data-mode="stack"] .ab-resume { position: fixed; bottom: max(20px, calc(env(safe-area-inset-bottom) + 14px)); opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
+.ab[data-mode="stack"] .ab-resume[data-on] { opacity: 1; pointer-events: auto; }
+.ab[data-mode="stack"] .ab-track { padding-bottom: 14vh; }

@@ -68,17 +68,18 @@ test("the track is clipped, not a scroll container (overflow: clip), so nothing 
 });
 
 test("stacked (phones, reduced motion): each slide rises in as it comes into view (spec §3; final review I6)", () => {
-  let cb: IntersectionObserverCallback = () => {};
-  const observed: Element[] = [];
+  const observers: { cb: IntersectionObserverCallback; observed: Element[] }[] = [];
   globalThis.IntersectionObserver = class {
-    constructor(c: IntersectionObserverCallback) { cb = c; }
-    observe(el: Element) { observed.push(el); }
+    o: { cb: IntersectionObserverCallback; observed: Element[] };
+    constructor(c: IntersectionObserverCallback) { this.o = { cb: c, observed: [] }; observers.push(this.o); }
+    observe(el: Element) { this.o.observed.push(el); }
     unobserve() {}
     disconnect() {}
   } as never;
   window.matchMedia = vi.fn().mockReturnValue({ matches: true, addEventListener() {}, removeEventListener() {} }) as never;   // (reduced: stacked)
   const { container } = render(<AboutTrack />);
   const slides = [...container.querySelectorAll(".ab-slide")];
+  const { cb, observed } = observers.find((o) => o.observed.includes(slides[0]))!;   // (the slides' own observer)
   expect(observed.length).toBe(slides.length);
   expect(slides[0]).not.toHaveAttribute("data-in");
   act(() => { cb([{ target: slides[0], isIntersecting: true } as unknown as IntersectionObserverEntry], {} as IntersectionObserver); });
@@ -103,4 +104,18 @@ test("End to end follows \"That's still how I work…\", before the quotes (Liam
 test("End to end is plain text, not a link: it didn't read as clickable, so a click by accident took people away (Liam, 2026-10-12)", () => {
   render(<AboutTrack />);
   expect(screen.getByText("End to end").closest("a")).toBeNull();
+});
+
+test("View resume holds still in the middle for the whole of About, outside the sliding track (Liam, 2026-10-12)", () => {
+  const { container } = render(<AboutTrack />);
+  const cv = screen.getAllByRole("link", { name: /View resume/ });
+  expect(cv).toHaveLength(1);
+  expect(cv[0].closest(".ab-track")).toBeNull();
+  expect(cv[0].closest(".ab")).toBe(container.querySelector(".ab"));
+  expect(cv[0].className).toContain("ab-resume");
+});
+
+test("a line's two colours stay one run of text: its spans are wrapped together, so a stacked (flex) slide can't split them (Liam's phone, 2026-10-12)", () => {
+  const { container } = render(<AboutTrack />);
+  for (const slide of container.querySelectorAll(".ab-slide.ab-big")) expect(slide.children).toHaveLength(1);
 });

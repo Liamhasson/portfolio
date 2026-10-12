@@ -11,7 +11,8 @@ import "./about.css";
 
 /** A line in two colours: its highlights in the near-white, the rest in the darker tone (Liam, 2026-10-12). */
 function Words({ line }: { line: Line }) {
-  return <>{line.map((s, i) => <span key={i} className={s.hi ? "hi" : undefined}>{s.t}</span>)}</>;
+  // (one run of text: a stacked slide is a flex box, which would make each span its own line)
+  return <span>{line.map((s, i) => <span key={i} className={s.hi ? "hi" : undefined}>{s.t}</span>)}</span>;
 }
 
 /**
@@ -20,7 +21,7 @@ function Words({ line }: { line: Line }) {
  * phones and under reduced motion. No WebGL: the quiet reading page.
  */
 export function AboutTrack() {
-  const section = useRef<HTMLElement>(null), track = useRef<HTMLDivElement>(null), bar = useRef<HTMLSpanElement>(null);
+  const section = useRef<HTMLElement>(null), track = useRef<HTMLDivElement>(null), bar = useRef<HTMLSpanElement>(null), resume = useRef<HTMLAnchorElement>(null);
   useEffect(() => {
     const sec = section.current, tr = track.current, clip = tr?.parentElement;
     if (!sec || !tr || !clip) return;
@@ -55,13 +56,21 @@ export function AboutTrack() {
       ? new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) (e.target as HTMLElement).dataset.in = ""; }), { rootMargin: "0px 0px -12% 0px" })
       : null;
     tr.querySelectorAll(".ab-slide").forEach((el) => io?.observe(el));
+    // phones (stacked): the fixed resume shows only while About is on screen
+    const ioSec = typeof IntersectionObserver === "function"
+      ? new IntersectionObserver(([e]) => {
+        const el = resume.current;
+        if (!el) return;
+        if (e.isIntersecting) el.dataset.on = ""; else delete el.dataset.on;
+      }, { rootMargin: "-65% 0px 0px 0px" })   // (only while About reaches the bottom third, where it sits: gone before the pull comes up)
+      : null;
+    ioSec?.observe(sec);
     layout();
     void document.fonts?.ready.then(layout);
     window.addEventListener("resize", layout);
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => { cancelAnimationFrame(raf); io?.disconnect(); sec.removeEventListener("focusin", onFocus); window.removeEventListener("resize", layout); window.removeEventListener("scroll", onScroll); };
+    return () => { cancelAnimationFrame(raf); io?.disconnect(); ioSec?.disconnect(); sec.removeEventListener("focusin", onFocus); window.removeEventListener("resize", layout); window.removeEventListener("scroll", onScroll); };
   }, []);
-  const last = ABOUT.verbs.length - 1;
   return (
     <>
       <section ref={section} className="ab" data-mode="track" data-portrait={ABOUT.portrait ? "" : undefined} aria-labelledby="about-h">
@@ -90,7 +99,6 @@ export function AboutTrack() {
                       </li>
                     ))}
                   </ul>
-                  {i === last && <a href={ABOUT.resume.href} target="_blank" rel="noopener noreferrer" className="ab-pill">{ABOUT.resume.label} ↗</a>}
                 </div>
               ))}
               <p className="ab-slide ab-big"><Words line={ABOUT.closing} /></p>
@@ -100,6 +108,9 @@ export function AboutTrack() {
             <Image className="ab-portrait" src={ABOUT.portrait.src} alt={ABOUT.portrait.alt} width={ABOUT.portrait.width} height={ABOUT.portrait.height} sizes="21vw" priority />
           )}
           <span className="ab-bar" aria-hidden><span ref={bar} /></span>
+          {/* the resume holds still in the middle for the whole of About (Liam, 2026-10-12): above the progress line on the
+              pinned track, fixed at the bottom on phones while About is on screen */}
+          <a ref={resume} href={ABOUT.resume.href} target="_blank" rel="noopener noreferrer" className="ab-pill ab-resume">{ABOUT.resume.label} ↗</a>
         </div>
       </section>
       <div className="ab-end">
