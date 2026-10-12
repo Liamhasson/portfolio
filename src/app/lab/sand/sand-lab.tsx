@@ -19,6 +19,8 @@ import { readLoaderMode, releaseHold, showCopy } from "./loader-mode";
 import { LoadProgress } from "@/three/sand/load-progress";
 import { anchorsWorld } from "@/three/sand/cascade";
 import { holdScroll } from "@/lib/smooth-scroll";
+import { DeskSketches } from "@/three/sand/desk-sketches";
+import { sketchFont } from "./sketch-font";
 import { ballKeyPos } from "@/three/sand/ball-light";
 import { SAND_ENCODE, SAND_LAYER, SandComposite } from "@/three/sand/sand-composite";
 import { Pullback } from "@/three/sand/pullback";
@@ -255,6 +257,20 @@ export function SandLab({ hero }: { hero: boolean }) {
       let riseClock = 0;
       // the desk's top as a rectangle in the hero's units (x, z) and its height, for keeping the top view inside it
       let deskTop: { min: THREE.Vector2; max: THREE.Vector2; y: number } | null = null;
+      // the sketches of the work behind the desk, seen through the tilt (desk-sketches.ts; Liam, 2026-10-12)
+      let sketches: DeskSketches | null = null;
+      const placeSketches = () => {
+        if (!sketches || !shot || !shotMeta || !deskTop) return;
+        // from the tilt's last frame, behind the desk's far edge
+        const v = shot.view(shotMeta.beats.tilt[1]);
+        const cam = stage!.camera.clone();
+        cam.position.copy(v.position); cam.quaternion.copy(v.quaternion);
+        cam.fov = THREE.MathUtils.radToDeg(stage!.vfovFor(cam.aspect, v.lens));
+        cam.updateProjectionMatrix(); cam.updateMatrixWorld();
+        const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+        const far = new THREE.Vector3((deskTop.min.x + deskTop.max.x) / 2, deskTop.y, deskTop.min.y);
+        sketches.place(cam, far.sub(cam.position).dot(fwd) + 1.2, stage!.bufferHeight);
+      };
       // the desk, then the rising sand: textures uploaded and shaders compiled before they join the scene (no hitch as
       // the camera tilts onto them); started once the hero is running
       const loadDesk = async () => {
@@ -279,6 +295,12 @@ export function SandLab({ hero }: { hero: boolean }) {
         }
         deskLoaded = d;
         (window as unknown as { __desk3d?: unknown }).__desk3d = d;
+        await document.fonts.load(`500 40px ${sketchFont.style.fontFamily}`).catch(() => {});
+        if (disposed) return;
+        sketches = new DeskSketches(sketchFont.style.fontFamily);
+        st.scene.add(sketches.group);
+        placeSketches();
+        st.onSettings(placeSketches);
         const spots = await RisingSand.loadSpots(`${SAND_BASE}/desk-spill.bin`, shot.data.chaos_center, shot.data.chaos_scale).catch(() => null);
         if (disposed || !spots) return;
         const r = new RisingSand(field!.material, spots, { high: 900, mid: 700, low: 400 }[tier]);   // a few single grains (Liam: Lusion's floor)
@@ -725,6 +747,7 @@ export function SandLab({ hero }: { hero: boolean }) {
           );
           // the name leaves the frame with the ball (it is a plane in the world behind it); faded once it has gone
           wordmark?.setFade((1 - ease(p, [BEATS.tilt[0] + 0.3, BEATS.tilt[1]])) * loaderLight);
+          sketches?.update(p, reduced);
           // the rising sand: on once the desk is coming into view, off inside the screen (its clock: ambient; frozen, so still,
           // under reduced motion)
           const um = field!.material.uniforms;
@@ -965,6 +988,8 @@ export function SandLab({ hero }: { hero: boolean }) {
       {hero && <div ref={projectsRef} id="projects" aria-hidden className="pointer-events-none absolute left-0 w-px" style={{ top: `${PAGE_VH - 100}vh`, height: "100vh" }} />}
       {hero && <WorkIndex bind={bindIndex} />}
       {hero && <Brief ref={briefRef} />}
+      {/* (the sketches' handwriting, loaded with the story: desk-sketches.ts draws it into the scene) */}
+      {hero && <span aria-hidden className={sketchFont.className} style={{ position: "absolute", opacity: 0, pointerEvents: "none" }}>a</span>}
       {hero ? (
         <HeroOverlay exit={readExit} scrolled={readScrolled} />
       ) : (
