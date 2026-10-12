@@ -1,7 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { ihash3 } from "./int-hash";
 import { SWIRL_GLSL } from "./swirl";
-import { WORDMARK_FRAGMENT } from "./wordmark";
 import { PAINT_FRAGMENT } from "./paint";
 
 // (Liam, 2026-10-12: the deployed hero, open ~8 hours, had smeared into streaks with no structure.) The noises that move
@@ -10,7 +9,7 @@ import { PAINT_FRAGMENT } from "./paint";
 // streaks). Their hash is integer arithmetic now: exact at any age.
 describe("noise that ages well", () => {
   test("no time-driven noise hashes through sin()", () => {
-    for (const glsl of [SWIRL_GLSL, WORDMARK_FRAGMENT, PAINT_FRAGMENT]) expect(glsl).not.toMatch(/fract\(sin\(/);
+    for (const glsl of [SWIRL_GLSL, PAINT_FRAGMENT]) expect(glsl).not.toMatch(/fract\(sin\(/);
   });
   test("the integer hash: in [0, 1), deterministic, and as lively at a million as at zero", () => {
     const vals: number[] = [];

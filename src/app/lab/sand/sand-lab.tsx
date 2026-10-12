@@ -5,7 +5,6 @@ import { Stage } from "@/three/stage";
 import { loadSandMeta, loadSandParts, SAND_BASE } from "@/three/sand/data";
 import { CURSOR_WARM, SAND_LOOK, SandField, type SandState } from "@/three/sand/sand-field";
 import { PaintField } from "@/three/sand/paint";
-import { Wordmark } from "@/three/sand/wordmark";
 import { HeroOverlay } from "./hero-overlay";
 import { WorkIndex, type WorkIndexHandle } from "./work-index";
 import { BakedDesk } from "@/three/sand/baked-desk";
@@ -116,7 +115,6 @@ export function SandLab({ hero }: { hero: boolean }) {
     let stage: Stage | null = null;
     let field: SandField | null = null;
     let paint: PaintField | null = null;
-    let wordmark: Wordmark | null = null;
     const listeners: [string, EventListener][] = [];
     // the loader (spec 2026-10-12-loader-design.md): its mode from the boot script (page.tsx); the brief grows from first
     // paint with the hero's files, on its own frames (the stage isn't there yet)
@@ -127,7 +125,7 @@ export function SandLab({ hero }: { hero: boolean }) {
     let playing = hero && (mode === "play" || mode === "reduced");
     const progress = new LoadProgress();
     // the hero's other files, declared at about their sizes so none of them reads as a jump
-    for (const [id, size] of [["/lab/grain.png", 60e3], ["haze", 90e3], ["/lab/shot/camera.json", 60e3], ["wordmark-font", 110e3]] as const) progress.expect(id, size);
+    for (const [id, size] of [["/lab/grain.png", 60e3], ["haze", 90e3], ["/lab/shot/camera.json", 60e3]] as const) progress.expect(id, size);
     const growth = new BriefGrowth();
     let size = 0, sinceMount = 0, briefLast = performance.now(), briefOn = playing, briefRaf = 0;
     let onFullSize: (() => void) | null = null;
@@ -358,47 +356,7 @@ export function SandLab({ hero }: { hero: boolean }) {
         if (o) pbOpts = o;
         desk = shot?.deskLights(g.wattsToIrradiance, [a, b, c], pbOpts);
       };
-      // ?weight=bold|black|ultrablack: compare the wordmark's weight (default black); ?wordmark=0 hides it
       const params = new URLSearchParams(window.location.search);
-      if (params.get("wordmark") !== "0" && !compare) {
-        const weight = { bold: "Bold", black: "Black", ultrablack: "UltraBlack" }[params.get("weight") ?? "black"] ?? "Black";
-        wordmark = await Wordmark.create(data.meta, `/lab/fonts/Geist-${weight}.ttf`);
-        progress.done("wordmark-font");
-        if (disposed) return;
-        stage.scene.add(wordmark.mesh);
-        // ?wm=bottom: Lusion's placement, the name across the full width at the bottom (behind the sand)
-        if (params.get("wm") === "bottom") {
-          const mesh = wordmark.mesh;
-          const geoW = (mesh.geometry as THREE.PlaneGeometry).parameters.width;
-          const place = () => {
-            const cam = stage!.camera;
-            cam.updateMatrixWorld();
-            const at = (nx: number, ny: number) => {
-              const v = new THREE.Vector3(nx, ny, 0.5).unproject(cam).sub(cam.position).normalize();
-              const s = (mesh.position.z - cam.position.z) / v.z;
-              return cam.position.clone().addScaledVector(v, s);
-            };
-            mesh.position.z = -4.5;
-            const left = at(-0.902, -0.62), right = at(0.902, -0.62);
-            mesh.scale.setScalar(right.distanceTo(left) / (geoW * 0.95));
-            mesh.position.set((left.x + right.x) / 2, left.y, -4.5);
-          };
-          place();
-          stage.onSettings(place);
-        } else {
-          // the approved placement; on portrait screens it shrinks to fit the width (it overflowed both sides)
-          const mesh = wordmark.mesh;
-          const geoW = (mesh.geometry as THREE.PlaneGeometry).parameters.width;
-          const fit = () => {
-            const cam = stage!.camera;
-            const dist = cam.position.z - mesh.position.z;
-            const viewW = 2 * dist * Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2) * cam.aspect;
-            mesh.scale.setScalar(Math.min(1, (viewW * 0.9) / (geoW * 0.95)));
-          };
-          fit();
-          stage.onSettings(fit);
-        }
-      }
       stage.onSettings((s) => {
         field!.setGrains(s.grains);
         field!.setShadowSteps(s.shadowSteps);
@@ -755,8 +713,6 @@ export function SandLab({ hero }: { hero: boolean }) {
             { dir: deskNow.spot.dir, cos: new THREE.Vector2(-3, -2).lerp(deskNow.spot.cos, h) },
             (calibrating ? lampSat : lampSat + (0.05 - lampSat) * state.compact) * h,
           );
-          // the name leaves the frame with the ball (it is a plane in the world behind it); faded once it has gone
-          wordmark?.setFade((1 - ease(p, [BEATS.tilt[0] + 0.3, BEATS.tilt[1]])) * loaderLight);
           sketchClock = sketches?.showing ? sketchClock + (reduced || still ? 0 : dt) : 0;
           // (the hover lights the part of a sketch under a mouse: Liam, 2026-10-12)
           sketches?.update(p, reduced, sketchClock, { x: (pointer.x / canvas.clientWidth) * 2 - 1, y: 1 - (pointer.y / canvas.clientHeight) * 2, on: pointer.active && !pointer.touch });
@@ -849,8 +805,6 @@ export function SandLab({ hero }: { hero: boolean }) {
           paint!.update(stage!.renderer, dt);
           field!.setPaint(paint!.texture, canvas.clientWidth, canvas.clientHeight);
         }
-        wordmark?.setPaint(reduced ? null : paint!.texture, canvas.width, canvas.height);
-        wordmark?.update(dt, reduced || still);
         if (composite && !filterParam && !calibrating) {
           const toDesk = shot ? ease(progressRef.current, BEATS.tilt) : 0;
           const chaos = FILTER.chaos + (FILTER.desk - FILTER.chaos) * toDesk;
@@ -928,7 +882,6 @@ export function SandLab({ hero }: { hero: boolean }) {
         else window.removeEventListener(type, fn);
       }
       paint?.dispose();
-      wordmark?.dispose();
       field?.dispose();
       stage?.dispose();
     };
