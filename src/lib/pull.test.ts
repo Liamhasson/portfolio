@@ -15,14 +15,24 @@ describe("the pull at a page's end (spec 2026-10-12 §2)", () => {
     expect(s.fill).toBeCloseTo(300 / (PULL.need * vh), 6);
     expect(pullDone(gesture(undefined, { n: 11, dy: 60 }))).toBe(true);
   });
-  test("momentum from a flick that started above the end never fills it (Review Focus 1)", () => {
+  test("momentum from a flick that reached the end never fills it: momentum only ever slows (Review Focus 1)", () => {
     let atEnd = false;
     let s = pullStart();
     for (let k = 0; k < 120; k++) {
-      if (k === 20) atEnd = true;   // (the page reaches its end mid-gesture; the momentum keeps coming, 16 ms apart)
-      s = pullStep(s, { dy: 40, t: k * 0.016, atEnd, vh });
+      if (k === 20) atEnd = true;   // (the page reaches its end mid-flick; the momentum keeps coming, 16 ms apart, dying)
+      s = pullStep(s, { dy: 90 * Math.pow(0.95, k), t: k * 0.016, atEnd, vh });
     }
-    expect(s.fill).toBe(0);
+    expect(pullDone(s)).toBe(false);
+    expect(s.fill).toBeLessThan(0.1);
+  });
+  test("one continuous scroll down that reaches the end and keeps going fills it, wherever it started (Liam, 2026-10-12)", () => {
+    let atEnd = false;
+    let s = pullStart();
+    for (let k = 0; k < 80; k++) {
+      if (k === 20) atEnd = true;   // (the finger keeps scrolling at its own pace, a little uneven)
+      s = pullStep(s, { dy: 60 + (k % 3) * 4, t: k * 0.016, atEnd, vh });
+    }
+    expect(pullDone(s)).toBe(true);
   });
   test("a pause, then a fresh scroll at the end, counts", () => {
     let s = gesture(pullStart(), { n: 5, atEnd: () => false });
