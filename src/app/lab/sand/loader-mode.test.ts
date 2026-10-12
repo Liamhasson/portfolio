@@ -17,22 +17,22 @@ describe("when the loader plays (spec §3; Liam, 2026-10-12: every fresh page lo
   });
   test("the boot script sets html[data-loader] from the same rules: a reload plays it again, a deep link fades", () => {
     document.documentElement.removeAttribute("data-loader");
-    window.history.replaceState(null, "", "/lab/sand?hero");
+    window.history.replaceState(null, "", "/");
     new Function(LOADER_BOOT)();
     expect(["play", "reduced"]).toContain(document.documentElement.dataset.loader);
     new Function(LOADER_BOOT)();
     expect(["play", "reduced"]).toContain(document.documentElement.dataset.loader);
-    window.history.replaceState(null, "", "/lab/sand?hero#projects");
+    window.history.replaceState(null, "", "/#projects");
     new Function(LOADER_BOOT)();
     expect(document.documentElement.dataset.loader).toBe("fade");
-    window.history.replaceState(null, "", "/lab/sand?hero&loader#projects");
+    window.history.replaceState(null, "", "/?loader#projects");
     new Function(LOADER_BOOT)();
     expect(document.documentElement.dataset.loader).toBe("play");
     window.history.replaceState(null, "", "/");
   });
 
   test("it survives React rebuilding the page (a browser extension edits the DOM, hydration fails and the html's attributes are reset): the mode is read from a value React can't touch, and the hold is re-applied", () => {
-    window.history.replaceState(null, "", "/lab/sand?hero");
+    window.history.replaceState(null, "", "/");
     new Function(LOADER_BOOT)();
     delete document.documentElement.dataset.loader;   // (what React's client re-render does to <html>)
     expect(readLoaderMode()).toBe("play");

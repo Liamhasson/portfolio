@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-const pathname = vi.fn(() => "/lab/sand");   // the story is home (src/lib/story.ts)
+const pathname = vi.fn(() => "/");   // the story is the home page (src/lib/story.ts)
 const useActiveSection = vi.fn<(ids: readonly string[], resetKey?: string) => string | null>(() => null);
 
 vi.mock("next/link", () => ({
@@ -19,7 +19,7 @@ vi.mock("@/hooks/use-active-section", () => ({
 import { PillNav } from "./pill-nav";
 
 beforeEach(() => {
-  pathname.mockReturnValue("/lab/sand");
+  pathname.mockReturnValue("/");
   useActiveSection.mockReset();
   useActiveSection.mockReturnValue(null);
 });
@@ -34,7 +34,7 @@ describe("PillNav", () => {
   test("from a case study Projects leads into the story's index", () => {
     pathname.mockReturnValue("/cyvore");
     render(<PillNav />);
-    expect(screen.getByRole("link", { name: "Projects" })).toHaveAttribute("href", "/lab/sand?hero#projects");
+    expect(screen.getByRole("link", { name: "Projects" })).toHaveAttribute("href", "/#projects");
   });
 
   test("tracks the home sections and re-subscribes per page", () => {
@@ -51,7 +51,7 @@ describe("PillNav", () => {
   });
 
   test("About and Contact are their own pages, from everywhere (spec 2026-10-12 §5)", () => {
-    for (const path of ["/lab/sand", "/cyvore", "/about"]) {
+    for (const path of ["/", "/cyvore", "/about"]) {
       pathname.mockReturnValue(path);
       const { unmount } = render(<PillNav />);
       expect(screen.getByRole("link", { name: "About" })).toHaveAttribute("href", "/about");

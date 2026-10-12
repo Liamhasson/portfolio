@@ -22,12 +22,12 @@ describe("the name in the nav (Liam, 2026-10-12)", () => {
     pathname.mockReturnValue("/about");
     render(<NavName />);
     const link = screen.getByRole("link", { name: "Liam Hasson, back to the start" });
-    expect(link).toHaveAttribute("href", "/lab/sand?hero");
+    expect(link).toHaveAttribute("href", "/");
     expect(link).toHaveAttribute("data-next-link");
     expect(pairs().every((p) => p.style.transform === "translateY(-50%)")).toBe(true);   // (rolled: LIAM HASSON)
   });
   test("on the story it reads PRODUCT DESIGNER until the hero's line leaves, rolling with it", () => {
-    pathname.mockReturnValue("/lab/sand");
+    pathname.mockReturnValue("/");
     render(<NavName />);
     act(() => nameRoll.set(0));
     expect(pairs().every((p) => p.style.transform === "translateY(0%)")).toBe(true);
@@ -35,7 +35,7 @@ describe("the name in the nav (Liam, 2026-10-12)", () => {
     expect(pairs().every((p) => p.style.transform === "translateY(-50%)")).toBe(true);
   });
   test("on the story a click glides back to the top instead of reloading", () => {
-    pathname.mockReturnValue("/lab/sand");
+    pathname.mockReturnValue("/");
     render(<NavName />);
     fireEvent.click(screen.getByRole("link", { name: "Liam Hasson, back to the start" }));
     expect(glideTo).toHaveBeenCalled();

@@ -13,7 +13,7 @@ test("the frame in order: hero, at a glance, middle, challenges, impact, next", 
     .map((r) => r.getAttribute("aria-label") ?? r.querySelector("h2")?.textContent);
   expect(landmarks).toEqual(["Middle", "Challenges", "Impact"]);
   expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Pulse");
-  expect(screen.getByRole("link", { name: "Back to projects" })).toHaveAttribute("href", "/lab/sand?hero#projects"); // Back goes to the projects index, in the story (Liam, 2026-10-11)
+  expect(screen.getByRole("link", { name: "Back to projects" })).toHaveAttribute("href", "/#projects"); // Back goes to the projects index, in the story (Liam, 2026-10-11)
   expect(screen.getByRole("link", { name: /Next project: Eventread/ })).toBeInTheDocument();
   expect(document.querySelector("article")).toHaveAttribute("data-world", "pulse");
   expect(screen.getByText("visual")).toBeInTheDocument();

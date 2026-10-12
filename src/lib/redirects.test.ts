@@ -1,10 +1,8 @@
 import { expect, test } from "vitest";
-import { legacyRedirects } from "./redirects";
+import { labRedirect, legacyRedirects } from "./redirects";
 
-test("every live project's old Figma Sites URL redirects permanently", () => {
-  expect(legacyRedirects).toEqual([
-    { source: "/eventread-case-study", destination: "/eventread", permanent: true },
-    { source: "/cyvore-case-study", destination: "/cyvore", permanent: true },
-    { source: "/pulse-case-study", destination: "/pulse", permanent: true },
-  ]);
+test("on the live site the old story address goes home; the lab stays for local tools (pre-launch audit, 2026-10-12)", () => {
+  expect(labRedirect("production")).toEqual([{ source: "/lab/sand", destination: "/", permanent: false }]);
+  expect(labRedirect("development")).toEqual([]);
+  expect(legacyRedirects.every((r) => r.source.endsWith("-case-study"))).toBe(true);
 });
