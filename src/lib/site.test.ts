@@ -5,6 +5,7 @@ import sitemap from "@/app/sitemap";
 import { metadata as about } from "@/app/about/page";
 import { metadata as contact } from "@/app/contact/page";
 import { cyvore as cyvoreStudy } from "@/content/case-studies/cyvore";
+import { metadata as home } from "@/app/page";
 const cyvore = caseStudyMetadata(cyvoreStudy);
 
 test("the site's address, once: liamhasson.com (Liam, 2026-10-12)", () => {
@@ -16,7 +17,7 @@ test("link previews: a site name, a large card, the home page indexable", () => 
   expect(rootMetadata.openGraph).toMatchObject({ siteName: "Liam Hasson", type: "website" });
   expect(rootMetadata.twitter).toMatchObject({ card: "summary_large_image" });
   expect(rootMetadata.robots).toBeUndefined();
-  expect(rootMetadata.alternates?.canonical).toBe("/");
+  expect(home.alternates?.canonical).toBe("/");
 });
 
 test("robots allow everything and point at the sitemap; the sitemap lists every page", () => {

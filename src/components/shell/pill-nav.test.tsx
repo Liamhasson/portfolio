@@ -37,6 +37,16 @@ describe("PillNav", () => {
     expect(screen.getByRole("link", { name: "Projects" })).toHaveAttribute("href", "/#projects");
   });
 
+  test("on a case study Projects is lit; on a page that isn't one (the 404), nothing is (Liam, 2026-10-13)", () => {
+    pathname.mockReturnValue("/cyvore");
+    const { unmount } = render(<PillNav />);
+    expect(screen.getByRole("link", { name: "Projects" })).toHaveAttribute("aria-current", "page");
+    unmount();
+    pathname.mockReturnValue("/no-such-page");
+    render(<PillNav />);
+    for (const name of ["Projects", "About", "Contact"]) expect(screen.getByRole("link", { name })).not.toHaveAttribute("aria-current");
+  });
+
   test("tracks the home sections and re-subscribes per page", () => {
     pathname.mockReturnValue("/cyvore");
     render(<PillNav />);

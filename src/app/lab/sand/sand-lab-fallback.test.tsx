@@ -31,3 +31,10 @@ test("without WebGL, arriving at /#projects (Back from a case study) lands on th
   await waitFor(() => expect(seen).toContain("projects"));
   window.history.replaceState(null, "", "/");
 });
+
+test("the index ends on its four projects: no 'More coming soon' line (Liam, 2026-10-13)", async () => {
+  window.history.replaceState(null, "", "/");
+  render(<SandLab hero />);
+  await waitFor(() => expect(screen.getByTestId("sand-fallback")).toBeInTheDocument());
+  expect(screen.queryByText(/coming soon/i)).toBeNull();
+});

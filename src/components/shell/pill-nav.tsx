@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { holdScroll } from "@/lib/smooth-scroll";
 import { useActiveSection } from "@/hooks/use-active-section";
+import { PAGES } from "@/lib/site";
 import { STORY_HREF, STORY_PATH } from "@/lib/story";
 import { bindLight } from "./nav-light";
 import { useNavTone } from "./nav-tone";
@@ -28,7 +29,9 @@ export function PillNav() {
   // About and Contact are pages (spec 2026-10-12-about-contact-design.md §5); a case study sits under Projects; on the
   // story, the index lights Projects
   const page = pathname === "/about" ? "about" : pathname === "/contact" ? "contact" : null;
-  const active = page ?? (isHome ? activeSection : "projects");
+  // (Projects is lit on the case studies; on a page that isn't one of the site's, the 404, nothing is)
+  const isStudy = (PAGES as readonly string[]).includes(pathname) && !isHome && !page;
+  const active = page ?? (isHome ? activeSection : isStudy ? "projects" : null);
   const navRef = useRef<HTMLElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   useNavTone(navRef, pathname);

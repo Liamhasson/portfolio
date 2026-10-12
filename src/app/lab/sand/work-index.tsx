@@ -64,8 +64,6 @@ const CSS = `
 .wi .meta .n, .wl .meta .n { color:var(--ink); }
 .wi .name { font-size:2.15cqw; font-weight:400; letter-spacing:-.01em; margin:.7cqw 0 0; }
 .wi .line { font-size:1.3cqw; line-height:1.35; color:var(--dim); margin:.5cqw 0 0; max-width:36cqw; }
-.wi .more { margin:3.6cqw 3.6cqw 3.4cqw; padding-top:1.6cqw; border-top:1px solid var(--rule); display:flex; gap:.9cqw; font:400 .85cqw/1 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; color:var(--dim); }
-.wi .more .n, .wl .more .n { color:var(--ink); }
 .wi-panel { position:fixed; left:0; top:0; background:#0a0a0b; pointer-events:none; transform-origin:0 0; }
 .wl { --ink:#f4f1ee; --dim:rgba(244,241,238,.42); --rule:rgba(244,241,238,.14);
   position:fixed; inset:0; color:var(--ink); font-family:var(--font-sans); line-height:normal;
@@ -76,7 +74,6 @@ const CSS = `
 .wl .meta { display:flex; gap:8px; margin-top:12px; font:400 10px/1.2 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; color:var(--dim); }
 .wl .name { font-size:22px; font-weight:400; margin:6px 0 0; }
 .wl .line { font-size:15px; line-height:1.35; color:var(--dim); margin:4px 0 0; }
-.wl .more { margin-top:32px; padding-top:14px; border-top:1px solid var(--rule); display:flex; gap:8px; font:400 10px/1 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; color:var(--dim); }
 .np-index { font-size: 1.15cqw; margin: 0 4cqw; }
 .np-index-list { font-size: 15px; margin: 0 20px; }
 .wl.wl-static { position:relative; inset:auto; overflow:visible; min-height:100vh; }
@@ -145,7 +142,6 @@ function Cards({ playing, itemRef }: { playing: boolean; itemRef?: (el: HTMLElem
           );
         })}
       </ol>
-      <div className="more" ref={itemRef ? (el) => itemRef(el, CARDS.length) : undefined}><span className="n">05</span><span>More coming soon</span></div>
     </>
   );
 }

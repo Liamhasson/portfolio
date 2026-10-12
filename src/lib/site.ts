@@ -22,7 +22,6 @@ export const rootMetadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: { default: "Liam Hasson | Product Designer", template: "%s | Liam Hasson" },
   description: "Product designer who researches, prototypes and ships products people trust.",
-  alternates: { canonical: "/" },
   // (the preview image itself: app/opengraph-image.jpg and twitter-image.jpg, picked up by Next)
   openGraph: { siteName: "Liam Hasson", type: "website", locale: "en_US", url: "/" },
   twitter: { card: "summary_large_image" },

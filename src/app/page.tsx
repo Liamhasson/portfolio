@@ -1,5 +1,9 @@
 import { LOADER_BOOT } from "./lab/sand/loader-mode";
 import { SandLabLoader } from "./lab/sand/sand-lab-loader";
+import type { Metadata } from "next";
+
+// (its own address here, not in the root's metadata: a 404 inherited it and named itself the home page)
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 /**
  * The home page: the story (loader, hero, the shot to the desk and into the projects index). Moved here from
