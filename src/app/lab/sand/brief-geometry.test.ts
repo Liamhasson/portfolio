@@ -16,11 +16,14 @@ describe("the brief (spec §2.2, §2.4)", () => {
     const a = briefShapes(400, 300, 100), b = briefShapes(800, 600, 200);
     expect(b.anchors.map(([x, y]) => [x / 2, y / 2])).toEqual(a.anchors);
   });
-  test("it returns for a beat as the ball locks in", () => {
-    expect(briefReturn(0.5)).toBe(0);
-    expect(briefReturn(0.75)).toBe(0);
-    expect(briefReturn(0.88)).toBe(1);
-    expect(briefReturn(1)).toBe(0);
+  test("it returns as the ball locks in and stays around the formed ball until the camera tilts down (Liam, 2026-10-12)", () => {
+    expect(briefReturn(0.5, 1.0)).toBe(0);
+    expect(briefReturn(0.75, 1.2)).toBe(0);
+    expect(briefReturn(0.88, 1.4)).toBe(1);
+    expect(briefReturn(1, 1.7)).toBe(1);          // (the formed ball, the hold: still drawn)
+    expect(briefReturn(1, 1.9)).toBeGreaterThan(0);
+    expect(briefReturn(1, 1.9)).toBeLessThan(1);  // (fading as the tilt starts)
+    expect(briefReturn(1, 2.05)).toBe(0);
   });
 });
 

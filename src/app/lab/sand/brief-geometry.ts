@@ -1,4 +1,5 @@
 // src/app/lab/sand/brief-geometry.ts
+import { BEATS } from "@/three/sand/story-timeline";
 /**
  * The brief (spec 2026-10-12-loader-design.md §2.2, §2.4): the ball's circle with a designer's construction, at the
  * ball's projected centre and radius. It grows from nothing as the hero's files load (dragged out from its centre, as in
@@ -67,8 +68,10 @@ export class BriefGrowth {
 }
 
 const ease = (x: number) => { const t = Math.min(Math.max(x, 0), 1); return t * t * (3 - 2 * t); };
-/** As the ball locks in (compaction 0.75 .. 1): in by 0.85, held to 0.92, gone at 1. */
-export function briefReturn(compact: number): number {
-  if (compact <= 0.75 || compact >= 1) return 0;
-  return compact < 0.85 ? ease((compact - 0.75) / 0.1) : compact <= 0.92 ? 1 : 1 - ease((compact - 0.92) / 0.08);
+/** The brief returns as the ball locks in (compaction 0.75 .. 0.85) and stays around the formed ball until the camera
+ *  tilts down: it fades over the tilt's first 0.2 screens (Liam, 2026-10-12: "leave them on longer"). `p`: story
+ *  progress (screens). */
+export function briefReturn(compact: number, p: number): number {
+  const out = 1 - ease((p - BEATS.tilt[0]) / 0.2);
+  return ease((compact - 0.75) / 0.1) * out;
 }

@@ -864,9 +864,9 @@ export function SandLab({ hero }: { hero: boolean }) {
           // (the clock runs on until the release too: the cascade now ends before it)
           if (!loaderRunning({ cascadeDone: cascadeFinished, released })) loaderClock = null;
         }
-        // the brief returns for a beat as the ball locks in (spec §2.4)
+        // the brief returns as the ball locks in and stays until the camera tilts down (spec §2.4; Liam, 2026-10-12)
         if (hero && !reduced && loaderClock === null && !waitingForBrief) {
-          const a = briefReturn(state.compact);
+          const a = briefReturn(state.compact, p);
           if (a > 0 || briefReturnA > 0) {
             if (a > 0) placeBrief();
             briefRef.current?.update({ ...ballScreen, alpha: a * 0.9, dash: 0, squares: Array(9).fill(1) });
