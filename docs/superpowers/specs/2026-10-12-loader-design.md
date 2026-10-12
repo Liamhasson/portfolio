@@ -78,12 +78,12 @@ The story it tells, without a word: a brief, then ambiguity, then a product that
 
 ## 3. When it plays
 
-- **Once per session:** the first arrival on the story in a tab. `sessionStorage` remembers it once it completes.
-- **No loader** in these cases:
-  - later arrivals in the same tab (Back or Projects from a case study, a reload);
+- **Every fresh page load of the story** (Liam, 2026-10-12, revising "once per session": opening or reloading it plays
+  the loader).
+- **No loader** in these cases, which get a 0.6 s fade from black instead:
+  - client-side arrivals (Back or Projects from a case study), which don't reload the page;
   - deep links that land past the hero (`#projects`, `#about`, `#contact`).
-
-  These go straight to the scene, with a 0.6 s fade from black if it still needs a moment.
+- **`?loader`** plays it even on a deep link.
 - **Reduced motion:**
   - The brief still grows, since it is progress feedback, not decoration.
   - At 100% there is no splitting or flow: a 0.4 s crossfade to the hero's held state.

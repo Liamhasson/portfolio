@@ -15,7 +15,7 @@ import { vortexOnBall } from "@/three/sand/hero-layout";
 import { stepParallax } from "@/three/sand/parallax";
 import { Brief, type BriefHandle, briefReturn, briefSize } from "./brief";
 import { LOADER, loaderAt } from "./loader-timeline";
-import { markSeen, releaseHold, showCopy } from "./loader-mode";
+import { releaseHold, showCopy } from "./loader-mode";
 import { LoadProgress } from "@/three/sand/load-progress";
 import { anchorsWorld } from "@/three/sand/cascade";
 import { holdScroll } from "@/lib/smooth-scroll";
@@ -491,14 +491,14 @@ export function SandLab({ hero }: { hero: boolean }) {
             field!.setLightK(L.lightK);
             loaderLight = L.light;
             if (L.copy > 0) showCopy();
-            if (L.unlocked && !released) { released = true; releaseHold(); markSeen(window.sessionStorage); briefRef.current?.announce("ready"); loadDesk().catch(() => {}); }
+            if (L.unlocked && !released) { released = true; releaseHold(); briefRef.current?.announce("ready"); loadDesk().catch(() => {}); }
           } else {
             // reduced motion: a crossfade, no cascade
             const k = Math.min(loaderClock / LOADER.reducedFade, 1);
             briefRef.current?.update({ ...ballScreen, alpha: 1 - k, dash: 0, squares: Array(9).fill(1) });
             canvas.style.opacity = String(k);
             field!.setLightK(1); loaderLight = 1;
-            if (k >= 1 && !released) { released = true; releaseHold(); markSeen(window.sessionStorage); briefRef.current?.announce("ready"); loaderClock = null; loadDesk().catch(() => {}); }
+            if (k >= 1 && !released) { released = true; releaseHold(); briefRef.current?.announce("ready"); loaderClock = null; loadDesk().catch(() => {}); }
           }
         }
         // a later arrival: a short fade from black
