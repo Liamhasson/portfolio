@@ -45,11 +45,22 @@ export function PillNav() {
   const menuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
+    // the page behind stays put: the smooth scroller's hold (desktop), and the page itself (phones have none)
     holdScroll(true);
+    document.documentElement.dataset.menuOpen = "";
     menuRef.current?.querySelector<HTMLElement>("a")?.focus();
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { setOpenOn(null); burgerRef.current?.focus(); } };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { setOpenOn(null); burgerRef.current?.focus(); return; }
+      // Tab stays inside: its links, then the close button, and round again (Liam, 2026-10-13)
+      if (e.key !== "Tab") return;
+      const ring = [...(menuRef.current?.querySelectorAll<HTMLElement>("a") ?? []), burgerRef.current].filter((x): x is HTMLElement => !!x);
+      if (!ring.length) return;
+      e.preventDefault();
+      const at = ring.indexOf(document.activeElement as HTMLElement);
+      ring[at < 0 ? 0 : (at + (e.shiftKey ? -1 : 1) + ring.length) % ring.length].focus();
+    };
     document.addEventListener("keydown", onKey);
-    return () => { document.removeEventListener("keydown", onKey); holdScroll(false); };
+    return () => { document.removeEventListener("keydown", onKey); holdScroll(false); delete document.documentElement.dataset.menuOpen; };
   }, [open]);
 
   // the light on every pill

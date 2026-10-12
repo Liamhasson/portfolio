@@ -138,3 +138,7 @@ html[data-nav-tone="light"] .sh-name:hover { opacity: .7; }
 @keyframes sh-menu-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes sh-menu-rise { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .sh-menu, .sh-menu-link { animation: none; } }
+
+/* the menu open: the page behind stays put (phones have no smooth scroller to hold it; pill-nav.tsx) */
+html[data-menu-open] { overflow: hidden; }
+.sh-menu { overscroll-behavior: contain; }

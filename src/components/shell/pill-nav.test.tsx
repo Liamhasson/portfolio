@@ -114,6 +114,28 @@ describe("PillNav", () => {
 });
 
 describe("phones: the burger (Liam, 2026-10-12)", () => {
+  test("open, the page behind can't scroll (phones have no smooth scroller to stop); closed, it can (Liam, 2026-10-13)", () => {
+    render(<PillNav />);
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+    expect(document.documentElement).toHaveAttribute("data-menu-open");
+    fireEvent.click(screen.getByRole("button", { name: "Close menu" }));
+    expect(document.documentElement).not.toHaveAttribute("data-menu-open");
+  });
+
+  test("open, Tab stays inside it: through its links to the close button and round again, both ways (Liam, 2026-10-13)", () => {
+    render(<PillNav />);
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+    const links = within(screen.getByRole("dialog", { name: "Menu" })).getAllByRole("link");
+    const close = screen.getByRole("button", { name: "Close menu" });
+    links[links.length - 1].focus();
+    fireEvent.keyDown(document, { key: "Tab" });
+    expect(document.activeElement).toBe(close);
+    fireEvent.keyDown(document, { key: "Tab" });
+    expect(document.activeElement).toBe(links[0]);
+    fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(close);
+  });
+
   test("a Menu button, closed at first; the menu's links aren't on the page until it opens", () => {
     render(<PillNav />);
     const burger = screen.getByRole("button", { name: "Menu" });
