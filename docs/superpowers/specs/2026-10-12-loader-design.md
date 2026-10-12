@@ -58,9 +58,12 @@ The story it tells, without a word: a brief, then ambiguity, then a product that
 - **The grains split.** Each grain divides on its own clock (every 0.14 to 0.42 s, slowing as the count grows), the two
   halves pushed apart by a small impulse. The cascade from the 9 points reaches the full cloud (the tier's grain count)
   by about 2.6 s.
-- **The flow:** as they multiply, the grains are drawn into the vortex (its centre right of the copy on wide screens;
-  `hero-layout.ts`), each to its own place in the cloud, turning with the vortex (counter-clockwise). The cascade ends
-  as the hero's own cloud with its own motion (`swirl.ts`, the streams), with no seam.
+- **The flow:** as they multiply, the grains spread outward from the anchors into the vortex, each to its own place in
+  the cloud, turning with the vortex (counter-clockwise). The vortex turns about the ball's centre
+  (`hero-layout.ts` `vortexOnBall`, Liam, 2026-10-12), so the brief, the vortex and the ball share one centre. The
+  cascade ends as the hero's own cloud with its own motion (`swirl.ts`, the streams), with no seam.
+- **The cursor's lean** (`parallax.ts`: the front of the cloud follows the cursor more than the back) stays at rest until
+  scrolling unlocks, then follows the cursor.
 - **The key light comes up** from 0.9 s to 2.4 s: the hero's lighting, from dark to its normal level. The outlined name
   LIAM HASSON comes up with it.
 - **The copy and the nav** fade in from 2.8 s to 3.6 s: "Hi, I'm Liam." and its lines, and the pills, with their
