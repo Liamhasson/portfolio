@@ -45,7 +45,7 @@ describe("the sketches behind the desk (Liam, 2026-10-12): drawn during the tilt
     expect(s.reveal).toBe(1);
     expect(s.spin).toBe(0); expect(s.tilt).toBe(0);
   });
-  test("they float in space, like Oryzo's (Liam, 2026-10-12): a slow drift and a turn of a degree or two, each out of step", () => {
+  test("they float in space, like Oryzo's (Liam, 2026-10-12): a slow drift and a turn of a few degrees, each out of step", () => {
     let maxMove = 0, maxTurn = 0;
     const a = sketchFloat(0, 0, false), b = sketchFloat(0, 1, false);
     expect(a).not.toEqual(b);   // (out of step with each other)
@@ -54,12 +54,13 @@ describe("the sketches behind the desk (Liam, 2026-10-12): drawn during the tilt
       maxMove = Math.max(maxMove, Math.hypot(f.x, f.y, f.z));
       maxTurn = Math.max(maxTurn, Math.abs(f.rx), Math.abs(f.ry), Math.abs(f.rz));
       const g = sketchFloat(t + 1 / 60, 0, false);   // (smooth: a frame moves it a hair)
-      expect(Math.hypot(g.x - f.x, g.y - f.y, g.z - f.z)).toBeLessThan(0.1);
+      expect(Math.hypot(g.x - f.x, g.y - f.y, g.z - f.z)).toBeLessThan(0.15);
     }
     expect(maxMove).toBeGreaterThan(SKETCH_FLOAT.move * 0.5);
     expect(maxMove).toBeLessThanOrEqual(SKETCH_FLOAT.move * Math.sqrt(3) + 1e-9);
     expect(maxTurn).toBeGreaterThan(0.01);
-    expect(maxTurn).toBeLessThan(0.06);   // (under ~3.5 degrees)
+    expect(maxTurn).toBeGreaterThan(0.04);   // (visible: Liam, "a bit more visible")
+    expect(maxTurn).toBeLessThan(0.07);   // (but never more than ~4 degrees)
   });
   test("reduced motion: they hold still", () => {
     expect(sketchFloat(12.3, 2, true)).toEqual({ x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 });

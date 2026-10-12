@@ -50,9 +50,9 @@ export function sketchState(p: number, i: number, reduced: boolean) {
 
 /** The float: in the sketch's units and radians; each axis its own slow period; each sketch out of step. */
 export const SKETCH_FLOAT = {
-  move: 5,                              // units each way, on each axis
-  periods: [11, 8.5, 13],               // seconds: x, y, z
-  turn: [0.025, 0.035, 0.012],          // radians: about x, y, z
+  move: 9,                              // units each way, on each axis (Liam, 2026-10-12: "a bit more visible", was 5)
+  periods: [14, 11, 16],                // seconds: x, y, z
+  turn: [0.045, 0.06, 0.02],            // radians: about x, y, z (up to ~3.5 degrees)
   turnPeriods: [9.7, 12.3, 15.1],
 } as const;
 
