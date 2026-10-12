@@ -1,3 +1,4 @@
+import { CASCADE_GLSL } from "./cascade";
 import { PARALLAX_GLSL } from "./parallax";
 import { SWIRL_GLSL } from "./swirl";
 /**
@@ -205,6 +206,15 @@ float hash(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 4
 // (neighbours move together: sheets, not static), its domain warped as Blender's distortion warps it
 ${SWIRL_GLSL}
 ${PARALLAX_GLSL}
+uniform highp usampler2D uRestWords;   // every grain's packed chaos word (the cascade reads its ancestors')
+uniform vec3 uCascade;                 // x: seconds since 100% (the loader), y: 1 while it runs, z: the hero's own motion (0..1, the settle)
+vec3 cascadeRest(int i) {
+  int w = textureSize(uRestWords, 0).x;
+  uint word = texelFetch(uRestWords, ivec2(i - (i / w) * w, i / w), 0).r;
+  vec3 A0 = uChaosLo + vec3(float(word & 2047u) / 2047.0, float((word >> 11) & 1023u) / 1023.0, float(word >> 21) / 2047.0) * uChaosSize;
+  return uChaosC + uChaosShift + uChaosRot * (A0 - uChaosC);
+}
+${CASCADE_GLSL}
 vec3 flowOffset(vec3 p, float t, float time) {
   float k = 4.0 * t * (1.0 - t);
   if (uFlow.x <= 0.0 || k <= 0.0) return vec3(0.0);
@@ -258,6 +268,15 @@ void main() {
     swSize = mix(1.0, sw.w, swK);
   }
   p += swirl;
+  // the loader's cascade (cascade.ts): while it runs the grain is where its lineage has carried it; the hero's own motion
+  // (drift, flow, swirl, all of them offsets from the rest spot) comes back over the settle
+  float caSize = 1.0;
+  if (uCascade.y > 0.5) {
+    vec4 ca = cascadeAt(gl_VertexID, uCascade.x);
+    vec3 heroOff = p - (uChaosC + uChaosShift + uChaosRot * (A - uChaosC));
+    p = ca.xyz + heroOff * uCascade.z;
+    caSize = ca.w;
+  }
   // the same grain a frame ago, for its blur (only on a frame where something moved it: uMotionBlur.x is 0 otherwise);
   // the slow ambient drift barely moves in a frame, so it rides along as it is now
   vec3 pMoved = p, pPrev = p;
@@ -414,6 +433,7 @@ void main() {
   // (strictly under: the hash is 0.0 for ~0.3% of grains, and step(0, 0) is 1: big pebbles at a share of 0)
   float pebble = hash(aPosA + 4.4) < uPebble.x + uPebble.y * facing * facing ? 1.0 : 0.0;
   rad *= swSize;   // (grown in at its spot, shrunk away at the core)
+  rad *= caSize;   // (not yet born in the loader's cascade: not drawn)
   rad *= exp(uSizeJitter * (hash(aPosA + 6.1) + hash(aPosA + 7.3) - 1.0))
        * mix(1.0, mix(uPebble.z, uPebble.w, hash(aPosA + 8.2) * hash(aPosA + 8.9)), pebble * (1.0 - t));
   vBig = pebble * (1.0 - t);
@@ -489,6 +509,7 @@ in float vBlur;
 in float vBig;
 
 uniform float uExposure;
+uniform float uLightK;      // the loader's light coming up (0.35 .. 1): the sand's radiance scaled
 uniform float uOutScale;   // 1 on screen; 1/4 into the filtered sand layer (see sand-composite.ts)
 uniform float uSpec;     // the grain's reflectance at normal incidence (Cycles: specular IOR level 0.5 = F0 0.04)
 uniform float uGloss;    // its highlight's tightness (normalised Blinn exponent): roughness 0.22 broadened by the key's size
@@ -559,6 +580,7 @@ void main() {
   vec3 albK = mix(albedo, albedo * albedo * 2.2, uLampSat);
   col += albK * uFrontKey * (0.3 + 0.7 * max(n.z, 0.0)) + uFrontKey * pow(max(n.z, 0.0), uGloss) * glossNorm * uSpec;
   col *= uExposure * uOutScale;
+  col *= uLightK;
   gl_FragColor = vec4(col, vAlpha * edge);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>

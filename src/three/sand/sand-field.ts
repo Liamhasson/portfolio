@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { CASCADE, cascadeEnd } from "./cascade";
 import { PARALLAX } from "./parallax";
 import type { SandData } from "./data";
 import { SAND_FRAGMENT, SAND_VERTEX } from "./shaders";
@@ -165,6 +166,10 @@ export class SandField {
         uChaosC: { value: this.chaosCentre() },
         uChaosShift: { value: new THREE.Vector3() },
         uParallax: { value: new THREE.Vector3(0, 0, PARALLAX.back) },
+        uRestWords: { value: this.restWords(data) },
+        uCascade: { value: new THREE.Vector3(0, 0, 1) },
+        uAnchors: { value: Array.from({ length: 9 }, () => new THREE.Vector3()) },
+        uLightK: { value: 1 },
         uParallaxC: { value: new THREE.Vector4(0, 0, 0, 1) },
         uChaosRot: { value: this.chaosRot },
         uTime: { value: 0 },
@@ -381,6 +386,42 @@ export class SandField {
     const n = Math.min(count, this.data.count);
     this.points.geometry.setDrawRange(0, n);
     this.material.uniforms.uCountScale.value = Math.pow(this.data.meta.count / n, 0.35);
+  }
+
+  /** Every grain's packed chaos word in an integer texture (the cascade reads its ancestors'). */
+  private restWords(data: SandData): THREE.DataTexture {
+    const W = 2048, H = Math.ceil(data.count / W);
+    const buf = new Uint32Array(W * H);
+    for (let i = 0; i < data.count; i++) buf[i] = data.words[i * 2];
+    const tex = new THREE.DataTexture(buf, W, H, THREE.RedIntegerFormat, THREE.UnsignedIntType);
+    tex.internalFormat = "R32UI";
+    tex.minFilter = tex.magFilter = THREE.NearestFilter;
+    tex.needsUpdate = true;
+    return tex;
+  }
+
+  /** The loader's cascade (cascade.ts): seconds since 100% (null: off, the hero as it is), and the brief's anchors. */
+  setCascade(clock: number | null, anchors?: THREE.Vector3[]): void {
+    const u = this.material.uniforms;
+    if (anchors) anchors.forEach((a, i) => (u.uAnchors.value[i] as THREE.Vector3).copy(a));
+    if (clock === null) { (u.uCascade.value as THREE.Vector3).set(0, 0, 1); return; }
+    const settle = Math.min(Math.max((clock - cascadeEnd(this.drawn())) / CASCADE.settle, 0), 1);
+    (u.uCascade.value as THREE.Vector3).set(clock, 1, settle * settle * (3 - 2 * settle));
+    (u.uMotionBlur.value as THREE.Vector2).x = 0;   // (no streaks while it runs: its paths aren't the blur's)
+  }
+
+  cascadeDone(clock: number): boolean {
+    return clock >= cascadeEnd(this.drawn()) + CASCADE.settle;
+  }
+
+  /** The loader's light coming up: the sand's radiance scaled (0.35 .. 1). */
+  setLightK(k: number): void {
+    this.material.uniforms.uLightK.value = k;
+  }
+
+  private drawn(): number {
+    const c = this.points.geometry.drawRange.count;
+    return c === Infinity ? this.data.count : Math.min(c, this.data.count);
   }
 
   /** The lean toward the cursor (parallax.ts): the front's offset in NDC, about the cloud's centre and radius. */

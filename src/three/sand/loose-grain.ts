@@ -178,7 +178,7 @@ export function looseGrainUniforms(sand: THREE.ShaderMaterial): Record<string, T
     uRamp: su.uRamp, uRampAt: su.uRampAt,
     uLightPos: su.uLightPos, uLightCol: su.uLightCol, uLightR2: su.uLightR2, uSpotDir: su.uSpotDir, uSpotCos: su.uSpotCos,
     uCursorPos: su.uCursorPos, uCursorCol: su.uCursorCol, uCursorReach: su.uCursorReach,
-    uExposure: su.uExposure, uOutScale: su.uOutScale, uWrap: su.uWrap, uGapFill: su.uGapFill, uRough: su.uRough,
+    uExposure: su.uExposure, uLightK: su.uLightK, uOutScale: su.uOutScale, uWrap: su.uWrap, uGapFill: su.uGapFill, uRough: su.uRough,
     uBounce: su.uBounce, uGroundCol: su.uGroundCol, uFillCol: su.uFillCol, uFrontKey: su.uFrontKey, uUpView: su.uUpView,
     uSpec: su.uSpec, uGloss: su.uGloss, uSSS: su.uSSS, uLampSat: su.uLampSat,
     uShutter: su.uShutter, uMotionBlur: su.uMotionBlur, uPointScale: su.uPointScale, uMinPx: su.uMinPx, uEdge: su.uEdge,
