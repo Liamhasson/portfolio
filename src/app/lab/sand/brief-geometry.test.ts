@@ -1,6 +1,6 @@
 // src/app/lab/sand/brief-geometry.test.ts
 import { describe, expect, test } from "vitest";
-import { BRIEF, briefReturn, briefShapes, briefSize } from "./brief-geometry";
+import { BRIEF, briefReturn, briefShapes } from "./brief-geometry";
 
 describe("the brief (spec §2.2, §2.4)", () => {
   test("its construction: anchors in the cascade's order, the box around the circle, the handles 0.5523 r", () => {
@@ -15,19 +15,6 @@ describe("the brief (spec §2.2, §2.4)", () => {
   test("it scales with the viewport (a resize mid-load re-projects it)", () => {
     const a = briefShapes(400, 300, 100), b = briefShapes(800, 600, 200);
     expect(b.anchors.map(([x, y]) => [x / 2, y / 2])).toEqual(a.anchors);
-  });
-  test("it grows with the progress, never shrinks, and takes at least 1.2 s even when everything is cached", () => {
-    let s = 0, t = 0;
-    const dt = 1 / 60;
-    while (t < 0.6) { s = briefSize(s, 1, t, dt); t += dt; }
-    expect(s).toBeLessThan(0.6);   // cached: still growing at 0.6 s
-    while (t < BRIEF.minGrow + 0.4) { const n = briefSize(s, 1, t, dt); expect(n).toBeGreaterThanOrEqual(s); s = n; t += dt; }
-    expect(s).toBeCloseTo(1, 2);
-    expect(briefSize(0.8, 0.5, 5, dt)).toBe(0.8);   // never shrinks
-  });
-  test("it follows a stall and a burst smoothly (no jump over 0.1 in a frame)", () => {
-    let s = 0;
-    for (let i = 0; i < 300; i++) { const p = i < 100 ? 0.3 : 0.95; const n = briefSize(s, p, i / 60, 1 / 60); expect(n - s).toBeLessThan(0.1); s = n; }
   });
   test("it returns for a beat as the ball locks in", () => {
     expect(briefReturn(0.5)).toBe(0);
@@ -52,5 +39,38 @@ describe("the square that rounds into a circle (Liam, 2026-10-12): a designer's 
     const a = briefShapes(400, 300, 100, 0.25), b = briefShapes(400, 300, 100, 0.5);
     expect(b.ends[0][0]).toBeGreaterThan(a.ends[0][0]);   // (the top-left corner's top end moves right, toward the midpoint)
     expect(b.ends[0]).toEqual([300 + 50, 200]);
+  });
+});
+
+describe("the square grows smoothly (Liam, 2026-10-12: 'something feels slightly stuck as the square is getting bigger')", () => {
+  test("a burst in the download never jolts it: its speed changes gently from frame to frame", async () => {
+    const { BriefGrowth } = await import("./brief-geometry");
+    const g = new BriefGrowth();
+    let prev = 0, prevStep = 0;
+    for (let i = 0; i < 240; i++) {
+      const p = i < 90 ? 0.25 : 0.95, s = g.step(p, i / 60, 1 / 60);
+      const step = s - prev;
+      if (i > 1) expect(Math.abs(step - prevStep)).toBeLessThan(0.0035);
+      prev = s; prevStep = step;
+    }
+  });
+  test("a stalled download never stops it dead: it keeps creeping, never far past the real progress", async () => {
+    const { BriefGrowth } = await import("./brief-geometry");
+    const g = new BriefGrowth();
+    let s = 0;
+    for (let i = 0; i < 60 * 4; i++) s = g.step(0.5, i / 60, 1 / 60);
+    const a = s;
+    for (let i = 0; i < 30; i++) s = g.step(0.5, 4 + i / 60, 1 / 60);
+    expect(s).toBeGreaterThan(a);          // still moving
+    expect(s).toBeLessThan(0.5 + 0.09);    // but never far ahead
+  });
+  test("cached: whole within the minimum ramp plus a beat, never shrinking", async () => {
+    const { BriefGrowth } = await import("./brief-geometry");
+    const g = new BriefGrowth();
+    let s = 0, t = 0;
+    while (t < 0.6) { s = g.step(1, t, 1 / 60); t += 1 / 60; }
+    expect(s).toBeLessThan(0.6);
+    while (t < BRIEF.minGrow + 0.7) { const n = g.step(1, t, 1 / 60); expect(n).toBeGreaterThanOrEqual(s); s = n; t += 1 / 60; }
+    expect(s).toBe(1);
   });
 });

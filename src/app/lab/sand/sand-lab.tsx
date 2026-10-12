@@ -13,8 +13,8 @@ import { revealAt } from "@/three/sand/screen-reveal";
 import { DriftGrains } from "@/three/sand/drift-grains";
 import { vortexOnBall } from "@/three/sand/hero-layout";
 import { stepParallax } from "@/three/sand/parallax";
-import { Brief, type BriefHandle, briefReturn, briefSize } from "./brief";
-import { LOADER, loaderAt } from "./loader-timeline";
+import { Brief, type BriefHandle, BriefGrowth, briefReturn } from "./brief";
+import { LOADER, loaderAt, loaderRunning } from "./loader-timeline";
 import { readLoaderMode, releaseHold, showCopy } from "./loader-mode";
 import { LoadProgress } from "@/three/sand/load-progress";
 import { anchorsWorld } from "@/three/sand/cascade";
@@ -120,6 +120,7 @@ export function SandLab({ hero }: { hero: boolean }) {
     const progress = new LoadProgress();
     // the hero's other files, declared at about their sizes so none of them reads as a jump
     for (const [id, size] of [["/lab/grain.png", 60e3], ["haze", 90e3], ["/lab/shot/camera.json", 60e3], ["wordmark-font", 110e3]] as const) progress.expect(id, size);
+    const growth = new BriefGrowth();
     let size = 0, sinceMount = 0, briefLast = performance.now(), briefOn = playing, briefRaf = 0;
     let onFullSize: (() => void) | null = null;
     let ballScreen = { cx: window.innerWidth / 2, cy: window.innerHeight / 2, r: 0 };
@@ -129,7 +130,7 @@ export function SandLab({ hero }: { hero: boolean }) {
       holdScroll(true);   // (each frame: the smooth scroller registers after this component mounts)
       if (progress.value !== lastProgress) { lastProgress = progress.value; stalledFor = 0; } else stalledFor += dt;
       if (stalledFor > 15 && progress.value < 1) { giveUp(); return; }
-      size = briefSize(size, progress.value, sinceMount, dt);
+      size = growth.step(progress.value, sinceMount, dt);
       briefRef.current?.update({ ...ballScreen, r: ballScreen.r * size, alpha: 1, dash: 0, squares: Array(9).fill(1), round: 0 });   // (the square grows)
       briefRef.current?.announce(progress.value);
       if (size >= 0.999 && onFullSize) { const f = onFullSize; onFullSize = null; f(); }
@@ -140,7 +141,7 @@ export function SandLab({ hero }: { hero: boolean }) {
     const stopBrief = () => { briefOn = false; cancelAnimationFrame(briefRaf); };
     const fail = () => { stopBrief(); briefRef.current?.update({ ...ballScreen, alpha: 0, dash: 0, squares: Array(9).fill(1) }); releaseHold(); };
     let loaderClock: number | null = null, waitingForBrief = false, cascadeOn = false, released = false, loaderLight = 1, fadeClock: number | null = null;
-    let lastProgress = -1, stalledFor = 0;
+    let lastProgress = -1, stalledFor = 0, cascadeFinished = false;
     // the loader gives up (a load stalled, not failed): the page is freed now, and when the hero does arrive it simply shows
     const giveUp = () => {
       playing = false; waitingForBrief = false; loaderClock = null; loaderLight = 1;
@@ -848,8 +849,10 @@ export function SandLab({ hero }: { hero: boolean }) {
         if (waitingForBrief) field!.setCascade(-1);   // (nothing born yet: the brief is still growing)
         else if (loaderClock !== null && cascadeOn) {
           // (the cascade's clock starts as the circle closes: nothing is born while the square rounds)
-          field!.setCascade(loaderClock - LOADER.round);
-          if (field!.cascadeDone(loaderClock - LOADER.round)) { field!.setCascade(null); loaderClock = null; }
+          if (!cascadeFinished) field!.setCascade(loaderClock - LOADER.round);
+          if (!cascadeFinished && field!.cascadeDone(loaderClock - LOADER.round)) { field!.setCascade(null); cascadeFinished = true; }
+          // (the clock runs on until the release too: the cascade now ends before it)
+          if (!loaderRunning({ cascadeDone: cascadeFinished, released })) loaderClock = null;
         }
         // the brief returns for a beat as the ball locks in (spec §2.4)
         if (hero && !reduced && loaderClock === null && !waitingForBrief) {

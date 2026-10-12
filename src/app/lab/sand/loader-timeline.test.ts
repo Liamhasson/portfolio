@@ -41,3 +41,13 @@ test("at 100% the square rounds into the circle first (its own beat), then its p
   expect(loaderAt(LOADER.round + LOADER.unlock - 0.01).unlocked).toBe(false);
   expect(loaderAt(LOADER.round + LOADER.unlock).unlocked).toBe(true);
 });
+
+test("the loader's clock runs until the release, even when the cascade ends first (it stopped there and the page never unlocked: Liam, 2026-10-12)", async () => {
+  const { cascadeEnd } = await import("@/three/sand/cascade");
+  const { loaderRunning } = await import("./loader-timeline");
+  // (with no settle the cascade now ends before the unlock)
+  expect(LOADER.round + cascadeEnd(160000)).toBeLessThan(LOADER.round + LOADER.unlock);
+  expect(loaderRunning({ cascadeDone: true, released: false })).toBe(true);
+  expect(loaderRunning({ cascadeDone: false, released: true })).toBe(true);
+  expect(loaderRunning({ cascadeDone: true, released: true })).toBe(false);
+});

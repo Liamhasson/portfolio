@@ -4,7 +4,7 @@
 import { forwardRef, useImperativeHandle, useRef } from "react";
 import { BRIEF, briefShapes } from "./brief-geometry";
 
-export { BRIEF, briefReturn, briefShapes, briefSize } from "./brief-geometry";
+export { BRIEF, BriefGrowth, briefReturn, briefShapes } from "./brief-geometry";
 
 /** Which curve anchor (the cascade's index) each corner end becomes at the circle: TL.top, TR.top → top (1); TR.right,
  *  BR.right → right (2); BR.bottom, BL.bottom → bottom (3); BL.left, TL.left → left (4). */

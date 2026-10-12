@@ -41,3 +41,8 @@ export function loaderAt(t0: number) {
     unlocked: t >= LOADER.unlock,
   };
 }
+
+/** The loader keeps its clock until both the cascade is done and the page is released (either can come first). */
+export function loaderRunning({ cascadeDone, released }: { cascadeDone: boolean; released: boolean }): boolean {
+  return !(cascadeDone && released);
+}

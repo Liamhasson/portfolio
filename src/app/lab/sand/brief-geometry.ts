@@ -39,15 +39,31 @@ export function briefShapes(cx: number, cy: number, r: number, round = 1): Brief
   };
 }
 
-/** The size (0..1 of the ball's): chases the progress (a damped ease), at most the minimum-duration ramp, never back. */
-export function briefSize(prev: number, progress: number, elapsed: number, dt: number): number {
-  const cap = Math.min(elapsed / BRIEF.minGrow, 1);
-  const target = Math.min(progress, cap * cap * (3 - 2 * cap));
-  const gap = target - prev;
-  if (gap <= 0) return prev;   // never shrinks
-  // a damped chase, closing at least 0.3 a second, so it lands on the target instead of creeping at it forever
-  const step = Math.max(gap * (1 - Math.exp(-dt * 6)), Math.min(gap, 0.3 * dt));
-  return Math.min(prev + step, 1);
+/**
+ * The square's growth, smooth (Liam, 2026-10-12: "something feels slightly stuck as the square is getting bigger"): a
+ * critically damped spring toward the progress, its acceleration capped, so a burst in the download eases it on and a
+ * stall eases it down instead of stopping it dead; through a stall it keeps creeping, never more than 8% past the real
+ * progress. At least BRIEF.minGrow to grow whole; never shrinks.
+ */
+export class BriefGrowth {
+  size = 0;
+  private follow = 0;   // the spring that follows the download
+  private vel = 0;
+  step(progress: number, elapsed: number, dt: number): number {
+    const r = Math.min(elapsed / BRIEF.minGrow, 1), ramp = r * r * (3 - 2 * r);
+    const p = Math.min(Math.max(progress, 0), 1);
+    const target = p >= 1 ? 1 : Math.max(p, Math.min(p + 0.08, this.follow + 0.015));
+    const w = 3.5;
+    const acc = Math.max(-10, Math.min(10, w * w * (target - this.follow) - 2 * w * this.vel));
+    this.vel = Math.max(0, this.vel + acc * dt);
+    // (the last stretch to whole closes at a steady pace instead of an endless tail)
+    if (target >= 1 && 1 - this.follow < 0.05) this.vel = Math.max(this.vel, 0.3);
+    this.follow = Math.min(1, this.follow + this.vel * dt);
+    if (target >= 1 && this.follow > 0.999) this.follow = 1;
+    // the size: the spring, held to the minimum ramp (a cached load grows along the ramp alone); never shrinks
+    this.size = Math.max(this.size, Math.min(ramp, this.follow));
+    return this.size;
+  }
 }
 
 const ease = (x: number) => { const t = Math.min(Math.max(x, 0), 1); return t * t * (3 - 2 * t); };
