@@ -60,4 +60,6 @@ for k in ("side_fill",):
 meta = {**{k: v for k, v in shut.items() if k not in ("materials", "lights", "laptop", "probe_lit")}, "version": 3, "materials": mats,
         "lights": lights, "screen": "screen.jpg", "lid": {"pivot": "lid_pivot", "baked_open_deg": opn["lid_open_deg"]}}
 json.dump(meta, open(os.path.join(DST, "desk.json"), "w"))
+# the lighting bakes as GPU-compressed KTX2 (desk3d-ktx2.py)
+subprocess.run(["python3", "scripts/lab/desk3d-ktx2.py"], check=True)
 print("published", len(mats), "surfaces;", subprocess.run(["du", "-sh", DST], capture_output=True, text=True).stdout.strip())

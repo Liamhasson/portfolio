@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { EXRLoader } from "three/addons/loaders/EXRLoader.js";
+import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";
 import { RectAreaLightUniformsLib } from "three/addons/lights/RectAreaLightUniformsLib.js";
 import { REVEAL, type RevealFrame } from "./screen-reveal";
 import { holdLoop, loopVideo } from "./card-loops";
@@ -678,15 +679,25 @@ export class BakedDesk {
     const { meta, base } = files;
     const url = (f: string) => files.urls.get(f) ?? `${base}/${f}`;
     const tl = new THREE.TextureLoader();
+    // the lighting bakes are GPU-compressed KTX2 (scripts/lab/desk3d-ktx2.py), transcoded off the main thread to what
+    // this GPU reads (BC on desktops, ETC or ASTC on phones)
+    const kl = new KTX2Loader().setTranscoderPath("/lab/basis/").detectSupport(renderer);
     const loaded: THREE.Texture[] = [];
-    const tex = (file: string, color: boolean) =>
-      tl.loadAsync(url(file)).then((t) => {
-        t.colorSpace = color ? THREE.SRGBColorSpace : THREE.NoColorSpace;
-        t.flipY = false; // glTF UV convention
-        t.anisotropy = 8;
-        loaded.push(t);
-        return t;
-      });
+    const cache = new Map<string, Promise<THREE.Texture>>();   // (identical bakes are one file: one texture)
+    const tex = (file: string, color: boolean) => {
+      let t = cache.get(file);
+      if (!t) {
+        t = (file.endsWith(".ktx2") ? kl.loadAsync(url(file)) : tl.loadAsync(url(file))).then((t) => {
+          t.colorSpace = color ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+          t.flipY = false; // glTF UV convention (a KTX2 is stored top row first, as the JPEG)
+          t.anisotropy = 8;
+          loaded.push(t);
+          return t;
+        });
+        cache.set(file, t);
+      }
+      return t;
+    };
     const [gltf, probe] = await Promise.all([
       deskGltfLoader().parseAsync(files.glb, `${base}/`),
       new EXRLoader().loadAsync(url(meta.probe)),
@@ -887,6 +898,7 @@ export class BakedDesk {
     d.setState(0, 0);
     d.setScreen(null);
     d.textures = [...loaded, lut];
+    kl.dispose();   // (its transcoding workers)
     for (const u of files.urls.values()) URL.revokeObjectURL(u);   // (every image is in: the textures hold them)
     const [cx, cy, cz] = meta.chaos_center; // Blender, z up
     d.group.scale.setScalar(1 / k);
