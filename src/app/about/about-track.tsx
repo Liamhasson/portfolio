@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { NextPagePull } from "@/components/shell/next-page-pull";
 import { ABOUT, type Line } from "@/content/about";
-import { sectionHeight, trackLayout, trackProgress, trackX } from "./track";
+import { scrollForSlide, sectionHeight, trackLayout, trackProgress, trackX } from "./track";
 import "./about.css";
 
 /** A line in two colours: its highlights in the near-white, the rest in the darker tone (Liam, 2026-10-12). */
@@ -22,29 +22,44 @@ function Words({ line }: { line: Line }) {
 export function AboutTrack() {
   const section = useRef<HTMLElement>(null), track = useRef<HTMLDivElement>(null), bar = useRef<HTMLSpanElement>(null);
   useEffect(() => {
-    const sec = section.current, tr = track.current;
-    if (!sec || !tr) return;
+    const sec = section.current, tr = track.current, clip = tr?.parentElement;
+    if (!sec || !tr || !clip) return;
     let raf = 0, height = 0;
+    // the track's window: the clip (narrower than the screen when the portrait stands beside it)
+    const viewW = () => clip.clientWidth || window.innerWidth;
     const frame = () => {
       if (sec.dataset.mode !== "track") return;
       const p = trackProgress(window.scrollY, sec.offsetTop, height, window.innerHeight);
-      tr.style.transform = `translate3d(${trackX(p, tr.scrollWidth, window.innerWidth)}px, 0, 0)`;
+      tr.style.transform = `translate3d(${trackX(p, tr.scrollWidth, viewW())}px, 0, 0)`;
       if (bar.current) bar.current.style.transform = `scaleX(${p})`;
     };
     const layout = () => {
       const mode = trackLayout({ w: window.innerWidth, h: window.innerHeight, reduced: window.matchMedia("(prefers-reduced-motion: reduce)").matches });
       sec.dataset.mode = mode;
       if (mode === "stack") { sec.style.height = ""; tr.style.transform = ""; return; }
-      height = sectionHeight(tr.scrollWidth, window.innerWidth, window.innerHeight);
+      height = sectionHeight(tr.scrollWidth, viewW(), window.innerHeight);
       sec.style.height = `${height}px`;
       frame();
     };
     const onScroll = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(frame); };
+    // keyboard focus (and find-in-page) on a slide: scroll the page to where the track shows it
+    const onFocus = (e: FocusEvent) => {
+      if (sec.dataset.mode !== "track") return;
+      const slide = (e.target as HTMLElement).closest<HTMLElement>(".ab-slide");
+      if (!slide) return;
+      window.scrollTo(0, scrollForSlide(sec.offsetTop, slide.offsetLeft, window.innerWidth * 0.06, Math.max(tr.scrollWidth - viewW(), 0)));
+    };
+    sec.addEventListener("focusin", onFocus);
+    // stacked: each slide rises in as it comes into view (about.css; only the stack shows it)
+    const io = typeof IntersectionObserver === "function"
+      ? new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) (e.target as HTMLElement).dataset.in = ""; }), { rootMargin: "0px 0px -12% 0px" })
+      : null;
+    tr.querySelectorAll(".ab-slide").forEach((el) => io?.observe(el));
     layout();
     void document.fonts?.ready.then(layout);
     window.addEventListener("resize", layout);
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", layout); window.removeEventListener("scroll", onScroll); };
+    return () => { cancelAnimationFrame(raf); io?.disconnect(); sec.removeEventListener("focusin", onFocus); window.removeEventListener("resize", layout); window.removeEventListener("scroll", onScroll); };
   }, []);
   const last = ABOUT.verbs.length - 1;
   return (

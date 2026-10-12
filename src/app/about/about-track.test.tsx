@@ -1,5 +1,5 @@
 // src/app/about/about-track.test.tsx
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), prefetch: vi.fn() }) }));
@@ -52,4 +52,42 @@ test("the resume opens in a new tab, safely; the pull leads to Contact", () => {
   expect(cv).toHaveAttribute("rel", "noopener noreferrer");
   expect(screen.getByRole("link", { name: "Next: Contact" })).toHaveAttribute("href", "/contact");
   expect(screen.getByRole("link", { name: "Next: Contact" })).toHaveTextContent("Keep scrolling");   // (Liam, 2026-10-12)
+});
+
+test("tabbing to a link on the track scrolls the page to its slide, not the clip (final review I3)", () => {
+  window.scrollTo = vi.fn() as never;
+  render(<AboutTrack />);
+  screen.getByRole("link", { name: /finding a section, 35s → 8s/ }).focus();
+  expect(window.scrollTo).toHaveBeenCalled();
+});
+
+test("the track is clipped, not a scroll container (overflow: clip), so nothing can scroll it sideways (final review I3)", async () => {
+  const css = (await import("node:fs")).readFileSync(`${process.cwd()}/src/app/about/about.css`, "utf8");
+  expect(css).toMatch(/\.ab-clip \{[^}]*overflow: clip/);
+  expect(css).toMatch(/\.ab\[data-mode="track"\] \.ab-pin \{[^}]*overflow: clip/);
+});
+
+test("stacked (phones, reduced motion): each slide rises in as it comes into view (spec §3; final review I6)", () => {
+  let cb: IntersectionObserverCallback = () => {};
+  const observed: Element[] = [];
+  globalThis.IntersectionObserver = class {
+    constructor(c: IntersectionObserverCallback) { cb = c; }
+    observe(el: Element) { observed.push(el); }
+    unobserve() {}
+    disconnect() {}
+  } as never;
+  window.matchMedia = vi.fn().mockReturnValue({ matches: true, addEventListener() {}, removeEventListener() {} }) as never;   // (reduced: stacked)
+  const { container } = render(<AboutTrack />);
+  const slides = [...container.querySelectorAll(".ab-slide")];
+  expect(observed.length).toBe(slides.length);
+  expect(slides[0]).not.toHaveAttribute("data-in");
+  act(() => { cb([{ target: slides[0], isIntersecting: true } as unknown as IntersectionObserverEntry], {} as IntersectionObserver); });
+  expect(slides[0]).toHaveAttribute("data-in");
+});
+
+test("the track's first line slides in on arrival, and the ground carries the site's film grain (spec §2, §3.3; final review I6)", async () => {
+  const css = (await import("node:fs")).readFileSync(`${process.cwd()}/src/app/about/about.css`, "utf8");
+  expect(css).toMatch(/\.ab\[data-mode="track"\] \.ab-slide:first-child \{[^}]*animation: ab-in/);
+  expect(css).toMatch(/@keyframes ab-in/);
+  expect(css).toMatch(/url\("?\/lab\/grain\.png"?\)/);
 });

@@ -99,7 +99,7 @@ Andrada's and Emil's highlights are chosen with Liam when their quotes arrive.
 One screen, no scroll.
 
 1. **The brief grows** in the centre, exactly as the loader's does (`brief.tsx`, `BriefGrowth`): from a point, its size
-   the loading progress of the sand (the light tier, about 0.7 MB, plus the density volumes), at least 1.2 s.
+   the loading progress of the sand (the light tier's grains, about 0.7 MB, plus the three density volumes, about 3.5 MB: about 4.2 MB in all; final review 2026-10-12), at least 1.2 s. The words never wait for it: they are in by 8 s after the page opens, whatever the load is doing.
 2. **At 100% its anchors become grains** and split (the loader's cascade, `cascade.ts`), but the grains **gather into
    the ball** inside the brief instead of building the vortex: the hero's own ball, about 30% of the viewport's
    height, lit by the hero's light.

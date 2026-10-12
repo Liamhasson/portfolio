@@ -15,7 +15,7 @@ import { ballKeyPos } from "@/three/sand/ball-light";
 import { contactView } from "@/three/sand/contact-view";
 import { parseTierOverride, pickTier, readSignals, settingsFor } from "@/three/tier";
 import { Brief, type BriefHandle, BriefGrowth } from "@/app/lab/sand/brief";
-import { contactAt, contactStalled } from "./contact-timeline";
+import { contactAt, contactStalled, wordsShown } from "./contact-timeline";
 import { ContactEnd } from "./contact-end";
 import "./contact.css";
 
@@ -45,13 +45,21 @@ export function ContactScene() {
     progress.expect("haze", 90e3);
     const growth = new BriefGrowth();
     let ball = { cx: window.innerWidth / 2, cy: window.innerHeight * 0.42, r: window.innerHeight * 0.15 };
-    let since = 0, last = performance.now(), lastP = -1, stalledFor = 0, raf = 0, growing = true;
+    let since = 0, last = performance.now(), lastP = -1, stalledFor = 0, raf = 0, growing = true, gaveUp = false;
+    // the words: the timeline's, but never later than CONTACT_T.wordsBy since the page opened (a slow link)
+    const mountAt = performance.now();
+    let shown = 0;
+    const showWords = (timeline: number) => {
+      const w = wordsShown((performance.now() - mountAt) / 1000, timeline);
+      if (Math.abs(w - shown) > 0.001) { shown = w; setWords(w); }
+    };
     let onFull: (() => void) | null = null;
     const cleanups: (() => void)[] = [];
     // the still: no WebGL, an error, or a stalled load; never a blank page
     const giveUp = () => {
-      growing = false; cancelAnimationFrame(raf);
-      stage?.stop();
+      growing = false; gaveUp = true; cancelAnimationFrame(raf);
+      // gone for good: a load finishing later, or the tab coming back, never restarts it (final review I2)
+      stage?.dispose(); stage = null;
       setStill(true); setWords(1);
       briefRef.current?.update({ cx: window.innerWidth / 2, cy: window.innerHeight * 0.42, r: window.innerHeight * 0.15, alpha: 1, dash: 0, squares: Array(9).fill(1), round: 1 });
     };
@@ -64,6 +72,7 @@ export function ContactScene() {
       const size = growth.step(progress.value, since, dt);
       briefRef.current?.update({ ...ball, r: ball.r * size, alpha: 1, dash: 0, squares: Array(9).fill(1), round: 0 });
       briefRef.current?.announce(progress.value);
+      showWords(0);
       if (size >= 0.999 && onFull) { const f = onFull; onFull = null; f(); }
       if (growing) raf = requestAnimationFrame(grow);
     };
@@ -71,10 +80,11 @@ export function ContactScene() {
 
     (async () => {
       const probe = document.createElement("canvas").getContext("webgl2");
+      if (gaveUp) return;
       if (!probe || new URLSearchParams(window.location.search).has("nogl")) { giveUp(); return; }   // (?nogl: the fallback, as in the story)
       const tier = pickTier(readSignals(probe), parseTierOverride(window.location.search));
       const meta = await loadSandMeta(SAND_BASE);
-      if (disposed) return;
+      if (disposed || gaveUp) return;
       const { camera } = meta;
       stage = new Stage(canvas, { position: camera.position, target: camera.target, lensMm: camera.lens_mm, sensorMm: camera.sensor_mm, renderAspect: camera.render[0] / camera.render[1] }, tier, false);
       const st = stage;
@@ -93,7 +103,7 @@ export function ContactScene() {
       };
       st.onSettings((s) => { frame(); field?.setGrains(s.grains); field?.setPointScale(st.bufferHeight, THREE.MathUtils.degToRad(st.camera.fov)); });
       const data = await loadSandParts(meta, settingsFor("low", window.devicePixelRatio || 1).grains, SAND_BASE, progress);
-      if (disposed) return;
+      if (disposed || gaveUp) return;
       field = new SandField(data);
       st.scene.add(field.points);
       field.setGrains(st.settings.grains);
@@ -109,7 +119,7 @@ export function ContactScene() {
       st.renderFrame = (r, sc, cam) => comp.render(r, sc, cam);
       comp.sigma = 0.28;   // (the ball's filter width: sand-lab.tsx FILTER.ball)
       new THREE.TextureLoader().loadAsync("/lab/grain.png").finally(() => progress.done("/lab/grain.png")).then((t) => {
-        if (disposed) return;
+        if (disposed || gaveUp) return;
         comp.grade = new FilmGradePass(t);
         comp.gradeStill = reduced;
       }).catch(() => {});
@@ -124,7 +134,7 @@ export function ContactScene() {
       await st.renderer.compileAsync(st.scene, st.camera).catch(() => {});
       await comp.warm(st.renderer, st.scene, st.camera).catch(() => {});
       progress.compile(1);
-      if (disposed) return;
+      if (disposed || gaveUp) return;
 
       // the cursor: a light, and unless motion is reduced a soft drift (as in the hero)
       paint = new PaintField();
@@ -151,7 +161,7 @@ export function ContactScene() {
         if (t0 !== null) {
           growing = false;
           briefRef.current?.update({ ...ball, alpha: 1, dash: 0, squares: Array(9).fill(1), round: k.round });
-          setWords(k.words);
+          showWords(k.words);
         }
         if (cascading) {
           if (t0 === null) field!.setCascade(-1);

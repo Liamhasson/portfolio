@@ -1,6 +1,6 @@
 // src/app/contact/contact-timeline.test.ts
 import { expect, test } from "vitest";
-import { CONTACT_T, contactAt, contactStalled } from "./contact-timeline";
+import { CONTACT_T, contactAt, contactStalled, wordsShown } from "./contact-timeline";
 
 test("after the brief is full: its corners round, then the cascade, then the words", () => {
   expect(contactAt(0).round).toBe(0);
@@ -15,4 +15,10 @@ test("a stalled load gives up after 15 s, never while it still moves or once it'
   expect(contactStalled(15.1, 0.4)).toBe(true);
   expect(contactStalled(14.9, 0.4)).toBe(false);
   expect(contactStalled(30, 1)).toBe(false);
+});
+
+test("on a slow link the words don't wait for the sand: they're in by about 8 s whatever the load is doing (final review I1)", () => {
+  expect(wordsShown(2, 0)).toBe(0);
+  expect(wordsShown(CONTACT_T.wordsBy + 0.9, 0)).toBe(1);
+  expect(wordsShown(3, 0.4)).toBe(0.4);   // (the timeline's own words, when sooner)
 });

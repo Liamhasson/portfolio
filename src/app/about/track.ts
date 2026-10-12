@@ -6,8 +6,11 @@
  */
 export type TrackMode = "track" | "stack";
 
+/** Below this height the tallest slide (Build it, with the resume) doesn't fit the pinned screen: stack instead. */
+export const TRACK_MIN_H = 560;
+
 export const trackLayout = ({ w, h, reduced }: { w: number; h: number; reduced: boolean }): TrackMode =>
-  reduced || w / h < 1 ? "stack" : "track";
+  reduced || w / h < 1 || h < TRACK_MIN_H ? "stack" : "track";
 
 export const sectionHeight = (trackW: number, viewW: number, vh: number) => vh + Math.max(trackW - viewW, 0);
 
@@ -17,3 +20,8 @@ export function trackProgress(scrollY: number, top: number, height: number, vh: 
 }
 
 export const trackX = (p: number, trackW: number, viewW: number) => -p * Math.max(trackW - viewW, 0);
+
+/** Where the page scrolls so a slide `slideLeft` along the track shows `inset` from the clip's left edge (keyboard focus,
+ *  find-in-page): the section's top plus that much of the track's travel, never past its ends. */
+export const scrollForSlide = (top: number, slideLeft: number, inset: number, overflow: number) =>
+  top + Math.min(Math.max(slideLeft - inset, 0), overflow);
