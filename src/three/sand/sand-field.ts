@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { PARALLAX } from "./parallax";
 import type { SandData } from "./data";
 import { SAND_FRAGMENT, SAND_VERTEX } from "./shaders";
 
@@ -163,6 +164,8 @@ export class SandField {
         uBallRot: { value: this.ballRot },
         uChaosC: { value: this.chaosCentre() },
         uChaosShift: { value: new THREE.Vector3() },
+        uParallax: { value: new THREE.Vector3(0, 0, PARALLAX.back) },
+        uParallaxC: { value: new THREE.Vector4(0, 0, 0, 1) },
         uChaosRot: { value: this.chaosRot },
         uTime: { value: 0 },
         uDrift: { value: SAND_LOOK.drift },
@@ -378,6 +381,13 @@ export class SandField {
     const n = Math.min(count, this.data.count);
     this.points.geometry.setDrawRange(0, n);
     this.material.uniforms.uCountScale.value = Math.pow(this.data.meta.count / n, 0.35);
+  }
+
+  /** The lean toward the cursor (parallax.ts): the front's offset in NDC, about the cloud's centre and radius. */
+  setParallax(x: number, y: number, centre: THREE.Vector3, radius: number): void {
+    const u = this.material.uniforms;
+    (u.uParallax.value as THREE.Vector3).set(x, y, PARALLAX.back);
+    (u.uParallaxC.value as THREE.Vector4).set(centre.x, centre.y, centre.z, radius);
   }
 
   /** Depth of field, 0..1 of the look's (it belongs to the hero's camera; 0 = sharp throughout). */

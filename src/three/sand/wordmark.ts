@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { SandMeta } from "./data";
+import { INT_HASH_GLSL } from "./int-hash";
 
 /**
  * LIAM HASSON behind the sand: heavy Geist letters as dark outlines in the void, light travelling through their strokes
@@ -158,7 +159,9 @@ uniform float uInnerEdge;    // screen px in from the rim over which it fades to
 uniform vec3 uInnerCol;      // its colour: a pale warm white, as the pills' light
 uniform float uBlurPx;       // the lens's blur at the name (screen px): its edges spread over it
 
-float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+${INT_HASH_GLSL}
+// (an integer hash: the light's flow moves with the clock; a sin() hash lost its precision hours into a visit)
+float hash(vec2 p) { return ihash(p); }
 float vnoise(vec2 p) {
   vec2 i = floor(p), f = fract(p);
   vec2 u = f * f * (3.0 - 2.0 * f);

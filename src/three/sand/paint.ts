@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { INT_HASH_GLSL } from "./int-hash";
 
 /**
  * The cursor's soft drift: a low-resolution screen-space velocity field the pointer stirs, which then decays (the model
@@ -23,7 +24,7 @@ out vec2 vUv;
 void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }
 `;
 
-const PAINT_FRAGMENT = /* glsl */ `
+export const PAINT_FRAGMENT = /* glsl */ `
 precision highp float;
 in vec2 vUv;
 out vec4 outColor;
@@ -39,7 +40,9 @@ uniform float uCurlScale;
 uniform float uCurlStrength;
 uniform float uTime;
 
-float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+${INT_HASH_GLSL}
+// (an integer hash: the curl moves with the clock; a sin() hash lost its precision hours into a visit)
+float hash(vec2 p) { return ihash(p); }
 float vnoise(vec2 p) {
   vec2 i = floor(p), f = fract(p);
   vec2 u = f * f * (3.0 - 2.0 * f);

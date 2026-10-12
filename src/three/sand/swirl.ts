@@ -1,3 +1,5 @@
+import { INT_HASH_GLSL, ihash3 } from "./int-hash";
+
 /**
  * The chaos at rest (Liam, 2026-10-11: "a continuous inwards and around themselves motion, no identical movements",
  * Lusion's about page as the reference): every grain is carried by a strong inward vortex and a slowly changing
@@ -11,7 +13,11 @@
  * and time): the vertex shader computes it (SWIRL_GLSL); the TS mirror below is what the tests check.
  */
 export const SWIRL = {
-  lifeMin: 20, lifeMax: 60,   // seconds
+  lifeMin: 20, lifeMax: 60,   // seconds: how far a region's spiral turns over a life
+  lifeMean: 40,               // seconds: the shared pace every region's phase runs at (Liam, 2026-10-12: each region on
+                              // its own life made neighbours drift apart every second; hours in, the streams were noise)
+  wobble: 0.2,                // cycles: each region's own pace, a bounded wobble about the shared one (never drifting)
+  wobblePeriod: 90,           // seconds
   born: 1.4,                  // the radius it is born at, x its spot's
   core: 0.45,                 // and drawn in to
   coreAlong: 0.75,            // along the axis (toward the lens) it starts at its spot and is only drawn in, to this:
@@ -29,7 +35,9 @@ const f = (v: number) => v.toFixed(4);
 const AX = (() => { const [x, y, z] = SWIRL.axis, l = Math.hypot(x, y, z); return [x / l, y / l, z / l] as [number, number, number]; })();
 
 export const SWIRL_GLSL = /* glsl */ `
-float swHash(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453123); }
+${INT_HASH_GLSL}
+// (an integer hash: the current moves with the clock, and a sin() hash lost its precision hours into a visit)
+float swHash(vec3 p) { return ihash(p); }
 float swNoise(vec3 p) {
   vec3 i = floor(p), q = fract(p);
   vec3 u = q * q * (3.0 - 2.0 * q);
@@ -42,7 +50,7 @@ vec4 swirlAt(vec3 p, vec3 seed, vec3 c, float R, float time) {
   vec3 fq = (p - c) * (${f(SWIRL.field)} / R);
   float n1 = 0.5 + 0.5 * swNoise(fq + vec3(11.0)), n2 = 0.5 + 0.5 * swNoise(fq + vec3(-7.0, 23.0, 5.0)), n3 = swNoise(fq + vec3(41.0, -3.0, 17.0));
   float life = mix(${f(SWIRL.lifeMin)}, ${f(SWIRL.lifeMax)}, n1);   // (shared: a grain's own life would drift it off its sheet)
-  float ph = fract(time / life + 2.0 * n2 + 0.03 * seed.y);
+  float ph = fract(time / ${f(SWIRL.lifeMean)} + ${f(SWIRL.wobble)} * sin(6.2831853 * (time / ${f(SWIRL.wobblePeriod)} + n1)) + 2.0 * n2 + 0.03 * seed.y);
   float inK = pow(ph, 1.4);
   vec3 d = p - c;
   float along = dot(d, ax);
@@ -62,7 +70,7 @@ vec4 swirlAt(vec3 p, vec3 seed, vec3 c, float R, float time) {
 const fract = (x: number) => x - Math.floor(x);
 const mix = (a: number, b: number, t: number) => a + (b - a) * t;
 const smoothstep = (a: number, b: number, x: number) => { const t = Math.min(Math.max((x - a) / (b - a), 0), 1); return t * t * (3 - 2 * t); };
-const swHash = (x: number, y: number, z: number) => fract(Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453123);
+const swHash = (x: number, y: number, z: number) => ihash3(x, y, z);
 function swNoise(x: number, y: number, z: number): number {
   const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
   const qx = x - ix, qy = y - iy, qz = z - iz;
@@ -77,7 +85,7 @@ export function swirlAt(p: [number, number, number], seed: [number, number, numb
   const fs = SWIRL.field / R, fx = (p[0] - c[0]) * fs, fy = (p[1] - c[1]) * fs, fz = (p[2] - c[2]) * fs;
   const n1 = 0.5 + 0.5 * swNoise(fx + 11, fy + 11, fz + 11), n2 = 0.5 + 0.5 * swNoise(fx - 7, fy + 23, fz + 5), n3 = swNoise(fx + 41, fy - 3, fz + 17);
   const life = mix(SWIRL.lifeMin, SWIRL.lifeMax, n1);
-  const phRaw = time / life + 2 * n2 + 0.03 * seed[1];
+  const phRaw = time / SWIRL.lifeMean + SWIRL.wobble * Math.sin(2 * Math.PI * (time / SWIRL.wobblePeriod + n1)) + 2 * n2 + 0.03 * seed[1];
   const ph = fract(phRaw), lifeIndex = Math.floor(phRaw);
   const inK = Math.pow(ph, 1.4);
   const d = [p[0] - c[0], p[1] - c[1], p[2] - c[2]];

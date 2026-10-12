@@ -1,3 +1,4 @@
+import { PARALLAX_GLSL } from "./parallax";
 import { SWIRL_GLSL } from "./swirl";
 /**
  * The sand's shaders (GLSL 3, three.js ShaderMaterial). Look target: the approved Cycles renders
@@ -203,6 +204,7 @@ float hash(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 4
 // The flow's push on a grain at p, t of the way from chaos to ball: one smooth noise field shared by all the grains
 // (neighbours move together: sheets, not static), its domain warped as Blender's distortion warps it
 ${SWIRL_GLSL}
+${PARALLAX_GLSL}
 vec3 flowOffset(vec3 p, float t, float time) {
   float k = 4.0 * t * (1.0 - t);
   if (uFlow.x <= 0.0 || k <= 0.0) return vec3(0.0);
@@ -395,6 +397,8 @@ void main() {
   vec2 pvel = texture(uPaint, suv).xy * frontness;           // CSS px / s
   vec2 push = pvel * uPaintScale;
   gl_Position.xy += push / (uViewport * 0.5) * gl_Position.w;
+  // the lean toward the cursor by depth (parallax.ts): the front follows it, the back a little; the loose cloud only
+  gl_Position.xy += uParallax.xy * mix(uParallax.z, 1.0, parallaxFront(p)) * (1.0 - t) * gl_Position.w;
   // the cursor only moves the grains, never stretches them (Liam, 2026-10-10: its streak smudged the sand)
   vec2 blur = vec2(0.0);
   float packed = floor(aAttr.z * 255.0 + 0.5);

@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { PARALLAX_GLSL } from "./parallax";
 
 /**
  * Loose grains (the floating grains, the rising sand) drawn and lit as the sand's own: one vertex shader (light through
@@ -120,6 +121,8 @@ const LOOSE_BODY = /* glsl */ `
   vec2 suv = gl_Position.xy / gl_Position.w * 0.5 + 0.5;
   vec2 pvel = texture(uPaint, suv).xy;
   gl_Position.xy += pvel * uPaintScale / (uViewport * 0.5) * gl_Position.w;
+  // the lean toward the cursor by depth, as the sand's (parallax.ts), fading as the sand compacts
+  gl_Position.xy += uParallax.xy * mix(uParallax.z, 1.0, parallaxFront(iPos)) * (1.0 - smoothstep(0.0, 1.0, uCompact)) * gl_Position.w;
   // the cursor only moves them, never stretches them (Liam, 2026-10-10, the sand's own fix 01138e3: its streak smudged)
   vec2 blur = vec2(0.0);
   // the grain: a randomly squashed, randomly turned pebble, as the sand's
@@ -165,7 +168,7 @@ const LOOSE_BODY = /* glsl */ `
 `;
 
 export function looseGrainVertex(decl: string, locals: string): string {
-  return `precision highp float;\n${decl}\n${LOOSE_UNIFORMS}\n${LOOSE_FUNCS}\nvoid main() {\n${locals}\n${LOOSE_BODY}\n}\n`;
+  return `precision highp float;\n${decl}\n${LOOSE_UNIFORMS}\n${PARALLAX_GLSL}\n${LOOSE_FUNCS}\nvoid main() {\n${locals}\n${LOOSE_BODY}\n}\n`;
 }
 
 /** The sand's own uniforms, shared (its palette, lights, material, cursor, drift field, grain look, shadows). */
@@ -182,7 +185,7 @@ export function looseGrainUniforms(sand: THREE.ShaderMaterial): Record<string, T
     uGround: su.uGround, uPaint: su.uPaint, uPaintScale: su.uPaintScale, uViewport: su.uViewport, uBufH: su.uBufH,
     // the sand's shadows: its own uniforms, shared (its volumes swap as it compacts)
     uLo: su.uLo, uSize: su.uSize, uVolA: su.uVolA, uVolB: su.uVolB, uVolMix: su.uVolMix, uSigmaMax: su.uSigmaMax,
-    uShadowK: su.uShadowK, uCompact: su.uCompact, uChaosC: su.uChaosC, uChaosShift: su.uChaosShift, uChaosRot: su.uChaosRot, uBallC: su.uBallC,
+    uShadowK: su.uShadowK, uCompact: su.uCompact, uChaosC: su.uChaosC, uChaosShift: su.uChaosShift, uParallax: su.uParallax, uParallaxC: su.uParallaxC, uChaosRot: su.uChaosRot, uBallC: su.uBallC,
     uBallVolC: su.uBallVolC, uBallVolS: su.uBallVolS, uBallRot: su.uBallRot, uGrainShadow: { value: 1 },
     uShadeBall: { value: new THREE.Vector4() }, uShadeLamp: { value: new THREE.Vector4() }, uShadeK: { value: 0 },
   };

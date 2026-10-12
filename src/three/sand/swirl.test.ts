@@ -46,18 +46,23 @@ describe("the chaos at rest: Lusion's flow and a strong inward vortex (Liam, 202
 
   test("in sheets, as Lusion's: neighbours move together (the cloud keeps its filaments); far grains differently", () => {
     const off = (p: [number, number, number], seed: [number, number, number], t: number) => { const q = swirlAt(p, seed, C, R, t).pos; return [q[0] - p[0], q[1] - p[1], q[2] - p[2]]; };
-    let near = 0, far = 0;
+    // (medians, rebirths left out: a pair straddling a region's rebirth, or the core where the turn is steepest, is
+    // rightly apart; the typical pair is what makes the sheets)
+    const near: number[] = [], far: number[] = [];
     for (let i = 0; i < 40; i++) {
       const p: [number, number, number] = [((i * 0.37) % 2 - 1) * R * 0.8, ((i * 0.61) % 2 - 1) * R * 0.6, ((i * 0.23) % 2 - 1) * R * 0.7];
       const q: [number, number, number] = [p[0] + 0.03 * R, p[1], p[2]];
       const w: [number, number, number] = [-p[0], -p[1] + 0.4 * R, p[2] * 0.3];
       const t = 7 + i * 3.1;
+      if (swirlAt(p, [0.2, 0.4, 0.6], C, R, t).life !== swirlAt(q, [0.7, 0.1, 0.9], C, R, t).life) continue;
       const a = off(p, [0.2, 0.4, 0.6], t), b = off(q, [0.7, 0.1, 0.9], t), c = off(w, [0.2, 0.4, 0.6], t);
-      near += len([a[0] - b[0], a[1] - b[1], a[2] - b[2]]);
-      far += len([a[0] - c[0], a[1] - c[1], a[2] - c[2]]);
+      near.push(len([a[0] - b[0], a[1] - b[1], a[2] - b[2]]));
+      far.push(len([a[0] - c[0], a[1] - c[1], a[2] - c[2]]));
     }
-    expect(near / 40).toBeLessThan(0.1 * R);
-    expect(far / near).toBeGreaterThan(4);
+    const median = (v: number[]) => [...v].sort((x, y) => x - y)[v.length >> 1];
+    expect(near.length).toBeGreaterThan(30);
+    expect(median(near)).toBeLessThan(0.1 * R);
+    expect(median(far) / median(near)).toBeGreaterThan(4);
   });
 
   test("smooth: within a life a grain moves a little each frame (its streak), never jumps", () => {
@@ -80,4 +85,23 @@ test("never toward the lens: the spiral draws grains in around the axis, never o
       expect(Math.abs(along)).toBeLessThanOrEqual(Math.abs(along0) + SWIRL.turb * R * 1.8);
     }
   }
+});
+
+test("it never ages (Liam, 2026-10-12: a tab open for hours had lost every stream): hours in, neighbours still move together", () => {
+  // each region kept its own life, so its phase (time / life) drifted from its neighbours' a little more every second;
+  // after minutes the sheets were noise. A shared pace with each region's own bounded wobble keeps them together forever.
+  const R2 = 2.5, C2: [number, number, number] = [0, 0, 0];
+  const spread = (t0: number) => {
+    const d: number[] = [];
+    for (let i = 0; i < 60; i++) {
+      const p: [number, number, number] = [((i * 0.37) % 2 - 1) * R2 * 0.8, ((i * 0.61) % 2 - 1) * R2 * 0.6, ((i * 0.23) % 2 - 1) * R2 * 0.7];
+      const q: [number, number, number] = [p[0] + 0.03 * R2, p[1], p[2]];
+      const t = t0 + i * 3.1;
+      const a = swirlAt(p, [0.2, 0.4, 0.6], C2, R2, t), b = swirlAt(q, [0.7, 0.1, 0.9], C2, R2, t);
+      if (a.life !== b.life) continue;
+      d.push(Math.hypot(a.pos[0] - b.pos[0], a.pos[1] - b.pos[1], a.pos[2] - b.pos[2]));
+    }
+    return [...d].sort((x, y) => x - y)[d.length >> 1];
+  };
+  for (const hours of [1, 8, 30]) expect(spread(hours * 3600)).toBeLessThan(0.12 * R2);
 });

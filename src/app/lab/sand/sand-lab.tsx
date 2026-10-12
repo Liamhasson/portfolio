@@ -11,7 +11,8 @@ import { WorkIndex, type WorkIndexHandle } from "./work-index";
 import { BakedDesk } from "@/three/sand/baked-desk";
 import { revealAt } from "@/three/sand/screen-reveal";
 import { DriftGrains } from "@/three/sand/drift-grains";
-import { heroShift } from "@/three/sand/hero-layout";
+import { vortexOnBall } from "@/three/sand/hero-layout";
+import { stepParallax } from "@/three/sand/parallax";
 import { ballKeyPos } from "@/three/sand/ball-light";
 import { SAND_ENCODE, SAND_LAYER, SandComposite } from "@/three/sand/sand-composite";
 import { Pullback } from "@/three/sand/pullback";
@@ -307,16 +308,10 @@ export function SandLab({ hero }: { hero: boolean }) {
         field!.setPointScale(stage!.bufferHeight, (stage!.camera.fov * Math.PI) / 180);
         setStatus(`${s.tier} · ${s.grains.toLocaleString()} grains · ${s.shadowSteps} shadow steps · dpr ${s.pixelRatio}`);
       });
-      // the vortex to the right of the copy (Liam, 2026-10-11): the hero's cloud moved sideways at the hero's own framing
+      // the vortex's heart on the ball (Liam, 2026-10-12: where the ball will form, so it transforms smoothly)
       if (hero) {
-        const shiftCloud = () => {
-          const aspect = stage!.camera.aspect;
-          const tanHalfW = Math.tan(stage!.vfovFor(aspect, camera.lens_mm) / 2) * aspect;
-          const c = field!.material.uniforms.uChaosC.value as THREE.Vector3;
-          (field!.material.uniforms.uChaosShift.value as THREE.Vector3).set(...heroShift(camera.position, camera.target, [c.x, c.y, c.z], tanHalfW, aspect));
-        };
-        shiftCloud();
-        stage.onSettings(shiftCloud);
+        const c = field.material.uniforms.uChaosC.value as THREE.Vector3, b = field.material.uniforms.uBallC.value as THREE.Vector3;
+        (field.material.uniforms.uChaosShift.value as THREE.Vector3).set(...vortexOnBall([c.x, c.y, c.z], [b.x, b.y, b.z]));
       }
 
       const state: SandState = { compact: 0, time: 0, ballSpin: 0, chaosSpin: 0 };
@@ -376,6 +371,7 @@ export function SandLab({ hero }: { hero: boolean }) {
       let lastScroll = window.scrollY;
       // the snap into the screen: carrying the page in (Liam, 2026-10-11), and the progress a frame ago (its direction)
       let snapping = false, lastRawP = 0;
+      let cursorLean: [number, number] = [0, 0];   // the vortex's lean toward the cursor (NDC, parallax.ts)
       let spinVel = 0;
 
       // the cursor: a light (Lusion model) and, unless motion is reduced, a soft drift
@@ -666,6 +662,13 @@ export function SandLab({ hero }: { hero: boolean }) {
         cursorWorld.copy(cam.position).addScaledVector(dir, dist - 0.45);
         cursorI = damp(cursorI, pointer.active ? 1 : 0, pointer.active ? 5 : 2.5, dt);
         field!.setCursor(cursorWorld, cursorI);
+        // the vortex leans toward the cursor in depth (parallax.ts): the front follows it, the back a little
+        {
+          const cs = field!.material.uniforms.uChaosSize.value as THREE.Vector3;
+          const on = pointer.active && !reduced && !still;
+          cursorLean = stepParallax(cursorLean, on ? [(pointer.x / canvas.clientWidth) * 2 - 1, -((pointer.y / canvas.clientHeight) * 2 - 1)] : null, dt);
+          field!.setParallax(cursorLean[0], cursorLean[1], chaosC, 0.5 * Math.max(cs.x, cs.z));
+        }
         // the grains leaving the sand: from the chaos's shell, then the ball's; thinning over the desk; none on the index
         {
           const cs = field!.material.uniforms.uChaosSize.value as THREE.Vector3;
