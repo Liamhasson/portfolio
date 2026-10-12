@@ -20,9 +20,15 @@ export function NextPagePull({ href, label, line, className, active = true }: { 
     if (!active) return;
     const root = document.documentElement;
     const atEnd = () => window.scrollY + window.innerHeight >= root.scrollHeight - 2;
-    // arriving at the end means a restored position (a fresh page starts at the top): step back above the pull
-    if (window.scrollY > 0 && atEnd()) window.scrollTo(0, window.scrollY - window.innerHeight * 0.25);
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    // arriving at the end means a restored position (a fresh page starts at the top): step back above the pull. Now,
+    // and again once the router has restored the old position (it does so after the page mounts), unless the reader
+    // has already started scrolling
+    let touched = false;
+    const nudge = () => { if (!touched && window.scrollY > 0 && atEnd()) window.scrollTo(0, window.scrollY - window.innerHeight * 0.25); };
+    nudge();
+    const later = [setTimeout(nudge, 120), setTimeout(nudge, 400)];
+    const stopLater = () => later.forEach(clearTimeout);
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return stopLater;
     router.prefetch(href);
     let s = pullStart(), gone = false, touchY: number | null = null;
     const feed = (dy: number) => {
@@ -30,8 +36,11 @@ export function NextPagePull({ href, label, line, className, active = true }: { 
       if (fillRef.current) fillRef.current.style.transform = `scaleX(${s.fill})`;
       if (!gone && pullDone(s)) { gone = true; router.push(href); }
     };
-    const onWheel = (e: WheelEvent) => feed(e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? window.innerHeight : 1));
-    const onTouchStart = (e: TouchEvent) => { touchY = e.touches[0]?.clientY ?? null; s = { ...s, lastT: -Infinity }; };
+    const onWheel = (e: WheelEvent) => {
+      touched = true;
+      feed(e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? window.innerHeight : 1));
+    };
+    const onTouchStart = (e: TouchEvent) => { touched = true; touchY = e.touches[0]?.clientY ?? null; s = { ...s, lastT: -Infinity }; };
     const onTouchMove = (e: TouchEvent) => {
       const y = e.touches[0]?.clientY;
       if (touchY === null || y === undefined) return;
@@ -42,6 +51,7 @@ export function NextPagePull({ href, label, line, className, active = true }: { 
     window.addEventListener("touchstart", onTouchStart, { passive: true });
     window.addEventListener("touchmove", onTouchMove, { passive: true });
     return () => {
+      stopLater();
       window.removeEventListener("wheel", onWheel);
       window.removeEventListener("touchstart", onTouchStart);
       window.removeEventListener("touchmove", onTouchMove);

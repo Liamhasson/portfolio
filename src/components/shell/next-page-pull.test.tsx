@@ -64,4 +64,24 @@ describe("NextPagePull", () => {
     wheel(200, 20);
     expect(push).not.toHaveBeenCalled();
   });
+  test("Back restores the page at its end after it mounts (Next.js restores scroll later): it still steps back above the pull", () => {
+    vi.useFakeTimers();
+    setPage(0);   // (mounted at the top: the restoration hasn't happened yet)
+    render(<NextPagePull href="/contact" label="Contact" line="x" />);
+    scrollY = 2000;   // (the router restores the old position)
+    act(() => { vi.advanceTimersByTime(500); });
+    expect(window.scrollTo).toHaveBeenCalledWith(0, 1750);
+    vi.useRealTimers();
+  });
+  test("…but never moves a reader who has already started scrolling", () => {
+    vi.useFakeTimers();
+    setPage(0);
+    render(<NextPagePull href="/contact" label="Contact" line="x" />);
+    now += 16; act(() => { fireEvent.wheel(window, { deltaY: 40 }); });
+    scrollY = 2000;
+    act(() => { vi.advanceTimersByTime(500); });
+    expect(window.scrollTo).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
 });
+
