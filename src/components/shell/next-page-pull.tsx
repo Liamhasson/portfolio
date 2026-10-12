@@ -4,8 +4,26 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
-import { pullDone, pullStart, pullStep } from "@/lib/pull";
+import { PULL, pullDone, pullStart, pullStep } from "@/lib/pull";
 import "./next-page-pull.css";
+
+/** After the pull opens the next page, the rest of that gesture (the trackpad's momentum) is swallowed until it ends
+ *  (a pause longer than PULL.gap), so the new page opens at its top instead of already scrolled into. Lives on the
+ *  window: it outlasts this component, which the next page replaces. Capturing, so it runs before the smooth scroller. */
+function swallowRestOfGesture(): void {
+  let last = performance.now() / 1000;
+  const off = () => { window.removeEventListener("wheel", stop, true); window.removeEventListener("touchmove", stop, true); };
+  const stop = (e: Event) => {
+    const t = performance.now() / 1000;
+    if (t - last > PULL.gap || t < last) { off(); return; }
+    last = t;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  };
+  window.addEventListener("wheel", stop, { capture: true, passive: false });
+  window.addEventListener("touchmove", stop, { capture: true, passive: false });
+  setTimeout(off, 2000);   // (never longer than any momentum)
+}
 
 /**
  * The end of a page (spec 2026-10-12-about-contact-design.md §2): the next page peeks in as an ordinary link, and
@@ -34,7 +52,7 @@ export function NextPagePull({ href, label, line, className, active = true }: { 
     const feed = (dy: number) => {
       s = pullStep(s, { dy, t: performance.now() / 1000, atEnd: atEnd(), vh: window.innerHeight });
       if (fillRef.current) fillRef.current.style.transform = `scaleX(${s.fill})`;
-      if (!gone && pullDone(s)) { gone = true; router.push(href); }
+      if (!gone && pullDone(s)) { gone = true; swallowRestOfGesture(); router.push(href); }
     };
     const onWheel = (e: WheelEvent) => {
       touched = true;

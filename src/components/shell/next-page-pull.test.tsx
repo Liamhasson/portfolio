@@ -83,5 +83,22 @@ describe("NextPagePull", () => {
     expect(window.scrollTo).not.toHaveBeenCalled();
     vi.useRealTimers();
   });
+  test("the rest of the gesture that opened the next page doesn't scroll it: swallowed until the gesture ends", () => {
+    setPage(1500);
+    const { unmount } = render(<NextPagePull href="/about" label="About" line="x" />);
+    scrollY = 2000;
+    now += 1000;
+    wheel(80, 8);
+    expect(push).toHaveBeenCalledTimes(1);
+    unmount();   // (the next page replaces this one)
+    now += 16;
+    const more = new WheelEvent("wheel", { deltaY: 80, cancelable: true });
+    window.dispatchEvent(more);
+    expect(more.defaultPrevented).toBe(true);
+    now += 400;   // (a pause: a new gesture, the reader's own)
+    const fresh = new WheelEvent("wheel", { deltaY: 80, cancelable: true });
+    window.dispatchEvent(fresh);
+    expect(fresh.defaultPrevented).toBe(false);
+  });
 });
 
