@@ -4,7 +4,7 @@ import { PULL, pullDone, pullStart, pullStep } from "./pull";
 
 const vh = 1000;
 /** A gesture: wheel events `dy` each, `every` seconds apart, from `t0`. */
-function gesture(s = pullStart(), { t0 = 0, n = 10, dy = 60, every = 0.016, atEnd = () => true } = {}) {
+function gesture(s = pullStart(), { t0 = 0, n = 10, dy = 60, every = 0.016, atEnd = (): boolean => true } = {}) {
   for (let k = 0; k < n; k++) s = pullStep(s, { dy, t: t0 + k * every, atEnd: atEnd(), vh });
   return s;
 }
