@@ -100,6 +100,10 @@ export function PillNav() {
   const currentOf = (id: string): "location" | "page" | undefined => (active === id ? (isHome && id === "projects" ? "location" : "page") : undefined);
 
   return (
+    <>
+    {/* on a case study, a scrim in the page's own colour behind the nav: text scrolling under it never collides with
+        it (Liam, 2026-10-13); not over the story's sand. Nav chrome, so the tone sampler reads past it (nav-tone.ts) */}
+    {isStudy && <div aria-hidden data-nav-chrome="" className="sh-scrim" />}
     <nav
       ref={navRef}
       aria-label="Primary"
@@ -151,5 +155,6 @@ export function PillNav() {
         </div>
       )}
     </nav>
+    </>
   );
 }

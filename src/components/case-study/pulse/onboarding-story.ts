@@ -10,6 +10,7 @@
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { mountStoryScreens, type StoryInfo } from "./onboarding-app";
+import { pinFit } from "@/lib/case-studies/pin-fit";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -27,7 +28,7 @@ const WEIGHTS = [1, 1.6, 1.6, 1, 1, 1, 1.4, 1.4, 1, 1, 1, 1];
 const STARTS = WEIGHTS.map((_, i) => WEIGHTS.slice(0, i).reduce((a, b) => a + b, 0));
 const TOTAL = STARTS[SCREENS - 1] + WEIGHTS[SCREENS - 1];
 /** The site's fixed pill nav ends about here (src/components/shell/pill-nav.tsx); a pinned story starts below it. */
-const NAV_CLEAR = 104;
+const NAV_CLEAR = 116;   // (below the nav's scrim: nav.css .sh-scrim, 112px at most)
 
 export const stageOf = (beat: number) => STAGES.findIndex((s) => beat >= s.from && beat <= s.to);
 
@@ -94,13 +95,14 @@ export function mountPulseStory(root: HTMLElement, name: string): () => void {
     });
   };
 
-  // Centred when it fits below the site's fixed nav; otherwise as far below it as the screen allows (never under 16px).
-  const pinTop = () => {
-    const free = innerHeight - pin.offsetHeight;
-    return Math.max(16, free / 2 >= NAV_CLEAR ? free / 2 : Math.min(NAV_CLEAR, free - 16));
-  };
+  // Centred when it fits below the site's fixed nav; else below it, scaled down if the screen is short (pin-fit.ts)
+  const fit = () => pinFit(innerHeight, pin.offsetHeight, NAV_CLEAR);
+  const pinTop = () => fit().top;
   const layout = () => {
-    root.style.setProperty("--pin-top", `${pinTop()}px`);
+    const f = fit();
+    root.style.setProperty("--pin-top", `${f.top}px`);
+    pin.style.transform = f.scale < 1 ? `scale(${f.scale})` : "";
+    pin.style.transformOrigin = "50% 0";
     track.style.height = `${pin.offsetHeight + TOTAL * UNIT_VH * innerHeight}px`;
   };
   layout();

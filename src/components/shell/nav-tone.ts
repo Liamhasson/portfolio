@@ -41,6 +41,8 @@ export function useNavTone(nav: React.RefObject<HTMLElement | null>, resetKey: s
       const ground = groundAt(Math.max(0, r.left - 6), r.top + r.height / 2);
       if (!ground) return;
       const tone = luminance(ground.color) > 0.4 ? "light" : "dark";
+      // (the scrim behind the nav takes the ground's own colour: nav.css .sh-scrim)
+      root.style.setProperty("--nav-ground", `${ground.color.r} ${ground.color.g} ${ground.color.b}`);
       if (root.dataset.navTone !== tone) root.dataset.navTone = tone;
       const world = ground.el.closest<HTMLElement>("[data-world]");
       const css = world ? getComputedStyle(world) : null;

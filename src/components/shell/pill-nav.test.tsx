@@ -47,6 +47,16 @@ describe("PillNav", () => {
     for (const name of ["Projects", "About", "Contact"]) expect(screen.getByRole("link", { name })).not.toHaveAttribute("aria-current");
   });
 
+  test("on a case study a scrim in the page's own colour sits behind the nav, so text scrolling under it never collides with it; not over the story's sand (Liam, 2026-10-13)", () => {
+    pathname.mockReturnValue("/eventread");
+    const { container, unmount } = render(<PillNav />);
+    expect(container.querySelector(".sh-scrim")).not.toBeNull();
+    unmount();
+    pathname.mockReturnValue("/");
+    const home = render(<PillNav />);
+    expect(home.container.querySelector(".sh-scrim")).toBeNull();
+  });
+
   test("tracks the home sections and re-subscribes per page", () => {
     pathname.mockReturnValue("/cyvore");
     render(<PillNav />);
