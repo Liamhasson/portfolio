@@ -63,4 +63,6 @@ meta = {**{k: v for k, v in shut.items() if k not in ("materials", "lights", "la
 json.dump(meta, open(os.path.join(DST, "desk.json"), "w"))
 # the lighting bakes as GPU-compressed KTX2 (desk3d-ktx2.py)
 subprocess.run(["python3", "scripts/lab/desk3d-ktx2.py"], check=True)
+# half-size data maps and screen still for phones (desk3d-half.py)
+subprocess.run(["python3", "scripts/lab/desk3d-half.py"], check=True)
 print("published", len(mats), "surfaces;", subprocess.run(["du", "-sh", DST], capture_output=True, text=True).stdout.strip())

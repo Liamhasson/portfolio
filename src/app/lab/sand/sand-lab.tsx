@@ -298,7 +298,9 @@ export function SandLab({ hero }: { hero: boolean }) {
       const deskProgress = new LoadProgress();
       let deskDownload: Promise<DeskDownload> | null = null;
       let deskDone = false;   // (downloaded: what's left is local work)
-      const startDesk = () => (deskDownload ??= deskFiles = BakedDesk.fetch("/lab/desk3d", deskProgress).then((d) => { deskDone = true; return d; }));
+      // (phones and the lowest tier: the data maps and the screen's still at half size, for GPU memory)
+      const deskHalf = window.matchMedia("(pointer: coarse)").matches || tier === "low";
+      const startDesk = () => (deskDownload ??= deskFiles = BakedDesk.fetch("/lab/desk3d", deskProgress, { half: deskHalf }).then((d) => { deskDone = true; return d; }));
       // the desk failed or stalled: the story stops waiting for it (the index shows on its own)
       let deskGaveUp = false;
       // the desk, then the rising sand: textures uploaded and shaders compiled before they join the scene (no hitch as

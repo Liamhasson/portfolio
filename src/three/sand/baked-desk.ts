@@ -71,18 +71,22 @@ export interface BakedDeskMeta {
   lid?: { pivot: string; baked_open_deg: number };
 }
 
-/** Every file the desk downloads after desk.json, once each (its loading line counts them all). */
-export function deskFiles(meta: BakedDeskMeta): string[] {
+/** Every file the desk downloads after desk.json, once each (its loading line counts them all). `half`: phones take the
+ *  data maps and the screen's still at half size (scripts/lab/desk3d-half.py; Liam, 2026-10-13: GPU memory). */
+export function deskFiles(meta: BakedDeskMeta, { half = false }: { half?: boolean } = {}): string[] {
+  const small = (f: string) => (half ? halfOf(f) : f);
   const out = new Set<string>(["desk.glb", meta.probe, meta.lut]);
-  if (meta.screen) out.add(meta.screen);
+  if (meta.screen) out.add(small(meta.screen));
   for (const m of Object.values(meta.materials)) {
     if (m.screen) continue;
     for (const f of typeof m.diff === "string" ? [m.diff] : Object.values(m.diff)) if (f) out.add(f);
-    if (m.rough) out.add(m.rough);
-    if (m.normal) out.add(m.normal);
+    if (m.rough) out.add(small(m.rough));
+    if (m.normal) out.add(small(m.normal));
   }
   return [...out];
 }
+
+const halfOf = (f: string) => f.replace(/\.jpg$/, ".half.jpg");
 
 /** The desk's model is meshopt-compressed (gltfpack, scripts/lab/desk3d-publish.py): 9.8 MB down to about 1 MB. */
 export function deskGltfLoader(): GLTFLoader {
@@ -99,6 +103,8 @@ export function releaseDesk(files: DeskDownload): void {
 
 export interface DeskDownload {
   base: string;
+  /** the data maps and the screen's still at half size (phones) */
+  half?: boolean;
   meta: BakedDeskMeta;
   glb: ArrayBuffer;
   lut: ArrayBuffer;
@@ -677,12 +683,12 @@ export class BakedDesk {
   }
 
   /** Downloads every file, counting their bytes into `progress`; no GPU work. */
-  static async fetch(base = "/lab/desk3d", progress: LoadProgress | null = null): Promise<DeskDownload> {
+  static async fetch(base = "/lab/desk3d", progress: LoadProgress | null = null, { half = false }: { half?: boolean } = {}): Promise<DeskDownload> {
     const meta = (await (await fetch(`${base}/desk.json`)).json()) as BakedDeskMeta;
     const urls = new Map<string, string>();
     let glb: ArrayBuffer | null = null, lut: ArrayBuffer | null = null;
     try {
-      await Promise.all(deskFiles(meta).map(async (f) => {
+      await Promise.all(deskFiles(meta, { half }).map(async (f) => {
         const res = await fetchTracked(`${base}/${f}`, f, progress);
         if (f === "desk.glb") glb = await res.arrayBuffer();
         else if (f === meta.lut) lut = await res.arrayBuffer();
@@ -692,7 +698,7 @@ export class BakedDesk {
       for (const u of urls.values()) URL.revokeObjectURL(u);
       throw e;
     }
-    return { base, meta, glb: glb!, lut: lut!, urls };
+    return { base, meta, half, glb: glb!, lut: lut!, urls };
   }
 
   static async load(renderer: THREE.WebGLRenderer, base = "/lab/desk3d"): Promise<BakedDesk> {
@@ -715,7 +721,8 @@ export class BakedDesk {
 
   private static async assemble(renderer: THREE.WebGLRenderer, files: DeskDownload, kl: KTX2Loader): Promise<BakedDesk> {
     const { meta, base } = files;
-    const url = (f: string) => files.urls.get(f) ?? `${base}/${f}`;
+    // (the half-size copy, where one was downloaded)
+    const url = (f: string) => files.urls.get(f) ?? files.urls.get(halfOf(f)) ?? `${base}/${f}`;
     const tl = new THREE.TextureLoader();
     const loaded: THREE.Texture[] = [];
     const cache = new Map<string, Promise<THREE.Texture>>();   // (identical bakes are one file: one texture)

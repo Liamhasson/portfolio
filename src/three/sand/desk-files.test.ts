@@ -88,4 +88,16 @@ describe("the desk's files (pre-launch audit, 2026-10-12)", () => {
     URL.revokeObjectURL = orig;
     expect(revoked).toEqual(["blob:a", "blob:b"]);
   });
+
+  test("phones load the data maps and the screen's still at half size (Liam, 2026-10-13: GPU memory); the lighting bakes stay as they are", () => {
+    const full = deskFiles(meta), half = deskFiles(meta, { half: true });
+    expect(half.length).toBe(full.length);
+    for (const f of [meta.screen!, "bake_desk_top.normal.jpg", "bake_desk_top.rough.jpg"]) {
+      expect(full).toContain(f);
+      expect(half).toContain(f.replace(/\.jpg$/, ".half.jpg"));
+      expect(half).not.toContain(f);
+    }
+    expect(half.filter((f) => f.endsWith(".ktx2"))).toEqual(full.filter((f) => f.endsWith(".ktx2")));
+    for (const f of half.filter((f) => f.endsWith(".half.jpg"))) expect(existsSync(`${DIR}/${f}`), f).toBe(true);
+  });
 });
