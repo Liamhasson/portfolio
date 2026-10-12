@@ -1,5 +1,4 @@
 import Link from "next/link";
-import "./status.css";
 
 /** A wrong address (Liam, 2026-10-13): the site's own page, the way back to the start and to the projects. */
 export default function NotFound() {

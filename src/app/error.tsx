@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import "./status.css";
 
 /** A page that broke (Liam, 2026-10-13): said plainly, with another try and the way back. */
 export default function Error({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
