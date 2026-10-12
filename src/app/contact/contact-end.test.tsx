@@ -49,4 +49,19 @@ describe("Contact's words (spec 2026-10-12 §4)", () => {
     expect(wrap).toHaveAttribute("inert");
     expect(wrap.style.opacity).toBe("0");
   });
+  test("the pill keeps its width while it says Copied: the address stays in place, hidden, under the word (Liam, 2026-10-12)", async () => {
+    vi.useFakeTimers();
+    Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
+    render(<ContactEnd show={1} />);
+    const email = screen.getByRole("link", { name: /Liamhasson@gmail.com/ });
+    await act(async () => { email.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 })); });
+    const layers = email.querySelectorAll("[data-swap]");
+    expect(layers).toHaveLength(2);   // (both in the same grid cell: the pill is as wide as the wider)
+    expect(layers[0]).toHaveTextContent("Liamhasson@gmail.com");
+    expect(layers[0]).toHaveStyle({ visibility: "hidden" });
+    expect(layers[1]).toHaveTextContent("Copied");
+    expect(layers[1]).toHaveStyle({ visibility: "visible" });
+    expect(screen.getByRole("link", { name: /Liamhasson@gmail.com/ })).toBe(email);   // (its name stays the address)
+  });
 });
+

@@ -29,7 +29,12 @@ export function ContactEnd({ show }: { show: number }) {
       style={{ opacity: String(k), transform: `translateY(${(1 - k) * 14}px)` }}>
       <h1 className="ct-head">{CONTACT.headline}</h1>
       <div className="ct-pills">
-        <a href={`mailto:${CONTACT.email}`} onClick={onEmail} className="ct-pill">{copied ? "Copied" : CONTACT.email}</a>
+        {/* the address and "Copied" share one grid cell, so the pill keeps its width (Liam, 2026-10-12); its name stays
+            the address, the status line below says it was copied */}
+        <a href={`mailto:${CONTACT.email}`} onClick={onEmail} aria-label={CONTACT.email} className="ct-pill ct-swap">
+          <span data-swap="" style={{ visibility: copied ? "hidden" : "visible" }}>{CONTACT.email}</span>
+          <span data-swap="" aria-hidden style={{ visibility: copied ? "visible" : "hidden" }}>Copied</span>
+        </a>
         <a href={CONTACT.linkedin} target="_blank" rel="noopener noreferrer" className="ct-pill">LinkedIn ↗</a>
         <a href={`tel:${CONTACT.phone.replace(/\s/g, "")}`} className="ct-pill">{CONTACT.phone}</a>
       </div>
