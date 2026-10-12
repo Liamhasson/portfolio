@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { fetchTracked, type LoadProgress } from "./load-progress";
 
 /** The live sand's data, exported by `blender/lookdev/lookdev.py --scene export` (see build_export there). */
 export interface SandMeta {
@@ -41,10 +42,8 @@ export interface SandData {
 
 export const SAND_BASE = "/lab/sand";
 
-async function bytes(url: string): Promise<ArrayBuffer> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`sand: ${url} ${res.status}`);
-  return res.arrayBuffer();
+async function bytes(url: string, progress: LoadProgress | null = null): Promise<ArrayBuffer> {
+  return (await fetchTracked(url, url, progress)).arrayBuffer();
 }
 
 function volumeTexture(data: Uint8Array, [w, h, d]: [number, number, number]): THREE.Data3DTexture {
@@ -58,15 +57,19 @@ function volumeTexture(data: Uint8Array, [w, h, d]: [number, number, number]): T
   tex.needsUpdate = true;
   return tex;
 }
+/** The sand's description (small): fetched first, so the stage and the brief can be placed at once. */
+export async function loadSandMeta(base = SAND_BASE, progress: LoadProgress | null = null): Promise<SandMeta> {
+  return (await (await fetchTracked(`${base}/sand.json`, `${base}/sand.json`, progress)).json()) as SandMeta;
+}
 
-/** Loads the sand: only the parts needed to draw `grains` (the tier's count), and the density volumes. */
-export async function loadSand(grains: number, base = SAND_BASE): Promise<SandData> {
-  const meta = (await (await fetch(`${base}/sand.json`)).json()) as SandMeta;
+/** The grains (only the parts needed to draw `grains`, the tier's count) and the density volumes, counted. */
+export async function loadSandParts(meta: SandMeta, grains: number, base = SAND_BASE, progress: LoadProgress | null = null): Promise<SandData> {
   const parts = meta.parts.filter((p) => p.start < grains);
   const n = parts.reduce((s, p) => s + p.count, 0);
-  const [chaos, mid, ball, ...partBufs] = await Promise.all(
-    ["vol_chaos.bin", "vol_mid.bin", "vol_ball.bin", ...parts.map((p) => p.file)].map((f) => bytes(`${base}/${f}`)),
-  );
+  const files = ["vol_chaos.bin", "vol_mid.bin", "vol_ball.bin", ...parts.map((p) => p.file)];
+  // (declared up front, so the progress knows the whole before the first byte)
+  files.forEach((f) => progress?.expect(`${base}/${f}`, 1));
+  const [chaos, mid, ball, ...partBufs] = await Promise.all(files.map((f) => bytes(`${base}/${f}`, progress)));
   const words = new Uint32Array(n * 2);
   const attributes = new Uint8Array(n * 4);
   parts.forEach((p, i) => {
@@ -74,14 +77,16 @@ export async function loadSand(grains: number, base = SAND_BASE): Promise<SandDa
     attributes.set(new Uint8Array(partBufs[i], p.count * 8, p.count * 4), p.start * 4);
   });
   return {
-    meta,
-    count: n,
-    words,
-    attributes,
+    meta, count: n, words, attributes,
     volumes: {
       chaos: volumeTexture(new Uint8Array(chaos), meta.volume.res),
       mid: volumeTexture(new Uint8Array(mid), meta.volume.res),
       ball: volumeTexture(new Uint8Array(ball), meta.volume.res),
     },
   };
+}
+
+/** Loads the sand: only the parts needed to draw `grains` (the tier's count), and the density volumes. */
+export async function loadSand(grains: number, base = SAND_BASE): Promise<SandData> {
+  return loadSandParts(await loadSandMeta(base), grains, base);
 }
