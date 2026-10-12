@@ -15,9 +15,7 @@ const ITEMS = [
   { id: "contact", label: "Contact" },
 ] as const;
 
-const SECTION_IDS = ITEMS.map((i) => i.id);
-/** Only Projects has a place yet; About and Contact pages come later (Liam, 2026-10-11). */
-const LIVE = new Set<string>(["projects"]);
+const SECTION_IDS = ["projects"] as const;   // (the story's one in-page section)
 
 /** The site nav, as on the case-study boards: light under the pointer, one filled pill that slides to the active page,
     colours matched to what it sits on (nav-tone.ts). */
@@ -26,8 +24,10 @@ export function PillNav() {
   // the story is home (spec 2026-10-11 §6): its sections are in-page anchors there; elsewhere the pills lead into it
   const isHome = pathname === STORY_PATH;
   const activeSection = useActiveSection(SECTION_IDS, pathname);
-  // a case study sits under Projects
-  const active = isHome ? activeSection : "projects";
+  // About and Contact are pages (spec 2026-10-12-about-contact-design.md §5); a case study sits under Projects; on the
+  // story, the index lights Projects
+  const page = pathname === "/about" ? "about" : pathname === "/contact" ? "contact" : null;
+  const active = page ?? (isHome ? activeSection : "projects");
   const navRef = useRef<HTMLElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   useNavTone(navRef, pathname);
@@ -79,18 +79,11 @@ export function PillNav() {
           const isActive = active === item.id;
           const cls = `sh-pill sh-enter${isActive ? " is-active" : ""}`;
           const style = { "--i": k + 1 } as React.CSSProperties;
-          if (!LIVE.has(item.id)) {
-            // looks and lights like the others; goes nowhere until its page exists
-            return (
-              <button key={item.id} type="button" data-light="" aria-disabled="true" aria-label={`${item.label}, coming soon`} className={cls} style={style}>
-                {item.label}
-              </button>
-            );
-          }
-          const href = isHome ? `#${item.id}` : `${STORY_HREF}#${item.id}`;
-          const current = isActive ? (isHome ? "location" : "page") : undefined;
-          // On home, a plain anchor lets Lenis own the smooth scroll (no router scrollIntoView fight).
-          return isHome ? (
+          const isPage = item.id !== "projects";
+          const href = isPage ? `/${item.id}` : isHome ? "#projects" : `${STORY_HREF}#projects`;
+          const current = isActive ? (isHome && !isPage ? "location" : "page") : undefined;
+          // On home, Projects is a plain anchor so Lenis owns the smooth scroll (no router scrollIntoView fight).
+          return isHome && !isPage ? (
             <a key={item.id} href={href} data-light="" aria-current={current} className={cls} style={style}>{item.label}</a>
           ) : (
             <Link key={item.id} href={href} data-light="" aria-current={current} className={cls} style={style}>{item.label}</Link>

@@ -37,23 +37,10 @@ describe("PillNav", () => {
     expect(screen.getByRole("link", { name: "Projects" })).toHaveAttribute("href", "/lab/sand?hero#projects");
   });
 
-  test("About and Contact look like the others but go nowhere yet (Liam, 2026-10-11)", () => {
-    render(<PillNav />);
-    for (const name of ["About", "Contact"]) {
-      const pill = screen.getByRole("button", { name: `${name}, coming soon` });
-      expect(pill).toHaveTextContent(name);
-      expect(pill).toHaveAttribute("aria-disabled", "true");
-      expect(pill).not.toHaveAttribute("href");
-      expect(pill.className).toContain("pill");
-      fireEvent.click(pill); // nothing happens, nothing throws
-    }
-    expect(screen.queryByRole("link", { name: /About|Contact/ })).toBeNull();
-  });
-
   test("tracks the home sections and re-subscribes per page", () => {
     pathname.mockReturnValue("/cyvore");
     render(<PillNav />);
-    expect(useActiveSection).toHaveBeenCalledWith(["projects", "about", "contact"], "/cyvore");
+    expect(useActiveSection).toHaveBeenCalledWith(["projects"], "/cyvore");
   });
 
   test("on home the section you're in is the active pill", () => {
@@ -63,12 +50,34 @@ describe("PillNav", () => {
     expect(screen.getByRole("link", { name: "Projects" }).className).toContain("is-active");
   });
 
+  test("About and Contact are their own pages, from everywhere (spec 2026-10-12 §5)", () => {
+    for (const path of ["/lab/sand", "/cyvore", "/about"]) {
+      pathname.mockReturnValue(path);
+      const { unmount } = render(<PillNav />);
+      expect(screen.getByRole("link", { name: "About" })).toHaveAttribute("href", "/about");
+      expect(screen.getByRole("link", { name: "Contact" })).toHaveAttribute("href", "/contact");
+      expect(screen.getByRole("link", { name: "About" })).toHaveAttribute("data-next-link");
+      unmount();
+    }
+  });
+
+  test("the pill of the page you're on is lit", () => {
+    pathname.mockReturnValue("/about");
+    const { unmount } = render(<PillNav />);
+    expect(screen.getByRole("link", { name: "About" })).toHaveAttribute("aria-current", "page");
+    unmount();
+    pathname.mockReturnValue("/contact");
+    render(<PillNav />);
+    expect(screen.getByRole("link", { name: "Contact" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Projects" })).not.toHaveAttribute("aria-current");
+  });
+
   test("a case study sits under Projects: Projects is the active pill", () => {
     pathname.mockReturnValue("/cyvore");
-    useActiveSection.mockReturnValue("about");
+    useActiveSection.mockReturnValue("projects");
     render(<PillNav />);
     expect(screen.getByRole("link", { name: "Projects" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("button", { name: "About, coming soon" })).not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("link", { name: "About" })).not.toHaveAttribute("aria-current");
   });
 
   test("no reading progress bar anywhere (removed by Liam, 2026-10-09)", () => {

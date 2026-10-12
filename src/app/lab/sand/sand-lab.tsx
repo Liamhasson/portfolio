@@ -19,6 +19,8 @@ import { readLoaderMode, releaseHold, showCopy } from "./loader-mode";
 import { LoadProgress } from "@/three/sand/load-progress";
 import { anchorsWorld } from "@/three/sand/cascade";
 import { holdScroll } from "@/lib/smooth-scroll";
+import { sectionRedirect } from "@/lib/story";
+import { useRouter } from "next/navigation";
 import { DeskSketches } from "@/three/sand/desk-sketches";
 import { sketchFont } from "./sketch-font";
 import { ballKeyPos } from "@/three/sand/ball-light";
@@ -100,6 +102,12 @@ export function SandLab({ hero }: { hero: boolean }) {
   // no WebGL2 (or the sand failed to load): the approved renders as stills, chaos then ball with scroll
   const [fallback, setFallback] = useState(false);
   const [stillBall, setStillBall] = useState(false);
+  // old links to the story's About and Contact anchors: their pages now (spec 2026-10-12-about-contact-design.md §5)
+  const router = useRouter();
+  useEffect(() => {
+    const to = sectionRedirect(window.location.hash);
+    if (to) router.replace(to);
+  }, [router]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -1004,8 +1012,6 @@ export function SandLab({ hero }: { hero: boolean }) {
       )}
     </div>
     {hero && <div ref={spacerRef} className="bg-black" style={{ height: 0 }} aria-hidden />}
-    {hero && <div id="about" aria-hidden className="h-px" />}
-    {hero && <div id="contact" aria-hidden className="h-px" />}
     </>
   );
 }
