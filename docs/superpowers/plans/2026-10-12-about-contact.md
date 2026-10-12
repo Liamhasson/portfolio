@@ -375,8 +375,9 @@ describe("NextPagePull", () => {
     expect(link).toHaveTextContent("I’m Liam.");
   });
   test("a fresh scroll at the end fills the line and opens the next page when full", () => {
-    setPage(2000);
+    setPage(1500);   // (mounted above the end; then the reader scrolls down to it)
     render(<NextPagePull href="/about" label="About" line="x" />);
+    scrollY = 2000;
     now += 1000;
     wheel(80, 4);
     expect(push).not.toHaveBeenCalled();

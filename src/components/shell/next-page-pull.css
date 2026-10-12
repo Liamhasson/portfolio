@@ -1,0 +1,8 @@
+/* src/components/shell/next-page-pull.css: sizes in em, so the page (or the index's container) sets the scale */
+.np { display: block; color: #f4efe9; text-decoration: none; padding: 4em 0 6em; }
+.np-label { display: block; font: 400 0.75em/1.4 var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: rgba(244, 239, 233, 0.55); }
+.np-line { display: block; margin-top: 0.6em; font-size: 3.2em; line-height: 1.15; color: rgba(244, 239, 233, 0.42); }
+.np:hover .np-line { color: #f4efe9; transition: color 0.3s; }
+.np-track { display: block; position: relative; margin-top: 2em; height: 1px; overflow: hidden; background: rgba(255, 255, 255, 0.1); }
+.np-fill { position: absolute; inset: 0; background: rgb(230, 191, 174); transform-origin: left; transform: scaleX(0); }
+.np:focus-visible { outline: 1px solid rgb(230, 191, 174); outline-offset: 0.5em; }
