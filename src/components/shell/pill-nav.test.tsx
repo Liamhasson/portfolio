@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 const pathname = vi.fn(() => "/lab/sand");   // the story is home (src/lib/story.ts)
