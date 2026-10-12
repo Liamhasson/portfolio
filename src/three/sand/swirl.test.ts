@@ -22,7 +22,7 @@ describe("the chaos at rest: Lusion's flow and a strong inward vortex (Liam, 202
         }
       }
     }
-  });
+  }, 30000);   // (heavy: ~430k samples; ~1 s alone, past the 5 s default when the whole suite runs at once)
 
   test("it travels inward over its life (the vortex draws it in) and turns around the axis", () => {
     const { p, seed } = rests[700];

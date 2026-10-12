@@ -12,6 +12,17 @@ describe("when the loader plays (spec §3)", () => {
     for (const h of ["#projects", "#about", "#contact"]) expect(loaderMode({ seen: false, hash: h, reduced: false })).toBe("fade");
     expect(loaderMode({ seen: false, hash: "#elsewhere", reduced: false })).toBe("play");
   });
+  test("?loader replays it (to watch it again), still honouring reduced motion", () => {
+    expect(loaderMode({ seen: true, hash: "", reduced: false, replay: true })).toBe("play");
+    expect(loaderMode({ seen: true, hash: "#projects", reduced: true, replay: true })).toBe("reduced");
+    document.documentElement.removeAttribute("data-loader");
+    sessionStorage.setItem(SEEN_KEY, "1");
+    window.history.replaceState(null, "", "/lab/sand?hero&loader");
+    new Function(LOADER_BOOT)();
+    expect(document.documentElement.dataset.loader).toBe("play");
+    window.history.replaceState(null, "", "/");
+    sessionStorage.removeItem(SEEN_KEY);
+  });
   test("storage that throws (Safari private mode) never breaks it: not seen, and marking is a no-op", () => {
     const bad = { getItem: () => { throw new Error("denied"); }, setItem: () => { throw new Error("denied"); } };
     expect(readSeen(bad)).toBe(false);

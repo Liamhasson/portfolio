@@ -491,14 +491,14 @@ export function SandLab({ hero }: { hero: boolean }) {
             field!.setLightK(L.lightK);
             loaderLight = L.light;
             if (L.copy > 0) showCopy();
-            if (L.unlocked && !released) { released = true; releaseHold(); markSeen(window.sessionStorage); briefRef.current?.announce("ready"); }
+            if (L.unlocked && !released) { released = true; releaseHold(); markSeen(window.sessionStorage); briefRef.current?.announce("ready"); loadDesk().catch(() => {}); }
           } else {
             // reduced motion: a crossfade, no cascade
             const k = Math.min(loaderClock / LOADER.reducedFade, 1);
             briefRef.current?.update({ ...ballScreen, alpha: 1 - k, dash: 0, squares: Array(9).fill(1) });
             canvas.style.opacity = String(k);
             field!.setLightK(1); loaderLight = 1;
-            if (k >= 1 && !released) { released = true; releaseHold(); markSeen(window.sessionStorage); briefRef.current?.announce("ready"); loaderClock = null; }
+            if (k >= 1 && !released) { released = true; releaseHold(); markSeen(window.sessionStorage); briefRef.current?.announce("ready"); loaderClock = null; loadDesk().catch(() => {}); }
           }
         }
         // a later arrival: a short fade from black
@@ -839,7 +839,8 @@ export function SandLab({ hero }: { hero: boolean }) {
       }
       stage.start();
       (window as unknown as { __sand?: unknown }).__sand = { stage, field, state, drift, rising: null, composite };   // lab debugging
-      loadDesk().catch(() => {});
+      // the desk (~20 MB, compiled on the GPU) waits for the loader: loaded mid-cascade it hitched frames up to 0.8 s
+      if (!playing) loadDesk().catch(() => {});
       if (playing) {
         await new Promise<void>((res) => { if (size >= 0.999) res(); else onFullSize = res; });
         if (disposed) return;
