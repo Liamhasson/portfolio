@@ -15,7 +15,7 @@ import { vortexOnBall } from "@/three/sand/hero-layout";
 import { stepParallax } from "@/three/sand/parallax";
 import { Brief, type BriefHandle, briefReturn, briefSize } from "./brief";
 import { LOADER, loaderAt } from "./loader-timeline";
-import { releaseHold, showCopy } from "./loader-mode";
+import { readLoaderMode, releaseHold, showCopy } from "./loader-mode";
 import { LoadProgress } from "@/three/sand/load-progress";
 import { anchorsWorld } from "@/three/sand/cascade";
 import { holdScroll } from "@/lib/smooth-scroll";
@@ -108,7 +108,7 @@ export function SandLab({ hero }: { hero: boolean }) {
     const listeners: [string, EventListener][] = [];
     // the loader (spec 2026-10-12-loader-design.md): its mode from the boot script (page.tsx); the brief grows from first
     // paint with the hero's files, on its own frames (the stage isn't there yet)
-    const mode = (document.documentElement.dataset.loader ?? "none") as "play" | "reduced" | "fade" | "none";
+    const mode = hero ? readLoaderMode() : "none";
     const playing = hero && (mode === "play" || mode === "reduced");
     const progress = new LoadProgress();
     let size = 0, sinceMount = 0, briefLast = performance.now(), briefOn = playing, briefRaf = 0;

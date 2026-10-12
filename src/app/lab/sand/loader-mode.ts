@@ -16,7 +16,21 @@ export function loaderMode({ hash, reduced, replay = false }: { hash: string; re
 }
 
 /** Runs inline before first paint (page.tsx): the nav and copy stay hidden, and scrolling locked, from the first frame. */
-export const LOADER_BOOT = `(function(){try{var deep=${JSON.stringify(DEEP)}.indexOf(location.hash)>=0;var replay=new URLSearchParams(location.search).has("loader");var r=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;document.documentElement.dataset.loader=(!replay&&deep)?"fade":(r?"reduced":"play")}catch(e){}})();`;
+export const LOADER_BOOT = `(function(){try{var deep=${JSON.stringify(DEEP)}.indexOf(location.hash)>=0;var replay=new URLSearchParams(location.search).has("loader");var r=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;var m=(!replay&&deep)?"fade":(r?"reduced":"play");window.__loaderMode=m;document.documentElement.dataset.loader=m}catch(e){}})();`;
+
+/**
+ * The mode the boot script chose, read once by the story. Kept in a value React can't touch: a browser extension that
+ * edits the page (Liam's QuillBot, 2026-10-12) makes hydration fail, and React's re-render resets <html>'s attributes,
+ * wiping data-loader before the story mounts. Re-applies the hold if it was wiped; used up, so a later client-side arrival
+ * (no boot script) reads none.
+ */
+export function readLoaderMode(): LoaderMode | "none" {
+  const w = window as unknown as { __loaderMode?: LoaderMode };
+  const mode = w.__loaderMode ?? (document.documentElement.dataset.loader as LoaderMode | undefined) ?? "none";
+  delete w.__loaderMode;
+  if (mode === "play" || mode === "reduced") document.documentElement.dataset.loader = mode;
+  return mode;
+}
 
 /** The loader is done (or failed): the nav and copy are shown, and scrolling is free. */
 export function releaseHold(): void {

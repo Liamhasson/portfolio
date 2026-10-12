@@ -1,6 +1,6 @@
 // src/app/lab/sand/loader-mode.test.ts
 import { describe, expect, test } from "vitest";
-import { LOADER_BOOT, loaderMode } from "./loader-mode";
+import { LOADER_BOOT, loaderMode, readLoaderMode } from "./loader-mode";
 
 describe("when the loader plays (spec §3; Liam, 2026-10-12: every fresh page load)", () => {
   test("every fresh page load of the hero plays it; under reduced motion: reduced", () => {
@@ -29,5 +29,19 @@ describe("when the loader plays (spec §3; Liam, 2026-10-12: every fresh page lo
     new Function(LOADER_BOOT)();
     expect(document.documentElement.dataset.loader).toBe("play");
     window.history.replaceState(null, "", "/");
+  });
+
+  test("it survives React rebuilding the page (a browser extension edits the DOM, hydration fails and the html's attributes are reset): the mode is read from a value React can't touch, and the hold is re-applied", () => {
+    window.history.replaceState(null, "", "/lab/sand?hero");
+    new Function(LOADER_BOOT)();
+    delete document.documentElement.dataset.loader;   // (what React's client re-render does to <html>)
+    expect(readLoaderMode()).toBe("play");
+    expect(document.documentElement.dataset.loader).toBe("play");
+    window.history.replaceState(null, "", "/");
+  });
+  test("without the boot script (a client-side arrival): none", () => {
+    delete (window as unknown as { __loaderMode?: string }).__loaderMode;
+    delete document.documentElement.dataset.loader;
+    expect(readLoaderMode()).toBe("none");
   });
 });
