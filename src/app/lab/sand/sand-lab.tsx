@@ -339,7 +339,10 @@ export function SandLab({ hero }: { hero: boolean }) {
         (window as unknown as { __desk3d?: unknown }).__desk3d = d;
         await document.fonts.load(`500 40px ${sketchFont.style.fontFamily}`).catch(() => {});
         if (disposed) return;
-        sketches = new DeskSketches(sketchFont.style.fontFamily);
+        const sk = new DeskSketches(sketchFont.style.fontFamily);
+        await sk.precompile(st.renderer, st.camera, st.scene).catch(() => {});   // (none compiles mid-tilt)
+        if (disposed) return;
+        sketches = sk;
         st.scene.add(sketches.group);
         placeSketches();
         st.onSettings(placeSketches);
@@ -351,6 +354,12 @@ export function SandLab({ hero }: { hero: boolean }) {
         if (disposed) return;
         st.scene.add(r.mesh);
         risingLoaded = r;
+        // last, everything again for the targets the compositor draws into from the tilt on (the scene into the desk's
+        // linear target, the desk into its depth pass): none of it compiles mid-shot (Liam, 2026-10-13: hitches)
+        if (composite) {
+          await composite.precompile(st.renderer).catch(() => {});
+          await composite.precompileScene(st.renderer, st.scene, st.camera).catch(() => {});
+        }
         (window as unknown as { __sand?: { rising?: RisingSand } }).__sand!.rising = r;
       };
       const leanQ = new THREE.Quaternion(), leanE = new THREE.Euler();

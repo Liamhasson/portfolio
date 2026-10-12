@@ -80,3 +80,19 @@ describe("the sketches behind the desk (Liam, 2026-10-12): drawn during the tilt
   });
 });
 
+
+test("its shaders compile ahead, every sketch shown for that moment and hidden again: none compiles as the camera tilts into them (Liam, 2026-10-13: hitches)", async () => {
+  const { DeskSketches } = await import("./desk-sketches");
+  // (jsdom has no 2D canvas: a stand-in that draws nothing, for the textures the sketches paint)
+  const noop: ProxyHandler<object> = { get: (_t, k) => (k === "measureText" ? () => ({ width: 10 }) : k === "canvas" ? document.createElement("canvas") : () => {}), set: () => true };
+  const orig = HTMLCanvasElement.prototype.getContext;
+  HTMLCanvasElement.prototype.getContext = (() => new Proxy({}, noop)) as never;
+  const s = new DeskSketches("Caveat");
+  HTMLCanvasElement.prototype.getContext = orig;
+  const seen: boolean[][] = [];
+  const renderer = { compileAsync: async (o: import("three").Object3D) => { const v: boolean[] = []; o.traverse((c) => v.push(c.visible)); seen.push(v); } };
+  await s.precompile(renderer as never, {} as never, {} as never);
+  expect(seen).toHaveLength(1);
+  expect(seen[0].every(Boolean)).toBe(true);
+  expect(s.showing).toBe(false);
+});

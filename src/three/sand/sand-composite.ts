@@ -350,10 +350,33 @@ export class SandComposite {
     return this.bg;
   }
 
+  /** Every pass's shaders, compiled for the screen and for drawing into a target (three builds a program for each):
+   *  the desk's dim and lens and the depth-only pass were left to compile at the tilt (Liam, 2026-10-13: hitches). */
+  async precompile(renderer: THREE.WebGLRenderer): Promise<void> {
+    const passes = Object.values(this).filter((v): v is THREE.Scene => v instanceof THREE.Scene);
+    const was = renderer.getRenderTarget();
+    const linear = new THREE.WebGLRenderTarget(1, 1);   // (the linear targets: the desk's, the lens's)
+    for (const target of [null, this.rt, linear]) {
+      renderer.setRenderTarget(target);
+      await Promise.all(passes.map((sc) => renderer.compileAsync(sc, this.ortho)));
+    }
+    renderer.setRenderTarget(was);
+    linear.dispose();
+  }
+
+  /** The scene's own materials compiled for the desk's target too (it draws the scene into a linear target from the
+   *  tilt on, and three builds a program per kind of target). */
+  async precompileScene(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): Promise<void> {
+    const was = renderer.getRenderTarget();
+    const linear = new THREE.WebGLRenderTarget(1, 1);
+    renderer.setRenderTarget(linear);
+    try { await renderer.compileAsync(scene, camera); } finally { renderer.setRenderTarget(was); linear.dispose(); }
+  }
+
   /** Compiles its own passes' shaders and makes its targets now, not on the frame each is first needed (stalls of up
    *  to 200 ms mid-scroll). */
   async warm(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): Promise<void> {
-    await Promise.all([this.scene, this.rawScene, this.discScene, this.hazeScene, this.dimScene, this.dofScene, this.prepScene, this.smoothScene, this.deskLensScene].map((sc) => renderer.compileAsync(sc, this.ortho)));
+    await this.precompile(renderer);
     // and drawn once each way (the GPU builds its pipelines on a shader's first draw into each kind of target)
     const d = this.defocus;
     for (const v of [0, 4]) {

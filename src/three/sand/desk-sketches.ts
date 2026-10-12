@@ -276,4 +276,16 @@ export class DeskSketches {
 
   /** Any sketch on screen (its float's clock runs only then). */
   get showing(): boolean { return this.built.some((b) => b.place.visible); }
+
+  /** Compiles their shaders now, every sketch shown for that moment (three compiles only what's visible), then hidden
+   *  again: none compiles as the camera tilts into them (Liam, 2026-10-13: hitches). */
+  async precompile(renderer: THREE.WebGLRenderer, camera: THREE.Camera, scene: THREE.Scene): Promise<void> {
+    const was = this.built.map((b) => b.place.visible);
+    for (const b of this.built) b.place.visible = true;
+    try {
+      await renderer.compileAsync(this.group, camera, scene);
+    } finally {
+      this.built.forEach((b, i) => { b.place.visible = was[i]; });
+    }
+  }
 }
