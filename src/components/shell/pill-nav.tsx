@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { holdScroll } from "@/lib/smooth-scroll";
 import { useActiveSection } from "@/hooks/use-active-section";
 import { STORY_HREF, STORY_PATH } from "@/lib/story";
 import { bindLight } from "./nav-light";
@@ -31,6 +32,22 @@ export function PillNav() {
   const navRef = useRef<HTMLElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   useNavTone(navRef, pathname);
+
+  // phones: the burger and its full-screen menu (Liam, 2026-10-12; nav.css shows one or the other by width)
+  // (open on the page it was opened on: a new page is closed by itself)
+  const [openOn, setOpenOn] = useState<string | null>(null);
+  const open = openOn === pathname;
+  const setOpen = (o: boolean | ((was: boolean) => boolean)) => setOpenOn((typeof o === "function" ? o(open) : o) ? pathname : null);
+  const burgerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    holdScroll(true);
+    menuRef.current?.querySelector<HTMLElement>("a")?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { setOpenOn(null); burgerRef.current?.focus(); } };
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("keydown", onKey); holdScroll(false); };
+  }, [open]);
 
   // the light on every pill
   useEffect(() => {
@@ -65,6 +82,9 @@ export function PillNav() {
     return () => { cancelAnimationFrame(raf); removeEventListener("resize", onResize); };
   }, [active]);
 
+  const hrefOf = (id: string) => (id !== "projects" ? `/${id}` : isHome ? "#projects" : `${STORY_HREF}#projects`);
+  const currentOf = (id: string): "location" | "page" | undefined => (active === id ? (isHome && id === "projects" ? "location" : "page") : undefined);
+
   return (
     <nav
       ref={navRef}
@@ -90,6 +110,32 @@ export function PillNav() {
           );
         })}
       </div>
+      <button
+        ref={burgerRef}
+        type="button"
+        className={`sh-burger sh-enter${open ? " is-open" : ""}`}
+        aria-label={open ? "Close menu" : "Menu"}
+        aria-expanded={open}
+        aria-controls="site-menu"
+        onClick={() => setOpen((o) => !o)}
+      >
+        <i aria-hidden /><i aria-hidden />
+      </button>
+      {open && (
+        <div ref={menuRef} id="site-menu" role="dialog" aria-modal="true" aria-label="Menu" className="sh-menu">
+          <ul>
+            {ITEMS.map((item, k) => {
+              const href = hrefOf(item.id), current = currentOf(item.id);
+              const props = { href, "aria-current": current, className: `sh-menu-link${current ? " is-active" : ""}`, style: { "--i": k } as React.CSSProperties, onClick: () => setOpen(false) };
+              return (
+                <li key={item.id}>
+                  {isHome && item.id === "projects" ? <a {...props}>{item.label}</a> : <Link {...props}>{item.label}</Link>}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
     </nav>
   );
 }

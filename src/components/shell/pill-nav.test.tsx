@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 const pathname = vi.fn(() => "/lab/sand");   // the story is home (src/lib/story.ts)
@@ -100,5 +100,41 @@ describe("PillNav", () => {
     expect(nav.querySelectorAll(".hl")).toHaveLength(1);
     expect(nav.querySelector(".hl")).toHaveAttribute("aria-hidden", "true");
     expect(nav.querySelectorAll("[data-light]")).toHaveLength(3);
+  });
+});
+
+describe("phones: the burger (Liam, 2026-10-12)", () => {
+  test("a Menu button, closed at first; the menu's links aren't on the page until it opens", () => {
+    render(<PillNav />);
+    const burger = screen.getByRole("button", { name: "Menu" });
+    expect(burger).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+  test("it opens a full-screen menu: the three pages, the one you're on marked, focus inside", () => {
+    pathname.mockReturnValue("/about");
+    render(<PillNav />);
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+    const menu = screen.getByRole("dialog", { name: "Menu" });
+    const links = within(menu).getAllByRole("link");
+    expect(links.map((l) => l.textContent)).toEqual(["Projects", "About", "Contact"]);
+    expect(within(menu).getByRole("link", { name: "About" })).toHaveAttribute("aria-current", "page");
+    expect(within(menu).getByRole("link", { name: "About" })).toHaveAttribute("href", "/about");
+    expect(menu.contains(document.activeElement)).toBe(true);
+    expect(screen.getByRole("button", { name: "Close menu" })).toHaveAttribute("aria-expanded", "true");
+  });
+  test("Escape closes it, and focus returns to the button", () => {
+    render(<PillNav />);
+    const burger = screen.getByRole("button", { name: "Menu" });
+    fireEvent.click(burger);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(burger);
+  });
+  test("choosing a page closes it", () => {
+    pathname.mockReturnValue("/cyvore");
+    render(<PillNav />);
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("link", { name: "Contact" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });

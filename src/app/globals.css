@@ -83,5 +83,6 @@ html.lenis body {
 html[data-loader="play"], html[data-loader="reduced"], html[data-loader="arriving"] { overflow: hidden; }
 html[data-loader="play"] .sh-nav, html[data-loader="reduced"] .sh-nav,
 html[data-loader="play"] .sh-name, html[data-loader="reduced"] .sh-name,
+html[data-loader="play"] .sh-burger, html[data-loader="reduced"] .sh-burger,
 html[data-loader="play"] [data-testid="hero-overlay"], html[data-loader="reduced"] [data-testid="hero-overlay"] { opacity: 0; pointer-events: none; visibility: hidden; }
 .sh-nav, .sh-name, [data-testid="hero-overlay"] { transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1); }

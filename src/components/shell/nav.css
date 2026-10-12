@@ -105,3 +105,36 @@ html[data-nav-tone="light"] .sh-name:hover { opacity: .7; }
 
 /* Back as a pill with its label (back-button.tsx; Liam, 2026-10-12) */
 .sh-back.sh-back-pill { display: flex; gap: 8px; width: auto; padding: 0 20px 0 14px; border-radius: 999px; font: 500 14px/1 var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif; }
+
+/* phones: the burger and its full-screen menu (pill-nav.tsx; Liam, 2026-10-12). Desktop keeps the pills. */
+.sh-burger { display: none; }
+@media (max-width: 600px) {
+  .sh-nav { display: none; }
+  .sh-burger {
+    position: relative; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 999px;
+    background: rgba(20, 16, 15, .72); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .16); cursor: pointer; z-index: 2;
+    -webkit-tap-highlight-color: transparent;
+  }
+  html[data-nav-tone="light"] .sh-burger:not(.is-open) { background: rgba(255, 255, 255, .72); box-shadow: inset 0 0 0 1px rgba(26, 26, 46, .2); }
+  .sh-burger i { position: absolute; left: 14px; right: 14px; height: 1.5px; background: #f4efe9; border-radius: 1px; transition: transform 320ms var(--nav-settle); }
+  html[data-nav-tone="light"] .sh-burger:not(.is-open) i { background: var(--nav-ink); }
+  .sh-burger i:first-child { transform: translateY(-3.5px); }
+  .sh-burger i:last-child { transform: translateY(3.5px); }
+  .sh-burger.is-open i:first-child { transform: rotate(45deg); }
+  .sh-burger.is-open i:last-child { transform: rotate(-45deg); }
+  .sh-name { z-index: 60; }   /* (the name stays over the open menu) */
+}
+.sh-menu {
+  position: fixed; inset: 0; z-index: 1; background: #0b0908; display: flex; align-items: flex-end;
+  padding: 0 6vw 14svh; animation: sh-menu-in 360ms var(--nav-settle) both;
+}
+.sh-menu ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.sh-menu-link {
+  display: block; padding: 4px 0; text-decoration: none; color: rgba(244, 239, 233, .5);
+  font: 400 clamp(40px, 13vw, 64px)/1.1 var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif; letter-spacing: -.02em;
+  animation: sh-menu-rise 600ms cubic-bezier(.22, 1, .36, 1) both; animation-delay: calc(80ms + var(--i) * 70ms);
+}
+.sh-menu-link.is-active, .sh-menu-link:focus-visible, .sh-menu-link:hover { color: #f4efe9; outline: none; }
+@keyframes sh-menu-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sh-menu-rise { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .sh-menu, .sh-menu-link { animation: none; } }
