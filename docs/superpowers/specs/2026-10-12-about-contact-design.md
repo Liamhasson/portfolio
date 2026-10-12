@@ -24,15 +24,26 @@ Geist and Geist Mono, the motion is ours, the quality bar of Lusion and Oryzo.
 The story's timeline (`story-timeline.ts`) runs on past the index: today it ends at `STORY_SCREENS` (4.3) plus the
 `SCREEN_HOLD` (0.8). The new beats follow the hold, in story progress `p` (screens).
 
-### 2.1 Through the screen (~0.7 screen)
+### 2.1 Through the screen: the index becomes the sand (~0.7 screen)
 
-- The index's surface comes apart into sand from its centre outward: the grains of the hero's own system, lit by the
-  screen's light, opening a hole that grows to fill the frame.
-- The camera keeps moving forward, through the hole. The index's DOM fades out as its surface opens and stops taking
-  pointer events as soon as the opening starts.
-- Beyond the screen is **the hero's void**: the same world as the loader and the hero, with the cloud loose and far.
-  The switch from the laptop's camera to the void's camera happens while the sand fills the frame, so it never shows.
-- Scroll-driven and reversible: scrolling back closes the screen and the index returns.
+Liam, 2026-10-12, after a mockup that faded a soft hole of sand into the middle of the index ("if it appears out of
+nowhere it must use the loader's entry; if it's scroll-triggered, shouldn't it be at the end of the index?") and the
+reference he gave (Marinko Tambur, "Make This Epic Fluid Particle Swirls in Blender": particles that carry an image,
+advected by a fluid, the image torn by the flow while every particle stays crisp):
+
+- **When:** only once the index is at its end: the last card (Nordic Logic) has scrolled to rest. Scrolling on starts it.
+- **The index becomes the sand.** At that moment every grain takes its colour from the index under it (the card
+  images, titles, the dark between them): before anything moves, what you see is still exactly the index.
+- **It tears from the bottom up**, along an uneven front, where the scroll pushes. Each grain lets go in turn and is
+  carried by the flow (the hero's own swirl field, slow and coherent, never jitter); the cards tear into streams that
+  fold over each other, lit from the side like the hero's sand (no glow). Where grains have left, the index has holes;
+  nothing blurs or fades, every grain stays crisp.
+- **Through:** the camera goes forward through the gaps; grains near the lens grow and pass it (the existing depth of
+  field). Beyond is **the hero's void**, and the same grains loosen into the far, faint cloud behind About. The switch
+  from the laptop's camera to the void's camera happens while grains fill the frame, so it never shows.
+- The index's DOM is replaced by the sand at the moment it lets go (identical pixels), and is inert from then on.
+- Scroll-driven and reversible: scrolling back gathers the grains back into the index, which returns as itself.
+- Prototype of the idea and the timing (2D, rough): `.superpowers/brainstorm/…/content/index-to-sand.html`.
 
 ### 2.2 About (~3.5 screens)
 
@@ -140,8 +151,11 @@ one-line change.
 - **Timeline:** `story-timeline.ts` gains the beats after the hold (through, about, contact) as named spans, with tests
   like the existing ones; the page's length grows accordingly. The index's anchor (`#projects`) is unchanged; `#about`
   and `#contact` move to the start of their sections.
-- **Through the screen:** a short GPU dissolve of the screen's surface into grains (stateless, in the vertex shader,
-  like `rising.ts`), plus the camera switch hidden behind it. The index DOM fades and goes inert.
+- **Through the screen:** at the index's end, its current state is drawn into an offscreen image from the cards' real
+  positions, images and titles (no DOM-to-canvas library: the cards are known images and text). A grain's rest position
+  is its spot on that image, its colour is sampled from it, and its path after letting go is the swirl field integrated
+  from its release time, stateless in the vertex shader (like `rising.ts`), so scroll scrubs both ways. A TS mirror tests
+  that a grain sits exactly on its pixel before release and moves continuously after.
 - **New modules** (`sand-lab.tsx` is already 1,000 lines and only wires them):
   - `about-track.tsx`: the pinned track, its slides, the portrait, the progress line; its motion a pure function of
     progress (tested);
