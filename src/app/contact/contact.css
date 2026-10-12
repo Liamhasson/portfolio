@@ -1,0 +1,12 @@
+/* src/app/contact/contact.css (spec 2026-10-12 §4): one screen, the ball and its brief, the words below */
+.ct { position: relative; height: 100svh; overflow: hidden; background: #000; font-family: var(--font-sans); }
+.ct-canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; }
+/* the still: the approved ball render (1600x1000; its ball centred at 50% across, 49.9% down, 46.6% of the height
+   across: measured 2026-10-12) scaled so the ball is 30% of the view's height, its centre at 50% across, 42% down */
+.ct-still { --h: calc(100vh * 0.3 / 0.466); position: fixed; height: var(--h); width: calc(var(--h) * 1.6); max-width: none; left: calc(50vw - 0.5 * var(--h) * 1.6); top: calc(42vh - 0.499 * var(--h)); }
+.ct-words { position: absolute; left: 0; right: 0; bottom: 10svh; text-align: center; z-index: 10; }
+.ct-head { margin: 0; font-weight: 400; font-size: clamp(30px, 3.6vw, 64px); line-height: 1.15; color: #f4efe9; }
+.ct-pills { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.8vw; margin-top: 2.2vw; }
+.ct-pill { padding: 0.85em 1.5em; border-radius: 99px; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(20, 16, 15, 0.7); color: #f4efe9; text-decoration: none; font-size: clamp(14px, 1.2vw, 18px); }
+.ct-pill:hover, .ct-pill:focus-visible { border-color: rgba(230, 191, 174, 0.6); }
+@media (max-aspect-ratio: 1/1) { .ct-pills { flex-direction: column; align-items: center; gap: 10px; margin-top: 22px; } }
