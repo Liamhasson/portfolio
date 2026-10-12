@@ -656,7 +656,7 @@ import { WorkIndex } from "./work-index";
 test("past the last project, About peeks in: the pull to its page (spec 2026-10-12 §2), in both layouts", () => {
   window.matchMedia = vi.fn().mockReturnValue({ matches: false, addEventListener() {}, removeEventListener() {} }) as never;
   render(<WorkIndex bind={() => {}} />);
-  const links = screen.getAllByRole("link", { name: "Next: About", hidden: true });
+  const links = screen.getAllByLabelText("Next: About");   // (by label: role queries fail in the index's container-unit styles under jsdom)
   expect(links).toHaveLength(2);
   for (const l of links) expect(l).toHaveAttribute("href", "/about");
   expect(links[0]).toHaveTextContent("I’m Liam. I love crafting products where design and user needs meet.");

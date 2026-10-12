@@ -13,6 +13,8 @@ import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import { matrix3d, type Pt } from "@/three/sand/homography";
 import { holdLoop, loopVideo } from "@/three/sand/card-loops";
+import { NextPagePull } from "@/components/shell/next-page-pull";
+import { ABOUT, plain } from "@/content/about";
 
 /** The projects (copy and tags from the approved plan and the current portfolio). The three finished ones open their
  *  case studies; Nordic Logic is in progress (a still, not a link). */
@@ -76,6 +78,8 @@ const CSS = `
 .wl .name { font-size:22px; font-weight:400; margin:6px 0 0; }
 .wl .line { font-size:15px; line-height:1.35; color:var(--dim); margin:4px 0 0; }
 .wl .more { margin-top:32px; padding-top:14px; border-top:1px solid var(--rule); display:flex; gap:8px; font:400 10px/1 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; color:var(--dim); }
+.np-index { font-size: 1.15cqw; margin: 0 4cqw; }
+.np-index-list { font-size: 15px; margin: 0 20px; }
 `;
 
 function Media({ c, playing }: { c: (typeof CARDS)[number]; playing: boolean }) {
@@ -233,11 +237,14 @@ export function WorkIndex({ bind }: { bind: (h: WorkIndexHandle) => void }) {
             <h2 className="title">Selected work</h2>
           </div>
           <Cards playing={playing.wide} />
+          {/* past the last project, About peeks in: the pull to its page (spec 2026-10-12-about-contact-design.md §2) */}
+          <NextPagePull href="/about" label="About" line={plain(ABOUT.lines[0])} className="np-index" active={playing.wide} />
         </div>
       </section>
       <section ref={listEl} className="wl z-[7]" style={{ visibility: "hidden", pointerEvents: "none" }} aria-label="Selected work">
         <h2 className="title" style={{ opacity: 0 }}>Selected work</h2>
         <Cards playing={playing.list} itemRef={(el, i) => { listItems.current[i] = el; if (el && !el.style.opacity) el.style.opacity = "0"; }} />
+        <NextPagePull href="/about" label="About" line={plain(ABOUT.lines[0])} className="np-index np-index-list" active={playing.list} />
       </section>
     </>
   );
