@@ -21,7 +21,7 @@ const CARDS: { n: string; name: string; tags: string[]; line: string; href?: str
   { n: "01", name: "Eventread", tags: ["SaaS web app", "Designer-builder"], line: "The check every booker skips.", href: "/eventread", video: "/work/eventread", poster: "/work/eventread.jpg" },
   { n: "02", name: "Cyvore", tags: ["B2B website", "Information architecture"], line: "A cybersecurity startup needed a site investors would believe in.", href: "/cyvore", video: "/work/cyvore", poster: "/work/cyvore.jpg" },
   { n: "03", name: "Pulse", tags: ["Fitness app", "User research"], line: "A goal-focused fitness app designed around four retention milestones.", href: "/pulse", video: "/work/pulse", poster: "/work/pulse.jpg" },
-  { n: "04", name: "Nordic Logic", tags: ["B2B website", "Design system"], line: "A launch site for a startup with no clients to point to yet.", href: "/nordic-logic", video: "/work/nordic-logic", poster: "/work/nordic-logic.jpg" },
+  { n: "04", name: "Nordic Logic", tags: ["B2B website", "Design system"], line: "A launch site for a startup with no clients to point to yet.", href: "/nordic-logic", video: "/work/nordic-logic-live", poster: "/work/nordic-logic-live.jpg" },
 ];
 
 export interface WorkIndexHandle {
