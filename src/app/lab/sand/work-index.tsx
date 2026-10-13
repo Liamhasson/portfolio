@@ -15,13 +15,13 @@ import { matrix3d, type Pt } from "@/three/sand/homography";
 import { holdLoop, loopVideo } from "@/three/sand/card-loops";
 import { NextPagePull } from "@/components/shell/next-page-pull";
 
-/** The projects (copy and tags from the approved plan and the current portfolio). The three finished ones open their
- *  case studies; Nordic Logic is in progress (a still, not a link). */
+/** The projects (copy and tags from the approved plan and the current portfolio). Each opens its case study and plays a
+ *  loop of the product in use (Nordic Logic live since 2026-10-13: its hero film landing on the portal). */
 const CARDS: { n: string; name: string; tags: string[]; line: string; href?: string; video?: string; poster: string; progress?: boolean }[] = [
   { n: "01", name: "Eventread", tags: ["SaaS web app", "Designer-builder"], line: "The check every booker skips.", href: "/eventread", video: "/work/eventread", poster: "/work/eventread.jpg" },
   { n: "02", name: "Cyvore", tags: ["B2B website", "Information architecture"], line: "A cybersecurity startup needed a site investors would believe in.", href: "/cyvore", video: "/work/cyvore", poster: "/work/cyvore.jpg" },
   { n: "03", name: "Pulse", tags: ["Fitness app", "User research"], line: "A goal-focused fitness app designed around four retention milestones.", href: "/pulse", video: "/work/pulse", poster: "/work/pulse.jpg" },
-  { n: "04", name: "Nordic Logic", tags: ["B2B website", "Design system"], line: "A carrier invoice audit startup that needed to build trust without any social proof or clients.", poster: "/work/nordic-logic.jpg", progress: true },
+  { n: "04", name: "Nordic Logic", tags: ["B2B website", "Design system"], line: "A launch site for a startup with no clients to point to yet.", href: "/nordic-logic", video: "/work/nordic-logic", poster: "/work/nordic-logic.jpg" },
 ];
 
 export interface WorkIndexHandle {
