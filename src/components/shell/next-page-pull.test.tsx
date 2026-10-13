@@ -20,6 +20,8 @@ beforeEach(() => {
   Object.defineProperty(window, "innerHeight", { configurable: true, value: 1000 });
   window.matchMedia = vi.fn().mockReturnValue({ matches: false, addEventListener() {}, removeEventListener() {} }) as never;
   window.scrollTo = vi.fn((_x: unknown, y?: unknown) => { scrollY = Number(y); }) as never;
+  // (jsdom lays nothing out: every pull counts as rendered unless a test says otherwise)
+  vi.spyOn(HTMLElement.prototype, "getClientRects").mockReturnValue([{}] as unknown as DOMRectList);
 });
 afterEach(() => vi.restoreAllMocks());
 
@@ -99,6 +101,37 @@ describe("NextPagePull", () => {
     const fresh = new WheelEvent("wheel", { deltaY: 80, cancelable: true });
     window.dispatchEvent(fresh);
     expect(fresh.defaultPrevented).toBe(false);
+  });
+  test("a finger's: the page can't cancel a touch scroll under way, so scrolling stops until the finger lifts, then the next page is at its top", () => {
+    vi.useFakeTimers();
+    setPage(1500);
+    const { unmount } = render(<NextPagePull href="/about" label="About" line="x" />);
+    const under = screen.getByText("x");   // (where the finger comes down: in the page the next one replaces)
+    scrollY = 2000;
+    now += 1000;
+    act(() => { fireEvent.touchStart(under, { touches: [{ clientY: 900 }] }); });
+    for (let y = 860; y >= 200; y -= 40) { now += 16; act(() => { fireEvent.touchMove(under, { touches: [{ clientY: y }] }); }); }
+    expect(push).toHaveBeenCalledWith("/about");
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(document.documentElement.style.overflow).toBe("hidden");   // (no fling starts or carries on)
+    unmount();   // (the next page replaces this one: the finger's element is gone from the page)
+    scrollY = 240;   // (what the rest of the swipe scrolled the next page by)
+    act(() => { vi.advanceTimersByTime(500); });
+    expect(document.documentElement.style.overflow).toBe("hidden");   // (the finger still down)
+    act(() => { fireEvent.touchEnd(under, { touches: [] }); });   // (heard there: it no longer reaches the window)
+    act(() => { vi.advanceTimersByTime(300); });
+    expect(document.documentElement.style.overflow).toBe("");
+    expect(window.scrollTo).toHaveBeenLastCalledWith(0, 0);
+    vi.useRealTimers();
+  });
+  test("not rendered (the home page's plain-HTML copy while the story runs): it never fills or opens the page", () => {
+    vi.mocked(HTMLElement.prototype.getClientRects).mockReturnValue([] as unknown as DOMRectList);
+    setPage(1500);
+    render(<NextPagePull href="/about" label="About" line="x" />);
+    scrollY = 2000;
+    now += 1000;
+    wheel(200, 20);
+    expect(push).not.toHaveBeenCalled();
   });
 });
 
