@@ -474,14 +474,17 @@ export function SandLab({ hero }: { hero: boolean }) {
       // the wait for the desk (story-timeline.ts deskWait): whether it's holding; a jump to the projects (the nav's
       // Projects, Lenis's 1.5 s anchor glide) isn't held; the desk's loading, to notice a stall
       let deskWaiting = false, jumpingSince = -1, deskSeen = -1, deskStill = 0;
-      // the page runs on past the story by the index's own overflow (measured every 20 frames)
+      // the page runs on past the story by the 16:10 index's own overflow (measured every 20 frames); the phone list
+      // lays its length out in the page itself (work-index.tsx), so there it needs none
       const fitIndex = (ix: WorkIndexHandle) => {
         if (++spacerTick % 20 !== 0 || !spacerRef.current) return;
-        const need = `${Math.round(ix.overflow())}px`;
-        if (spacerRef.current.style.height === need) return;
-        spacerRef.current.style.height = need;
-        // (the anchor covers the index and its projects, so the nav's Projects is lit while they're in view)
-        if (projectsRef.current) projectsRef.current.style.height = `calc(100vh + ${need})`;
+        const flow = ix.flow();
+        const need = `${flow === null ? Math.round(ix.overflow()) : 0}px`;
+        // (the anchor covers the index and its projects, so the nav's Projects is lit while they're in view; on phones
+        // exactly the list, never past it: anything longer would lengthen the page again)
+        const reach = flow === null ? `calc(100vh + ${need})` : `${Math.round(flow)}px`;
+        if (spacerRef.current.style.height !== need) spacerRef.current.style.height = need;
+        if (projectsRef.current && projectsRef.current.style.height !== reach) projectsRef.current.style.height = reach;
       };
       let briefReturnA = 0;   // the brief's return on scroll, last frame (only redrawn while it shows)
       let cursorLean: [number, number] = [0, 0];   // the vortex's lean toward the cursor (NDC, parallax.ts)
@@ -542,6 +545,7 @@ export function SandLab({ hero }: { hero: boolean }) {
 
       stage.onFrame((dt) => {
         const desk3d = deskLoaded, rising = risingLoaded;
+        stage!.covered = false;   // (set below while the phone list covers the screen: nothing of the scene shows)
         chaosC.addVectors(chaosC0, chaosShift);
         // the loader (loader-timeline.ts): seconds since 100% from frame time (a hidden tab pauses it)
         if (loaderClock !== null) {
@@ -712,6 +716,7 @@ export function SandLab({ hero }: { hero: boolean }) {
                 ix.show((Number.isFinite(indexMix) ? indexMix : take) * (1 - ease(sett, [0.05, 0.35])));
                 ix.list(ease(sett, [0.4, 1]));
                 ix.interactive(sett > 0.999 ? "list" : "none");
+                stage!.covered = take > 0.999 && g2 >= 1;
               } else {
                 const s = Math.min(W / w, H / ih), cw = w * s, ch = ih * s, x0 = (W - cw) / 2, y0 = (H - ch) / 2;
                 const rest: [number, number][] = [[x0, y0], [x0 + cw, y0], [x0 + cw, y0 + ch], [x0, y0 + ch]];
@@ -739,6 +744,7 @@ export function SandLab({ hero }: { hero: boolean }) {
                 ix.place([[0, 0], [W, 0], [W, H], [0, H]]);
                 ix.panel({ x: 0, y: 0, w: W, h: H });
                 ix.show(0); ix.list(1); ix.interactive("list");
+                stage!.covered = true;
               } else {
                 const { w, h: ih } = ix.size();
                 const k = Math.min(W / w, H / ih), cw = w * k, ch = ih * k, x0 = (W - cw) / 2, y0 = (H - ch) / 2;
@@ -1059,7 +1065,7 @@ export function SandLab({ hero }: { hero: boolean }) {
       {hero && <div ref={veilRef} aria-hidden className="pointer-events-none fixed inset-0 bg-black opacity-0" style={{ zIndex: 30 }} />}
       {/* the nav's Projects (/#projects) lands where the index has settled (once this page is the home) */}
       {hero && <div ref={projectsRef} id="projects" aria-hidden className="pointer-events-none absolute left-0 w-px" style={{ top: `${PAGE_VH - 100}vh`, height: "100vh" }} />}
-      {hero && <WorkIndex bind={bindIndex} />}
+      {hero && <WorkIndex bind={bindIndex} end={PAGE_VH - 100} />}
       {hero && <Brief ref={briefRef} />}
       {/* (the sketches' handwriting, loaded with the story: desk-sketches.ts draws it into the scene) */}
       {hero && <span aria-hidden className={sketchFont.className} style={{ position: "absolute", opacity: 0, pointerEvents: "none" }}>a</span>}

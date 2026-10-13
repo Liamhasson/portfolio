@@ -31,6 +31,9 @@ export class Stage {
   private readonly grainGov: GrainGovernor;
   /** ?governor=0 holds the starting grains and sharpness (diagnostics: measure their real cost). */
   private readonly governorOn = typeof window === "undefined" || new URLSearchParams(window.location.search).get("governor") !== "0";
+  /** Something opaque covers the whole canvas (the phones' project list): the frame callbacks run, nothing is drawn, and
+   *  the governor doesn't read the frame times (an undrawn frame says nothing about the sand's cost). */
+  covered = false;
   private raf = 0;
   private last = 0;
   private running = false;
@@ -142,7 +145,7 @@ export class Stage {
       this.last = now;
       // the governor's step first, then the frame: a resize clears the canvas, so one made after the draw showed a black
       // frame (Liam, 2026-10-11: "random blackout frames" over the desk, where the governor steps)
-      const next = this.governorOn ? this.grainGov.sample(frameMs) : null;
+      const next = this.governorOn && !this.covered ? this.grainGov.sample(frameMs) : null;
       if (next) {
         const sharper = next.pixelRatio !== this.settings.pixelRatio;
         this.settings = { ...this.settings, grains: next.grains, pixelRatio: next.pixelRatio };
@@ -151,7 +154,7 @@ export class Stage {
           this.resize();
         } else this.tierChanges.forEach((cb) => cb(this.settings));
       }
-      const err = stepFrame(this.frames, dt, now / 1000, () => this.draw());
+      const err = stepFrame(this.frames, dt, now / 1000, () => { if (!this.covered) this.draw(); });
       if (err) {
         this.stop();
         console.error("stage: a frame failed", err);

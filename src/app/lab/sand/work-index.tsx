@@ -7,7 +7,11 @@
  * perspective transform), crossfades in where the two coincide, then:
  *   - landscape: settles into the view (16:10, contained) and takes the pointer;
  *   - portrait (phones): the screen's black panel grows to fill the phone, the 16:10 layout gives way, and the phone
- *     list surfaces row by row (the same rise as the screen's wake reveal), so the screen becomes the section.
+ *     list surfaces row by row (the same rise as the screen's wake reveal), so the screen becomes the section. The list
+ *     is part of the page: pinned (sticky) through the story, then scrolled by the browser itself past the story's end.
+ *     (It was a fixed layer the page's scroll was copied into each frame, with a spacer re-measured from the screen's
+ *     height: on iPhones it trailed the finger, and the toolbar's collapse resized the page under it, which jumped it
+ *     back up and kept the pull to About from filling. Liam, 2026-10-13.)
  */
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
@@ -37,10 +41,14 @@ export interface WorkIndexHandle {
   interactive(which: "none" | "wide" | "list"): void;
   /** The box the 16:10 index lays out in (CSS px). */
   size(): { w: number; h: number };
-  /** How far the settled index's content runs past the view, in CSS px on screen (0: it all fits, or not settled). The
-   *  page grows by this much: the scroll that brought the viewer in carries on through the projects (Liam, 2026-10-10). */
+  /** How far the settled 16:10 index's content runs past the view, in CSS px on screen (0: it all fits, or not settled).
+   *  The page grows by this much: the scroll that brought the viewer in carries on through the projects (Liam,
+   *  2026-10-10). */
   overflow(): number;
-  /** Scroll the settled index's content by `px` CSS px on screen. */
+  /** Phones: the list's own length (CSS px), which it lays out in the page itself from the story's end on, so the page
+   *  needs no spacer. null where the 16:10 index is used. */
+  flow(): number | null;
+  /** Scroll the settled 16:10 index's content by `px` CSS px on screen (the phone list scrolls with the page). */
   scroll(px: number): void;
 }
 
@@ -77,6 +85,9 @@ const CSS = `
 .np-index { font-size: 1.15cqw; margin: 0 4cqw; }
 .np-index-list { font-size: 15px; margin: 0 20px; }
 .wl.wl-static { position:relative; inset:auto; overflow:visible; min-height:100vh; }
+.wl-track { position:absolute; left:0; top:0; width:100%; pointer-events:none; }
+.wl.wl-live { position:sticky; inset:0 auto auto; overflow:visible; min-height:100vh; }
+@media (min-aspect-ratio: 1/1) { .wl-track { display:none; } }
 @media (min-width: 768px) { .wl.wl-static .grid { grid-template-columns:1fr 1fr; gap:48px 4vw; } .wl.wl-static .np-index-list { margin:0; } }
 `;
 
@@ -146,7 +157,8 @@ function Cards({ playing, itemRef }: { playing: boolean; itemRef?: (el: HTMLElem
   );
 }
 
-export function WorkIndex({ bind }: { bind: (h: WorkIndexHandle) => void }) {
+/** `end`: where the story ends and the projects begin, in vh from the page's top (its #projects anchor). */
+export function WorkIndex({ bind, end }: { bind: (h: WorkIndexHandle) => void; end: number }) {
   const box = useRef<HTMLDivElement>(null);
   const panelEl = useRef<HTMLDivElement>(null);
   const listEl = useRef<HTMLDivElement>(null);
@@ -157,6 +169,8 @@ export function WorkIndex({ bind }: { bind: (h: WorkIndexHandle) => void }) {
     // the settled 16:10 index's scale on screen (contained in the view)
     const restScale = () => Math.min(window.innerWidth / sz().w, window.innerHeight / sz().h);
     let mode: "none" | "wide" | "list" = "none";
+    // (before it settles: the layout it will take, so the page is already long enough when the viewer gets there)
+    const layout = () => (mode !== "none" ? mode : window.innerWidth / window.innerHeight < 1 ? "list" : "wide");
     const apply = () => {
       const el = box.current;
       if (!el) return;
@@ -208,15 +222,14 @@ export function WorkIndex({ bind }: { bind: (h: WorkIndexHandle) => void }) {
       },
       size: sz,
       overflow() {
-        // (before it settles: what it will need, so the page is already long enough when the viewer gets there)
-        const m = mode !== "none" ? mode : window.innerWidth / window.innerHeight < 1 ? "list" : "wide";
-        if (m === "list" && listEl.current) return Math.max(listEl.current.scrollHeight - listEl.current.clientHeight, 0);
         const page = box.current?.querySelector<HTMLElement>(".page");
-        if (m === "wide" && page) return Math.max(page.scrollHeight - page.clientHeight, 0) * restScale();
+        if (layout() === "wide" && page) return Math.max(page.scrollHeight - page.clientHeight, 0) * restScale();
         return 0;
       },
+      flow() {
+        return layout() === "list" && listEl.current ? listEl.current.offsetHeight : null;
+      },
       scroll(px) {
-        if (mode === "list" && listEl.current) listEl.current.scrollTop = px;
         const page = box.current?.querySelector<HTMLElement>(".page");
         if (page) page.scrollTop = mode === "wide" ? px / restScale() : 0;
       },
@@ -239,11 +252,16 @@ export function WorkIndex({ bind }: { bind: (h: WorkIndexHandle) => void }) {
           <NextPagePull href="/about" label="About" line="Keep scrolling" className="np-index" active={playing.wide} />
         </div>
       </section>
-      <section ref={listEl} className="wl z-[7]" style={{ visibility: "hidden", pointerEvents: "none" }} aria-label="Selected work">
-        <h2 className="title" style={{ opacity: 0 }}>Selected work</h2>
-        <Cards playing={playing.list} itemRef={(el, i) => { listItems.current[i] = el; if (el && !el.style.opacity) el.style.opacity = "0"; }} />
-        <NextPagePull href="/about" label="About" line="Keep scrolling" className="np-index np-index-list" active={playing.list} />
-      </section>
+      {/* phones: the list pinned at the top through the story, then scrolling on with the page from its end (the track's
+          length is the story's plus the list's: the page's length, whatever the toolbar does to the screen's height) */}
+      <div className="wl-track">
+        <section ref={listEl} className="wl wl-live z-[7]" style={{ visibility: "hidden", pointerEvents: "none" }} aria-label="Selected work">
+          <h2 className="title" style={{ opacity: 0 }}>Selected work</h2>
+          <Cards playing={playing.list} itemRef={(el, i) => { listItems.current[i] = el; if (el && !el.style.opacity) el.style.opacity = "0"; }} />
+          <NextPagePull href="/about" label="About" line="Keep scrolling" className="np-index np-index-list" active={playing.list} />
+        </section>
+        <div aria-hidden style={{ height: `${end}vh` }} />
+      </div>
     </>
   );
 }
