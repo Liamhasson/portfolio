@@ -3,7 +3,7 @@ import type { Challenge } from "@/lib/case-studies/types";
 
 /** Board frame 06 · Challenges: numbered, each with its chips (and final screen) from the study, then what happened,
     what I did and what it changed. */
-export function ChallengeList({ challenges, Extras }: { challenges: readonly Challenge[]; Extras?: ComponentType<{ index: number }> }) {
+export function ChallengeList({ challenges, Extras, After }: { challenges: readonly Challenge[]; Extras?: ComponentType<{ index: number }>; After?: ComponentType }) {
   const headingId = useId();
   return (
     <section aria-labelledby={headingId} className="f chal">
@@ -35,6 +35,7 @@ export function ChallengeList({ challenges, Extras }: { challenges: readonly Cha
           </li>
         ))}
       </ol>
+      {After && <After />}
     </section>
   );
 }

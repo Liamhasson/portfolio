@@ -28,3 +28,14 @@
   background: var(--void); color: var(--ink);
 }
 [data-world="pulse"] .f { background: var(--void); color: var(--ink); }
+
+/* Nordic Logic: docs/prototypes/nordic-logic-mockups.html:19-29, the site's own tokens (web-v2/app/globals.css, 1524f60) */
+[data-world="nordic-logic"] {
+  --nav-ink: #0c1116; --nav-canvas: #f9f9f8; /* the site nav and Back in this world */
+  --canvas: #f9f9f8; --surface: #ffffff; --mist: #efedeb; --frost: #ebe9e6; --hair: #e4e1dc; --hair-2: #d4d0c9;
+  --ink: #0c1116; --ink-2: #363b40; --ink-3: #5a6672;
+  --onyx: #0f151b; --onyx-card: #19212b; --onyx-line: #2a3542; --onyx-text: #8b98a6;
+  --signal: #1b4dff; --signal-lift: #5b82ff; --settle: cubic-bezier(0.22, 1, 0.36, 1);
+  background: var(--canvas); color: var(--ink);
+}
+[data-world="nordic-logic"] .f { background: var(--canvas); color: var(--ink); }

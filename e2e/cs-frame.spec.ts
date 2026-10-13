@@ -5,6 +5,7 @@ const WORLD_BG: Record<(typeof STUDIES)[number], string> = {
   eventread: "rgb(248, 248, 246)", // --canvas #f8f8f6
   cyvore: "rgb(11, 8, 20)",        // --void #0b0814
   pulse: "rgb(6, 11, 20)",         // --void #060b14
+  "nordic-logic": "rgb(249, 249, 248)", // --canvas #f9f9f8 (Nordic Logic's Daylight)
 };
 
 for (const slug of STUDIES) {

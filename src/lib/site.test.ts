@@ -25,7 +25,7 @@ test("robots allow everything and point at the sitemap; the sitemap lists every 
   expect(r.rules).toMatchObject({ userAgent: "*", allow: "/" });
   expect(r.sitemap).toBe("https://liamhasson.com/sitemap.xml");
   expect(sitemap().map((e) => e.url)).toEqual(PAGES.map((p) => `https://liamhasson.com${p}`));
-  expect(PAGES).toEqual(["/", "/eventread", "/cyvore", "/pulse", "/about", "/contact"]);
+  expect(PAGES).toEqual(["/", "/eventread", "/cyvore", "/pulse", "/nordic-logic", "/about", "/contact"]);
 });
 
 test("each page names its own canonical address; a case study shares its own picture", () => {

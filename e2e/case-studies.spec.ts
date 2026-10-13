@@ -1,12 +1,13 @@
 import { expect, test } from "@playwright/test";
 
 const loop = [
-  ["eventread", "Cyvore", "The Danger Score."],
-  ["cyvore", "Pulse", "One story, told in one screen."],
-  ["pulse", "Eventread", "Goal-based onboarding."],
+  ["eventread", "Cyvore", "cyvore", "The Danger Score."],
+  ["cyvore", "Pulse", "pulse", "One story, told in one screen."],
+  ["pulse", "Nordic Logic", "nordic-logic", "Goal-based onboarding."],
+  ["nordic-logic", "Eventread", "eventread", "Built for the sceptic."],
 ] as const;
 
-for (const [slug, next, signature] of loop) {
+for (const [slug, next, nextSlug, signature] of loop) {
   test(`/${slug} has the full frame`, async ({ page }) => {
     await page.goto(`/${slug}`);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -15,6 +16,6 @@ for (const [slug, next, signature] of loop) {
     await expect(page.getByRole("region", { name: "Challenges" })).toBeVisible();
     await expect(page.getByRole("region", { name: "Impact" })).toBeVisible();
     await page.getByRole("link", { name: `Next project: ${next}` }).click();
-    await expect(page).toHaveURL(new RegExp(`/${next.toLowerCase()}$`));
+    await expect(page).toHaveURL(new RegExp(`/${nextSlug}$`));
   });
 }

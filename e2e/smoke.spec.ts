@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 // (the home page is the story: its loader hides the copy at first, so it's opened at the index, which skips the loader)
-for (const path of ["/#projects", "/pulse", "/cyvore", "/eventread"]) {
+for (const path of ["/#projects", "/pulse", "/cyvore", "/eventread", "/nordic-logic"]) {
   test(`${path} renders with primary nav and h1`, async ({ page }) => {
     const res = await page.goto(path);
     expect(res?.status()).toBe(200);

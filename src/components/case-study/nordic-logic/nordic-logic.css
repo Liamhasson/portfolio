@@ -1,0 +1,290 @@
+/* nordic-logic: the board's CSS (docs/prototypes/nordic-logic-mockups.html), scoped to the Nordic Logic case study:
+   board chrome and mock shell dropped, selectors under [data-world="nordic-logic"], Liam's text floored as on the
+   other studies. Every word Liam writes is Geist; Nordic Logic's own type (Schibsted Grotesk, Instrument Sans,
+   IBM Plex Mono) only inside the product: the first audit and the system strip (fonts.ts). No gradients, no glow. */
+/* declared where fonts.ts's variable classes land (a custom property resolves where it's declared) */
+[data-world="nordic-logic"] .nl-fonts {
+  --nl-display: var(--font-schibsted), "Helvetica Neue", Arial, sans-serif;
+  --nl-body: var(--font-instrument), system-ui, sans-serif;
+  --nl-mono: var(--font-plex-mono), ui-monospace, monospace;
+}
+/* ------------------------------ Liam's type (Geist 400) ------------------------------ */
+[data-world="nordic-logic"] .label { font: 400 max(11px, calc(var(--u) * 12))/1.15 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
+[data-world="nordic-logic"] .title { font-size: calc(var(--u) * 72); line-height: .95; letter-spacing: -.025em; }
+[data-world="nordic-logic"] .display { font-size: calc(var(--u) * 48); line-height: 1.16; letter-spacing: -.018em; }
+[data-world="nordic-logic"] .display em { font-style: italic; }
+[data-world="nordic-logic"] .quiet { color: var(--ink-3); }
+[data-world="nordic-logic"] .body { font-size: max(15px, calc(var(--u) * 18)); line-height: 1.55; color: var(--ink-2); max-width: 44ch; }
+[data-world="nordic-logic"] .body .lead { color: var(--ink); }
+[data-world="nordic-logic"] .g12 { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: calc(var(--u) * 24); padding: 0 calc(var(--u) * 72); }
+[data-world="nordic-logic"] .btn { display: inline-flex; align-items: center; gap: calc(var(--u) * 10); height: calc(var(--u) * 48); padding: 0 calc(var(--u) * 20); border-radius: calc(var(--u) * 999); font: 500 max(15px, calc(var(--u) * 15))/1 var(--sans); white-space: nowrap; }
+[data-world="nordic-logic"] .btn .ic { width: calc(var(--u) * 16); height: calc(var(--u) * 16); }
+[data-world="nordic-logic"] .f .btn-ghost { background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 calc(var(--u) * 1) var(--hair-2); }
+[data-world="nordic-logic"] .f .btn-ink { background: var(--ink); color: #fff; }
+[data-world="nordic-logic"] .ic { width: calc(var(--u) * 16); height: calc(var(--u) * 16); fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+[data-world="nordic-logic"] .w-title { font-size: calc(var(--u) * 32); line-height: 1.15; letter-spacing: -.015em; }
+/* the dark chapter (the site's own): Onyx */
+[data-world="nordic-logic"] .f.onyx { background: var(--onyx); color: #fff; }
+[data-world="nordic-logic"] .onyx .title { color: #fff; }
+[data-world="nordic-logic"] .onyx .label { color: var(--onyx-text); }
+[data-world="nordic-logic"] .onyx .body { color: rgba(255,255,255,.66); }
+[data-world="nordic-logic"] .onyx .body .lead { color: #fff; }
+
+/* ------------------------------ 1 hero ------------------------------ */
+[data-world="nordic-logic"] .hero { height: calc(var(--u) * 900); }
+[data-world="nordic-logic"] .hero-head { position: absolute; left: calc(var(--u) * 72); right: calc(var(--u) * 72); top: calc(var(--u) * 132); display: flex; justify-content: space-between; align-items: flex-end; }
+[data-world="nordic-logic"] .hero-right { display: flex; align-items: center; gap: calc(var(--u) * 36); padding-bottom: calc(var(--u) * 6); }
+[data-world="nordic-logic"] .hero-line { font-size: calc(var(--u) * 28); line-height: 1.2; letter-spacing: -.01em; color: var(--ink-2); max-width: 24ch; }
+[data-world="nordic-logic"] .tray { position: absolute; left: calc(var(--u) * 72); top: calc(var(--u) * 276); width: calc(var(--u) * 1296); height: calc(var(--u) * 596); border-radius: calc(var(--u) * 24); background: var(--mist); overflow: hidden; }
+[data-world="nordic-logic"] .tray img { position: absolute; left: calc(var(--u) * 40); top: calc(var(--u) * 40); width: calc(var(--u) * 1216); height: auto; border-radius: calc(var(--u) * 12); box-shadow: 0 0 0 calc(var(--u) * 1) var(--hair); }
+
+/* ------------------------------ 2 at a glance ------------------------------ */
+[data-world="nordic-logic"] .glance { height: calc(var(--u) * 270); padding-top: calc(var(--u) * 56); }
+[data-world="nordic-logic"] .strip { margin: 0 calc(var(--u) * 72); display: grid; grid-template-columns: calc(var(--u) * 330) calc(var(--u) * 220) calc(var(--u) * 220) 1fr; border-top: calc(var(--u) * 1) solid var(--hair-2); border-bottom: calc(var(--u) * 1) solid var(--hair-2); }
+[data-world="nordic-logic"] .strip > div { padding: calc(var(--u) * 28) calc(var(--u) * 24) calc(var(--u) * 30); border-left: calc(var(--u) * 1) solid var(--hair); }
+[data-world="nordic-logic"] .strip > div:first-child { padding-left: 0; border-left: 0; }
+[data-world="nordic-logic"] .strip .label { margin-bottom: calc(var(--u) * 14); }
+[data-world="nordic-logic"] .strip p { font-size: max(15px, calc(var(--u) * 17)); line-height: 1.5; max-width: 30ch; }
+[data-world="nordic-logic"] .tools { display: flex; flex-wrap: wrap; gap: 0 calc(var(--u) * 20); font-size: max(15px, calc(var(--u) * 17)); line-height: 1.55; }
+[data-world="nordic-logic"] .tools li { position: relative; white-space: nowrap; }
+[data-world="nordic-logic"] .tools li:not(:last-child)::after { content: ""; position: absolute; right: calc(var(--u) * -12); top: .74em; width: calc(var(--u) * 3); height: calc(var(--u) * 3); border-radius: 50%; background: var(--ink-3); }
+
+/* ------------------------------ 3 problem ------------------------------ */
+[data-world="nordic-logic"] .problem { padding: calc(var(--u) * 96) 0 calc(var(--u) * 80); }
+[data-world="nordic-logic"] .fig-num { font: 400 calc(var(--u) * 196)/.74 var(--sans); letter-spacing: -.05em; font-variant-numeric: tabular-nums; margin-left: calc(var(--u) * -6); margin-top: calc(var(--u) * 4); }
+[data-world="nordic-logic"] .fig-num small { font-size: .45em; letter-spacing: -.02em; margin-left: calc(var(--u) * 6); }
+[data-world="nordic-logic"] .fig-sub { font-size: max(15px, calc(var(--u) * 24)); line-height: 1.2; font-style: italic; color: var(--ink-2); margin-top: calc(var(--u) * 20); }
+[data-world="nordic-logic"] .fig-src { margin-top: calc(var(--u) * 16); }
+
+/* ------------------------------ 4 solution ------------------------------ */
+[data-world="nordic-logic"] .solution { padding: calc(var(--u) * 128) 0 calc(var(--u) * 120); }
+[data-world="nordic-logic"] .cmp-head { margin-top: calc(var(--u) * 96); align-items: end; }
+[data-world="nordic-logic"] .cmp-head .display { grid-column: 1 / 13; }
+/* The comparison: Liam's analysis, so his type. A ledger: the rows that are level sit quiet, the three that differ
+   carry the weight and the one accent. */
+[data-world="nordic-logic"] .cmp { margin: calc(var(--u) * 40) calc(var(--u) * 72) 0; background: var(--surface); border-radius: calc(var(--u) * 20); box-shadow: inset 0 0 0 calc(var(--u) * 1) var(--hair); padding: calc(var(--u) * 12) calc(var(--u) * 32) calc(var(--u) * 16); }
+[data-world="nordic-logic"] .cmp-row { display: grid; grid-template-columns: calc(var(--u) * 300) 1fr 1fr; column-gap: calc(var(--u) * 32); align-items: baseline; padding: calc(var(--u) * 18) 0; border-top: calc(var(--u) * 1) solid var(--hair); }
+[data-world="nordic-logic"] .cmp-row.th { border-top: 0; padding: calc(var(--u) * 18) 0 calc(var(--u) * 14); }
+[data-world="nordic-logic"] .cmp-row.th span { font: 400 max(11px, calc(var(--u) * 12))/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+[data-world="nordic-logic"] .cmp-row.th span:last-child { color: var(--ink); }
+[data-world="nordic-logic"] .cmp-group { padding: calc(var(--u) * 26) 0 calc(var(--u) * 6); border-top: calc(var(--u) * 1) solid var(--hair-2); font: 400 max(11px, calc(var(--u) * 12))/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+[data-world="nordic-logic"] .cmp-row .k { font-size: max(15px, calc(var(--u) * 16)); color: var(--ink-3); }
+[data-world="nordic-logic"] .cmp-row .v { font-size: max(15px, calc(var(--u) * 16)); line-height: 1.45; color: var(--ink-3); }
+[data-world="nordic-logic"] .cmp-row .v .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+[data-world="nordic-logic"] .cmp-row.diff .k { color: var(--ink); font-size: max(15px, calc(var(--u) * 18)); }
+[data-world="nordic-logic"] .cmp-row.diff .v { color: var(--ink-2); font-size: max(15px, calc(var(--u) * 18)); }
+[data-world="nordic-logic"] .cmp-row.diff .v.us { color: var(--ink); position: relative; padding-left: calc(var(--u) * 18); }
+[data-world="nordic-logic"] .cmp-row.diff .v.us::before { content: ""; position: absolute; left: 0; top: .2em; bottom: .2em; width: calc(var(--u) * 2); border-radius: calc(var(--u) * 2); background: var(--signal); }
+[data-world="nordic-logic"] .cmp-who { display: none; }
+[data-world="nordic-logic"] .cmp-src { margin: calc(var(--u) * 18) calc(var(--u) * 72) 0; line-height: 1.5; }
+
+/* the first audit, working: a replica of the site's FirstAudit (product type inside) */
+[data-world="nordic-logic"] .fa-head { margin-top: calc(var(--u) * 112); align-items: end; }
+[data-world="nordic-logic"] .fa-head .w-title { grid-column: 1 / 7; }
+[data-world="nordic-logic"] .fa-head .body { grid-column: 8 / 13; }
+[data-world="nordic-logic"] .fa-tray { margin: calc(var(--u) * 40) calc(var(--u) * 72) 0; border-radius: calc(var(--u) * 24); background-color: var(--canvas); background-image: radial-gradient(circle, #cdc8c0 calc(var(--u) * 1.05), transparent calc(var(--u) * 1.3)); background-size: calc(var(--u) * 11) calc(var(--u) * 11); box-shadow: inset 0 0 0 calc(var(--u) * 1) var(--hair); padding: calc(var(--u) * 64) 0 calc(var(--u) * 56); }
+[data-world="nordic-logic"] .fa-q { text-align: center; font: 500 calc(var(--u) * 40)/1.05 var(--nl-display); letter-spacing: -.022em; color: var(--ink); }
+[data-world="nordic-logic"] .fa-q span { display: block; color: #8b939b; }
+[data-world="nordic-logic"] .fa { position: relative; width: calc(var(--u) * 1296); height: calc(var(--u) * 530); margin: calc(var(--u) * 48) auto 0; }
+[data-world="nordic-logic"] .fa svg.wires { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+[data-world="nordic-logic"] .fa .w { fill: none; stroke: var(--signal); stroke-width: 1.25; stroke-dasharray: 1; stroke-dashoffset: 1; vector-effect: non-scaling-stroke; transition: stroke-dashoffset 440ms var(--settle), opacity 320ms var(--settle); }
+[data-world="nordic-logic"] .fa .w.on { stroke-dashoffset: 0; }
+[data-world="nordic-logic"] .fa .w.rest { opacity: .3; }
+[data-world="nordic-logic"] .fa-node { position: absolute; width: calc(var(--u) * 420); height: calc(var(--u) * 60); display: flex; align-items: center; gap: calc(var(--u) * 10); padding: 0 calc(var(--u) * 20); background: var(--surface); border: 0; border-radius: calc(var(--u) * 8); box-shadow: 0 0 0 calc(var(--u) * 1) var(--frost), 0 1px 2px rgba(12,17,22,.04); font: 400 max(15px, calc(var(--u) * 17))/1.2 var(--nl-body); color: var(--ink); text-align: left; opacity: 0; transform: translateY(calc(var(--u) * 6)); transition: opacity 340ms var(--settle), transform 340ms var(--settle), box-shadow 320ms var(--settle); }
+[data-world="nordic-logic"] .fa-node.on { opacity: 1; transform: none; }
+[data-world="nordic-logic"] .fa-node.rest { opacity: .38; }
+[data-world="nordic-logic"] .fa-node svg { width: calc(var(--u) * 20); height: calc(var(--u) * 20); fill: #7c8b9c; flex: none; transition: fill 320ms; }
+[data-world="nordic-logic"] .fa-node.pulse { box-shadow: 0 0 0 calc(var(--u) * 1) var(--signal), 0 1px 2px rgba(12,17,22,.04); }
+[data-world="nordic-logic"] .fa-node.pulse svg, [data-world="nordic-logic"] .fa-node.end svg { fill: var(--signal); }
+[data-world="nordic-logic"] .fa-node.end { box-shadow: 0 0 0 calc(var(--u) * 1) #a9bcff, 0 1px 2px rgba(12,17,22,.04); }
+[data-world="nordic-logic"] .fa-node[data-n="send"], [data-world="nordic-logic"] .fa-node[data-n="breakdown"], [data-world="nordic-logic"] .fa-node[data-n="decide"] { left: calc(var(--u) * 438); }
+[data-world="nordic-logic"] .fa-node[data-n="send"] { top: 0; }
+[data-world="nordic-logic"] .fa-node[data-n="breakdown"] { top: calc(var(--u) * 94); }
+[data-world="nordic-logic"] .fa-node[data-n="decide"] { top: calc(var(--u) * 188); }
+[data-world="nordic-logic"] .fa-node[data-n="sign"], [data-world="nordic-logic"] .fa-node[data-n="file"], [data-world="nordic-logic"] .fa-node[data-n="credit"] { left: calc(var(--u) * 166); }
+[data-world="nordic-logic"] .fa-node[data-n="sign"], [data-world="nordic-logic"] .fa-node[data-n="walk"] { top: calc(var(--u) * 282); }
+[data-world="nordic-logic"] .fa-node[data-n="walk"] { left: calc(var(--u) * 710); }
+[data-world="nordic-logic"] .fa-node[data-n="file"] { top: calc(var(--u) * 376); }
+[data-world="nordic-logic"] .fa-node[data-n="credit"] { top: calc(var(--u) * 470); }
+/* the fork: both branches are buttons, drawn the same */
+[data-world="nordic-logic"] button.fa-node { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+[data-world="nordic-logic"] button.fa-node .choose { margin-left: auto; font: 500 max(11px, calc(var(--u) * 11))/1 var(--nl-mono); letter-spacing: .08em; text-transform: uppercase; color: #6f7b88; transition: opacity 200ms; }
+[data-world="nordic-logic"] .fa.chosen button.fa-node { cursor: default; }
+[data-world="nordic-logic"] .fa.chosen button.fa-node .choose { opacity: 0; }
+@media (hover: hover) { [data-world="nordic-logic"] .fa:not(.chosen) button.fa-node:hover { box-shadow: 0 0 0 calc(var(--u) * 1) #7c8b9c, 0 1px 2px rgba(12,17,22,.04); } }
+[data-world="nordic-logic"] button.fa-node:focus-visible, [data-world="nordic-logic"] .fa-again:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }
+[data-world="nordic-logic"] .fa:not(.chosen) button.fa-node:active { transform: scale(.985); }
+[data-world="nordic-logic"] .fa-out { position: absolute; left: calc(var(--u) * 710); top: calc(var(--u) * 376); width: calc(var(--u) * 420); font: 400 max(15px, calc(var(--u) * 15))/1.45 var(--nl-body); color: var(--ink-3); opacity: 0; transition: opacity 400ms var(--settle); }
+[data-world="nordic-logic"] .fa-out.on { opacity: 1; }
+[data-world="nordic-logic"] .fa-again { position: absolute; left: calc(var(--u) * 710); top: calc(var(--u) * 482); height: max(36px, calc(var(--u) * 36)); padding: 0 calc(var(--u) * 16); border: 0; border-radius: 999px; background: var(--ink); color: #fff; font: 500 max(13px, calc(var(--u) * 13))/1 var(--sans); cursor: pointer; animation: nl-fade 300ms var(--settle) both; }
+@keyframes nl-fade { from { opacity: 0; } }
+[data-world="nordic-logic"] .sol-foot { margin-top: calc(var(--u) * 96); align-items: end; }
+[data-world="nordic-logic"] .sol-foot .display { grid-column: 1 / 12; font-size: calc(var(--u) * 52); }
+[data-world="nordic-logic"] .sol-foot .display em { color: var(--ink-3); }
+
+/* ------------------------------ 5 how it works (the site's dark chapter) ------------------------------ */
+[data-world="nordic-logic"] .how { padding: calc(var(--u) * 128) 0 calc(var(--u) * 120); }
+[data-world="nordic-logic"] .how-left { grid-column: 1 / 5; display: flex; flex-direction: column; gap: calc(var(--u) * 36); }
+[data-world="nordic-logic"] .how-left .body { max-width: 34ch; }
+[data-world="nordic-logic"] .cards { grid-column: 5 / 13; display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--u) * 24); }
+[data-world="nordic-logic"] .cards video, [data-world="nordic-logic"] .denied-row video { display: block; width: 100%; height: auto; background: var(--onyx-card); }
+[data-world="nordic-logic"] .cards video { aspect-ratio: 1; border-radius: calc(var(--u) * 20); }
+[data-world="nordic-logic"] .denied-row { margin-top: calc(var(--u) * 120); align-items: end; }
+[data-world="nordic-logic"] .denied-row video { grid-column: 1 / 9; aspect-ratio: 16 / 10; border-radius: calc(var(--u) * 20); box-shadow: 0 0 0 calc(var(--u) * 1) var(--onyx-line); }
+[data-world="nordic-logic"] .denied-row .side { grid-column: 9 / 13; display: flex; flex-direction: column; gap: calc(var(--u) * 18); padding-bottom: calc(var(--u) * 8); }
+[data-world="nordic-logic"] .sys { margin: calc(var(--u) * 120) calc(var(--u) * 72) 0; padding-top: calc(var(--u) * 28); border-top: calc(var(--u) * 1) solid var(--onyx-line); display: grid; grid-template-columns: calc(var(--u) * 300) 1fr calc(var(--u) * 200); gap: calc(var(--u) * 48); align-items: start; }
+[data-world="nordic-logic"] .sys .label.head { margin-bottom: calc(var(--u) * 18); }
+[data-world="nordic-logic"] .sys-sw { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(var(--u) * 8); }
+[data-world="nordic-logic"] .sys-sw i { display: block; height: calc(var(--u) * 52); border-radius: calc(var(--u) * 8); box-shadow: inset 0 0 0 calc(var(--u) * 1) rgba(255,255,255,.08); }
+[data-world="nordic-logic"] .sys-sw span { display: block; margin-top: calc(var(--u) * 8); font: 400 max(11px, calc(var(--u) * 11))/1.25 var(--mono); color: var(--onyx-text); letter-spacing: .04em; }
+[data-world="nordic-logic"] .sys-type { display: flex; flex-direction: column; gap: calc(var(--u) * 18); }
+[data-world="nordic-logic"] .sys-type > div { display: grid; grid-template-columns: calc(var(--u) * 170) 1fr; align-items: baseline; gap: calc(var(--u) * 20); }
+[data-world="nordic-logic"] .sys-type .s1 { font: 500 calc(var(--u) * 40)/1.05 var(--nl-display); letter-spacing: -.025em; color: #fff; }
+[data-world="nordic-logic"] .sys-type .s2 { font: 400 max(15px, calc(var(--u) * 17))/1.5 var(--nl-body); color: #c9d1d9; }
+[data-world="nordic-logic"] .sys-type .s3 { font: 500 max(12px, calc(var(--u) * 13))/1.4 var(--nl-mono); letter-spacing: .06em; color: #c9d1d9; }
+[data-world="nordic-logic"] .sys-type .s3 b { color: var(--signal-lift); font-weight: 500; }
+[data-world="nordic-logic"] .sys-mark { display: flex; flex-direction: column; align-items: flex-start; gap: calc(var(--u) * 18); }
+[data-world="nordic-logic"] .sys-mark img { width: calc(var(--u) * 96); height: auto; }
+[data-world="nordic-logic"] .sys-mark .body { font-size: max(14px, calc(var(--u) * 14)); }
+
+/* ------------------------------ 6 challenges ------------------------------ */
+[data-world="nordic-logic"] .chal { padding: calc(var(--u) * 112) 0 calc(var(--u) * 104); }
+[data-world="nordic-logic"] .chs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(5, auto); column-gap: calc(var(--u) * 48); margin: calc(var(--u) * 64) calc(var(--u) * 72) 0; }
+[data-world="nordic-logic"] .ch { display: grid; grid-row: span 5; grid-template-rows: subgrid; border-top: calc(var(--u) * 1) solid var(--ink); padding-top: calc(var(--u) * 20); }
+[data-world="nordic-logic"] .ch-head { display: flex; flex-direction: column; gap: calc(var(--u) * 18); }
+[data-world="nordic-logic"] .ch-num { font: 400 max(11px, calc(var(--u) * 12))/1 var(--mono); letter-spacing: .08em; color: var(--ink-3); }
+[data-world="nordic-logic"] .ch-title { font-size: calc(var(--u) * 26); line-height: 1.2; letter-spacing: -.012em; padding-right: calc(var(--u) * 24); }
+[data-world="nordic-logic"] .ch-chips { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--u) * 8); padding: calc(var(--u) * 22) 0 calc(var(--u) * 4); align-content: start; min-height: calc(var(--u) * 30); }
+[data-world="nordic-logic"] .chip { display: inline-flex; align-items: center; gap: calc(var(--u) * 7); height: max(24px, calc(var(--u) * 26)); padding: 0 calc(var(--u) * 10); border-radius: 999px; border: calc(var(--u) * 1) solid var(--hair-2); background: var(--surface); font: 500 max(11px, calc(var(--u) * 11))/1 var(--mono); letter-spacing: .07em; text-transform: uppercase; white-space: nowrap; color: var(--ink-2); }
+[data-world="nordic-logic"] .chip b { font-weight: 500; color: inherit; }
+[data-world="nordic-logic"] .chip.sig { color: var(--signal); border-color: #b9c8ff; }
+[data-world="nordic-logic"] .seq { display: inline-flex; align-items: center; gap: calc(var(--u) * 8); white-space: nowrap; }
+[data-world="nordic-logic"] .arrow { font: 400 max(11px, calc(var(--u) * 12))/1 var(--mono); color: var(--ink-3); }
+[data-world="nordic-logic"] .ch-shot { display: block; width: 100%; height: auto; border-radius: calc(var(--u) * 10); box-shadow: 0 0 0 calc(var(--u) * 1) var(--hair); }
+[data-world="nordic-logic"] .step { padding-top: calc(var(--u) * 18); }
+[data-world="nordic-logic"] .step .k { font: 400 max(11px, calc(var(--u) * 11))/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+[data-world="nordic-logic"] .step p { font-size: max(15px, calc(var(--u) * 16)); line-height: 1.55; color: var(--ink-2); margin-top: calc(var(--u) * 10); }
+[data-world="nordic-logic"] .step.res { margin-top: calc(var(--u) * 22); padding-top: calc(var(--u) * 16); border-top: calc(var(--u) * 1) solid var(--hair-2); }
+[data-world="nordic-logic"] .step.res .k { color: var(--ink); }
+[data-world="nordic-logic"] .step.res p { font-size: max(15px, calc(var(--u) * 21)); line-height: 1.32; color: var(--ink); letter-spacing: -.008em; }
+/* With Claude Code: the two exchanges, under the three challenges */
+[data-world="nordic-logic"] .cc { margin: calc(var(--u) * 72) calc(var(--u) * 72) 0; display: grid; grid-template-columns: calc(var(--u) * 260) 1fr 1fr; gap: calc(var(--u) * 24); align-items: start; }
+[data-world="nordic-logic"] .cc-intro { display: flex; flex-direction: column; gap: calc(var(--u) * 14); padding-top: calc(var(--u) * 6); }
+[data-world="nordic-logic"] .cc-intro p:not(.label) { font-size: max(15px, calc(var(--u) * 15)); line-height: 1.5; color: var(--ink-2); }
+[data-world="nordic-logic"] .ex { background: var(--surface); border-radius: calc(var(--u) * 16); box-shadow: inset 0 0 0 calc(var(--u) * 1) var(--hair); padding: calc(var(--u) * 22) calc(var(--u) * 24) calc(var(--u) * 24); display: flex; flex-direction: column; gap: calc(var(--u) * 14); }
+[data-world="nordic-logic"] .ex dl { display: flex; flex-direction: column; gap: calc(var(--u) * 14); }
+[data-world="nordic-logic"] .ex-line { display: grid; grid-template-columns: calc(var(--u) * 64) 1fr; gap: calc(var(--u) * 12); align-items: baseline; }
+[data-world="nordic-logic"] .ex-line dt { font: 400 max(11px, calc(var(--u) * 11))/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+[data-world="nordic-logic"] .ex-line dd { font-size: max(15px, calc(var(--u) * 17)); line-height: 1.45; color: var(--ink); }
+[data-world="nordic-logic"] .ex-line.ai dd { color: var(--ink-2); }
+[data-world="nordic-logic"] .ex-res { padding-top: calc(var(--u) * 12); border-top: calc(var(--u) * 1) solid var(--hair); font-size: max(14px, calc(var(--u) * 14)); line-height: 1.5; color: var(--ink-3); }
+
+/* ------------------------------ 7 impact ------------------------------ */
+[data-world="nordic-logic"] .outcome { padding: calc(var(--u) * 96) 0 calc(var(--u) * 72); }
+[data-world="nordic-logic"] .outcome .display { margin-top: calc(var(--u) * 32); font-size: calc(var(--u) * 52); }
+[data-world="nordic-logic"] .outcome .display a { background-image: linear-gradient(currentColor, currentColor); background-size: 100% calc(var(--u) * 1.5); background-repeat: no-repeat; background-position: 0 92%; }
+[data-world="nordic-logic"] .outcome .row-cta { margin-top: calc(var(--u) * 44); }
+
+/* ------------------------------ 8 next: Eventread peeks in, on Mist so its light page reads ------------------------------ */
+[data-world="nordic-logic"] .f.next { height: calc(var(--u) * 630); background: var(--mist); }
+[data-world="nordic-logic"] .er { position: absolute; left: 0; right: 0; top: calc(var(--u) * 64); bottom: calc(var(--u) * -40); background: #f8f8f6; color: #1a1a2e; border-radius: calc(var(--u) * 32) calc(var(--u) * 32) 0 0; overflow: hidden; }
+[data-world="nordic-logic"] .er-text { position: absolute; left: calc(var(--u) * 72); top: calc(var(--u) * 72); width: calc(var(--u) * 520); }
+[data-world="nordic-logic"] .er-next { display: flex; align-items: center; gap: calc(var(--u) * 14); font: 400 max(11px, calc(var(--u) * 13))/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #6b6b80; }
+[data-world="nordic-logic"] .er-next i { display: block; width: calc(var(--u) * 80); height: calc(var(--u) * 1); background: #d6d3cb; }
+[data-world="nordic-logic"] .er-title { font-size: calc(var(--u) * 72); line-height: .95; letter-spacing: -.025em; color: rgba(26,26,46,.55); margin-top: calc(var(--u) * 150); }
+[data-world="nordic-logic"] .f .er-line { font-size: max(15px, calc(var(--u) * 19)); line-height: 1.5; color: #4a4a5c; margin-top: calc(var(--u) * 40); max-width: 32ch; }
+[data-world="nordic-logic"] .er-frame { position: absolute; left: calc(var(--u) * 640); top: calc(var(--u) * 72); width: calc(var(--u) * 728); height: calc(var(--u) * 560); border-radius: calc(var(--u) * 20); overflow: hidden; background: #f2f1ec; box-shadow: 0 0 0 calc(var(--u) * 1) #e6e4de; }
+[data-world="nordic-logic"] .er-frame img { width: 100%; height: 100%; object-fit: cover; object-position: 0 0; display: block; }
+
+[data-world="nordic-logic"] .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-world="nordic-logic"] :is(.fa .w, .fa-node, .fa-out, .fa-again) { transition: none; }
+}
+
+/* ------------------------------ phones and tablets (< 1100px): the board's phone frame ------------------------------ */
+@container (max-width: 1099px) {
+  [data-world="nordic-logic"] .g12 { grid-template-columns: minmax(0, 1fr); padding: 0 calc(var(--u) * 16); }
+  [data-world="nordic-logic"] .g12 > * { grid-column: 1 / -1 !important; }
+  [data-world="nordic-logic"] .title { font-size: calc(var(--u) * 44); }
+  [data-world="nordic-logic"] .hero { height: auto; padding: calc(var(--u) * 108) calc(var(--u) * 16) calc(var(--u) * 32); }
+  [data-world="nordic-logic"] .hero-head { position: static; display: block; width: auto; }
+  [data-world="nordic-logic"] .hero .title { font-size: calc(var(--u) * 48); margin-top: calc(var(--u) * 14) !important; }
+  [data-world="nordic-logic"] .hero-right { display: block; padding: 0; }
+  [data-world="nordic-logic"] .hero-line { font-size: max(15px, calc(var(--u) * 22)); margin-top: calc(var(--u) * 14); max-width: none; }
+  [data-world="nordic-logic"] .hero-right .btn { margin-top: calc(var(--u) * 22); }
+  [data-world="nordic-logic"] .tray { position: relative; left: auto; top: auto; width: auto; height: calc(var(--u) * 330); margin-top: calc(var(--u) * 32); border-radius: calc(var(--u) * 20); }
+  [data-world="nordic-logic"] .tray img { left: calc(var(--u) * -101); top: calc(var(--u) * 20); width: calc(var(--u) * 560); border-radius: calc(var(--u) * 10); }
+  [data-world="nordic-logic"] .glance { height: auto; padding: calc(var(--u) * 24) calc(var(--u) * 16); }
+  [data-world="nordic-logic"] .strip { margin: 0; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  [data-world="nordic-logic"] .strip > div { padding: calc(var(--u) * 18) calc(var(--u) * 12) calc(var(--u) * 18) 0; border-left: 0; border-top: calc(var(--u) * 1) solid var(--hair); }
+  [data-world="nordic-logic"] .strip > div:nth-child(-n + 2) { border-top: 0; }
+  [data-world="nordic-logic"] .strip > div:last-child { grid-column: 1 / -1; }
+  [data-world="nordic-logic"] .strip p, [data-world="nordic-logic"] .tools { font-size: max(15px, calc(var(--u) * 15)); }
+  [data-world="nordic-logic"] .problem { padding: calc(var(--u) * 64) 0 calc(var(--u) * 56); }
+  [data-world="nordic-logic"] .problem .display { font-size: calc(var(--u) * 28); margin-top: calc(var(--u) * 24) !important; }
+  [data-world="nordic-logic"] .problem-cols { margin-top: calc(var(--u) * 32) !important; row-gap: calc(var(--u) * 20); }
+  [data-world="nordic-logic"] .fig { padding-left: 0 !important; margin-top: calc(var(--u) * 12); }
+  [data-world="nordic-logic"] .fig-num { font-size: calc(var(--u) * 120); }
+  /* Solution: the comparison as one card per row, LateShipment beside Nordic Logic */
+  [data-world="nordic-logic"] .solution { padding: calc(var(--u) * 56) 0 calc(var(--u) * 64); }
+  [data-world="nordic-logic"] .solution > .g12:first-child .body { margin-top: calc(var(--u) * 18); }
+  [data-world="nordic-logic"] .cmp-head { margin-top: calc(var(--u) * 44); }
+  [data-world="nordic-logic"] .cmp-head .display, [data-world="nordic-logic"] .sol-foot .display { font-size: calc(var(--u) * 28); }
+  [data-world="nordic-logic"] .cmp { margin: calc(var(--u) * 20) calc(var(--u) * 16) 0; border-radius: calc(var(--u) * 16); padding: calc(var(--u) * 6) calc(var(--u) * 16) calc(var(--u) * 12); }
+  [data-world="nordic-logic"] .cmp-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: calc(var(--u) * 12); row-gap: calc(var(--u) * 6); padding: calc(var(--u) * 12) 0; }
+  [data-world="nordic-logic"] .cmp-row .k { grid-column: 1 / -1; color: var(--ink); }
+  [data-world="nordic-logic"] .cmp-row.th { display: none; }
+  [data-world="nordic-logic"] .cmp-who { display: block; font: 400 max(10px, calc(var(--u) * 9))/1.6 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+  [data-world="nordic-logic"] .v.us .cmp-who { color: var(--ink); }
+  [data-world="nordic-logic"] .cmp-row .v, [data-world="nordic-logic"] .cmp-row.diff .v, [data-world="nordic-logic"] .cmp-row .k, [data-world="nordic-logic"] .cmp-row.diff .k { font-size: max(14px, calc(var(--u) * 14)); }
+  [data-world="nordic-logic"] .cmp-row.diff .v.us { padding-left: calc(var(--u) * 10); }
+  [data-world="nordic-logic"] .cmp-group { padding-top: calc(var(--u) * 16); }
+  [data-world="nordic-logic"] .cmp-src { margin: calc(var(--u) * 12) calc(var(--u) * 16) 0; }
+  /* the first audit, top to bottom; the fork as two equal buttons side by side */
+  [data-world="nordic-logic"] .fa-head { margin-top: calc(var(--u) * 56); }
+  [data-world="nordic-logic"] .fa-head .w-title { font-size: calc(var(--u) * 24); }
+  [data-world="nordic-logic"] .fa-head .body { margin-top: calc(var(--u) * 10); font-size: max(15px, calc(var(--u) * 16)); }
+  [data-world="nordic-logic"] .fa-tray { margin: calc(var(--u) * 20) calc(var(--u) * 16) 0; border-radius: calc(var(--u) * 20); padding: calc(var(--u) * 24) calc(var(--u) * 14); }
+  [data-world="nordic-logic"] .fa-q { font-size: calc(var(--u) * 24); }
+  [data-world="nordic-logic"] .fa { width: auto; height: auto; margin-top: calc(var(--u) * 20); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: calc(var(--u) * 12) calc(var(--u) * 10); }
+  [data-world="nordic-logic"] .fa svg.wires { display: none; }
+  [data-world="nordic-logic"] .fa-node, [data-world="nordic-logic"] .fa-out, [data-world="nordic-logic"] .fa-again { position: static; width: auto; }
+  [data-world="nordic-logic"] .fa-node { grid-column: 1 / -1; height: auto; min-height: 46px; padding: calc(var(--u) * 10) calc(var(--u) * 14); font-size: 15px; }
+  [data-world="nordic-logic"] .fa-node svg { width: 18px; height: 18px; }
+  [data-world="nordic-logic"] .fa-node[data-n="sign"] { grid-column: 1; }
+  [data-world="nordic-logic"] .fa-node[data-n="walk"] { grid-column: 2; }
+  [data-world="nordic-logic"] button.fa-node { min-height: 56px; line-height: 1.25; }
+  [data-world="nordic-logic"] button.fa-node .choose { display: none; }
+  [data-world="nordic-logic"] .fa-node:not(.on), [data-world="nordic-logic"] .fa-out:not(.on) { display: none; }
+  [data-world="nordic-logic"] .fa-out { grid-column: 1 / -1; padding: calc(var(--u) * 4) calc(var(--u) * 2) 0; }
+  [data-world="nordic-logic"] .fa-again { grid-column: 1 / -1; justify-self: start; }
+  [data-world="nordic-logic"] .sol-foot { margin-top: calc(var(--u) * 48); }
+  /* How it works: the four cards one per row, then the denial clip, then the system */
+  [data-world="nordic-logic"] .how { padding: calc(var(--u) * 64) 0 calc(var(--u) * 56); }
+  [data-world="nordic-logic"] .how-left { gap: calc(var(--u) * 18); }
+  [data-world="nordic-logic"] .how-left .body { font-size: max(15px, calc(var(--u) * 16)); max-width: none; }
+  [data-world="nordic-logic"] .cards { grid-template-columns: minmax(0, 1fr); gap: calc(var(--u) * 16); margin-top: calc(var(--u) * 28); }
+  [data-world="nordic-logic"] .denied-row { margin-top: calc(var(--u) * 48); row-gap: calc(var(--u) * 20); }
+  [data-world="nordic-logic"] .denied-row .w-title { font-size: calc(var(--u) * 24); }
+  [data-world="nordic-logic"] .denied-row .body { font-size: max(15px, calc(var(--u) * 16)); }
+  [data-world="nordic-logic"] .sys { margin: calc(var(--u) * 48) calc(var(--u) * 16) 0; grid-template-columns: minmax(0, 1fr); gap: calc(var(--u) * 32); }
+  [data-world="nordic-logic"] .sys-type > div { grid-template-columns: minmax(0, 1fr); gap: calc(var(--u) * 6); }
+  [data-world="nordic-logic"] .sys-type .s1 { font-size: calc(var(--u) * 28); }
+  /* challenges, then the exchanges stacked */
+  [data-world="nordic-logic"] .chal { padding: calc(var(--u) * 64) 0 calc(var(--u) * 56); }
+  [data-world="nordic-logic"] .chs { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; row-gap: calc(var(--u) * 48); margin: calc(var(--u) * 32) calc(var(--u) * 16) 0; }
+  [data-world="nordic-logic"] .ch { grid-row: auto; grid-template-rows: none; }
+  [data-world="nordic-logic"] .ch-title { font-size: calc(var(--u) * 24); }
+  [data-world="nordic-logic"] .cc { margin: calc(var(--u) * 48) calc(var(--u) * 16) 0; grid-template-columns: minmax(0, 1fr); gap: calc(var(--u) * 16); }
+  [data-world="nordic-logic"] .ex dl { display: flex; flex-direction: column; gap: calc(var(--u) * 14); }
+[data-world="nordic-logic"] .ex-line { grid-template-columns: minmax(0, 1fr); gap: calc(var(--u) * 4); }
+  [data-world="nordic-logic"] .outcome { padding: calc(var(--u) * 64) 0; }
+  [data-world="nordic-logic"] .outcome .display { font-size: calc(var(--u) * 30); }
+  [data-world="nordic-logic"] .f.next { height: auto; padding-bottom: calc(var(--u) * 40); }
+  [data-world="nordic-logic"] .er { position: relative; inset: auto; display: block; padding: calc(var(--u) * 40) calc(var(--u) * 16) calc(var(--u) * 24); margin-top: calc(var(--u) * 24); }
+  [data-world="nordic-logic"] .er-text { position: static; width: auto; }
+  [data-world="nordic-logic"] .er-title { font-size: calc(var(--u) * 48); margin-top: calc(var(--u) * 24); }
+  [data-world="nordic-logic"] .f .er-line { margin-top: calc(var(--u) * 16); }
+  [data-world="nordic-logic"] .er-frame { position: relative; left: auto; top: auto; width: 100%; height: calc(var(--u) * 240); margin-top: calc(var(--u) * 28); }
+}

@@ -2,11 +2,13 @@ import { render, screen } from "@testing-library/react";
 import { expect, test } from "vitest";
 import { NextProject } from "./next-project";
 
-test("next project loops Eventread → Cyvore → Pulse → Eventread", () => {
+test("next project loops Eventread → Cyvore → Pulse → Nordic Logic → Eventread", () => {
   const { rerender } = render(<NextProject from="eventread" />);
   expect(screen.getByRole("link", { name: /Next project: Cyvore/ })).toHaveAttribute("href", "/cyvore");
   rerender(<NextProject from="cyvore" />);
   expect(screen.getByRole("link", { name: /Next project: Pulse/ })).toHaveAttribute("href", "/pulse");
   rerender(<NextProject from="pulse" />);
+  expect(screen.getByRole("link", { name: /Next project: Nordic Logic/ })).toHaveAttribute("href", "/nordic-logic");
+  rerender(<NextProject from="nordic-logic" />);
   expect(screen.getByRole("link", { name: /Next project: Eventread/ })).toHaveAttribute("href", "/eventread");
 });

@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
 
-export type CaseSlug = "eventread" | "cyvore" | "pulse";
+export type CaseSlug = "eventread" | "cyvore" | "pulse" | "nordic-logic";
 
 /** Spec §2: the eight blocks of the frame, in page order. */
 export type BlockId =
@@ -82,4 +82,6 @@ export interface CaseStudyEntry {
   HeroVisual: ComponentType;
   /** Each challenge's chips (and final screen, where the board shows one), from the board. */
   ChallengeExtras: ComponentType<{ index: number }>;
+  /** Under the challenges, where a board shows something that belongs to all of them (Nordic Logic: the Claude Code exchanges). */
+  ChallengesAfter?: ComponentType;
 }

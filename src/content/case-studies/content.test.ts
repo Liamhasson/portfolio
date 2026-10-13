@@ -3,9 +3,10 @@ import { liveProjects } from "@/lib/projects";
 import { validateCaseStudy } from "@/lib/case-studies/validate";
 import { cyvore } from "./cyvore";
 import { eventread } from "./eventread";
+import { nordicLogic } from "./nordic-logic";
 import { pulse } from "./pulse";
 
-const studies = [eventread, cyvore, pulse];
+const studies = [eventread, cyvore, pulse, nordicLogic];
 
 describe("case-study content", () => {
   test.each(studies)("$slug fits the frame", (study) => {

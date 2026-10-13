@@ -12,8 +12,8 @@ describe("project registry", () => {
     ]);
   });
 
-  test("only Eventread, Cyvore and Pulse are live", () => {
-    expect(liveProjects.map((p) => p.slug)).toEqual(["eventread", "cyvore", "pulse"]);
+  test("Eventread, Cyvore, Pulse and Nordic Logic are live", () => {
+    expect(liveProjects.map((p) => p.slug)).toEqual(["eventread", "cyvore", "pulse", "nordic-logic"]);
   });
 
   test("tags have no duplicates", () => {
@@ -23,7 +23,8 @@ describe("project registry", () => {
   test("next project cycles through live projects", () => {
     expect(nextProject("eventread").slug).toBe("cyvore");
     expect(nextProject("cyvore").slug).toBe("pulse");
-    expect(nextProject("pulse").slug).toBe("eventread");
+    expect(nextProject("pulse").slug).toBe("nordic-logic");
+    expect(nextProject("nordic-logic").slug).toBe("eventread");
   });
 
   test("next project rejects in-progress or unknown slugs", () => {

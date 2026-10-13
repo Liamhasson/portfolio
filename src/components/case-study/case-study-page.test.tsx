@@ -14,10 +14,10 @@ test("the frame in order: hero, at a glance, middle, challenges, impact, next", 
   expect(landmarks).toEqual(["Middle", "Challenges", "Impact"]);
   expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Pulse");
   expect(screen.getByRole("link", { name: "Back to projects" })).toHaveAttribute("href", "/#projects"); // Back goes to the projects index, in the story (Liam, 2026-10-11)
-  expect(screen.getByRole("link", { name: /Next project: Eventread/ })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: /Next project: Nordic Logic/ })).toBeInTheDocument(); // Pulse → Nordic Logic since 2026-10-13
   expect(document.querySelector("article")).toHaveAttribute("data-world", "pulse");
   expect(screen.getByText("visual")).toBeInTheDocument();
   expect(screen.getByText("extras 2")).toBeInTheDocument();
   expect(screen.getAllByText("What happened")).toHaveLength(pulse.challenges.length);
-  expect(screen.getByRole("img", { name: "Eventread month view for Berlin, November 2026" })).toBeInTheDocument(); // the next study peeks in
+  expect(screen.getByRole("img", { name: /Nordic Logic.s home page/ })).toBeInTheDocument(); // the next study peeks in
 });

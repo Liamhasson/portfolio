@@ -5,7 +5,7 @@ import type { CaseStudy } from "@/lib/case-studies/types";
 export const SITE_URL = "https://liamhasson.com";
 
 /** Every page, in the order a visitor meets them. */
-export const PAGES = ["/", "/eventread", "/cyvore", "/pulse", "/about", "/contact"] as const;
+export const PAGES = ["/", "/eventread", "/cyvore", "/pulse", "/nordic-logic", "/about", "/contact"] as const;
 
 /** The site's link preview (app/opengraph-image.jpg, twitter-image.jpg). Next replaces a parent's openGraph and twitter
  *  whole when a page sets its own, so every page that does spreads these in (final review, 2026-10-12). */

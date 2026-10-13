@@ -8,6 +8,7 @@ const MIDDLES: Record<string, [string, string][]> = {
   eventread: [["problem", "Problem"], ["signature", "Solution"], ["supporting", "How it works"], ["supporting", "Design system"]],
   cyvore: [["problem", "Problem"], ["signature", "Solution"], ["supporting", "How it works"]],
   pulse: [["problem", "Problem"], ["signature", "Solution"], ["supporting", "How it works"]],
+  "nordic-logic": [["problem", "Problem"], ["signature", "Solution"], ["supporting", "How it works"]],
 };
 
 test.each(Object.keys(MIDDLES))("%s middle blocks follow the frame order", (slug) => {

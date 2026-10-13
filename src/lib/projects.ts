@@ -25,7 +25,7 @@ export const projects: readonly Project[] = [
   {
     slug: "nordic-logic",
     name: "Nordic Logic",
-    status: "in-progress",
+    status: "live",
     tags: ["B2B", "Web design", "Motion", "Brand", "Design system"],
   },
   {

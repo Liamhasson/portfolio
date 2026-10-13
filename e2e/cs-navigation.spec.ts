@@ -16,8 +16,8 @@ test("leaving Cyvore by the next-project link leaves nothing of it running; Back
 test("leaving Pulse by the next-project link leaves nothing of it running, and the page can scroll", async ({ page }) => {
   await page.goto("/pulse");
   await page.waitForFunction(() => window.__csScrollTriggers && window.__csScrollTriggers().includes("pulse"));
-  await page.getByRole("link", { name: "Next project: Eventread" }).click();
-  await expect(page).toHaveURL(/\/eventread$/);
+  await page.getByRole("link", { name: "Next project: Nordic Logic" }).click(); // Pulse → Nordic Logic since 2026-10-13
+  await expect(page).toHaveURL(/\/nordic-logic$/);
   await expect.poll(() => page.evaluate(() => window.__csScrollTriggers!().filter((w) => w === "pulse").length)).toBe(0);
   expect(await page.evaluate(() => document.documentElement.style.overflow)).toBe("");
   await page.goBack();

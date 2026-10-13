@@ -20,3 +20,11 @@ test("challenges: the did and changed parts render, inside an explicit list", ()
   expect(within(first).getByText(pulse.challenges[0].did)).toBeInTheDocument();
   expect(within(first).getByText(pulse.challenges[0].changed)).toBeInTheDocument();
 });
+
+test("challenges: a study's after-block renders under the list, inside the section", () => {
+  const After = () => <p>under the three</p>;
+  render(<ChallengeList challenges={pulse.challenges} After={After} />);
+  const section = screen.getByRole("region", { name: "Challenges" });
+  expect(within(section).getByText("under the three")).toBeInTheDocument();
+  expect(within(screen.getByRole("list")).queryByText("under the three")).toBeNull();
+});
