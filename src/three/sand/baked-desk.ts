@@ -471,6 +471,10 @@ export function screenMediaTexture(video: HTMLVideoElement): THREE.VideoTexture 
   return t;
 }
 
+/** The cards' media corners on the laptop screen, as the index draws them (work-index.tsx: .wi .media border-radius
+ *  .8cqw): a fraction of the page's width (Liam, 2026-10-13: sharp on the screen, rounded on the page). */
+export const MEDIA_RADIUS = 0.008;
+
 /** Whether a card's loop shows yet: once it has a frame (until then, the still in its place: never a black card). */
 export function mediaOn(video: HTMLVideoElement | null): number {
   return video && video.readyState >= 2 ? 1 : 0;
@@ -494,10 +498,23 @@ function withScreenReveal(material: THREE.Material, u: Record<string, THREE.IUni
       shader.fragmentShader.replace(
         // the screen at a point: the still, or a card's loop where it plays (sharp: the blur of the reveal is the still's)
         "void main() {",
-        `vec3 screenAt(vec2 uv, float lod) {
+        `// a card's media box cut to the index's rounded corners (MEDIA_RADIUS of the page's width): the page around it
+      vec3 roundCut(vec3 c, vec2 uv, vec4 b) {
+        vec2 ts = vec2(textureSize(emissiveMap, 0));
+        float a = ts.y / ts.x;   // (uv y in the page's widths)
+        vec2 q = vec2(uv.x, uv.y * a), lo = vec2(b.x, b.y * a), hi = vec2(b.z, b.w * a);
+        float r = ${MEDIA_RADIUS.toFixed(4)};
+        float d = length(q - clamp(q, lo + r, hi - r)) - r;
+        return mix(c, uRevBg, smoothstep(-0.0004, 0.0004, d));   // (about a design pixel of edge)
+      }
+      vec3 screenAt(vec2 uv, float lod) {
         vec3 c = textureLod(emissiveMap, uv, lod).rgb;
-        ${Array.from({ length: MED_N }, (_, i) => `if (uMedOn[${i}] > 0.0 && all(greaterThanEqual(uv, uMedBox[${i}].xy)) && all(lessThan(uv, uMedBox[${i}].zw)))
-          c = mix(c, textureLod(uMed${i}, (uv - uMedBox[${i}].xy) / (uMedBox[${i}].zw - uMedBox[${i}].xy), lod + log2(float(textureSize(uMed${i}, 0).x) / (float(textureSize(emissiveMap, 0).x) * (uMedBox[${i}].z - uMedBox[${i}].x)))).rgb, uMedOn[${i}]);`).join("\n        ")}
+        ${Array.from({ length: MED_N }, (_, i) => `if (all(greaterThanEqual(uv, uMedBox[${i}].xy)) && all(lessThan(uv, uMedBox[${i}].zw))) {
+          if (uMedOn[${i}] > 0.0) c = mix(c, textureLod(uMed${i}, (uv - uMedBox[${i}].xy) / (uMedBox[${i}].zw - uMedBox[${i}].xy), lod + log2(float(textureSize(uMed${i}, 0).x) / (float(textureSize(emissiveMap, 0).x) * (uMedBox[${i}].z - uMedBox[${i}].x)))).rgb, uMedOn[${i}]);
+          c = roundCut(c, uv, uMedBox[${i}]);
+        } else if (all(greaterThanEqual(uv, uMedBox[${i}].xy - 0.002)) && all(lessThan(uv, uMedBox[${i}].zw + 0.002))) {
+          c = roundCut(c, uv, uMedBox[${i}]);   // (the still's card runs a pixel past its box: cut that ring too)
+        }`).join("\n        ")}
         return c;
       }\n` + "void main() {",
       ).replace(
