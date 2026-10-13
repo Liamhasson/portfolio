@@ -21,7 +21,10 @@ import { holdScroll, wallAt } from "@/lib/smooth-scroll";
 import { sectionRedirect } from "@/lib/story";
 import { useRouter } from "next/navigation";
 import { DeskSketches } from "@/three/sand/desk-sketches";
-import { sketchFont } from "./sketch-font";
+import { sketchFont, storyFont } from "./sketch-font";
+import { DeskNotes } from "@/three/sand/note-story/desk-notes";
+import { NoteStoryPlayer } from "@/three/sand/note-story/story-player";
+import { STORIES, storyFor } from "@/three/sand/note-story/stories";
 import { ballKeyPos } from "@/three/sand/ball-light";
 import { SAND_ENCODE, SAND_LAYER, SandComposite } from "@/three/sand/sand-composite";
 import { Pullback } from "@/three/sand/pullback";
@@ -62,6 +65,14 @@ const SIDE_FILL = { pos: [1.35, -0.95, 0.45], watts: 38, color: [1.0, 0.86, 0.72
  */
 const LEAN = 0.035;
 const LEAN_DAMP = -Math.log(1 - 0.1) * 60;   // their per-frame 0.1 at 60 fps, as a rate
+/**
+ * The notes on the desk (Liam, 2026-10-13/14): touchable while the desk is in view; the one under the cursor lifts and
+ * the lens racks focus onto it (the desk through the lens at RACK.fstop); a click brings it to the camera with its story
+ * (note-story/), the desk behind it softening (STORY.blur device px) and dimming.
+ */
+const NOTES_FROM = BEATS.tilt[0] + 0.3, NOTES_TO = BEATS.tail[0] + 0.5;
+const RACK = { fstop: 1.4, rate: 7 } as const;
+const STORY = { blur: 14, dim: 0.45, rate: 5 } as const;
 /** The floating grains' density through the page (Liam: strong in the hero, sparse over the desk, none on the index). */
 const DRIFT = { hero: 1, desk: 0.12 } as const;
 
@@ -118,6 +129,7 @@ export function SandLab({ hero }: { hero: boolean }) {
     storyStarted();   // (the boot script's safety net stands down)
     let disposed = false;
     let stage: Stage | null = null;
+    let disposeNotes: (() => void) | null = null;   // (the notes' story, if it was made: its overlay and any hold it has)
     let field: SandField | null = null;
     let paint: PaintField | null = null;
     // the desk's download, and whether the build took it (else unmounting gives its files back)
@@ -279,6 +291,12 @@ export function SandLab({ hero }: { hero: boolean }) {
       let sketchClock = 0;   // the sketches' float (desk-sketches.ts): runs while they are on screen, restarts after
       // the desk's top as a rectangle in the hero's units (x, z) and its height, for keeping the top view inside it
       let deskTop: { min: THREE.Vector2; max: THREE.Vector2; y: number } | null = null;
+      // the notes: touchable, and their stories
+      let notes: DeskNotes | null = null;
+      let player: NoteStoryPlayer | null = null;
+      let hovered: string | null = null;
+      let storyOpen = false;
+      const noteFx = { rack: 0, focus: 1, blur: 0 };
       // the sketches of the work behind the desk, seen through the tilt (desk-sketches.ts; Liam, 2026-10-12)
       let sketches: DeskSketches | null = null;
       const placeSketches = () => {
@@ -337,6 +355,16 @@ export function SandLab({ hero }: { hero: boolean }) {
         }
         deskLoaded = d;
         (window as unknown as { __desk3d?: unknown }).__desk3d = d;
+        notes = new DeskNotes(d.group, STORIES.map((x) => ({ name: x.mesh, size: x.size, rotZ: x.rotZ })));
+        (window as unknown as { __notes?: unknown }).__notes = notes;   // lab debugging
+        player = new NoteStoryPlayer(storyFont.style.fontFamily);
+        player.el.addEventListener("click", () => player?.close());
+        player.preload(STORIES).catch(() => {});
+        disposeNotes = () => {
+          player?.dispose();
+          if (storyOpen) { document.documentElement.style.overflow = ""; holdScroll(false); }
+          document.documentElement.style.cursor = "";
+        };
         await document.fonts.load(`500 40px ${sketchFont.style.fontFamily}`).catch(() => {});
         if (disposed) return;
         const sk = new DeskSketches(sketchFont.style.fontFamily);
@@ -534,6 +562,36 @@ export function SandLab({ hero }: { hero: boolean }) {
       const leave = () => { pointer.active = false; paint!.release(); };
       document.documentElement.addEventListener("mouseleave", leave);
       listeners.push(["__leave", leave]);
+      // the notes: a click on one (the desk in view, nothing else under the pointer) brings it up with its story; while
+      // it's up, scroll stands still, and a scroll, a click or Esc puts the note back
+      const notesLive = () => hero && !!notes && !!player && !storyOpen && !snapping && !reduced
+        && progressRef.current >= NOTES_FROM && progressRef.current <= NOTES_TO;
+      const pickAt = (x: number, y: number) => notes!.pick(new THREE.Vector2((x / (canvas.clientWidth || 1)) * 2 - 1, 1 - (y / (canvas.clientHeight || 1)) * 2), stage!.camera);
+      const openStory = (name: string) => {
+        const story = storyFor(name), pose = notes?.pose(name);
+        if (!story || !pose || !player || !notes) return;
+        storyOpen = true; hovered = null;
+        document.documentElement.style.cursor = "";
+        holdScroll(true);
+        document.documentElement.style.overflow = "hidden";
+        notes.setVisible(name, false);
+        player.liveCamera = stage!.camera;
+        player.open(story, pose, stage!.camera, () => notes?.pose(name) ?? null, () => {
+          notes?.setVisible(name, true);
+          storyOpen = false;
+          document.documentElement.style.overflow = "";
+          holdScroll(false);
+        });
+      };
+      on("click", ((e: MouseEvent) => {
+        if (!notesLive() || (e.target as Element | null)?.closest?.("a, button, input, textarea, select, [role=dialog]")) return;
+        const name = pickAt(e.clientX, e.clientY);
+        if (name) openStory(name);
+      }) as EventListener);
+      const putBack = () => { if (storyOpen) player?.close(); };
+      on("keydown", ((e: KeyboardEvent) => { if (storyOpen && ["Escape", " ", "ArrowDown", "ArrowUp", "PageDown", "PageUp", "Home", "End"].includes(e.key)) putBack(); }) as EventListener);
+      on("wheel", putBack as EventListener);
+      on("touchmove", putBack as EventListener);
       const ndc = new THREE.Vector3();
       const cursorWorld = new THREE.Vector3();
       const focus = new THREE.Vector3();
@@ -670,7 +728,7 @@ export function SandLab({ hero }: { hero: boolean }) {
           }
           // the lean: toward the cursor, eased; out as the index takes over
           {
-            const want = pointer.active && loaderClock === null && !waitingForBrief   // (waits for the loader)
+            const want = pointer.active && loaderClock === null && !waitingForBrief && !storyOpen   // (waits for the loader; still while a note is up)
               ? new THREE.Vector2(Math.min(Math.max((pointer.x / W) * 2 - 1, -1), 1), Math.min(Math.max(1 - (pointer.y / H) * 2, -1), 1))
               : new THREE.Vector2();
             lean.lerp(reduced || calibrating ? new THREE.Vector2() : want, 1 - Math.exp(-LEAN_DAMP * dt));
@@ -907,6 +965,23 @@ export function SandLab({ hero }: { hero: boolean }) {
           }
           briefReturnA = a;
         }
+        // the notes: the one under the cursor lifts and the lens racks onto it; a story up, the desk softens behind it
+        if (notes) {
+          const live = notesLive() && pointer.active && !pointer.touch;
+          const over = live ? pickAt(pointer.x, pointer.y) : null;
+          if (over !== hovered) { hovered = over; document.documentElement.style.cursor = over ? "pointer" : ""; }
+          notes.update(storyOpen ? null : hovered, dt);
+          if (hovered) noteFx.focus = notes.depth(hovered, stage!.camera) ?? noteFx.focus;
+          noteFx.rack = damp(noteFx.rack, hovered ? 1 : 0, RACK.rate, dt);
+          noteFx.blur = damp(noteFx.blur, storyOpen ? 1 : 0, STORY.rate, dt);
+          if (composite) {
+            if (noteFx.rack > 0.002) { composite.lens.desk = noteFx.rack; composite.lens.focus = noteFx.focus; composite.lens.fstop = RACK.fstop; }
+            if (noteFx.blur > 0.01) {
+              composite.defocus = 0.5 + noteFx.blur * STORY.blur * Math.min(window.devicePixelRatio || 1, 2);
+              composite.deskDim = Math.max(composite.deskDim, noteFx.blur * STORY.dim);
+            }
+          }
+        }
       });
       // the loader: nothing of the hero shows until the brief is whole; then its points become the sand
       if (playing) {
@@ -963,6 +1038,7 @@ export function SandLab({ hero }: { hero: boolean }) {
         else window.removeEventListener(type, fn);
       }
       if (deskFiles && !deskTaken) deskFiles.then(releaseDesk).catch(() => {});
+      disposeNotes?.();
       paint?.dispose();
       field?.dispose();
       stage?.dispose();

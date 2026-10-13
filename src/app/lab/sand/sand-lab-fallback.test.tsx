@@ -3,7 +3,7 @@ import { beforeEach, expect, test, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }) }));
 vi.mock("next/link", () => ({ default: ({ href, children, ...rest }: React.ComponentProps<"a">) => <a href={href} {...rest}>{children}</a> }));
-vi.mock("next/font/google", () => ({ Caveat: () => ({ className: "caveat", style: { fontFamily: "Caveat" } }) }));
+vi.mock("next/font/google", () => ({ Caveat: () => ({ className: "caveat", style: { fontFamily: "Caveat" } }), Nothing_You_Could_Do: () => ({ className: "nycd", style: { fontFamily: "Nothing You Could Do" } }) }));
 
 import { SandLab } from "./sand-lab";
 

@@ -409,10 +409,17 @@ export class SandComposite {
     // the lens, from the sand's colour and depth (half size)
     const lens = this.lens;
     const dofP = this.material.uniforms.uDofP.value as THREE.Vector4;
-    if (lens.amount > 0.001 && (camera as THREE.PerspectiveCamera).isPerspectiveCamera) {
+    // the lens's blur per unit of amount (device px), for the sand and for the desk alone (the notes' rack focus: the
+    // desk through the lens with no gather on the sand; Liam, 2026-10-14)
+    let lensScale = 0;
+    if ((camera as THREE.PerspectiveCamera).isPerspectiveCamera) {
       const cam = camera as THREE.PerspectiveCamera;
       const f = lens.lensMm / 1000, pointScale = size.y / (2 * Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2));
-      dofP.set(pointScale * ((f / lens.fstop) / Math.max(lens.focus - f, 1e-3)) * lens.amount, lens.focus, cam.near, cam.far);
+      lensScale = pointScale * ((f / lens.fstop) / Math.max(lens.focus - f, 1e-3));
+    }
+    if (lens.amount > 0.001 && lensScale > 0) {
+      const cam = camera as THREE.PerspectiveCamera;
+      dofP.set(lensScale * lens.amount, lens.focus, cam.near, cam.far);
       const hw = Math.max(1, Math.round(size.x / 2)), hh = Math.max(1, Math.round(size.y / 2));
       if (this.dofRt.width !== hw || this.dofRt.height !== hh) this.dofRt.setSize(hw, hh);
       this.gather(renderer, this.rt.texture, this.rt.depthTexture!, dofP, this.dofRt, size);
@@ -439,15 +446,15 @@ export class SandComposite {
       du.uDim.value = this.deskDim;
       (du.uTexel.value as THREE.Vector2).set(1 / size.x, 1 / size.y);
       renderer.render(this.discScene, this.ortho);
-    } else if (lens.desk > 0.002 && dofP.x > 0) {
+    } else if (lens.desk > 0.002 && lensScale > 0) {
       // the desk through the same lens: into its target with its depth, the gather at half size, then to the screen
       const bg = this.background(size);
       renderer.setRenderTarget(bg);
       renderer.render(scene, camera);
       const hw = Math.max(1, Math.round(size.x / 2)), hh = Math.max(1, Math.round(size.y / 2));
       if (this.dofBgRt.width !== hw || this.dofBgRt.height !== hh) this.dofBgRt.setSize(hw, hh);
-      const deskP = this.deskP.copy(dofP);
-      deskP.x *= lens.desk / Math.max(lens.amount, 1e-3);   // (dofP carries the sand's amount)
+      const cam = camera as THREE.PerspectiveCamera;
+      const deskP = this.deskP.set(lensScale * lens.desk, lens.focus, cam.near, cam.far);
       this.gather(renderer, bg.texture, bg.depthTexture!, deskP, this.dofBgRt, size);
       renderer.setRenderTarget(null);
       const lu = this.deskLensMat.uniforms;
