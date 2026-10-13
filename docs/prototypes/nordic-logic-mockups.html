@@ -1,0 +1,705 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nordic Logic mockups</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:ital,wght@0,400;0,500;1,400&family=Geist+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;500&family=Instrument+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ------------------------------------------------------------------
+   Board chrome (real px). Frames use --u = 1/1440 of the frame width
+   (container query units) so each frame keeps exact 1440 proportions.
+   Mobile frame: --u = 1/390.
+   The page follows Nordic Logic's own world (web-v2/app/globals.css, live
+   1524f60): Daylight ground, Ink, Onyx for the dark chapter, Signal as the
+   one accent. No gradients, no glow. Every word I write is Geist; Schibsted
+   Grotesk, Instrument Sans and IBM Plex Mono appear only inside the product.
+   ------------------------------------------------------------------ */
+:root {
+  --canvas: #f9f9f8; --surface: #ffffff; --mist: #efedeb; --frost: #ebe9e6;
+  --hair: #e4e1dc; --hair-2: #d4d0c9;
+  --ink: #0c1116; --ink-2: #363b40; --ink-3: #5a6672;
+  --onyx: #0f151b; --onyx-card: #19212b; --onyx-line: #2a3542; --onyx-text: #8b98a6;
+  --signal: #1b4dff; --signal-lift: #5b82ff; --haze: #edf2fa;
+  --sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --mono: "Geist Mono", ui-monospace, monospace;
+  --nl-display: "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --nl-body: "Instrument Sans", system-ui, sans-serif;
+  --nl-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --settle: cubic-bezier(0.22, 1, 0.36, 1);
+}
+* { box-sizing: border-box; }
+html, body { background: #111113; }
+body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
+.board { max-width: 1536px; margin: 0 auto; padding: 64px 48px 160px; }
+.board-head { display: grid; grid-template-columns: 1fr auto; gap: 24px 48px; align-items: end; padding-bottom: 40px; border-bottom: 1px solid #26262b; }
+.board-head h1 { margin: 0; font: 400 32px/1.1 var(--sans); color: #f2f2f4; letter-spacing: -.01em; }
+.board-head h1 em { font-style: italic; color: #8c8c96; }
+.board-head p { margin: 10px 0 0; max-width: 72ch; color: #8c8c96; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 20px; font: 400 11px/1.4 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: #8c8c96; }
+.legend i { display: inline-block; width: 18px; height: 0; border-top: 1px dashed #8c8c96; vertical-align: middle; margin-right: 8px; }
+.flags { max-width: 1440px; margin: 32px auto 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 40px; }
+.flags li { border-top: 1px solid #2a2a30; padding-top: 12px; font-size: 14px; line-height: 1.55; color: #a6a6ae; }
+.flags b { display: block; font: 400 11px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #f0a020; margin-bottom: 6px; }
+.block { margin-top: 80px; }
+.cap { display: flex; justify-content: space-between; gap: 16px; margin: 0 auto 12px; max-width: 1440px; font: 400 12px/1.4 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: #8c8c96; }
+.cap b { font-weight: 400; color: #e6e6ea; }
+.frame { container-type: inline-size; max-width: 1440px; margin: 0 auto; border-radius: 3px; overflow: hidden; box-shadow: 0 0 0 1px rgba(255,255,255,.07), 0 30px 80px -40px rgba(0,0,0,.8); }
+.f { --u: calc(100cqw / 1440); position: relative; overflow: hidden; background: var(--canvas); color: var(--ink); font-family: var(--sans); font-weight: 400; }
+.f.m { --u: calc(100cqw / 390); }
+.f p { margin: 0; }
+.f h1, .f h2, .f h3 { margin: 0; font-weight: 400; }
+.f a { color: inherit; text-decoration: none; }
+.fold { position: absolute; left: 0; right: 0; height: 0; pointer-events: none; z-index: 60; }
+.fold::before, .fold::after { content: ""; position: absolute; top: 0; width: calc(var(--u) * 28); border-top: calc(var(--u) * 1.5) dashed #9a9aac; }
+.fold::before { left: 0; } .fold::after { right: 0; }
+.fold span { position: absolute; right: calc(var(--u) * 36); top: calc(var(--u) * -6); font: 400 calc(var(--u) * 10)/1 var(--mono); letter-spacing: .08em; color: #9a9aac; }
+
+/* ------------------------------ Liam's type (Geist 400) ------------------------------ */
+.label { font: 400 calc(var(--u) * 12)/1.15 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
+.title { font-size: calc(var(--u) * 72); line-height: .95; letter-spacing: -.025em; }
+.display { font-size: calc(var(--u) * 48); line-height: 1.16; letter-spacing: -.018em; }
+.display em { font-style: italic; }
+.quiet { color: var(--ink-3); }
+.body { font-size: calc(var(--u) * 18); line-height: 1.55; color: var(--ink-2); max-width: 44ch; }
+.body .lead { color: var(--ink); }
+.g12 { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: calc(var(--u) * 24); padding: 0 calc(var(--u) * 72); }
+.onyx { background: var(--onyx); color: #fff; }
+.onyx .label { color: var(--onyx-text); }
+.onyx .body { color: rgba(255,255,255,.66); }
+.onyx .body .lead { color: #fff; }
+.onyx .quiet { color: var(--onyx-text); }
+
+.btn { display: inline-flex; align-items: center; gap: calc(var(--u) * 10); height: calc(var(--u) * 48); padding: 0 calc(var(--u) * 20); border-radius: calc(var(--u) * 999); font: 500 calc(var(--u) * 15)/1 var(--sans); white-space: nowrap; }
+.f .btn-ghost { background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 calc(var(--u) * 1) var(--hair-2); }
+.f .btn-ink { background: var(--ink); color: #fff; }
+.ic { width: calc(var(--u) * 16); height: calc(var(--u) * 16); fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ------------------------------ shell (the portfolio's, unchanged) ------------------------------ */
+.f .sh-back { position: absolute; left: calc(var(--u) * 72); top: calc(var(--u) * 40); width: calc(var(--u) * 44); height: calc(var(--u) * 44); border-radius: 50%; background: var(--ink); color: var(--canvas); display: grid; place-items: center; z-index: 5; }
+.sh-back .ic { width: calc(var(--u) * 18); height: calc(var(--u) * 18); }
+.sh-nav { position: absolute; right: calc(var(--u) * 72); top: calc(var(--u) * 40); display: flex; gap: calc(var(--u) * 8); z-index: 5; }
+.pill { display: flex; align-items: center; height: calc(var(--u) * 44); padding: 0 calc(var(--u) * 20); border-radius: calc(var(--u) * 999); font: 500 calc(var(--u) * 14)/1 var(--sans); color: var(--ink); background: rgba(255,255,255,.72); box-shadow: inset 0 0 0 calc(var(--u) * 1) rgba(12,17,22,.2); }
+.pill.is-active { background: var(--ink); color: var(--canvas); box-shadow: none; }
+
+/* ------------------------------ 1 hero ------------------------------ */
+.hero { height: calc(var(--u) * 900); }
+.hero-head { position: absolute; left: calc(var(--u) * 72); right: calc(var(--u) * 72); top: calc(var(--u) * 132); display: flex; justify-content: space-between; align-items: flex-end; }
+.hero-right { display: flex; align-items: center; gap: calc(var(--u) * 36); padding-bottom: calc(var(--u) * 6); }
+.hero-line { font-size: calc(var(--u) * 28); line-height: 1.2; letter-spacing: -.01em; color: var(--ink-2); max-width: 24ch; }
+.tray { position: absolute; left: calc(var(--u) * 72); top: calc(var(--u) * 276); width: calc(var(--u) * 1296); height: calc(var(--u) * 596); border-radius: calc(var(--u) * 24); background: var(--mist); overflow: hidden; }
+.tray img { position: absolute; left: calc(var(--u) * 40); top: calc(var(--u) * 40); width: calc(var(--u) * 1216); height: auto; border-radius: calc(var(--u) * 12); box-shadow: 0 0 0 calc(var(--u) * 1) var(--hair); }
+
+/* ------------------------------ 2 at a glance ------------------------------ */
+.glance { height: calc(var(--u) * 270); padding-top: calc(var(--u) * 56); }
+.strip { margin: 0 calc(var(--u) * 72); display: grid; grid-template-columns: calc(var(--u) * 330) calc(var(--u) * 220) calc(var(--u) * 220) 1fr; border-top: calc(var(--u) * 1) solid var(--hair-2); border-bottom: calc(var(--u) * 1) solid var(--hair-2); }
+.strip > div { padding: calc(var(--u) * 28) calc(var(--u) * 24) calc(var(--u) * 30); border-left: calc(var(--u) * 1) solid var(--hair); }
+.strip > div:first-child { padding-left: 0; border-left: 0; }
+.strip .label { margin-bottom: calc(var(--u) * 14); }
+.strip p { font-size: calc(var(--u) * 17); line-height: 1.5; max-width: 30ch; }
+.tools { display: flex; flex-wrap: wrap; gap: 0 calc(var(--u) * 20); font-size: calc(var(--u) * 17); line-height: 1.55; }
+.tools span { position: relative; white-space: nowrap; }
+.tools span:not(:last-child)::after { content: ""; position: absolute; right: calc(var(--u) * -12); top: .74em; width: calc(var(--u) * 3); height: calc(var(--u) * 3); border-radius: 50%; background: var(--ink-3); }
+
+/* ------------------------------ 3 problem ------------------------------ */
+.problem { padding: calc(var(--u) * 96) 0 calc(var(--u) * 80); }
+.fig-num { font: 400 calc(var(--u) * 196)/.74 var(--sans); letter-spacing: -.05em; font-variant-numeric: tabular-nums; margin-left: calc(var(--u) * -6); margin-top: calc(var(--u) * 4); }
+.fig-num small { font-size: .45em; letter-spacing: -.02em; margin-left: calc(var(--u) * 6); }
+.fig-sub { font-size: calc(var(--u) * 24); line-height: 1.2; font-style: italic; color: var(--ink-2); margin-top: calc(var(--u) * 20); }
+.fig-src { margin-top: calc(var(--u) * 16); }
+
+/* ------------------------------ 4 solution ------------------------------ */
+.solution { padding: calc(var(--u) * 128) 0 calc(var(--u) * 120); }
+.cmp-head { margin-top: calc(var(--u) * 96); align-items: end; }
+.cmp-head .display { grid-column: 1 / 13; }
+.cmp-head .label { grid-column: 9 / 13; text-align: right; padding-bottom: calc(var(--u) * 10); }
+/* The comparison: my analysis, so my type. Laid out like a ledger: the rows that are level sit quiet,
+   the three that differ carry the weight and the one accent. */
+.cmp { margin: calc(var(--u) * 40) calc(var(--u) * 72) 0; background: var(--surface); border-radius: calc(var(--u) * 20); box-shadow: inset 0 0 0 calc(var(--u) * 1) var(--hair); padding: calc(var(--u) * 12) calc(var(--u) * 32) calc(var(--u) * 16); }
+.cmp-row { display: grid; grid-template-columns: calc(var(--u) * 300) 1fr 1fr; column-gap: calc(var(--u) * 32); align-items: baseline; padding: calc(var(--u) * 18) 0; border-top: calc(var(--u) * 1) solid var(--hair); }
+.cmp-row.th { border-top: 0; padding: calc(var(--u) * 18) 0 calc(var(--u) * 14); }
+.cmp-row.th span { font: 400 calc(var(--u) * 12)/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.cmp-row.th span:last-child { color: var(--ink); }
+.cmp-group { display: flex; align-items: center; gap: calc(var(--u) * 12); padding: calc(var(--u) * 26) 0 calc(var(--u) * 6); border-top: calc(var(--u) * 1) solid var(--hair-2); }
+.cmp-group span { font: 400 calc(var(--u) * 12)/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.cmp-group em { font-style: normal; color: var(--ink-3); font-size: calc(var(--u) * 14); }
+.cmp-row .k { font-size: calc(var(--u) * 16); color: var(--ink-3); }
+.cmp-row .v { font-size: calc(var(--u) * 16); line-height: 1.45; color: var(--ink-3); }
+.cmp-row .v .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.cmp-row.diff .k { color: var(--ink); font-size: calc(var(--u) * 18); }
+.cmp-row.diff .v { color: var(--ink-2); font-size: calc(var(--u) * 18); }
+.cmp-row.diff .v.us { color: var(--ink); position: relative; padding-left: calc(var(--u) * 18); }
+.cmp-row.diff .v.us::before { content: ""; position: absolute; left: 0; top: .2em; bottom: .2em; width: calc(var(--u) * 2); border-radius: calc(var(--u) * 2); background: var(--signal); }
+.cmp-src { margin: calc(var(--u) * 18) calc(var(--u) * 72) 0; }
+
+/* the first audit, working: a replica of the site's FirstAudit flow (product type inside) */
+.fa-head { margin-top: calc(var(--u) * 112); align-items: end; }
+.fa-tray { margin: calc(var(--u) * 40) calc(var(--u) * 72) 0; border-radius: calc(var(--u) * 24); background-color: var(--canvas); background-image: radial-gradient(circle, #cdc8c0 calc(var(--u) * 1.05), transparent calc(var(--u) * 1.3)); background-size: calc(var(--u) * 11) calc(var(--u) * 11); box-shadow: inset 0 0 0 calc(var(--u) * 1) var(--hair); padding: calc(var(--u) * 64) 0 calc(var(--u) * 56); }
+.fa-q { text-align: center; font: 500 calc(var(--u) * 40)/1.05 var(--nl-display); letter-spacing: -.022em; color: var(--ink); }
+.fa-q span { display: block; color: #8b939b; }
+.fa { position: relative; width: calc(var(--u) * 1296); height: calc(var(--u) * 530); margin: calc(var(--u) * 48) auto 0; }
+.fa svg.wires { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.fa .w { fill: none; stroke: var(--signal); stroke-width: calc(var(--u) * 1.25); stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 440ms var(--settle); vector-effect: non-scaling-stroke; }
+.fa .w.on { stroke-dashoffset: 0; }
+.fa-node { position: absolute; width: calc(var(--u) * 420); height: calc(var(--u) * 60); display: flex; align-items: center; gap: calc(var(--u) * 10); padding: 0 calc(var(--u) * 20); background: var(--surface); border-radius: calc(var(--u) * 8); box-shadow: 0 0 0 calc(var(--u) * 1) var(--frost), 0 1px 2px rgba(12,17,22,.04); font: 400 calc(var(--u) * 17)/1 var(--nl-body); color: var(--ink); opacity: 0; transform: translateY(calc(var(--u) * 6)); transition: opacity 340ms var(--settle), transform 340ms var(--settle), box-shadow 320ms var(--settle), color 320ms; text-align: left; border: 0; cursor: default; }
+.fa-node.on { opacity: 1; transform: none; }
+.fa-node svg { width: calc(var(--u) * 20); height: calc(var(--u) * 20); fill: #7c8b9c; flex: none; transition: fill 320ms; }
+.fa-node.pulse { box-shadow: 0 0 0 calc(var(--u) * 1) var(--signal), 0 1px 2px rgba(12,17,22,.04); }
+.fa-node.pulse svg { fill: var(--signal); }
+.fa-node.end { box-shadow: 0 0 0 calc(var(--u) * 1) #a9bcff, 0 1px 2px rgba(12,17,22,.04); }
+.fa-node.end svg { fill: var(--signal); }
+/* the fork: both branches are buttons, drawn the same */
+button.fa-node.choice { cursor: pointer; font: inherit; font: 400 calc(var(--u) * 17)/1 var(--nl-body); }
+button.fa-node.choice::after { content: "Choose"; margin-left: auto; font: 500 calc(var(--u) * 11)/1 var(--nl-mono); letter-spacing: .08em; text-transform: uppercase; color: #7c8b9c; transition: opacity 200ms; }
+.fa.chosen button.fa-node.choice::after { opacity: 0; }
+@media (hover: hover) { button.fa-node.choice:hover { box-shadow: 0 0 0 calc(var(--u) * 1) #7c8b9c, 0 1px 2px rgba(12,17,22,.04); } }
+button.fa-node.choice:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }
+button.fa-node.choice:active { transform: scale(.985); }
+.fa.chosen button.fa-node.choice { cursor: default; }
+.fa-node.rest { opacity: .38; }
+.fa .w.rest { opacity: .3; }
+.fa-out { position: absolute; width: calc(var(--u) * 420); font: 400 calc(var(--u) * 15)/1.45 var(--nl-body); color: #5a6672; opacity: 0; transition: opacity 400ms var(--settle); }
+.fa-out.on { opacity: 1; }
+.fa-again { position: absolute; left: calc(var(--u) * 710); top: calc(var(--u) * 482); height: calc(var(--u) * 36); padding: 0 calc(var(--u) * 16); border-radius: 999px; border: 0; background: var(--ink); color: #fff; font: 500 calc(var(--u) * 13)/1 var(--sans); cursor: pointer; opacity: 0; pointer-events: none; transition: opacity 300ms; }
+.fa-again.on { opacity: 1; pointer-events: auto; }
+.fa-again:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.sol-foot { margin-top: calc(var(--u) * 96); align-items: end; }
+.sol-foot .display { grid-column: 1 / 12; font-size: calc(var(--u) * 52); }
+.sol-foot .display em { color: var(--ink-3); }
+
+/* ------------------------------ 5 how it works (the site's dark chapter) ------------------------------ */
+.how { padding: calc(var(--u) * 128) 0 calc(var(--u) * 120); }
+.how .title { color: #fff; }
+.cards { grid-column: 5 / 13; display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--u) * 24); }
+.cards video { display: block; width: 100%; aspect-ratio: 1; border-radius: calc(var(--u) * 20); background: var(--onyx-card); }
+.how-left { grid-column: 1 / 5; display: flex; flex-direction: column; gap: calc(var(--u) * 36); }
+.how-left .body { max-width: 34ch; }
+.denied-row { margin-top: calc(var(--u) * 120); align-items: end; }
+.denied-row video { grid-column: 1 / 9; display: block; width: 100%; aspect-ratio: 16 / 10; border-radius: calc(var(--u) * 20); background: var(--onyx-card); box-shadow: 0 0 0 calc(var(--u) * 1) var(--onyx-line); }
+.denied-row .side { grid-column: 9 / 13; display: flex; flex-direction: column; gap: calc(var(--u) * 18); padding-bottom: calc(var(--u) * 8); }
+.w-title { font-size: calc(var(--u) * 32); line-height: 1.15; letter-spacing: -.015em; }
+.sys { margin: calc(var(--u) * 120) calc(var(--u) * 72) 0; padding-top: calc(var(--u) * 28); border-top: calc(var(--u) * 1) solid var(--onyx-line); display: grid; grid-template-columns: calc(var(--u) * 300) 1fr calc(var(--u) * 200); gap: calc(var(--u) * 48); align-items: start; }
+.sys-sw { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(var(--u) * 8); }
+.sys-sw i { display: block; height: calc(var(--u) * 52); border-radius: calc(var(--u) * 8); box-shadow: inset 0 0 0 calc(var(--u) * 1) rgba(255,255,255,.08); }
+.sys-sw span { display: block; margin-top: calc(var(--u) * 8); font: 400 calc(var(--u) * 11)/1 var(--mono); color: var(--onyx-text); letter-spacing: .04em; }
+.sys-type { display: flex; flex-direction: column; gap: calc(var(--u) * 18); }
+.sys-type div { display: grid; grid-template-columns: calc(var(--u) * 170) 1fr; align-items: baseline; gap: calc(var(--u) * 20); }
+.sys-type .s1 { font: 500 calc(var(--u) * 40)/1.05 var(--nl-display); letter-spacing: -.025em; color: #fff; }
+.sys-type .s2 { font: 400 calc(var(--u) * 17)/1.5 var(--nl-body); color: #c9d1d9; }
+.sys-type .s3 { font: 500 calc(var(--u) * 13)/1.4 var(--nl-mono); letter-spacing: .06em; color: #c9d1d9; }
+.sys-type .s3 b { color: var(--signal-lift); font-weight: 500; }
+.sys-mark { display: flex; flex-direction: column; align-items: flex-start; gap: calc(var(--u) * 18); }
+.sys-mark img { width: calc(var(--u) * 96); height: auto; }
+
+/* ------------------------------ 6 challenges ------------------------------ */
+.chal { padding: calc(var(--u) * 112) 0 calc(var(--u) * 104); }
+.chs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(5, auto); column-gap: calc(var(--u) * 48); margin: calc(var(--u) * 64) calc(var(--u) * 72) 0; }
+.ch { display: grid; grid-row: span 5; grid-template-rows: subgrid; border-top: calc(var(--u) * 1) solid var(--ink); padding-top: calc(var(--u) * 20); }
+.ch-head { display: flex; flex-direction: column; gap: calc(var(--u) * 18); }
+.ch-num { font: 400 calc(var(--u) * 12)/1 var(--mono); letter-spacing: .08em; color: var(--ink-3); }
+.ch-title { font-size: calc(var(--u) * 26); line-height: 1.2; letter-spacing: -.012em; padding-right: calc(var(--u) * 24); }
+.ch-chips { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--u) * 8); padding: calc(var(--u) * 22) 0 calc(var(--u) * 4); align-content: start; min-height: calc(var(--u) * 30); }
+.chip { display: inline-flex; align-items: center; gap: calc(var(--u) * 7); height: calc(var(--u) * 26); padding: 0 calc(var(--u) * 10); border-radius: calc(var(--u) * 999); border: calc(var(--u) * 1) solid var(--hair-2); background: var(--surface); font: 500 calc(var(--u) * 11)/1 var(--mono); letter-spacing: .07em; text-transform: uppercase; white-space: nowrap; color: var(--ink-2); }
+.chip b { font-weight: 500; color: var(--ink); }
+.chip.sig { color: var(--signal); border-color: #b9c8ff; }
+.seq { display: inline-flex; align-items: center; gap: calc(var(--u) * 8); white-space: nowrap; }
+.arrow { font: 400 calc(var(--u) * 12)/1 var(--mono); color: var(--ink-3); }
+.ch-shot { display: block; width: 100%; height: auto; border-radius: calc(var(--u) * 10); box-shadow: 0 0 0 calc(var(--u) * 1) var(--hair); }
+.step { padding-top: calc(var(--u) * 18); }
+.step .k { font: 400 calc(var(--u) * 11)/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.step p { font-size: calc(var(--u) * 16); line-height: 1.55; color: var(--ink-2); margin-top: calc(var(--u) * 10); }
+.step.res { margin-top: calc(var(--u) * 22); padding-top: calc(var(--u) * 16); border-top: calc(var(--u) * 1) solid var(--hair-2); }
+.step.res .k { color: var(--ink); }
+.step.res p { font-size: calc(var(--u) * 21); line-height: 1.32; color: var(--ink); letter-spacing: -.008em; }
+/* With Claude Code: the two exchanges, under the three challenges */
+.cc { margin: calc(var(--u) * 72) calc(var(--u) * 72) 0; display: grid; grid-template-columns: calc(var(--u) * 260) 1fr 1fr; gap: calc(var(--u) * 24); align-items: start; }
+.cc-intro { display: flex; flex-direction: column; gap: calc(var(--u) * 14); padding-top: calc(var(--u) * 6); }
+.cc-intro p { font-size: calc(var(--u) * 15); line-height: 1.5; color: var(--ink-2); }
+.ex { background: var(--surface); border-radius: calc(var(--u) * 16); box-shadow: inset 0 0 0 calc(var(--u) * 1) var(--hair); padding: calc(var(--u) * 22) calc(var(--u) * 24) calc(var(--u) * 24); display: flex; flex-direction: column; gap: calc(var(--u) * 14); }
+.ex-line { display: grid; grid-template-columns: calc(var(--u) * 64) 1fr; gap: calc(var(--u) * 12); align-items: baseline; }
+.ex-line .who { font: 400 calc(var(--u) * 11)/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.ex-line p { font-size: calc(var(--u) * 17); line-height: 1.45; color: var(--ink); }
+.ex-line.ai p { color: var(--ink-2); }
+.ex-res { padding-top: calc(var(--u) * 12); border-top: calc(var(--u) * 1) solid var(--hair); font-size: calc(var(--u) * 14); line-height: 1.5; color: var(--ink-3); }
+
+/* ------------------------------ 7 impact ------------------------------ */
+.outcome { padding: calc(var(--u) * 96) 0 calc(var(--u) * 72); }
+.outcome .display { margin-top: calc(var(--u) * 32); font-size: calc(var(--u) * 52); }
+.outcome .display a { background-image: linear-gradient(currentColor, currentColor); background-size: 100% calc(var(--u) * 1.5); background-repeat: no-repeat; background-position: 0 92%; }
+.outcome .row-cta { margin-top: calc(var(--u) * 44); }
+
+/* ------------------------------ 8 next ------------------------------ */
+.next { height: calc(var(--u) * 630); background: var(--mist); }
+.peek { position: absolute; left: 0; right: 0; top: calc(var(--u) * 64); bottom: calc(var(--u) * -40); border-radius: calc(var(--u) * 32) calc(var(--u) * 32) 0 0; overflow: hidden; }
+.peek-text { position: absolute; left: calc(var(--u) * 72); top: calc(var(--u) * 72); width: calc(var(--u) * 520); }
+.peek-next { display: flex; align-items: center; gap: calc(var(--u) * 14); font: 400 calc(var(--u) * 13)/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.peek-next i { display: block; width: calc(var(--u) * 80); height: calc(var(--u) * 1); }
+.peek-title { font-size: calc(var(--u) * 72); line-height: .95; letter-spacing: -.025em; margin-top: calc(var(--u) * 150); }
+.f .peek-line { font-size: calc(var(--u) * 19); line-height: 1.5; margin-top: calc(var(--u) * 40); max-width: 32ch; }
+.peek-frame { position: absolute; left: calc(var(--u) * 640); top: calc(var(--u) * 72); width: calc(var(--u) * 728); height: calc(var(--u) * 560); border-radius: calc(var(--u) * 20); overflow: hidden; }
+.peek-frame img { width: 100%; height: 100%; object-fit: cover; object-position: 0 0; display: block; }
+.peek.er { background: #f8f8f6; color: #1a1a2e; }
+.peek.er .peek-next { color: #6b6b80; } .peek.er .peek-next i { background: #d6d3cb; }
+.peek.er .peek-title { color: rgba(26,26,46,.55); } .peek.er .peek-line { color: #4a4a5c; }
+.peek.er .peek-frame { background: #f2f1ec; box-shadow: 0 0 0 calc(var(--u) * 1) #e6e4de; }
+.next.from-pulse { background: #060b14; }
+.peek.nl { background: var(--canvas); color: var(--ink); }
+.peek.nl .peek-next { color: var(--ink-3); } .peek.nl .peek-next i { background: var(--hair-2); }
+.peek.nl .peek-title { color: rgba(12,17,22,.55); } .peek.nl .peek-line { color: var(--ink-2); }
+.peek.nl .peek-frame { background: var(--mist); box-shadow: 0 0 0 calc(var(--u) * 1) var(--hair); }
+.peek.nl .peek-frame img { object-position: 50% 0; }
+
+/* ------------------------------ mobile (--u = 1/390) ------------------------------ */
+.phone-row { display: grid; grid-template-columns: 390px minmax(0, 1fr); gap: 56px; max-width: 1440px; margin: 0 auto; align-items: start; }
+.phone-row .frame { max-width: 390px; width: 100%; margin: 0; }
+.phone-notes { position: sticky; top: 32px; font: 400 14px/1.6 var(--sans); color: #a6a6ae; max-width: 52ch; }
+.phone-notes h3 { margin: 0 0 12px; font: 400 12px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #e6e6ea; }
+.phone-notes ol { margin: 0; padding-left: 20px; }
+.phone-notes li { margin: 0 0 10px; }
+.m .sh-back { left: calc(var(--u) * 16); top: calc(var(--u) * 16); }
+.m .sh-nav { right: calc(var(--u) * 16); top: calc(var(--u) * 16); gap: calc(var(--u) * 6); }
+.m .pill { padding: 0 calc(var(--u) * 13); font-size: calc(var(--u) * 13); }
+.m-hero { padding: calc(var(--u) * 108) calc(var(--u) * 16) calc(var(--u) * 32); }
+.m-hero .title { font-size: calc(var(--u) * 48); margin-top: calc(var(--u) * 14); }
+.m-hero .hero-line { font-size: calc(var(--u) * 22); margin-top: calc(var(--u) * 14); }
+.m-hero .btn { margin-top: calc(var(--u) * 22); }
+.m-tray { margin-top: calc(var(--u) * 32); height: calc(var(--u) * 330); border-radius: calc(var(--u) * 20); background: var(--mist); position: relative; overflow: hidden; }
+.m-tray img { position: absolute; left: calc(var(--u) * -101); top: calc(var(--u) * 20); width: calc(var(--u) * 560); border-radius: calc(var(--u) * 10); }
+.m-gap { padding: calc(var(--u) * 18) calc(var(--u) * 16); border-top: calc(var(--u) * 1) solid var(--hair-2); border-bottom: calc(var(--u) * 1) solid var(--hair-2); font: 400 calc(var(--u) * 10)/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); text-align: center; }
+.m-sol { padding: calc(var(--u) * 56) calc(var(--u) * 16) calc(var(--u) * 64); }
+.m-sol .title { font-size: calc(var(--u) * 44); }
+.m-sol .body { font-size: calc(var(--u) * 16); margin-top: calc(var(--u) * 18); }
+.m-sol .display { font-size: calc(var(--u) * 28); margin-top: calc(var(--u) * 44); }
+.m-cmp { margin-top: calc(var(--u) * 20); background: var(--surface); border-radius: calc(var(--u) * 16); box-shadow: inset 0 0 0 calc(var(--u) * 1) var(--hair); padding: calc(var(--u) * 6) calc(var(--u) * 16) calc(var(--u) * 12); }
+.m-cmp .grp { padding: calc(var(--u) * 16) 0 calc(var(--u) * 4); font: 400 calc(var(--u) * 10)/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.m-cmp .it { padding: calc(var(--u) * 12) 0; border-top: calc(var(--u) * 1) solid var(--hair); }
+.m-cmp .it .k { font-size: calc(var(--u) * 14); color: var(--ink); }
+.m-cmp .it .pair { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--u) * 12); margin-top: calc(var(--u) * 6); font-size: calc(var(--u) * 13); line-height: 1.4; color: var(--ink-3); }
+.m-cmp .it .pair span:first-child::before { content: "LateShipment"; display: block; font: 400 calc(var(--u) * 9)/1.6 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.m-cmp .it .pair span:last-child::before { content: "Nordic Logic"; display: block; font: 400 calc(var(--u) * 9)/1.6 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink); }
+.m-cmp .it.diff .pair span:last-child { color: var(--ink); border-left: calc(var(--u) * 2) solid var(--signal); padding-left: calc(var(--u) * 8); }
+.m-fa { margin-top: calc(var(--u) * 28); border-radius: calc(var(--u) * 20); background-color: var(--canvas); background-image: radial-gradient(circle, #cdc8c0 calc(var(--u) * 1.05), transparent calc(var(--u) * 1.3)); background-size: calc(var(--u) * 11) calc(var(--u) * 11); box-shadow: inset 0 0 0 calc(var(--u) * 1) var(--hair); padding: calc(var(--u) * 20) calc(var(--u) * 14); display: flex; flex-direction: column; gap: calc(var(--u) * 14); }
+.m-fa .n { height: calc(var(--u) * 46); display: flex; align-items: center; gap: calc(var(--u) * 8); padding: 0 calc(var(--u) * 14); background: var(--surface); border-radius: calc(var(--u) * 8); box-shadow: 0 0 0 calc(var(--u) * 1) var(--frost); font: 400 calc(var(--u) * 14)/1 var(--nl-body); }
+.m-fa .n svg { width: calc(var(--u) * 16); height: calc(var(--u) * 16); fill: #7c8b9c; flex: none; }
+.m-fa .fork { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--u) * 10); }
+.m-fa .fork .n { height: auto; min-height: calc(var(--u) * 56); padding: calc(var(--u) * 10) calc(var(--u) * 12); line-height: 1.25; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fa .w, .fa-node, .fa-out { transition: none; }
+}
+@media (max-width: 900px) {
+  .board { padding: 32px 16px 96px; }
+  .board-head { grid-template-columns: 1fr; }
+  .board-head h1 { font-size: 24px; }
+  .flags { grid-template-columns: minmax(0, 1fr); }
+  .block { margin-top: 56px; }
+  .cap { flex-direction: column; gap: 2px; font-size: 11px; }
+  .phone-row { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .phone-row .frame { margin: 0 auto; }
+  .phone-notes { position: static; }
+}
+</style>
+</head>
+<body>
+<!-- Lucide (shell) + the site's own first-audit marks (Material, filled), copied from FirstAudit.tsx on the live build -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-arrow-up-right" viewBox="0 0 24 24"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></symbol>
+  <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+  <symbol id="m-send" viewBox="0 0 24 24"><g transform="translate(5 3.5)"><path d="M4 13H10V7H14L7 0L0 7H4V13ZM7 2.83L9.17 5H8V11H6V5H4.83L7 2.83ZM0 15H14V17H0V15Z"/></g></symbol>
+  <symbol id="m-breakdown" viewBox="0 0 24 24"><g transform="translate(3 2)"><path d="M16.5 1.5L15 0L13.5 1.5L12 0L10.5 1.5L9 0L7.5 1.5L6 0L4.5 1.5L3 0V14H0V17C0 18.66 1.34 20 3 20H15C16.66 20 18 18.66 18 17V0L16.5 1.5ZM12 18H3C2.450 18 2 17.55 2 17V16H12V18ZM16 17C16 17.55 15.55 18 15 18C14.45 18 14 17.55 14 17V14H5V3H16V17Z"/><path d="M12 5H6V7H12V5Z"/><path d="M15 5H13V7H15V5Z"/><path d="M12 8H6V10H12V8Z"/><path d="M15 8H13V10H15V8Z"/></g></symbol>
+  <symbol id="m-decide" viewBox="0 0 24 24"><g transform="translate(4 4)"><path d="M10 0L12.29 2.29L9.41 5.17L10.83 6.59L13.71 3.71L16 6V0H10ZM6 0H0V6L2.29 3.71L7 8.410V16H9V7.59L3.71 2.29L6 0Z"/></g></symbol>
+  <symbol id="m-sign" viewBox="0 0 24 24"><g transform="translate(1.395 1)"><path d="M0 20H12V22H0V20ZM4.24 7.07L7.07 4.24L21.21 18.38L18.38 21.21L4.24 7.07ZM11.32 0L16.98 5.66L14.15 8.49L8.49 2.83L11.32 0ZM2.83 8.48L8.49 14.14L5.66 16.97L0 11.31L2.83 8.48Z"/></g></symbol>
+  <symbol id="m-file" viewBox="0 0 24 24"><g transform="translate(1.5 3)"><path d="M2.01 3.03L9.52 6.25L2 5.25L2.01 3.03V3.03ZM9.51 11.75L2 14.97V12.75L9.51 11.75V11.75ZM0.01 0L0 7L15 9L0 11L0.01 18L21 9L0.01 0Z"/></g></symbol>
+  <symbol id="m-credit" viewBox="0 0 24 24"><g transform="translate(2.5 2)"><path d="M4.5 9H2.5V16H4.5V9ZM10.5 9H8.5V16H10.5V9ZM19 18H0V20H19V18ZM16.5 9H14.5V16H16.5V9ZM9.5 2.26L14.71 5H4.290L9.5 2.26ZM9.5 0L0 5V7H19V5L9.5 0Z"/></g></symbol>
+  <symbol id="m-walk" viewBox="0 0 24 24"><g transform="translate(3 3)"><path d="M7.09 12.59L8.5 14L13.5 9L8.5 4L7.09 5.41L9.67 8H0V10H9.67L7.09 12.59ZM16 0H2C0.89 0 0 0.9 0 2V6H2V2H16V16H2V12H0V16C0 17.1 0.89 18 2 18H16C17.1 18 18 17.1 18 16V2C18 0.9 17.1 0 16 0Z"/></g></symbol>
+</svg>
+<main class="board">
+
+<header class="board-head">
+  <div>
+    <h1>Nordic Logic case study <em>— mockup board, v1</em></h1>
+    <p>Spec: docs/superpowers/specs/2026-10-13-nordic-logic-case-study-design.md. Same frame as Eventread, Cyvore and Pulse. Everything on it shows the live site (nordic-logic.vercel.app, build 1524f60), captured 13 Oct at 2× with Chrome on the GPU. The comparison was re-checked on LateShipment's own pages the same day. All copy here is the draft for your line-by-line approval.</p>
+  </div>
+  <div class="legend"><span><i></i>End of a 900px screen (board only)</span><span>1440 frames, scaled</span></div>
+</header>
+<ul class="flags">
+  <li><b>Changed since the spec · sample data</b>The live hero dashboard has carried no "Sample data" label since your call on 2 Oct; the breakdown and the invoice examples still do. So Challenge 02 says "the worked examples", not "every figure".</li>
+  <li><b>Changed since the spec · the form</b>The live form asks for name, company, email and the CSV in one step, so "contact details first" is out of Challenge 03.</li>
+  <li><b>Worth a look · "No minimum"</b>It's one of the site's four cards in How it works, and the comparison shows it as level, because LateShipment's pricing page now says "No minimums" too. Both are true; the card is the site's own copy.</li>
+  <li><b>Layout · the Claude Code exchanges</b>They sit as one strip under the three challenges rather than inside Challenge 02's column, where they'd squeeze to four words a line.</li>
+</ul>
+
+<!-- ============================== 1 HERO ============================== -->
+<section class="block">
+  <div class="cap"><span><b>01 · Hero</b> — shared; the live hero in a tray, as Eventread</span><span>1 screen · 1440 × 900</span></div>
+  <div class="frame"><div class="f hero">
+    <a class="sh-back" href="#" aria-label="Back to projects"><svg class="ic"><use href="#i-chevron-left"/></svg></a>
+    <nav class="sh-nav" aria-label="Primary"><a class="pill" href="#">Projects</a><a class="pill" href="#">About</a><a class="pill" href="#">Contact</a></nav>
+    <div class="hero-head">
+      <div>
+        <div class="label">B2B website</div>
+        <h1 class="title" style="margin-top:calc(var(--u) * 20);margin-left:calc(var(--u) * -3)">Nordic Logic</h1>
+      </div>
+      <div class="hero-right">
+        <p class="hero-line">A launch site for a startup with no clients to point to yet.</p>
+        <a class="btn btn-ghost" href="https://nordic-logic.vercel.app" target="_blank" rel="noopener">Visit site<svg class="ic"><use href="#i-arrow-up-right"/></svg></a>
+      </div>
+    </div>
+    <div class="tray"><img src="nordic-logic-mockups/hero.jpg" alt="Nordic Logic's home page: Your carriers owe you, above the client portal's overview"></div>
+  </div></div>
+</section>
+
+<!-- ============================== 2 AT A GLANCE ============================== -->
+<section class="block">
+  <div class="cap"><span><b>02 · At a glance</b> — shared</span><span>0.3 screen · 1440 × 270</span></div>
+  <div class="frame"><div class="f glance">
+    <div class="strip">
+      <div><div class="label">Role</div><p>Brand, product &amp; web design</p></div>
+      <div><div class="label">Timeline</div><p>Aug 2026 – ongoing</p></div>
+      <div><div class="label">Team</div><p>Solo, with the founder</p></div>
+      <div><div class="label">Tools</div><div class="tools"><span>Figma</span><span>Figma MCP</span><span>Claude Code</span><span>Next.js</span><span>three.js</span><span>Vercel</span><span>PostHog</span></div></div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ============================== 3 PROBLEM ============================== -->
+<section class="block">
+  <div class="cap"><span><b>03 · Problem</b> — told, not illustrated (final visuals only)</span><span>1 screen · 1440 × ~880</span></div>
+  <div class="frame"><div class="f problem">
+    <div class="fold" style="top:calc(var(--u) * 900)"><span>900</span></div>
+    <div class="g12">
+      <h2 class="title" style="grid-column:1/13;margin-left:calc(var(--u) * -3)">Problem</h2>
+      <p class="display" style="grid-column:1/12;margin-top:calc(var(--u) * 48)">A stranger, asked for their invoices. Nordic Logic recovers what parcel carriers overcharge. To do it, a one-person company asks a sceptical finance or operations lead for their carrier invoices, then a power of attorney, <em class="quiet">with no clients, reviews or results to show yet.</em></p>
+    </div>
+    <div class="g12" style="margin-top:calc(var(--u) * 80);align-items:start">
+      <p class="body" style="grid-column:1/5">The brief I started from, on 28 August, led with price: Nordic Logic’s 35% set against “a 40–50% market standard”.</p>
+      <p class="body" style="grid-column:5/9">LateShipment, the competitor a buyer would check first, publishes 35% on its own pricing page. A claim a prospect can disprove in ten minutes turns every careful line around it into marketing.</p>
+      <div style="grid-column:9/13;padding-left:calc(var(--u) * 24)">
+        <div class="fig-num" aria-hidden="true">35<small>%</small></div>
+        <div class="fig-sub">theirs, and ours</div>
+        <div class="label fig-src">LateShipment's pricing page · audit fee</div>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ============================== 4 SOLUTION ============================== -->
+<section class="block">
+  <div class="cap"><span><b>04 · Solution</b> — the comparison, then the first audit working (click a branch)</span><span>~2.3 screens · 1440 × ~2080</span></div>
+  <div class="frame"><div class="f solution">
+    <div class="fold" style="top:calc(var(--u) * 900)"><span>900</span></div>
+    <div class="fold" style="top:calc(var(--u) * 1800)"><span>1800</span></div>
+    <div class="g12" style="align-items:end">
+      <h2 class="title" style="grid-column:1/7;margin-left:calc(var(--u) * -3)">Solution</h2>
+      <p class="body" style="grid-column:8/13"><span class="lead">Built for the sceptic.</span> Nordic Logic's buyer expects to be sold to. So the site shows the work before it asks for anything, and it claims nothing it can't prove.</p>
+    </div>
+
+    <div class="g12 cmp-head">
+      <p class="display">Level on price. <em class="quiet">Different on the first step.</em></p>
+    </div>
+    <div class="cmp" role="table" aria-label="Nordic Logic compared with LateShipment">
+      <div class="cmp-row th" role="row"><span role="columnheader"></span><span role="columnheader">LateShipment</span><span role="columnheader">Nordic Logic</span></div>
+      <div class="cmp-group"><span>Level</span></div>
+      <div class="cmp-row" role="row"><span class="k" role="rowheader">Fee on billing errors</span><span class="v" role="cell"><span class="num">35%</span>, or <span class="num">25%</span> inside a bundle</span><span class="v" role="cell"><span class="num">35%</span></span></div>
+      <div class="cmp-row" role="row"><span class="k" role="rowheader">Fee on lost and damaged claims</span><span class="v" role="cell"><span class="num">50%</span></span><span class="v" role="cell"><span class="num">50%</span></span></div>
+      <div class="cmp-row" role="row"><span class="k" role="rowheader">Contract</span><span class="v" role="cell">None</span><span class="v" role="cell">Cancel any month</span></div>
+      <div class="cmp-row" role="row"><span class="k" role="rowheader">Minimum</span><span class="v" role="cell">None</span><span class="v" role="cell">None</span></div>
+      <div class="cmp-group"><span>Different</span></div>
+      <div class="cmp-row diff" role="row"><span class="k" role="rowheader">The first step</span><span class="v" role="cell">A 30-day trial on their platform, or a demo</span><span class="v us" role="cell">One CSV, then a free full breakdown. Nothing to connect, nothing signed</span></div>
+      <div class="cmp-row diff" role="row"><span class="k" role="rowheader">What you buy</span><span class="v" role="cell">One of four products in a post-purchase platform</span><span class="v us" role="cell">Only the audit</span></div>
+      <div class="cmp-row diff" role="row"><span class="k" role="rowheader">Who files</span><span class="v" role="cell">Automated refund claims</span><span class="v us" role="cell">One named person reviews every dispute</span></div>
+    </div>
+    <div class="label cmp-src">Source: LateShipment's pricing and DHL claims pages, checked 13 Oct 2026 · nine G2 reviews collected 6 Sep</div>
+
+    <div class="g12 fa-head">
+      <h3 class="w-title" style="grid-column:1/7">The first step, working</h3>
+      <p class="body" style="grid-column:8/13">The site's first audit has a real decision in it. After the breakdown, you go ahead or you don't. Pick a branch.</p>
+    </div>
+    <div class="fa-tray">
+      <p class="fa-q" aria-hidden="true">Your first audit.<span>Free, with nothing to connect.</span></p>
+      <div class="fa" id="fa" data-play>
+        <svg class="wires" viewBox="0 0 1296 530" preserveAspectRatio="none" aria-hidden="true">
+          <path class="w" data-w="t1" pathLength="1" d="M648 60 L648 94"/>
+          <path class="w" data-w="t2" pathLength="1" d="M648 154 L648 188"/>
+          <path class="w" data-w="fl" pathLength="1" d="M438 218 C 400 218, 376 244, 376 282"/>
+          <path class="w" data-w="fr" pathLength="1" d="M858 218 C 896 218, 920 244, 920 282"/>
+          <path class="w" data-w="l1" pathLength="1" d="M376 342 L376 376"/>
+          <path class="w" data-w="l2" pathLength="1" d="M376 436 L376 470"/>
+        </svg>
+        <div class="fa-node" data-n="send" style="left:calc(var(--u) * 438);top:0"><svg><use href="#m-send"/></svg>Send your invoices</div>
+        <div class="fa-node" data-n="breakdown" style="left:calc(var(--u) * 438);top:calc(var(--u) * 94)"><svg><use href="#m-breakdown"/></svg>Get a full breakdown</div>
+        <div class="fa-node" data-n="decide" style="left:calc(var(--u) * 438);top:calc(var(--u) * 188)"><svg><use href="#m-decide"/></svg>You decide</div>
+        <button type="button" class="fa-node choice" data-n="sign" data-branch="sign" style="left:calc(var(--u) * 166);top:calc(var(--u) * 282)"><svg aria-hidden="true"><use href="#m-sign"/></svg>Sign a power of attorney</button>
+        <button type="button" class="fa-node choice" data-n="walk" data-branch="walk" style="left:calc(var(--u) * 710);top:calc(var(--u) * 282)"><svg aria-hidden="true"><use href="#m-walk"/></svg>You walk away</button>
+        <div class="fa-node" data-n="file" style="left:calc(var(--u) * 166);top:calc(var(--u) * 376)"><svg><use href="#m-file"/></svg>We file the disputes</div>
+        <div class="fa-node" data-n="credit" style="left:calc(var(--u) * 166);top:calc(var(--u) * 470)"><svg><use href="#m-credit"/></svg>Carriers credit your account</div>
+        <p class="fa-out" data-out="sign" style="left:calc(var(--u) * 710);top:calc(var(--u) * 376)" aria-live="polite">Your carrier account is credited first. Our invoice, 35% of what was recovered, comes after.</p>
+        <p class="fa-out" data-out="walk" style="left:calc(var(--u) * 710);top:calc(var(--u) * 376)" aria-live="polite">The breakdown was free. Nothing signed, nothing owed.</p>
+        <button type="button" class="fa-again" data-again>Choose again</button>
+      </div>
+    </div>
+
+    <div class="g12 sol-foot">
+      <p class="display">Walking away is drawn with the same weight as signing. <em>Knowing they can decide is what makes a stranger trust it.</em></p>
+    </div>
+  </div></div>
+</section>
+
+<!-- ============================== 5 HOW IT WORKS ============================== -->
+<section class="block">
+  <div class="cap"><span><b>05 · How it works</b> — the site's dark chapter: four 3D cards, the denial chapter, the system</span><span>~2.4 screens · 1440 × ~2150</span></div>
+  <div class="frame"><div class="f onyx how">
+    <div class="fold" style="top:calc(var(--u) * 900)"><span>900</span></div>
+    <div class="fold" style="top:calc(var(--u) * 1800)"><span>1800</span></div>
+    <div class="g12" style="align-items:start">
+      <div class="how-left">
+        <h2 class="title" style="margin-left:calc(var(--u) * -3)">How it works</h2>
+        <p class="body"><span class="lead">Four things worth knowing.</span> After the first audit, the service runs month to month: every invoice is checked as it's issued, and disputes are filed as errors turn up. The site explains it in four cards, each a small 3D scene that never stops moving.</p>
+        <p class="label">Recorded from the live site · 2× · seamless loops</p>
+      </div>
+      <div class="cards">
+        <video src="nordic-logic-mockups/why-1.mp4" poster="nordic-logic-mockups/why-1-poster.jpg" autoplay muted loop playsinline aria-label="Three carriers, in depth: FedEx, DHL and UPS vans, each lit in turn"></video>
+        <video src="nordic-logic-mockups/why-2.mp4" poster="nordic-logic-mockups/why-2-poster.jpg" autoplay muted loop playsinline aria-label="Carrier comparison: three carrier lanes across a dot map of the US, the cheapest drawn in blue"></video>
+        <video src="nordic-logic-mockups/why-3.mp4" poster="nordic-logic-mockups/why-3-poster.jpg" autoplay muted loop playsinline aria-label="Multiple shops: one hub audits several shops, each disputed separately"></video>
+        <video src="nordic-logic-mockups/why-4.mp4" poster="nordic-logic-mockups/why-4-poster.jpg" autoplay muted loop playsinline aria-label="No minimum: parcels of every size pass through the same gate"></video>
+      </div>
+    </div>
+
+    <div class="g12 denied-row">
+      <video src="nordic-logic-mockups/denied.mp4" poster="nordic-logic-mockups/denied-poster.jpg" autoplay muted loop playsinline aria-label="When a carrier says no: the dark panel pins, fills the screen, and brings in rebut, re-file, close and escalate"></video>
+      <div class="side">
+        <div class="label">Chapter</div>
+        <h3 class="w-title">When a carrier says no.</h3>
+        <p class="body">A denial rejects one argument, not the money. The panel pins, fills the screen, then brings in the four answers: rebut, re-file, close, escalate.</p>
+      </div>
+    </div>
+
+    <div class="sys">
+      <div>
+        <div class="label" style="margin-bottom:calc(var(--u) * 18)">Colour</div>
+        <div class="sys-sw">
+          <div><i style="background:#1b4dff"></i><span>SIGNAL<br>1B4DFF</span></div>
+          <div><i style="background:#0c1116"></i><span>INK<br>0C1116</span></div>
+          <div><i style="background:#0f151b"></i><span>ONYX<br>0F151B</span></div>
+          <div><i style="background:#f9f9f8"></i><span>DAYLIGHT<br>F9F9F8</span></div>
+          <div><i style="background:#efedeb"></i><span>MIST<br>EFEDEB</span></div>
+          <div><i style="background:#5a6672"></i><span>SLATE<br>5A6672</span></div>
+        </div>
+      </div>
+      <div>
+        <div class="label" style="margin-bottom:calc(var(--u) * 18)">Type</div>
+        <div class="sys-type">
+          <div><span class="label">Schibsted Grotesk</span><span class="s1">Your carriers owe you.</span></div>
+          <div><span class="label">Instrument Sans</span><span class="s2">Every charge on every invoice, against the carrier's own rules.</span></div>
+          <div><span class="label">IBM Plex Mono</span><span class="s3">FEDEX GROUND · 42 LB BILLED · <b>+$25.97</b></span></div>
+        </div>
+      </div>
+      <div class="sys-mark">
+        <div class="label">Mark</div>
+        <img src="nordic-logic-mockups/mark-knockout.svg" alt="The Nordic Logic mark: N and L sharing one stroke, with a void between them">
+        <p class="body" style="font-size:calc(var(--u) * 14)">Signal is the one accent, never a fill. Weight stops at 500.</p>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ============================== 6 CHALLENGES ============================== -->
+<section class="block">
+  <div class="cap"><span><b>06 · Challenges</b> — shared; three, then the Claude Code exchanges</span><span>~1.4 screens · 1440 × ~1260</span></div>
+  <div class="frame"><div class="f chal">
+    <div class="fold" style="top:calc(var(--u) * 900)"><span>900</span></div>
+    <div class="g12"><h2 class="title" style="grid-column:1/10;margin-left:calc(var(--u) * -3)">Challenges</h2></div>
+    <div class="chs">
+      <article class="ch">
+        <div class="ch-head"><span class="ch-num">01</span><h3 class="ch-title">The founder's read on the competition didn't hold</h3></div>
+        <div class="ch-chips"><span class="chip">Their pricing page</span><span class="chip">Their claims pages</span><span class="chip"><b>9</b> G2 reviews</span></div>
+        <div class="step"><div class="k">What happened</div><p>Emil saw LateShipment as no real competitor: they didn't file claims themselves, offered no real customer service, and were cheaper because of it.</p></div>
+        <div class="step"><div class="k">What I did</div><p>I checked each point against their own pages and the nine G2 reviews I'd collected. All three were wrong. When he then wanted the site to compare only against firms that charge more, I pushed back: choosing who you compare against is itself a claim.</p></div>
+        <div class="step res"><div class="k">What it changed</div><p>The site names no rival and makes no comparison it can't defend. The fee is stated as plain fact.</p></div>
+      </article>
+      <article class="ch">
+        <div class="ch-head"><span class="ch-num">02</span><h3 class="ch-title">No number without a source</h3></div>
+        <div class="ch-chips"><img class="ch-shot" src="nordic-logic-mockups/calculator.jpg" alt="The live calculator: $500,000 a year in delivery spend, an estimated recovery of $5,000 to $15,000"></div>
+        <div class="step"><div class="k">What happened</div><p>The savings calculator needed a recovery rate, and Nordic Logic had no completed recovery to take one from. An early build showed 2.13%, a number the AI had made up.</p></div>
+        <div class="step"><div class="k">What I did</div><p>I asked where every figure came from. Published rates run from 1% to 20% and rise with the vendor's cut, so I used the lowest range as a range, then narrowed it to Emil's own estimate.</p></div>
+        <div class="step res"><div class="k">What it changed</div><p>A conservative 1–3% range, stated as an estimate, and the worked examples marked as sample data.</p></div>
+      </article>
+      <article class="ch">
+        <div class="ch-head"><span class="ch-num">03</span><h3 class="ch-title">Planned what happens after “Send”</h3></div>
+        <div class="ch-chips"><span class="chip">Upload</span><span class="seq"><span class="arrow">→</span><span class="chip">Emil alerted</span></span><span class="seq"><span class="arrow">→</span><span class="chip">Sender confirmed</span></span><span class="seq"><span class="arrow">→</span><span class="chip sig">Deleted at <b style="color:inherit">100</b> days</span></span></div>
+        <div class="step"><div class="k">What happened</div><p>Companies upload their carrier invoices to a one-person company. Where do the files go, who sees them, and for how long?</p></div>
+        <div class="step"><div class="k">What I did</div><p>I mapped every service that touches visitor data and chose analytics without cookies, so the site needs no consent banner. Each upload confirms to the sender and alerts Emil, and the form says the audit works without names, addresses or contents.</p></div>
+        <div class="step res"><div class="k">What it changed</div><p>No cookie banner, and every file is deleted 100 days after upload.</p></div>
+      </article>
+    </div>
+    <div class="cc">
+      <div class="cc-intro">
+        <div class="label">With Claude Code</div>
+        <p>Claude built the site and drafted the analyses. Every call was mine, and we checked each other.</p>
+      </div>
+      <div class="ex">
+        <div class="label">I caught it</div>
+        <div class="ex-line"><span class="who">Me</span><p>Why 2.12%? Where did you get this number from?</p></div>
+        <div class="ex-line ai"><span class="who">Claude</span><p>I made it up, and I was wrong to.</p></div>
+        <p class="ex-res">Reverted, and the whole field checked for a real source.</p>
+      </div>
+      <div class="ex">
+        <div class="label">It pushed back</div>
+        <div class="ex-line"><span class="who">Me</span><p>Look at their success stories and make the average of the whole to set a percentage for our calculator.</p></div>
+        <div class="ex-line ai"><span class="who">Claude</span><p>An average of vendor claims from 1% to 20% means nothing, so use the lowest, least biased range.</p></div>
+        <p class="ex-res">I agreed: a range, never a point figure.</p>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ============================== 7 IMPACT ============================== -->
+<section class="block">
+  <div class="cap"><span><b>07 · Impact</b> — shared; no usage numbers yet (outreach hasn't started)</span><span>0.7 screen · 1440 × ~600</span></div>
+  <div class="frame"><div class="f outcome">
+    <div class="g12">
+      <div style="grid-column:1/12">
+        <h2 class="title" style="margin-left:calc(var(--u) * -3)">Impact</h2>
+        <p class="display">Live at <a href="https://nordic-logic.vercel.app" target="_blank" rel="noopener">nordic-logic.vercel.app</a>, three weeks from brief to launch.<br><span class="quiet">Every claim on it is traced to a source, or cut.</span></p>
+        <div class="row-cta"><a class="btn btn-ink" href="https://nordic-logic.vercel.app" target="_blank" rel="noopener">Visit site<svg class="ic"><use href="#i-arrow-up-right"/></svg></a></div>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ============================== 8 NEXT ============================== -->
+<section class="block">
+  <div class="cap"><span><b>08 · Next project</b> — Eventread peeks in; the loop is Eventread → Cyvore → Pulse → Nordic Logic → Eventread</span><span>0.7 screen · 1440 × 630</span></div>
+  <div class="frame"><div class="f next">
+    <div class="peek er">
+      <div class="peek-text">
+        <div class="peek-next">Next project<i></i><svg class="ic"><use href="#i-arrow-right"/></svg></div>
+        <div class="peek-title">Eventread</div>
+        <p class="peek-line">The check every booker skips.</p>
+      </div>
+      <div class="peek-frame"><img src="nordic-logic-mockups/eventread-peek.jpg" alt="Eventread month view for Berlin, November 2026"></div>
+    </div>
+  </div></div>
+</section>
+
+<section class="block">
+  <div class="cap"><span><b>08b · On Pulse</b> — Pulse's next project becomes Nordic Logic (was Eventread)</span><span>0.7 screen · 1440 × 630</span></div>
+  <div class="frame"><div class="f next from-pulse">
+    <div class="peek nl">
+      <div class="peek-text">
+        <div class="peek-next">Next project<i></i><svg class="ic"><use href="#i-arrow-right"/></svg></div>
+        <div class="peek-title">Nordic Logic</div>
+        <p class="peek-line">A launch site for a startup with no clients to point to yet.</p>
+      </div>
+      <div class="peek-frame"><img src="nordic-logic-mockups/peek.jpg" alt="Nordic Logic's home page with the client portal overview"></div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ============================== MOBILE ============================== -->
+<section class="block">
+  <div class="cap"><span><b>Mobile · 390</b> — hero, then the Solution</span><span>stacked, not scaled down</span></div>
+  <div class="phone-row">
+    <div class="frame"><div class="f m">
+      <a class="sh-back" href="#" aria-label="Back to projects"><svg class="ic"><use href="#i-chevron-left"/></svg></a>
+      <nav class="sh-nav" aria-label="Primary"><a class="pill" href="#">Projects</a><a class="pill" href="#">About</a><a class="pill" href="#">Contact</a></nav>
+      <div class="m-hero">
+        <div class="label">B2B website</div>
+        <h1 class="title">Nordic Logic</h1>
+        <p class="hero-line">A launch site for a startup with no clients to point to yet.</p>
+        <a class="btn btn-ghost">Visit site<svg class="ic"><use href="#i-arrow-up-right"/></svg></a>
+        <div class="m-tray"><img src="nordic-logic-mockups/hero.jpg" alt="Nordic Logic's home page, cropped to the headline and the portal"></div>
+      </div>
+      <div class="m-gap">At a glance · Problem</div>
+      <div class="m-sol">
+        <h2 class="title">Solution</h2>
+        <p class="body"><span class="lead">Built for the sceptic.</span> Nordic Logic's buyer expects to be sold to. So the site shows the work before it asks for anything, and it claims nothing it can't prove.</p>
+        <p class="display">Level on price. <em class="quiet">Different on the first step.</em></p>
+        <div class="m-cmp">
+          <div class="grp">Level</div>
+          <div class="it"><div class="k">Fee on billing errors</div><div class="pair"><span>35%, or 25% in a bundle</span><span>35%</span></div></div>
+          <div class="it"><div class="k">Fee on lost and damaged</div><div class="pair"><span>50%</span><span>50%</span></div></div>
+          <div class="it"><div class="k">Contract · minimum</div><div class="pair"><span>None · none</span><span>Cancel any month · none</span></div></div>
+          <div class="grp">Different</div>
+          <div class="it diff"><div class="k">The first step</div><div class="pair"><span>A 30-day trial on their platform, or a demo</span><span>One CSV, then a free full breakdown</span></div></div>
+          <div class="it diff"><div class="k">What you buy</div><div class="pair"><span>One of four products</span><span>Only the audit</span></div></div>
+          <div class="it diff"><div class="k">Who files</div><div class="pair"><span>Automated refund claims</span><span>One named person reviews every dispute</span></div></div>
+        </div>
+        <div class="m-fa">
+          <div class="n"><svg><use href="#m-send"/></svg>Send your invoices</div>
+          <div class="n"><svg><use href="#m-breakdown"/></svg>Get a full breakdown</div>
+          <div class="n"><svg><use href="#m-decide"/></svg>You decide</div>
+          <div class="fork"><div class="n"><svg><use href="#m-sign"/></svg>Sign a power of attorney</div><div class="n"><svg><use href="#m-walk"/></svg>You walk away</div></div>
+        </div>
+      </div>
+    </div></div>
+    <div class="phone-notes">
+      <h3>How it stacks at 390</h3>
+      <ol>
+        <li>Hero keeps its order: label, title, line, Visit site. The tray crops to the headline and the top of the portal instead of shrinking the whole page.</li>
+        <li>The comparison becomes one card per row, LateShipment beside Nordic Logic; the three rows that differ keep the blue rule on Nordic Logic's side. Contract and minimum share a row.</li>
+        <li>The first audit runs top to bottom. The fork is two equal buttons side by side; the chosen branch continues underneath, the other stays in place.</li>
+        <li>How it works: the four cards stack one per row at full width, the denial clip follows, the system strip wraps to colour, then type, then the mark.</li>
+        <li>No horizontal scrolling anywhere. Reduced motion: the flow is shown drawn, the choice still works, the videos show their posters.</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+/* The first audit, working. Mirrors the site's beat: each card opens, the wire leaving it draws, the next card opens.
+   At the fork both branches are buttons; the chosen one runs to its end, the other quiets. */
+(() => {
+  const fa = document.getElementById("fa");
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const n = (k) => fa.querySelector(`[data-n="${k}"]`);
+  const w = (k) => fa.querySelector(`[data-w="${k}"]`);
+  const again = fa.querySelector("[data-again]");
+  const BEAT = reduce ? 0 : 420;
+  let timers = [];
+  const at = (ms, fn) => timers.push(setTimeout(fn, ms));
+  const clear = () => { timers.forEach(clearTimeout); timers = []; };
+  const pulse = (el, ms) => { if (reduce) return; el.classList.add("pulse"); at(ms, () => el.classList.remove("pulse")); };
+  const show = (seq, t0) => seq.forEach(([kind, key], i) => at(t0 + i * BEAT, () => {
+    const el = kind === "n" ? n(key) : w(key);
+    el.classList.add("on");
+    if (kind === "n") pulse(el, BEAT * 2);
+  }));
+
+  const trunk = [["n", "send"], ["w", "t1"], ["n", "breakdown"], ["w", "t2"], ["n", "decide"]];
+  const forks = () => { ["fl", "fr"].forEach((k) => w(k).classList.add("on")); ["sign", "walk"].forEach((k) => n(k).classList.add("on")); };
+
+  const reset = () => {
+    clear();
+    fa.classList.remove("chosen");
+    fa.querySelectorAll(".on, .pulse, .rest, .end").forEach((el) => { if (!el.matches("[data-n=send],[data-n=breakdown],[data-n=decide],[data-n=sign],[data-n=walk],[data-w=t1],[data-w=t2],[data-w=fl],[data-w=fr]")) el.classList.remove("on"); el.classList.remove("pulse", "rest", "end"); });
+    again.classList.remove("on");
+  };
+
+  const play = () => { show(trunk, 0); at(trunk.length * BEAT, forks); };
+  fa.querySelectorAll("[data-branch]").forEach((b) => b.addEventListener("click", () => {
+    if (fa.classList.contains("chosen")) return;
+    fa.classList.add("chosen");
+    const sign = b.dataset.branch === "sign";
+    n(sign ? "walk" : "sign").classList.add("rest");
+    w(sign ? "fr" : "fl").classList.add("rest");
+    pulse(b, BEAT * 2);
+    const seq = sign ? [["w", "l1"], ["n", "file"], ["w", "l2"], ["n", "credit"]] : [];
+    show(seq, BEAT);
+    const end = seq.length ? n("credit") : b;
+    at(BEAT * (seq.length + 1), () => { end.classList.add("end"); fa.querySelector(`[data-out="${b.dataset.branch}"]`).classList.add("on"); again.classList.add("on"); });
+  }));
+  again.addEventListener("click", () => { reset(); fa.querySelector(`[data-branch]`).focus({ preventScroll: true }); });
+
+  if (reduce) { play(); return; }
+  const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { io.disconnect(); play(); } }, { threshold: 0.35 });
+  io.observe(fa);
+})();
+</script>
+</body>
+</html>
