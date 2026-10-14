@@ -25,6 +25,9 @@ interface Note extends NoteSpec { mesh: THREE.Mesh; centre: THREE.Vector3; lift:
 const LIFT = { share: 0.1, rate: 9, glued: 0.22 };
 /** The live shadow: its darkness, how much larger than the paper, and its offset away from the lamp (m). */
 const SHADOW = { alpha: 0.42, grow: 1.12, offset: new THREE.Vector3(0.0016, 0, 0.001) };
+/** How far either side of the pen a sheet under it stays flat (m): the pen, its contact shadow and the strip the bake
+ *  never lit beneath it all stay put (Liam, 2026-10-14: a narrower band let that blank strip show). */
+const PINNED = 0.018;
 
 /** The bend, in the note's own vertex shader: past the hinge, the paper rises with the square of the distance. */
 function installBend(material: THREE.Material, bend: Bend): void {
@@ -80,8 +83,8 @@ export class DeskNotes {
         const far = side.reduce((m, v) => (Math.abs(v) > Math.abs(m) ? v : m), 0);
         axis = perp.multiplyScalar(Math.sign(far) || 1);
         const toLine = centre.clone().sub(line.at).dot(axis);
-        hinge = centre.clone().addScaledVector(axis, -toLine + 0.006);   // (the pen's radius past its line)
-        span = Math.max(Math.abs(far) - 0.006, 0.01);
+        hinge = centre.clone().addScaledVector(axis, -toLine + PINNED);
+        span = Math.max(Math.abs(far) - PINNED, 0.01);
       }
       const bend: Bend = { uBend: { value: 0 }, uHinge: { value: hinge }, uAxis: { value: axis }, uSpan: { value: span } };
       installBend(mesh.material as THREE.Material, bend);
