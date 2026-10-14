@@ -26,8 +26,9 @@ const LIFT = { share: 0.1, rate: 9, glued: 0.22 };
 /** The live shadow: its darkness, how much larger than the paper, and its offset away from the lamp (m). */
 const SHADOW = { alpha: 0.42, grow: 1.12, offset: new THREE.Vector3(0.0016, 0, 0.001) };
 /** How far either side of the pen a sheet under it stays flat (m): the pen, its contact shadow and the strip the bake
- *  never lit beneath it all stay put (Liam, 2026-10-14: a narrower band let that blank strip show). */
-const PINNED = 0.018;
+ *  never lit beneath it all stay put, measured from the pen's own points (Liam, 2026-10-14: a band round an average
+ *  line let that blank strip show). */
+const PINNED = 0.012;
 
 /** The bend, in the note's own vertex shader: past the hinge, the paper rises with the square of the distance. */
 function installBend(material: THREE.Material, bend: Bend): void {
@@ -65,28 +66,54 @@ export class DeskNotes {
    *  notes' shadows out (bake_notes_free.py), so they cast live ones. */
   constructor(group: THREE.Object3D, specs: NoteSpec[], o: { shadows?: boolean; pinnedBy?: string } = {}) {
     group.updateMatrixWorld(true);
-    const pin = o.pinnedBy ? (group.getObjectByName(o.pinnedBy) as THREE.Mesh | undefined) : undefined;
+    // (the loader sanitizes names: Blender's "Cylinder.001" arrives as "Cylinder001")
+    const pin = o.pinnedBy ? ((group.getObjectByName(o.pinnedBy) ?? group.getObjectByName(THREE.PropertyBinding.sanitizeNodeName(o.pinnedBy))) as THREE.Mesh | undefined) : undefined;
     const tex = o.shadows ? shadowTexture() : null;
+    // (the desk's model is compressed: each part keeps its own scale and offset, so everything here is worked out in the
+    // desk's space, metres, then carried into each note's own for its shader)
+    const toDesk = (o: THREE.Object3D) => new THREE.Matrix4().copy(group.matrixWorld).invert().multiply(o.matrixWorld);
+    const penPts: THREE.Vector3[] = [];
+    if (pin?.isMesh) {
+      const m = toDesk(pin), pos = pin.geometry.getAttribute("position");
+      for (let i = 0; i < pos.count; i++) penPts.push(new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(m));
+    }
     for (const spec of specs) {
       const mesh = (group.getObjectByName(`bake_${spec.name}`) ?? group.getObjectByName(spec.name)) as THREE.Mesh | undefined;
       if (!mesh?.isMesh) continue;
-      const centre = DeskNotes.topCentre(mesh.geometry);
+      const centreGeo = DeskNotes.topCentre(mesh.geometry);
+      const M = toDesk(mesh), Minv = M.clone().invert(), k = M.getMaxScaleOnAxis();   // (desk metres per geometry unit)
+      const centre = centreGeo.clone().applyMatrix4(M);
       const c = Math.cos(spec.rotZ), sn = Math.sin(spec.rotZ), [w, h] = spec.size;
       const right = new THREE.Vector3(c, 0, -sn), up = new THREE.Vector3(-sn, 0, -c);
       // where it's held: a sticky by its glue along the top; a sheet under the pen along the pen
       let hinge = centre.clone().addScaledVector(up, h / 2 - LIFT.glued * h), axis = up.clone().negate(), span = (1 - LIFT.glued) * h;
-      if (pin?.isMesh && spec.name.startsWith("card")) {
-        const line = DeskNotes.penLine(pin.geometry);
+      if (penPts.length && spec.name.startsWith("card")) {
+        // the free side: away from the pen, the written half. The bend starts past the farthest point of the
+        // pen itself over this sheet (its real footprint: it lies at an angle), plus a margin, so nothing within reach
+        // of it moves and the strip the bake never lit beneath it stays hidden
+        const line = DeskNotes.penLine(penPts);
         const corners = [-1, 1].flatMap((a) => [-1, 1].map((b) => centre.clone().addScaledVector(right, (a * w) / 2).addScaledVector(up, (b * h) / 2)));
         const perp = new THREE.Vector3(-line.dir.z, 0, line.dir.x);
-        const side = corners.map((k) => k.clone().sub(line.at).dot(perp));
-        const far = side.reduce((m, v) => (Math.abs(v) > Math.abs(m) ? v : m), 0);
-        axis = perp.multiplyScalar(Math.sign(far) || 1);
-        const toLine = centre.clone().sub(line.at).dot(axis);
-        hinge = centre.clone().addScaledVector(axis, -toLine + PINNED);
-        span = Math.max(Math.abs(far) - PINNED, 0.01);
+        // (the free side is the one the handwriting faces up toward: the pen runs near this card's middle, so neither
+        // its corners nor its area say which half is loose; the written half is)
+        axis = perp.multiplyScalar(Math.sign(perp.dot(up)) || 1);
+        const reach = Math.hypot(w, h) / 2 + PINNED, v = new THREE.Vector3();
+        let edge = -Infinity;
+        for (const q of penPts) { v.subVectors(q, centre); v.y = 0; if (v.length() <= reach) edge = Math.max(edge, v.dot(axis)); }
+        const farCorner = Math.max(...corners.map((q) => q.clone().sub(centre).dot(axis)));
+        const start = (Number.isFinite(edge) ? edge : 0) + PINNED;
+        hinge = centre.clone().addScaledVector(axis, start);
+        span = Math.max(farCorner - start, 0.01);
       }
-      const bend: Bend = { uBend: { value: 0 }, uHinge: { value: hinge }, uAxis: { value: axis }, uSpan: { value: span } };
+      // (a short free side curls less: never steeper than paper would)
+      const peak = Math.min((spec.name.startsWith("card") ? 0.7 : 1) * LIFT.share * h, 0.3 * span);
+      // into the note's own space for its shader
+      const bend: Bend = {
+        uBend: { value: 0 },
+        uHinge: { value: hinge.clone().applyMatrix4(Minv) },
+        uAxis: { value: axis.clone().transformDirection(Minv) },
+        uSpan: { value: span / k },
+      };
       installBend(mesh.material as THREE.Material, bend);
       let shadow: THREE.Mesh | null = null;
       if (tex) {
@@ -94,19 +121,19 @@ export class DeskNotes {
         shadow.rotation.set(-Math.PI / 2, 0, spec.rotZ);   // (flat on the desk, turned as the note is)
         shadow.position.copy(centre).add(SHADOW.offset); shadow.position.y = centre.y - 0.0004;
         shadow.renderOrder = -1;
-        (mesh.parent ?? group).add(shadow);
+        group.add(shadow);
       }
-      this.notes.push({ ...spec, mesh, centre, lift: 0, bend, peak: (spec.name.startsWith("card") ? 0.7 : 1) * LIFT.share * h, shadow, shadowA: 1 });
+      this.notes.push({ ...spec, mesh, centre: centreGeo, lift: 0, bend, peak: peak / k, shadow, shadowA: 1 });
     }
   }
 
   /** The pen's axis on the desk: its middle and its direction (the long axis of its points, seen from above). */
-  private static penLine(g: THREE.BufferGeometry): { at: THREE.Vector3; dir: THREE.Vector3 } {
-    const pos = g.getAttribute("position"), at = new THREE.Vector3();
-    for (let i = 0; i < pos.count; i++) at.add(new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i)));
-    at.divideScalar(pos.count);
+  private static penLine(pts: THREE.Vector3[]): { at: THREE.Vector3; dir: THREE.Vector3 } {
+    const at = new THREE.Vector3();
+    for (const q of pts) at.add(q);
+    at.divideScalar(pts.length);
     let xx = 0, zz = 0, xz = 0;
-    for (let i = 0; i < pos.count; i++) { const dx = pos.getX(i) - at.x, dz = pos.getZ(i) - at.z; xx += dx * dx; zz += dz * dz; xz += dx * dz; }
+    for (const q of pts) { const dx = q.x - at.x, dz = q.z - at.z; xx += dx * dx; zz += dz * dz; xz += dx * dz; }
     const a = 0.5 * Math.atan2(2 * xz, xx - zz);
     return { at, dir: new THREE.Vector3(Math.cos(a), 0, Math.sin(a)) };
   }
