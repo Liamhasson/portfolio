@@ -1,10 +1,11 @@
 import * as THREE from "three";
 
 /**
- * The notes on the desk as things to touch (Liam, 2026-10-13/14): the one under the cursor lifts a little, as paper
- * would, and the lens racks focus onto it; a click hands it to the story. Each note's mesh is baked in the desk's own
- * space (no node transform), so its frame comes from its geometry: the corners of its texture (glTF's uv, origin top
- * left) give the paper's right, its up, its size and its centre.
+ * The notes on the desk as things to touch (Liam, 2026-10-13/14): the one under the cursor bends a little, as paper
+ * would (a sticky's glued top stays down and its lower part curls up; the card, pinned under the pen, lifts only on its
+ * free side), and the lens racks focus onto it; a click hands it to the story. Each note's mesh is baked in the desk's
+ * own space (no node transform). The desk is baked without the notes' shadows, so each note casts its own, live: soft,
+ * and gone with the note when it leaves.
  */
 export interface NotePose {
   /** world: centre, the paper's right and up (unit), its normal (toward the camera), width and height */
@@ -16,24 +17,95 @@ export interface NotePose {
  *  turn round, the stickies' mirrored), so the paper's frame comes from here. */
 export interface NoteSpec { name: string; size: [number, number]; rotZ: number }
 
-interface Note extends NoteSpec { mesh: THREE.Mesh; base: THREE.Vector3; centre: THREE.Vector3; lift: number }
+interface Bend { uBend: THREE.IUniform<number>; uHinge: THREE.IUniform<THREE.Vector3>; uAxis: THREE.IUniform<THREE.Vector3>; uSpan: THREE.IUniform<number> }
+interface Note extends NoteSpec { mesh: THREE.Mesh; centre: THREE.Vector3; lift: number; bend: Bend; peak: number; shadow: THREE.Mesh | null; shadowA: number }
 
-/** How far a hovered note lifts, as a share of its height, and how quickly it comes and goes. */
-const LIFT = { share: 0.06, rate: 9 };
-const UP = new THREE.Vector3(0, 1, 0);
+/** How far a hovered note bends at its free edge (a share of its height), and how quickly it comes and goes; how much
+ *  of a sticky is glued (from its top). */
+const LIFT = { share: 0.1, rate: 9, glued: 0.22 };
+/** The live shadow: its darkness, how much larger than the paper, and its offset away from the lamp (m). */
+const SHADOW = { alpha: 0.42, grow: 1.12, offset: new THREE.Vector3(0.0016, 0, 0.001) };
+
+/** The bend, in the note's own vertex shader: past the hinge, the paper rises with the square of the distance. */
+function installBend(material: THREE.Material, bend: Bend): void {
+  const tags: string[] = (material.userData.shaderTags ??= []);
+  tags.push("notebend");
+  material.customProgramCacheKey = () => tags.join("|");
+  const prev = material.onBeforeCompile;
+  material.onBeforeCompile = (shader, renderer) => {
+    prev.call(material, shader, renderer);
+    Object.assign(shader.uniforms, bend);
+    shader.vertexShader = "uniform float uBend; uniform vec3 uHinge; uniform vec3 uAxis; uniform float uSpan;\n" + shader.vertexShader.replace(
+      "#include <begin_vertex>",
+      "#include <begin_vertex>\n  { float dd = max(dot(transformed - uHinge, uAxis), 0.0) / uSpan; transformed.y += uBend * dd * dd; }",
+    );
+  };
+  material.needsUpdate = true;
+}
+
+/** A soft dark rounded rectangle, for the live shadows. */
+function shadowTexture(): THREE.Texture {
+  const c = document.createElement("canvas"); c.width = c.height = 128;
+  const x = c.getContext("2d")!;
+  x.filter = "blur(10px)"; x.fillStyle = "#000";
+  x.beginPath(); x.roundRect(22, 22, 84, 84, 6); x.fill();
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.NoColorSpace;
+  return t;
+}
 
 export class DeskNotes {
   private readonly notes: Note[] = [];
   private readonly ray = new THREE.Raycaster();
   private readonly v = new THREE.Vector3();
 
-  constructor(group: THREE.Object3D, specs: NoteSpec[]) {
+  /** Call before the desk's shaders compile (the bend is part of the notes' own). `shadows`: the desk's bake leaves the
+   *  notes' shadows out (bake_notes_free.py), so they cast live ones. */
+  constructor(group: THREE.Object3D, specs: NoteSpec[], o: { shadows?: boolean; pinnedBy?: string } = {}) {
     group.updateMatrixWorld(true);
+    const pin = o.pinnedBy ? (group.getObjectByName(o.pinnedBy) as THREE.Mesh | undefined) : undefined;
+    const tex = o.shadows ? shadowTexture() : null;
     for (const spec of specs) {
       const mesh = (group.getObjectByName(`bake_${spec.name}`) ?? group.getObjectByName(spec.name)) as THREE.Mesh | undefined;
       if (!mesh?.isMesh) continue;
-      this.notes.push({ ...spec, mesh, base: mesh.position.clone(), centre: DeskNotes.topCentre(mesh.geometry), lift: 0 });
+      const centre = DeskNotes.topCentre(mesh.geometry);
+      const c = Math.cos(spec.rotZ), sn = Math.sin(spec.rotZ), [w, h] = spec.size;
+      const right = new THREE.Vector3(c, 0, -sn), up = new THREE.Vector3(-sn, 0, -c);
+      // where it's held: a sticky by its glue along the top; a sheet under the pen along the pen
+      let hinge = centre.clone().addScaledVector(up, h / 2 - LIFT.glued * h), axis = up.clone().negate(), span = (1 - LIFT.glued) * h;
+      if (pin?.isMesh && spec.name.startsWith("card")) {
+        const line = DeskNotes.penLine(pin.geometry);
+        const corners = [-1, 1].flatMap((a) => [-1, 1].map((b) => centre.clone().addScaledVector(right, (a * w) / 2).addScaledVector(up, (b * h) / 2)));
+        const perp = new THREE.Vector3(-line.dir.z, 0, line.dir.x);
+        const side = corners.map((k) => k.clone().sub(line.at).dot(perp));
+        const far = side.reduce((m, v) => (Math.abs(v) > Math.abs(m) ? v : m), 0);
+        axis = perp.multiplyScalar(Math.sign(far) || 1);
+        const toLine = centre.clone().sub(line.at).dot(axis);
+        hinge = centre.clone().addScaledVector(axis, -toLine + 0.006);   // (the pen's radius past its line)
+        span = Math.max(Math.abs(far) - 0.006, 0.01);
+      }
+      const bend: Bend = { uBend: { value: 0 }, uHinge: { value: hinge }, uAxis: { value: axis }, uSpan: { value: span } };
+      installBend(mesh.material as THREE.Material, bend);
+      let shadow: THREE.Mesh | null = null;
+      if (tex) {
+        shadow = new THREE.Mesh(new THREE.PlaneGeometry(w * SHADOW.grow, h * SHADOW.grow), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: SHADOW.alpha, depthWrite: false, toneMapped: false, alphaMap: tex }));
+        shadow.rotation.set(-Math.PI / 2, 0, spec.rotZ);   // (flat on the desk, turned as the note is)
+        shadow.position.copy(centre).add(SHADOW.offset); shadow.position.y = centre.y - 0.0004;
+        shadow.renderOrder = -1;
+        (mesh.parent ?? group).add(shadow);
+      }
+      this.notes.push({ ...spec, mesh, centre, lift: 0, bend, peak: (spec.name.startsWith("card") ? 0.7 : 1) * LIFT.share * h, shadow, shadowA: 1 });
     }
+  }
+
+  /** The pen's axis on the desk: its middle and its direction (the long axis of its points, seen from above). */
+  private static penLine(g: THREE.BufferGeometry): { at: THREE.Vector3; dir: THREE.Vector3 } {
+    const pos = g.getAttribute("position"), at = new THREE.Vector3();
+    for (let i = 0; i < pos.count; i++) at.add(new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i)));
+    at.divideScalar(pos.count);
+    let xx = 0, zz = 0, xz = 0;
+    for (let i = 0; i < pos.count; i++) { const dx = pos.getX(i) - at.x, dz = pos.getZ(i) - at.z; xx += dx * dx; zz += dz * dz; xz += dx * dz; }
+    const a = 0.5 * Math.atan2(2 * xz, xx - zz);
+    return { at, dir: new THREE.Vector3(Math.cos(a), 0, Math.sin(a)) };
   }
 
   /** The middle of the sheet's upper face (its edges left out), in the mesh's own space. */
@@ -54,12 +126,17 @@ export class DeskNotes {
     return hit ? (this.notes.find((n) => n.mesh === hit.object)?.name ?? null) : null;
   }
 
-  /** The hovered one lifts, the others settle (frame-rate independent). */
+  /** The hovered one bends, the others settle; a note away from the desk takes its shadow with it (frame-rate
+   *  independent). */
   update(hovered: string | null, dt: number): void {
     for (const n of this.notes) {
       const want = n.name === hovered ? 1 : 0;
       n.lift += (want - n.lift) * (1 - Math.exp(-LIFT.rate * dt));
-      n.mesh.position.copy(n.base).addScaledVector(UP, n.lift * LIFT.share * n.size[1]);
+      n.bend.uBend.value = n.lift * n.peak;
+      if (n.shadow) {
+        n.shadowA += ((n.mesh.visible ? 1 : 0) - n.shadowA) * (1 - Math.exp(-(n.mesh.visible ? 6 : 14) * dt));
+        (n.shadow.material as THREE.MeshBasicMaterial).opacity = SHADOW.alpha * n.shadowA * (1 - 0.25 * n.lift);
+      }
     }
   }
 

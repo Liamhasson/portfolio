@@ -132,26 +132,31 @@ void main() {
 }
 `;
 
-/** The desk through the lens: sharp where it's in focus, the gathered blur where it isn't, and in shadow by uDim. */
+/** The desk through the lens (the notes' rack focus; Liam, 2026-10-14): each pixel's blur from its depth, read as a disc
+ *  from the quarter-size desk, mixed in by how wide it is; in shadow by uDim. (The gathered version left a black band
+ *  near the camera with stepped edges; this one reads only the desk itself.) */
 const DESK_LENS_FRAGMENT = /* glsl */ `
 precision highp float;
 out highp vec4 pc_fragColor;
 #define gl_FragColor pc_fragColor
 in vec2 vUv;
-uniform sampler2D uTex;
-uniform sampler2D uBlur;
+uniform sampler2D uTex;       // the desk, full size
+uniform sampler2D uSmall;     // and at a quarter of it
 uniform sampler2D uDepth;
-uniform vec4 uDofP;
+uniform vec4 uDofP;           // blur scale (device px), focus distance, near, far
 uniform float uDofMax;
+uniform vec2 uTexel;          // one full-size pixel
 uniform float uDim;
-float cocAt(vec2 uv) {
-  float d = texture(uDepth, uv).r;
-  float z = uDofP.z * uDofP.w / (uDofP.w - d * (uDofP.w - uDofP.z));
-  return min(uDofP.x * abs(z - uDofP.y) / z, uDofMax);
-}
 void main() {
-  vec4 c = mix(texture(uTex, vUv), texture(uBlur, vUv), smoothstep(0.8, 2.5, cocAt(vUv)));
-  gl_FragColor = vec4(c.rgb * (1.0 - uDim), 1.0);
+  float d = texture(uDepth, vUv).r;
+  float z = uDofP.z * uDofP.w / (uDofP.w - d * (uDofP.w - uDofP.z));
+  float r = min(uDofP.x * abs(z - uDofP.y) / z, uDofMax);
+  vec4 sum = vec4(0.0);
+  for (int i = 0; i < 16; i++) {
+    float rr = sqrt((float(i) + 0.5) / 16.0) * r, an = float(i) * 2.39996;
+    sum += texture(uSmall, vUv + vec2(cos(an), sin(an)) * rr * uTexel);
+  }
+  gl_FragColor = vec4(mix(texture(uTex, vUv).rgb, sum.rgb / 16.0, smoothstep(0.6, 3.0, r)) * (1.0 - uDim), 1.0);
 }
 `;
 
@@ -238,7 +243,7 @@ export class SandComposite {
   private readonly deskLensMat = new THREE.ShaderMaterial({
     glslVersion: THREE.GLSL3, vertexShader: VERTEX, fragmentShader: DESK_LENS_FRAGMENT,
     depthTest: false, depthWrite: false, toneMapped: false, blending: THREE.NoBlending,
-    uniforms: { uTex: { value: null }, uBlur: { value: null }, uDepth: { value: null }, uDofP: { value: new THREE.Vector4() }, uDofMax: { value: 48 }, uDim: { value: 0 } },
+    uniforms: { uTex: { value: null }, uSmall: { value: null }, uDepth: { value: null }, uDofP: { value: new THREE.Vector4() }, uDofMax: { value: 24 }, uTexel: { value: new THREE.Vector2() }, uDim: { value: 0 } },
   });
   private readonly dofRt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
   private readonly dofSmoothRt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
@@ -447,19 +452,21 @@ export class SandComposite {
       (du.uTexel.value as THREE.Vector2).set(1 / size.x, 1 / size.y);
       renderer.render(this.discScene, this.ortho);
     } else if (lens.desk > 0.002 && lensScale > 0) {
-      // the desk through the same lens: into its target with its depth, the gather at half size, then to the screen
+      // the desk through the lens: into its target with its depth, a quarter-size copy, then each pixel's own disc
       const bg = this.background(size);
       renderer.setRenderTarget(bg);
       renderer.render(scene, camera);
-      const hw = Math.max(1, Math.round(size.x / 2)), hh = Math.max(1, Math.round(size.y / 2));
-      if (this.dofBgRt.width !== hw || this.dofBgRt.height !== hh) this.dofBgRt.setSize(hw, hh);
-      const cam = camera as THREE.PerspectiveCamera;
-      const deskP = this.deskP.set(lensScale * lens.desk, lens.focus, cam.near, cam.far);
-      this.gather(renderer, bg.texture, bg.depthTexture!, deskP, this.dofBgRt, size);
+      const bw = Math.max(1, Math.round(size.x / 4)), bh = Math.max(1, Math.round(size.y / 4));
+      if (this.blurRt.width !== bw || this.blurRt.height !== bh) this.blurRt.setSize(bw, bh);
+      this.raw.uniforms.uTex.value = bg.texture;
+      renderer.setRenderTarget(this.blurRt);
+      renderer.render(this.rawScene, this.ortho);
       renderer.setRenderTarget(null);
+      const cam = camera as THREE.PerspectiveCamera;
       const lu = this.deskLensMat.uniforms;
-      lu.uTex.value = bg.texture; lu.uBlur.value = this.dofBgRt.texture; lu.uDepth.value = bg.depthTexture;
-      (lu.uDofP.value as THREE.Vector4).copy(deskP); lu.uDim.value = this.deskDim;
+      lu.uTex.value = bg.texture; lu.uSmall.value = this.blurRt.texture; lu.uDepth.value = bg.depthTexture;
+      (lu.uDofP.value as THREE.Vector4).set(lensScale * lens.desk, lens.focus, cam.near, cam.far); lu.uDim.value = this.deskDim;
+      (lu.uTexel.value as THREE.Vector2).set(1 / size.x, 1 / size.y);
       renderer.render(this.deskLensScene, this.ortho);
     } else {
       renderer.render(scene, camera);
@@ -483,7 +490,6 @@ export class SandComposite {
     renderer.autoClear = autoClear;
   }
 
-  private readonly deskP = new THREE.Vector4();
   /** The lens's gather into `out` (half size): the blur radii (full size, never interpolated: between a far and a near
    *  pixel a mean is a radius neither has), then the 48 taps. */
   private gather(renderer: THREE.WebGLRenderer, color: THREE.Texture, depth: THREE.Texture, dofP: THREE.Vector4, out: THREE.WebGLRenderTarget, size: THREE.Vector2): void {

@@ -332,6 +332,8 @@ export function SandLab({ hero }: { hero: boolean }) {
         deskTaken = true;
         const d = await BakedDesk.build(st.renderer, files);
         if (disposed) return;
+        // the notes bend in their own shaders: set up before the desk's shaders compile (none compiles mid-shot)
+        const deskNotes = new DeskNotes(d.group, STORIES.map((x) => ({ name: x.mesh, size: x.size, rotZ: x.rotZ })), { shadows: true, pinnedBy: "bake_Cylinder.001" });
         const queue = [...d.textures];
         await new Promise<void>((res) => {
           const step = () => {
@@ -355,10 +357,11 @@ export function SandLab({ hero }: { hero: boolean }) {
         }
         deskLoaded = d;
         (window as unknown as { __desk3d?: unknown }).__desk3d = d;
-        notes = new DeskNotes(d.group, STORIES.map((x) => ({ name: x.mesh, size: x.size, rotZ: x.rotZ })));
+        notes = deskNotes;
         (window as unknown as { __notes?: unknown }).__notes = notes;   // lab debugging
         player = new NoteStoryPlayer(storyFont.style.fontFamily);
         player.el.addEventListener("click", () => player?.close());
+        (window as unknown as { __noteStory?: unknown }).__noteStory = player;   // lab debugging (and recording)
         player.preload(STORIES).catch(() => {});
         disposeNotes = () => {
           player?.dispose();

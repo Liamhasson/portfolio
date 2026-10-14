@@ -22,6 +22,10 @@ export class Pencil {
   used = 0;
   limit = Infinity;
   from = -1;
+  /** rubbing out (the phones' loop): the same marks, taken away (each frame's window, from the end back) */
+  erasing = false;
+  /** the smallest handwriting (units): raised on phones, where the small notes inside a sketch would be too small */
+  minSize = 0;
 
   constructor(readonly ctx: CanvasRenderingContext2D) {}
 
@@ -78,8 +82,8 @@ export class Pencil {
         d += L;
         const n = off + wob * (Math.sin(d * fr[0] + ph[0]) + 0.5 * Math.sin(d * fr[1] + ph[1]));
         const pr = Math.pow(Math.sin(Math.PI * Math.min(1, Math.max(0, t))), 0.55) * (0.75 + 0.25 * Math.sin(d * 0.04 + ph[1]));
-        ctx.globalAlpha = a * pa * (0.25 + 0.75 * pr);
-        ctx.lineWidth = S * w * (0.45 + 0.75 * pr);
+        ctx.globalAlpha = this.erasing ? 1 : a * pa * (0.25 + 0.75 * pr);
+        ctx.lineWidth = S * w * (0.45 + 0.75 * pr) * (this.erasing ? 2.2 : 1);
         ctx.beginPath(); ctx.moveTo(S * (ax + nx * n), S * (ay + ny * n)); ctx.lineTo(S * (bx + nx * n), S * (by + ny * n)); ctx.stroke();
       }
     }
@@ -117,7 +121,7 @@ export class Pencil {
   hatch(poly: Pt[], o: { gap?: number; ang?: number; a?: number; w?: number } = {}): void {
     const { ctx, S } = this;
     const gap = o.gap ?? 3.2, ang = o.ang ?? -0.95, a = o.a ?? 0.32;
-    if (this.makes(this.used + 1)) { ctx.save(); ctx.globalAlpha = a * 0.45; ctx.filter = `blur(${S * 3}px)`; this.path(poly); ctx.fill(); ctx.restore(); }
+    if (this.makes(this.used + 1)) { ctx.save(); ctx.globalAlpha = this.erasing ? 1 : a * 0.45; ctx.filter = `blur(${S * 3}px)`; this.path(poly); ctx.fill(); ctx.restore(); }
     ctx.save(); this.path(poly); ctx.clip();
     const xs = poly.map((p) => p[0]), ys = poly.map((p) => p[1]);
     const x0 = Math.min(...xs) - 40, x1 = Math.max(...xs) + 40, y0 = Math.min(...ys) - 40, y1 = Math.max(...ys) + 40;
@@ -132,6 +136,7 @@ export class Pencil {
   /** The width of a run of handwriting, in units. */
   measure(t: string, size: number, key = false): number {
     const { ctx, S } = this;
+    size = Math.max(size, this.minSize);
     ctx.save(); ctx.font = `${S * size * (key ? 1.22 : 1)}px ${this.font}`;
     const w = ctx.measureText(t).width / S;
     ctx.restore();
@@ -142,6 +147,7 @@ export class Pencil {
   words(x: number, y: number, runs: Run[], size: number, o: { align?: "left" | "center"; rot?: number; a?: number } = {}): void {
     const u = this.used + 1; this.used += 60; if (!this.makes(u)) return;
     const { ctx, S } = this;
+    size = Math.max(size, this.minSize);
     ctx.save(); ctx.translate(S * x, S * y); ctx.rotate(o.rot || 0);
     const font = (k: number) => `${S * size * (k ? 1.22 : 1)}px ${this.font}`;
     let total = 0;
@@ -149,7 +155,7 @@ export class Pencil {
     let cx = o.align === "center" ? -total / 2 : 0;
     for (const [t, k] of runs) {
       ctx.font = font(k);
-      if (k) { ctx.globalAlpha = 1; for (const [dx, dy] of [[0, 0], [0.9, 0.3], [-0.5, 0.6], [0.4, -0.5]]) ctx.fillText(t, cx + dx * S, dy * S); }
+      if (k || this.erasing) { ctx.globalAlpha = 1; for (const [dx, dy] of [[0, 0], [0.9, 0.3], [-0.5, 0.6], [0.4, -0.5]]) ctx.fillText(t, cx + dx * S, dy * S); }
       else { ctx.globalAlpha = o.a ?? 0.62; ctx.fillText(t, cx, 0); }
       cx += ctx.measureText(t).width;
     }
