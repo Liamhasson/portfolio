@@ -28,6 +28,10 @@ export interface Piece {
   light?: boolean;
   /** the image is a mark on a transparent ground: shown whole, on the dark */
   contain?: boolean;
+  /** a vertical film (a phone's): opened at its own shape */
+  portrait?: boolean;
+  /** where the tile's crop centres (CSS object-position), when the subject isn't in the middle */
+  focus?: string;
   /** its share of its row's width (layout A) */
   w: number;
 }
@@ -80,10 +84,22 @@ export const ROWS: Piece[][] = [
       image: P("hello.jpg"), loop: P("hello-loop.mp4"), video: P("hello-loop.mp4"), w: 414,
     },
   ],
+  // (Liam, 2026-10-15: producing Marni Came in the band's studio)
+  [
+    {
+      id: "studio-overhead", kind: "Photo", title: "In the studio", meta: "Producing",
+      credit: "At the desk, producing Marni Came in the band's studio.", image: P("studio-overhead.jpg"), w: 520,
+    },
+    {
+      id: "producing-marni-came", kind: "Music", title: "Producing Marni Came", meta: "In the studio",
+      credit: "Producing Marni Came in the band's studio.",
+      image: P("producing-marni-came.jpg"), loop: P("producing-marni-came-loop.mp4"), video: P("producing-marni-came.mp4"), portrait: true, focus: "50% 36%", w: 808,
+    },
+  ],
   [{ id: "marni-came-logotype", kind: "Art", title: "Marni Came · logotype", meta: "Identity", credit: "The band's logotype.", image: P("marni-came-logotype.png"), contain: true, w: 1328 }],
 ];
 
 /** The rows' heights on a wide screen, as a share of the window's width (the mockup's 1440 frame). */
-export const ROW_HEIGHT_VW = [22.9, 20.3, 18, 15.3];
+export const ROW_HEIGHT_VW = [22.9, 20.3, 18, 24, 15.3];
 
 export const PIECES: Piece[] = ROWS.flat();

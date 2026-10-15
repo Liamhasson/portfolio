@@ -83,9 +83,9 @@ function Tile({ piece: p, onOpen }: { piece: Piece; onOpen: (el: HTMLElement) =>
     >
       {p.image && (
         // eslint-disable-next-line @next/next/no-img-element -- the grid's stills, sized by their rows
-        <img className="pg-img" src={p.image} alt="" loading="lazy" style={p.contain ? { objectFit: "contain" } : undefined} />
+        <img className="pg-img" src={p.image} alt="" loading="lazy" style={p.contain ? { objectFit: "contain" } : p.focus ? { objectPosition: p.focus } : undefined} />
       )}
-      {p.loop && <video ref={video} className="pg-loop" src={p.loop} muted loop playsInline preload="none" aria-hidden />}
+      {p.loop && <video ref={video} className="pg-loop" src={p.loop} muted loop playsInline preload="none" aria-hidden style={p.focus ? { objectPosition: p.focus } : undefined} />}
       {p.peaks && <Wave src={p.peaks} live={live} big={!p.image} />}
       {!p.light && <span className="pg-shade" aria-hidden />}
       {(p.loop || p.video || p.youtube) && <span className="pg-play" aria-hidden />}
@@ -144,7 +144,7 @@ function Viewer({ index, onClose, onStep }: { index: number; onClose: () => void
             allowFullScreen
           />
         ) : p.video ? (
-          <video className="pg-frame" src={p.video} poster={p.image} controls autoPlay playsInline />
+          <video className="pg-frame" data-portrait={p.portrait ? "" : undefined} src={p.video} poster={p.image} controls autoPlay playsInline />
         ) : p.audio ? (
           <Track piece={p} />
         ) : (
