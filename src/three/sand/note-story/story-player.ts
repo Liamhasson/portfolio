@@ -36,6 +36,7 @@ export class NoteStoryPlayer {
   readonly el: HTMLDivElement;
   private readonly guides: SVGSVGElement;
   private readonly sel: SVGSVGElement;
+  private readonly label: HTMLAnchorElement;
   private readonly back: HTMLCanvasElement;
   private readonly front: HTMLCanvasElement;
   private readonly noteCanvas: HTMLCanvasElement;
@@ -78,6 +79,16 @@ export class NoteStoryPlayer {
     this.noteCanvas = layer("canvas") as HTMLCanvasElement;
     this.sel = document.createElementNS("http://www.w3.org/2000/svg", "svg"); this.sel.setAttribute("aria-hidden", "true"); this.sel.style.cssText = "position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:0;transition:opacity .4s"; el.appendChild(this.sel);
     this.front = layer("canvas", "transition:opacity .35s") as HTMLCanvasElement;
+    // the frame's name, as Figma shows a selected frame's: the case study the note comes from, and the way into it
+    this.label = document.createElement("a");
+    this.label.style.cssText = `position:absolute;transform:translateY(-100%);padding:6px 0;font:400 12px/1 var(--font-mono),ui-monospace,monospace;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;color:${LINE};text-decoration:none;opacity:0;pointer-events:none;transition:opacity .4s`;
+    this.label.addEventListener("click", (e) => {
+      e.stopPropagation();   // (a click anywhere else puts the note back)
+      if (this.onStudy && !e.metaKey && !e.ctrlKey) { e.preventDefault(); this.onStudy(this.label.getAttribute("href")!); }
+    });
+    this.label.addEventListener("pointerenter", () => { if (this.phase === "story") this.label.style.opacity = "1"; });
+    this.label.addEventListener("pointerleave", () => { if (this.phase === "story") this.label.style.opacity = "0.6"; });
+    el.appendChild(this.label);
     parent.appendChild(el);
     this.el = el;
     // graphite's tooth: lines catch the paper's grain and break up a little along their length
@@ -87,6 +98,9 @@ export class NoteStoryPlayer {
     for (let i = 0; i < id.data.length; i += 4) { s = (s * 16807) % 2147483647; const v = s / 2147483647; id.data[i] = id.data[i + 1] = id.data[i + 2] = 255; id.data[i + 3] = 255 * (v < 0.18 ? 0.15 : 0.55 + 0.45 * v); }
     tx.putImageData(id, 0, 0);
   }
+
+  /** Opens a case study from the label (the site's router); without it, the link loads the page. */
+  onStudy: ((href: string) => void) | null = null;
 
   get isOpen(): boolean { return this.phase !== "idle"; }
 
@@ -134,6 +148,8 @@ export class NoteStoryPlayer {
 
   private showChrome(on: boolean): void {
     for (const e of [this.guides, this.sel, this.shadow] as (HTMLElement | SVGSVGElement)[]) e.style.opacity = on ? "1" : "0";
+    this.label.style.opacity = on ? "0.6" : "0";
+    this.label.style.pointerEvents = on ? "auto" : "none";
   }
 
   private layout(): void {
@@ -141,14 +157,14 @@ export class NoteStoryPlayer {
     const shape = SHAPE[this.story!.shape];
     const phone = W / H < 0.8;
     if (!phone) {
-      // the mockups' frame fitted to the window
+      // the mockups' frame fitted to the window (the insight sits 24 units higher than the mockups': room for the frame's label)
       const k = Math.min(W / 1600, H / 1000);
       const nx = W / 2, ny = H / 2 + shape.noteDy * k;
-      this.L = { W, H, k, dpr, nx, ny, hw: shape.hw * k, hh: shape.hh * k, ox: nx, oy: ny + shape.orbitDy * k, rx: Math.min(shape.rx * k, W / 2 - 200 * k), ry: ORBIT.ry * k, iy: ny - shape.hh * k - 112 * k, phone, sy: 0, ks: k };
+      this.L = { W, H, k, dpr, nx, ny, hw: shape.hw * k, hh: shape.hh * k, ox: nx, oy: ny + shape.orbitDy * k, rx: Math.min(shape.rx * k, W / 2 - 200 * k), ry: ORBIT.ry * k, iy: ny - shape.hh * k - 136 * k, phone, sy: 0, ks: k };
     } else {
       // a phone: the insight at the top (clear of the nav), the note under it, one step at a time below, filling the width
       const k = Math.min((0.22 * H) / (2 * shape.hh), (W - 32) / 560);
-      const iy = 96 + 70 * k, ny = iy + 82 * k + 24 + shape.hh * k, below = ny + shape.hh * k + 24;
+      const iy = 96 + 70 * k, ny = iy + 82 * k + 46 + shape.hh * k, below = ny + shape.hh * k + 24;
       const ks = Math.min((W - 32) / PHONE.width, (H - below - 24) / PHONE.height);
       this.L = { W, H, k, dpr, nx: W / 2, ny, hw: shape.hw * k, hh: shape.hh * k, ox: W / 2, oy: 0, rx: 0, ry: 0, iy, phone, sy: (below + H - 24) / 2, ks };
     }
@@ -286,6 +302,13 @@ export class NoteStoryPlayer {
     this.sel.appendChild(at(document.createElementNS(ns, "rect"), { x: e0, y: f0, width: e1 - e0, height: f1 - f0, fill: "none", stroke: LINE, "stroke-opacity": 0.75, "stroke-width": 1 }));
     for (const [x, y] of [[e0, f0], [nx, f0], [e1, f0], [e1, ny], [e1, f1], [nx, f1], [e0, f1], [e0, ny]])
       this.sel.appendChild(at(document.createElementNS(ns, "rect"), { x: x - 4, y: y - 4, width: 8, height: 8, fill: "#120b0c", stroke: LINE, "stroke-width": 1.2 }));
+    // the label: above the frame's top-left corner, clear of its handle
+    const study = this.story!.study;
+    this.label.textContent = `${study.name} · case study`;
+    this.label.href = study.href;
+    this.label.setAttribute("aria-label", `Read the ${study.name} case study`);
+    this.label.style.left = `${e0}px`; this.label.style.top = `${f0 - 6}px`;
+    this.label.style.fontSize = `${Math.max(10, 12 * k).toFixed(1)}px`;
   }
 
   /** For recording: when set, the story moves only by what `advance` gives it (frame by frame, whatever the real rate). */

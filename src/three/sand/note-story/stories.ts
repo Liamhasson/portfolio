@@ -16,6 +16,8 @@ export interface Story {
   ink: string;
   /** sticky (square) or card (landscape) */
   shape: "sticky" | "card";
+  /** the case study it comes from: named on the selection frame's label, which opens it (Liam, 2026-10-15) */
+  study: { name: string; href: string };
   insight: { seed: number; draw(p: Pencil): void };
   steps: [Step, Step, Step, Step];
 }
@@ -93,7 +95,7 @@ const insightCircle = (p: Pencil, rx: number) => { p.loop(0, 12, rx, 62, { w: 1.
 export const STORIES: Story[] = [
   // ---------- 1 · "Who is this product for?" · Cyvore: the audience growing ----------
   {
-    mesh: "sticky_hero", size: [0.076, 0.076], rotZ: -0.21, paper: ["#efe0b0", "#e0cc95"], ink: "/lab/notes/who-for.png", shape: "sticky",
+    mesh: "sticky_hero", size: [0.076, 0.076], rotZ: -0.21, paper: ["#efe0b0", "#e0cc95"], ink: "/lab/notes/who-for.png", shape: "sticky", study: { name: "Cyvore", href: "/cyvore" },
     insight: { seed: 71, draw(p) {
       p.words(0, -20, [["Attackers don't target companies.", 0]], 23, { align: "center", rot: -0.02, a: 0.7 });
       p.words(0, 14, [["They target ", 0], ["the person", 1]], 23, { align: "center", rot: -0.02, a: 0.7 });
@@ -147,7 +149,7 @@ export const STORIES: Story[] = [
   },
   // ---------- 2 · "What would make this fail?" · Pulse: the Injury Log ----------
   {
-    mesh: "sticky_b", size: [0.076, 0.076], rotZ: 0.52, paper: ["#f1d3cd", "#e2b6b0"], ink: "/lab/notes/make-fail.png", shape: "sticky",
+    mesh: "sticky_b", size: [0.076, 0.076], rotZ: 0.52, paper: ["#f1d3cd", "#e2b6b0"], ink: "/lab/notes/make-fail.png", shape: "sticky", study: { name: "Pulse", href: "/pulse" },
     insight: { seed: 73, draw(p) {
       p.words(0, -2, [["A feature's name is a ", 0], ["promise", 1], [".", 0]], 23, { align: "center", rot: -0.02, a: 0.7 });
       p.words(0, 34, [["'Injury Log' promised a doctor.", 0]], 23, { align: "center", rot: -0.02, a: 0.7 });
@@ -217,7 +219,7 @@ export const STORIES: Story[] = [
   },
   // ---------- 3 · "Who does this better?" · Eventread: the gap between them ----------
   {
-    mesh: "sticky_c", size: [0.076, 0.076], rotZ: -0.35, paper: ["#efe0b0", "#e0cc95"], ink: "/lab/notes/does-better.png", shape: "sticky",
+    mesh: "sticky_c", size: [0.076, 0.076], rotZ: -0.35, paper: ["#efe0b0", "#e0cc95"], ink: "/lab/notes/does-better.png", shape: "sticky", study: { name: "Eventread", href: "/eventread" },
     insight: { seed: 79, draw(p) {
       p.words(0, -2, [["Nobody did it better.", 0]], 23, { align: "center", rot: -0.02, a: 0.7 });
       p.words(0, 34, [["The answer was ", 0], ["between", 1], [" them.", 0]], 23, { align: "center", rot: -0.02, a: 0.7 });
@@ -292,7 +294,7 @@ export const STORIES: Story[] = [
   },
   // ---------- 4 · "What do they check before they commit?" · Nordic Logic: winning a sceptic's trust ----------
   {
-    mesh: "card_a", size: [0.127, 0.076], rotZ: -0.34, paper: ["#f4f0e7", "#e6e0d3"], ink: "/lab/notes/check-commit-card.png", shape: "card",
+    mesh: "card_a", size: [0.127, 0.076], rotZ: -0.34, paper: ["#f4f0e7", "#e6e0d3"], ink: "/lab/notes/check-commit-card.png", shape: "card", study: { name: "Nordic Logic", href: "/nordic-logic" },
     insight: { seed: 83, draw(p) {
       p.words(0, -2, [["Knowing they can ", 0], ["decide", 1]], 23, { align: "center", rot: -0.02, a: 0.7 });
       p.words(0, 34, [["is what makes a stranger trust it.", 0]], 23, { align: "center", rot: -0.02, a: 0.7 });
