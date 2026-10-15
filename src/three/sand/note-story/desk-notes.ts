@@ -18,13 +18,21 @@ export interface NotePose {
 export interface NoteSpec { name: string; size: [number, number]; rotZ: number }
 
 interface Bend { uBend: THREE.IUniform<number>; uHinge: THREE.IUniform<THREE.Vector3>; uAxis: THREE.IUniform<THREE.Vector3>; uSpan: THREE.IUniform<number> }
-interface Note extends NoteSpec { mesh: THREE.Mesh; centre: THREE.Vector3; lift: number; bend: Bend; peak: number; shadow: THREE.Mesh | null; shadowA: number }
+interface Note extends NoteSpec {
+  mesh: THREE.Mesh; centre: THREE.Vector3; lift: number; bend: Bend; peak: number; shadow: THREE.Mesh | null; shadowA: number;
+  /** its shadow at rest (desk space), and where it goes as the paper lifts: toward the rising side, away from the lamp */
+  rest: THREE.Vector3; drift: THREE.Vector3;
+}
 
 /** How far a hovered note bends at its free edge (a share of its height), and how quickly it comes and goes; how much
  *  of a sticky is glued (from its top). */
 const LIFT = { share: 0.1, rate: 9, glued: 0.22 };
 /** The live shadow: its darkness, how much larger than the paper, and its offset away from the lamp (m). */
 const SHADOW = { alpha: 0.42, grow: 1.12, offset: new THREE.Vector3(0.0016, 0, 0.001) };
+/** As a hovered sheet lifts (Liam, 2026-10-15: "a light shadow underneath on hover"): its shadow slides out from under
+ *  it (by this share of the lift's height, toward the rising side and away from the lamp), widens and softens, and
+ *  darkens a little where the raised paper uncovers it. */
+const LIFT_SHADOW = { slide: 1.6, away: 1.1, grow: 0.16, darken: 0.45 };
 /** How far either side of the pen a sheet under it stays flat (m): the pen, its contact shadow and the strip the bake
  *  never lit beneath it all stay put, measured from the pen's own points (Liam, 2026-10-14: a band round an average
  *  line let that blank strip show). */
@@ -49,9 +57,11 @@ function installBend(material: THREE.Material, bend: Bend): void {
 
 /** A soft dark rounded rectangle, for the live shadows. */
 function shadowTexture(): THREE.Texture {
+  // (an alpha map reads the green channel: the shape in white on black)
   const c = document.createElement("canvas"); c.width = c.height = 128;
   const x = c.getContext("2d")!;
-  x.filter = "blur(10px)"; x.fillStyle = "#000";
+  x.fillStyle = "#000"; x.fillRect(0, 0, 128, 128);
+  x.filter = "blur(10px)"; x.fillStyle = "#fff";
   x.beginPath(); x.roundRect(22, 22, 84, 84, 6); x.fill();
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.NoColorSpace;
   return t;
@@ -64,7 +74,7 @@ export class DeskNotes {
 
   /** Call before the desk's shaders compile (the bend is part of the notes' own). `shadows`: the desk's bake leaves the
    *  notes' shadows out (bake_notes_free.py), so they cast live ones. */
-  constructor(group: THREE.Object3D, specs: NoteSpec[], o: { shadows?: boolean; pinnedBy?: string } = {}) {
+  constructor(group: THREE.Object3D, specs: NoteSpec[], o: { shadows?: boolean; pinnedBy?: string; lamp?: THREE.Vector3 } = {}) {
     group.updateMatrixWorld(true);
     // (the loader sanitizes names: Blender's "Cylinder.001" arrives as "Cylinder001")
     const pin = o.pinnedBy ? ((group.getObjectByName(o.pinnedBy) ?? group.getObjectByName(THREE.PropertyBinding.sanitizeNodeName(o.pinnedBy))) as THREE.Mesh | undefined) : undefined;
@@ -119,11 +129,16 @@ export class DeskNotes {
       if (tex) {
         shadow = new THREE.Mesh(new THREE.PlaneGeometry(w * SHADOW.grow, h * SHADOW.grow), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: SHADOW.alpha, depthWrite: false, toneMapped: false, alphaMap: tex }));
         shadow.rotation.set(-Math.PI / 2, 0, spec.rotZ);   // (flat on the desk, turned as the note is)
-        shadow.position.copy(centre).add(SHADOW.offset); shadow.position.y = centre.y - 0.0004;
+        // just under the sheet's lowest point (a curled sheet dips below its average: a shadow there showed through it)
+        const low = new THREE.Box3().setFromBufferAttribute(mesh.geometry.getAttribute("position") as THREE.BufferAttribute).applyMatrix4(M).min.y;
+        shadow.position.copy(centre).add(SHADOW.offset); shadow.position.y = low - 0.00015;
         shadow.renderOrder = -1;
         group.add(shadow);
       }
-      this.notes.push({ ...spec, mesh, centre: centreGeo, lift: 0, bend, peak: peak / k, shadow, shadowA: 1 });
+      // the lifted shadow's drift (desk metres at full lift): along the rising side, and away from the lamp on the desk
+      const away = o.lamp ? new THREE.Vector3(centre.x - o.lamp.x, 0, centre.z - o.lamp.z).normalize() : new THREE.Vector3(0.78, 0, 0.62);
+      const drift = axis.clone().setY(0).normalize().multiplyScalar(LIFT_SHADOW.slide * peak).addScaledVector(away, LIFT_SHADOW.away * peak);
+      this.notes.push({ ...spec, mesh, centre: centreGeo, lift: 0, bend, peak: peak / k, shadow, shadowA: 1, rest: shadow ? shadow.position.clone() : centre.clone(), drift });
     }
   }
 
@@ -165,7 +180,10 @@ export class DeskNotes {
       n.bend.uBend.value = n.lift * n.peak;
       if (n.shadow) {
         n.shadowA += ((n.mesh.visible ? 1 : 0) - n.shadowA) * (1 - Math.exp(-(n.mesh.visible ? 6 : 14) * dt));
-        (n.shadow.material as THREE.MeshBasicMaterial).opacity = SHADOW.alpha * n.shadowA * (1 - 0.25 * n.lift);
+        const l = n.lift;
+        n.shadow.position.copy(n.rest).addScaledVector(n.drift, l);
+        n.shadow.scale.setScalar(1 + LIFT_SHADOW.grow * l);
+        (n.shadow.material as THREE.MeshBasicMaterial).opacity = SHADOW.alpha * n.shadowA * (1 + LIFT_SHADOW.darken * l);
       }
     }
   }

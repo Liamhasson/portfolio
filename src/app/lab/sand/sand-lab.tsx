@@ -345,7 +345,7 @@ export function SandLab({ hero }: { hero: boolean }) {
         const d = await BakedDesk.build(st.renderer, files);
         if (disposed) return;
         // the notes bend in their own shaders: set up before the desk's shaders compile (none compiles mid-shot)
-        const deskNotes = new DeskNotes(d.group, STORIES.map((x) => ({ name: x.mesh, size: x.size, rotZ: x.rotZ })), { shadows: true, pinnedBy: "bake_Cylinder.001" });
+        const deskNotes = new DeskNotes(d.group, STORIES.map((x) => ({ name: x.mesh, size: x.size, rotZ: x.rotZ })), { shadows: true, pinnedBy: "bake_Cylinder.001", lamp: d.lights.find((l) => l.name === "lamp")?.light.position });
         const queue = [...d.textures];
         await new Promise<void>((res) => {
           const step = () => {
