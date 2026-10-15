@@ -1019,6 +1019,13 @@ export function SandLab({ hero }: { hero: boolean }) {
       // arriving with a section's hash (the nav from a case study, a shared link): the anchor didn't exist when the browser
       // looked for it (the story is client-only), so go there now
       const hash = window.location.hash.slice(1);
+      // back from the playground: the desk in full view (its drive is there)
+      if (hero && hash === "desk") {
+        requestAnimationFrame(() => {
+          const end = projectsRef.current ? projectsRef.current.getBoundingClientRect().top + window.scrollY : 0;
+          if (end > 0) window.scrollTo(0, ((BEATS.deskView[0] + BEATS.deskView[1]) / 2) * end / (STORY_SCREENS + SCREEN_HOLD));
+        });
+      }
       if (hero && ["projects", "about", "contact"].includes(hash)) {
         requestAnimationFrame(() => {
           const el = document.getElementById(hash);
