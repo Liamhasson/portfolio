@@ -372,7 +372,8 @@ export function SandLab({ hero }: { hero: boolean }) {
         drive = new DeskDrive(d.group);
         (window as unknown as { __drive?: unknown }).__drive = drive;   // lab debugging
         new THREE.TextureLoader().loadAsync("/playground/drive-screen.jpg").then((t) => {
-          t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; driveScreen = t; st.renderer.initTexture(t);
+          // (the desk's convention: the screen's uv from the glTF, no flip)
+          t.colorSpace = THREE.SRGBColorSpace; t.flipY = false; t.anisotropy = 8; driveScreen = t; st.renderer.initTexture(t);
         }).catch(() => {});
         (window as unknown as { __notes?: unknown }).__notes = notes;   // lab debugging
         player = new NoteStoryPlayer(storyFont.style.fontFamily);
