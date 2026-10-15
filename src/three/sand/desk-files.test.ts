@@ -28,7 +28,7 @@ describe("the desk's files (pre-launch audit, 2026-10-12)", () => {
     const gltf = await deskGltfLoader().parseAsync(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength), "");
     const meshes: THREE.Mesh[] = [];
     gltf.scene.traverse((o) => { if ((o as THREE.Mesh).isMesh) meshes.push(o as THREE.Mesh); });
-    expect(meshes).toHaveLength(19);
+    expect(meshes).toHaveLength(25);   // (19, and the playground drive: body, port, light, plug, cable, tape; 2026-10-15)
     for (const m of meshes) {
       expect(m.name, "named as its part (no wrapper nodes)").toMatch(/^bake_/);
       expect(m.geometry.getAttribute("uv"), m.name).toBeDefined();

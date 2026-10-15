@@ -32,6 +32,12 @@ export function glideTo(y: number, seconds: number, done: () => void, instant = 
   if (instant) done();
 }
 
+/** At the top of the page at once (a page arriving from the story, which had the page far down). */
+export function toTop(): void {
+  if (scroller) scroller.scrollTo(0, { immediate: true, force: true });
+  window.scrollTo({ top: 0, behavior: "instant" });
+}
+
 /** The loader's hold on scrolling: the smooth scroller stopped (keys and wheel), released at the unlock. */
 export function holdScroll(on: boolean): void {
   if (on) scroller?.stop?.(); else scroller?.start?.();

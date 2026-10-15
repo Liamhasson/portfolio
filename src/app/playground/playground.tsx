@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PIECES, ROWS, ROW_HEIGHT_VW, type Piece } from "./pieces";
+import { toTop } from "@/lib/smooth-scroll";
 import "./playground.css";
 
 /**
@@ -16,6 +17,8 @@ export function Playground() {
   const opener = useRef<HTMLElement | null>(null);
   const show = useCallback((i: number, from?: HTMLElement) => { if (from) opener.current = from; setOpen(i); }, []);
   const close = useCallback(() => { setOpen(null); requestAnimationFrame(() => opener.current?.focus()); }, []);
+  // arriving through the drive, the story had the page far down: start at the top
+  useEffect(() => { toTop(); }, []);
 
   return (
     <div className="pg">
