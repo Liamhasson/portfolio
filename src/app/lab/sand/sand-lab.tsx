@@ -74,8 +74,9 @@ const LEAN_DAMP = -Math.log(1 - 0.1) * 60;   // their per-frame 0.1 at 60 fps, a
 const NOTES_FROM = BEATS.tilt[0] + 0.3, NOTES_TO = BEATS.tail[0] + 0.5;
 const RACK = { fstop: 1.4, rate: 7 } as const;
 const STORY = { blur: 14, dim: 0.45, rate: 5 } as const;
-/** The drive's way in (seconds): the glide into the laptop, the drive's window held on the screen, the fade to the page. */
-const DRIVE_FLOW = { glide: 2.8, hold: 1.0, fade: 0.45 } as const;
+/** The drive's way in (seconds): the glide into the laptop, whose screen shows the playground itself (Liam, 2026-10-15:
+ *  no in-between window); arriving, the page takes over in place, the same picture. */
+const DRIVE_FLOW = { glide: 2.8 } as const;
 /** The floating grains' density through the page (Liam: strong in the hero, sparse over the desk, none on the index). */
 const DRIFT = { hero: 1, desk: 0.12 } as const;
 
@@ -371,7 +372,7 @@ export function SandLab({ hero }: { hero: boolean }) {
         notes = deskNotes;
         drive = new DeskDrive(d.group);
         (window as unknown as { __drive?: unknown }).__drive = drive;   // lab debugging
-        new THREE.TextureLoader().loadAsync("/playground/drive-screen.jpg").then((t) => {
+        new THREE.TextureLoader().loadAsync("/playground/playground-screen.jpg").then((t) => {
           // (the desk's convention: the screen's uv from the glTF, no flip)
           t.colorSpace = THREE.SRGBColorSpace; t.flipY = false; t.anisotropy = 8; driveScreen = t; st.renderer.initTexture(t);
         }).catch(() => {});
@@ -776,12 +777,9 @@ export function SandLab({ hero }: { hero: boolean }) {
           if (driveMounted) {
             if (ix) { ix.show(0); ix.panel(null); ix.list(0); ix.interactive("none"); }
             desk3d?.setScreenAlt(driveScreen, driveScreen ? 1 : 0);
-            // the drive's window fills the view, holds a moment, then the page hands over to the playground
+            // the screen (the playground's own picture) fills the view, and the page takes over in place
             if (!driveArrived && rawP >= BEATS.takeover[0] + 0.03) driveArrived = performance.now();   // (no smooth scroller: landed)
-            const since = driveArrived ? (performance.now() - driveArrived) / 1000 : -1;
-            const fade = since < DRIVE_FLOW.hold ? 0 : Math.min((since - DRIVE_FLOW.hold) / DRIVE_FLOW.fade, 1);
-            if (veilRef.current) veilRef.current.style.opacity = String(fade);
-            if (!driveLeft && fade >= 1) { driveLeft = true; routerRef.current.push("/playground"); }
+            if (!driveLeft && driveArrived) { driveLeft = true; routerRef.current.push("/playground"); }
           } else if (ix && desk3d) {
             const pt = Math.min(Math.max((f - shotMeta.screen_from) / (shotMeta.frames - 1 - shotMeta.screen_from), 0), 1);
             const take = ease(span(p, BEATS.takeover), [0, 1]);
