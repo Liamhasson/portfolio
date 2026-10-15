@@ -12,7 +12,7 @@
 /* the grid: rows of pieces, each its share of the row (layout A) */
 .pg-grid { display: flex; flex-direction: column; gap: 1.1vw; }
 .pg-row { display: flex; gap: 1.1vw; height: var(--h); }
-.pg-tile { position: relative; flex: 1 1 0; min-width: 0; overflow: hidden; border-radius: 10px; border: 1px solid rgba(244, 239, 233, 0.16); background: #141011; padding: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color var(--duration-ui) var(--ease-settle); }
+.pg-tile { container-type: inline-size; position: relative; flex: 1 1 0; min-width: 0; overflow: hidden; border-radius: 10px; border: 1px solid rgba(244, 239, 233, 0.16); background: #141011; padding: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color var(--duration-ui) var(--ease-settle); }
 .pg-tile:hover, .pg-tile:focus-visible { border-color: rgba(230, 191, 174, 0.55); }
 .pg-tile:focus-visible { outline: 2px solid var(--color-rose-soft); outline-offset: 3px; }
 .pg-img, .pg-loop { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
@@ -26,6 +26,15 @@
 .pg-name { flex: 1 1 auto; min-width: 0; font-size: clamp(12px, 1vw, 15px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pg-meta { flex: none; color: rgba(244, 239, 233, 0.72); white-space: nowrap; }
 .pg-tile[data-light] .pg-kind, .pg-tile[data-light] .pg-name, .pg-tile[data-light] .pg-meta { color: #1d1817; }
+/* a light piece: a soft paper-coloured fade under its words, so they never sit on the pencil */
+.pg-tile[data-light]::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 64px; background: linear-gradient(to top, rgba(246, 242, 234, 0.92), rgba(246, 242, 234, 0)); pointer-events: none; }
+.pg-tile[data-light]::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 44px; background: linear-gradient(to bottom, rgba(246, 242, 234, 0.85), rgba(246, 242, 234, 0)); pointer-events: none; z-index: 1; }
+.pg-tile[data-light] .pg-foot, .pg-tile[data-light] .pg-kind { z-index: 2; }
+/* a narrow tile: the line under the title, not beside it */
+@container (max-width: 300px) {
+  .pg-foot { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .pg-name { width: 100%; }
+}
 .pg-play { position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; margin: -22px; border-radius: 50%; border: 1px solid rgba(244, 239, 233, 0.55); transition: opacity 0.3s; }
 .pg-play::after { content: ""; position: absolute; left: 17px; top: 13px; border-left: 13px solid rgba(244, 239, 233, 0.85); border-top: 9px solid transparent; border-bottom: 9px solid transparent; }
 .pg-tile[data-live] .pg-play { opacity: 0; }
