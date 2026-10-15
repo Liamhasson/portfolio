@@ -493,6 +493,7 @@ function withScreenReveal(material: THREE.Material, u: Record<string, THREE.IUni
     Object.assign(shader.uniforms, u);
     shader.fragmentShader =
       `uniform vec4 uRevBox[${REV_N}];\nuniform vec3 uRevAnim[${REV_N}];\nuniform float uRevWake;\nuniform vec3 uRevBg;\n` +
+      `uniform sampler2D uAltTex;\nuniform float uAlt;\n` +
       `uniform vec4 uMedBox[${MED_N}];\nuniform float uMedOn[${MED_N}];\n` +
       Array.from({ length: MED_N }, (_, i) => `uniform sampler2D uMed${i};\n`).join("") +
       shader.fragmentShader.replace(
@@ -540,6 +541,8 @@ function withScreenReveal(material: THREE.Material, u: Record<string, THREE.IUni
             float lod = log2(max(max(foot, a.z * 3.46), 1.0));
             col += a.x * (screenAt(src, lod) - uRevBg);
           }
+          // the alternate image (the playground drive, opened; Liam, 2026-10-15): over the index, whole
+          if (uAlt > 0.0) col = mix(col, textureLod(uAltTex, suv, log2(max(foot, 1.0))).rgb, uAlt);
           totalEmissiveRadiance *= col * (1.0 - uRevWake);
         }
         #endif`,
@@ -669,6 +672,18 @@ export class BakedDesk {
     STATE.uLit.value = lit;
     for (const l of this.lights) if (l.follows === "open") l.light.intensity = l.base * open;
   }
+
+  /** The screen's alternate image, over the index (`k` 0..1): the playground drive, opened (Liam, 2026-10-15). The
+   *  deck and keys mirror it too. */
+  setScreenAlt(tex: THREE.Texture | null, k: number): void {
+    if (!this.screen) return;
+    const u = this.screen.reveal;
+    if (tex) u.uAltTex.value = tex;
+    u.uAlt.value = tex || u.uAltTex.value ? k : 0;
+    if (!this.screenStill) this.screenStill = VIEW.uScrTex.value;
+    VIEW.uScrTex.value = k > 0.5 && u.uAltTex.value ? u.uAltTex.value : this.screenStill;
+  }
+  private screenStill: THREE.Texture | null = null;
 
   /** The screen: where the index's first reveal is (screen-reveal.ts revealAt); null for off. */
   setScreen(f: RevealFrame | null): void {
@@ -815,6 +830,8 @@ export class BakedDesk {
           uRevBox: { value: REVEAL.elements.map((e) => new THREE.Vector4(e.box[0], e.box[1], e.box[2], e.box[3])) },
           uRevAnim: { value: REVEAL.elements.map(() => new THREE.Vector3(0, 0, 0)) },
           uRevWake: { value: 1 },
+          uAlt: { value: 0 },
+          uAltTex: { value: null },
           uRevBg: { value: new THREE.Color("#0a0a0b") },   // the index's --bg
         };
         withScreenReveal(mat, reveal);

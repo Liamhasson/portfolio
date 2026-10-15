@@ -23,6 +23,7 @@ import { useRouter } from "next/navigation";
 import { DeskSketches } from "@/three/sand/desk-sketches";
 import { sketchFont, storyFont } from "./sketch-font";
 import { DeskNotes } from "@/three/sand/note-story/desk-notes";
+import { DeskDrive } from "@/three/sand/note-story/desk-drive";
 import { NoteStoryPlayer } from "@/three/sand/note-story/story-player";
 import { STORIES, storyFor } from "@/three/sand/note-story/stories";
 import { ballKeyPos } from "@/three/sand/ball-light";
@@ -118,6 +119,8 @@ export function SandLab({ hero }: { hero: boolean }) {
   const [stillBall, setStillBall] = useState(false);
   // old links to the story's About and Contact anchors: their pages now (spec 2026-10-12-about-contact-design.md §5)
   const router = useRouter();
+  const routerRef = useRef(router);   // (the scene's effect reads it: the playground's hand-over)
+  useEffect(() => { routerRef.current = router; }, [router]);
   useEffect(() => {
     const to = sectionRedirect(window.location.hash);
     if (to) router.replace(to);
@@ -296,6 +299,11 @@ export function SandLab({ hero }: { hero: boolean }) {
       let player: NoteStoryPlayer | null = null;
       let hovered: string | null = null;
       let storyOpen = false;
+      // the playground drive: touchable like the notes; a click mounts it and the story glides into its screen
+      let drive: DeskDrive | null = null;
+      let driveOver = false, driveMounted = false, driveLeft = false;
+      let driveScreen: THREE.Texture | null = null;
+      let lastStoryEnd = 0;
       const noteFx = { rack: 0, focus: 1, blur: 0 };
       // the sketches of the work behind the desk, seen through the tilt (desk-sketches.ts; Liam, 2026-10-12)
       let sketches: DeskSketches | null = null;
@@ -358,6 +366,10 @@ export function SandLab({ hero }: { hero: boolean }) {
         deskLoaded = d;
         (window as unknown as { __desk3d?: unknown }).__desk3d = d;
         notes = deskNotes;
+        drive = new DeskDrive(d.group);
+        new THREE.TextureLoader().loadAsync("/playground/drive-screen.jpg").then((t) => {
+          t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; driveScreen = t; st.renderer.initTexture(t);
+        }).catch(() => {});
         (window as unknown as { __notes?: unknown }).__notes = notes;   // lab debugging
         player = new NoteStoryPlayer(storyFont.style.fontFamily);
         player.el.addEventListener("click", () => player?.close());
@@ -590,7 +602,17 @@ export function SandLab({ hero }: { hero: boolean }) {
         if (!notesLive() || (e.target as Element | null)?.closest?.("a, button, input, textarea, select, [role=dialog]")) return;
         const name = pickAt(e.clientX, e.clientY);
         if (name) openStory(name);
+        else if (driveAt(e.clientX, e.clientY)) mountDrive();
       }) as EventListener);
+      const driveAt = (x: number, y: number) => !!drive?.ready && drive.hit(new THREE.Vector2((x / (canvas.clientWidth || 1)) * 2 - 1, 1 - (y / (canvas.clientHeight || 1)) * 2), stage!.camera) !== null;
+      const mountDrive = () => {
+        if (driveMounted || !lastStoryEnd) return;
+        driveMounted = true; driveOver = false;
+        document.documentElement.style.cursor = "";
+        // on into the laptop: the story glides to where the screen takes over the view
+        const target = ((BEATS.takeover[0] + 0.04) / (STORY_SCREENS + SCREEN_HOLD)) * lastStoryEnd;
+        glideTo(target, 2.6, () => {}, reduced);
+      };
       const putBack = () => { if (storyOpen) player?.close(); };
       on("keydown", ((e: KeyboardEvent) => { if (storyOpen && ["Escape", " ", "ArrowDown", "ArrowUp", "PageDown", "PageUp", "Home", "End"].includes(e.key)) putBack(); }) as EventListener);
       on("wheel", putBack as EventListener);
@@ -640,6 +662,7 @@ export function SandLab({ hero }: { hero: boolean }) {
         // the story's end is where the index's anchor is (#projects), measured, not assumed: on phones vh is the large
         // viewport while innerHeight shrinks under the URL bar, so a jump to the anchor must still land on the end
         const storyEnd = hero && projectsRef.current ? Math.max(1, projectsRef.current.getBoundingClientRect().top + window.scrollY) : max;
+        lastStoryEnd = storyEnd;
         let rawP = hero ? storyProgress(window.scrollY, storyEnd) : progress;
         // the desk not in yet: scrolling down, the story waits on the formed ball, the brief and its loading line showing
         // (story-timeline.ts deskWait; Liam, 2026-10-12: hold before the tilt)
@@ -744,7 +767,14 @@ export function SandLab({ hero }: { hero: boolean }) {
           }
           // 3: the live index over the screen's quad, crossfading in where they coincide, then settling into the view
           const ix = indexRef.current;
-          if (ix && desk3d) {
+          if (driveMounted) {
+            if (ix) { ix.show(0); ix.panel(null); ix.list(0); ix.interactive("none"); }
+            desk3d?.setScreenAlt(driveScreen, driveScreen ? 1 : 0);
+            // the drive's window fills the view, then the page hands over to the playground
+            const fade = ease(p, [BEATS.takeover[0] - 0.12, BEATS.takeover[0]]);
+            if (veilRef.current) veilRef.current.style.opacity = String(fade);
+            if (!driveLeft && p >= BEATS.takeover[0] - 0.01) { driveLeft = true; routerRef.current.push("/playground"); }
+          } else if (ix && desk3d) {
             const pt = Math.min(Math.max((f - shotMeta.screen_from) / (shotMeta.frames - 1 - shotMeta.screen_from), 0), 1);
             const take = ease(span(p, BEATS.takeover), [0, 1]);
             const sett = ease(span(p, BEATS.indexIn), [0, 1]);
@@ -972,10 +1002,16 @@ export function SandLab({ hero }: { hero: boolean }) {
         if (notes) {
           const live = notesLive() && pointer.active && !pointer.touch;
           const over = live ? pickAt(pointer.x, pointer.y) : null;
-          if (over !== hovered) { hovered = over; document.documentElement.style.cursor = over ? "pointer" : ""; }
+          const overDrive = !over && live && !driveMounted && driveAt(pointer.x, pointer.y);
+          if (over !== hovered || overDrive !== driveOver) {
+            hovered = over; driveOver = overDrive;
+            document.documentElement.style.cursor = over || overDrive ? "pointer" : "";
+          }
           notes.update(storyOpen ? null : hovered, dt);
           if (hovered) noteFx.focus = notes.depth(hovered, stage!.camera) ?? noteFx.focus;
-          noteFx.rack = damp(noteFx.rack, hovered ? 1 : 0, RACK.rate, dt);
+          else if (driveOver && drive) noteFx.focus = drive.depth(stage!.camera);
+          noteFx.rack = damp(noteFx.rack, hovered || driveOver ? 1 : 0, RACK.rate, dt);
+          drive?.update(driveOver || driveMounted ? 1 : 0, dt);
           noteFx.blur = damp(noteFx.blur, storyOpen ? 1 : 0, STORY.rate, dt);
           if (composite) {
             if (noteFx.rack > 0.002) { composite.lens.desk = noteFx.rack; composite.lens.focus = noteFx.focus; composite.lens.fstop = RACK.fstop; }

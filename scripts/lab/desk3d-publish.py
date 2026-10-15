@@ -4,7 +4,10 @@ Geometry from the open state (all parts, the lid on its hinge); probes from shut
 frame), so the site blends the states on one mesh as the lid turns.
   python3 scripts/lab/desk3d-publish.py"""
 import json, os, shutil, subprocess, glob
-SRC, DST = "blender/lookdev/renders/bake", "public/lab/desk3d"
+# (BAKE_SRC: another bake's folder, e.g. renders/bake-drive; LOOKDEV_DIR: the checkout that holds the renders and
+# textures-local, which a worktree doesn't)
+LOOKDEV_DIR = os.environ.get("LOOKDEV_DIR", "blender/lookdev")
+SRC, DST = os.environ.get("BAKE_SRC", os.path.join(LOOKDEV_DIR, "renders", "bake")), "public/lab/desk3d"
 os.makedirs(DST, exist_ok=True)
 for f in glob.glob(os.path.join(DST, "bake_*")):
     os.remove(f)
@@ -50,7 +53,7 @@ for name, m in opn["materials"].items():
         m["combined"] = True
     mats[name] = m
 # the screen: the index design (from the prototype capture)
-shutil.copy("blender/lookdev/textures-local/work-index-screen.png", os.path.join(DST, "screen.png"))
+shutil.copy(os.path.join(LOOKDEV_DIR, "textures-local", "work-index-screen.png"), os.path.join(DST, "screen.png"))
 subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", os.path.join(DST, "screen.png"), "-q:v", "2", os.path.join(DST, "screen.jpg")], check=True)
 os.remove(os.path.join(DST, "screen.png"))
 subprocess.run(["python3", "scripts/lab/desk3d-screen-posters.py"], check=True)   # (the cards' current posters)
