@@ -39,15 +39,18 @@ export const ROWS: Piece[][] = [
     {
       id: "after-heartbreaks-film", kind: "Film", title: "Marni Came · After Heartbreaks", meta: "Director · Editor",
       credit: "Directed, produced and edited it, played in it, and co-graded the colour.",
-      image: P("after-heartbreaks-film.jpg"), loop: P("after-heartbreaks-loop.mp4"), youtube: "RnCQCxEN-vM", w: 586,
+      image: P("after-heartbreaks-film.jpg"), loop: P("after-heartbreaks-loop.mp4"), youtube: "RnCQCxEN-vM",
+      listen: { label: "Listen on Spotify", href: "https://open.spotify.com/track/4tAE4udEUdI2zK1M3vaQbC" }, w: 586,
     },
     {
-      id: "after-heartbreaks", kind: "Music", title: "Marni Came · After Heartbreaks", meta: "3:32",
-      credit: "Sang, played guitar, produced and wrote it, and made the cover.",
-      image: P("after-heartbreaks-cover.jpg"), audio: P("after-heartbreaks.m4a"), peaks: P("after-heartbreaks.peaks.json"),
-      listen: { label: "Listen on Spotify", href: "https://open.spotify.com/track/4tAE4udEUdI2zK1M3vaQbC" }, w: 330,
+      // (the split-face cover art on this track's tile; Liam, 2026-10-15)
+      id: "youll-be-you", kind: "Music", title: "Marni Came · You'll Be You", meta: "3:16", credit: "Sang, played guitar, produced and wrote it.",
+      image: P("after-heartbreaks-cover.jpg"), audio: P("youll-be-you.m4a"), peaks: P("youll-be-you.peaks.json"), w: 330,
     },
-    { id: "untitled-3d", kind: "3D", title: "Untitled", meta: "Abstract 3D", credit: "An abstract 3D piece.", image: P("untitled-3d.jpg"), w: 380 },
+    {
+      id: "is-it-all", kind: "Film", title: "Sanskrit · Is It All", meta: "Director · Editor", credit: "Wrote it, directed, edited, produced and mixed it.",
+      image: P("is-it-all.jpg"), loop: P("is-it-all-loop.mp4"), youtube: "QhhX9M16yhw", w: 380,
+    },
   ],
   [
     {
@@ -71,10 +74,7 @@ export const ROWS: Piece[][] = [
       image: P("my-small-world.jpg"), loop: P("my-small-world-loop.mp4"), youtube: "xj7WOprfJuA",
       listen: { label: "Sanskrit III on Spotify", href: "https://open.spotify.com/album/5Yu23QtYo9YAC6W98CIFxm" }, w: 462,
     },
-    {
-      id: "youll-be-you", kind: "Music", title: "Marni Came · You'll Be You", meta: "3:16", credit: "Sang, played guitar, produced and wrote it.",
-      audio: P("youll-be-you.m4a"), peaks: P("youll-be-you.peaks.json"), w: 420,
-    },
+    { id: "untitled-3d", kind: "3D", title: "Untitled", meta: "Abstract 3D", credit: "An abstract 3D piece.", image: P("untitled-3d.jpg"), w: 420 },
     {
       id: "hello", kind: "Motion", title: "Hello", meta: "Figma motion", credit: "Playing with Figma's motion tools.",
       image: P("hello.jpg"), loop: P("hello-loop.mp4"), video: P("hello-loop.mp4"), w: 414,
