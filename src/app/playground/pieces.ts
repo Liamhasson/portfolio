@@ -51,8 +51,8 @@ export const ROWS: Piece[][] = [
   ],
   [
     {
-      id: "dopamine", kind: "Film", title: "Marni Came · Dopamine (live)", meta: "Live video",
-      credit: "Played it on stage, and made the video.",
+      id: "dopamine", kind: "Film", title: "Marni Came · Dopamine (live)", meta: "Co-director · Editor",
+      credit: "Wrote, composed and performed it, co-directed, edited and produced the video.",
       image: P("dopamine.jpg"), loop: P("dopamine-loop.mp4"), video: P("dopamine.mp4"), w: 520,
     },
     {

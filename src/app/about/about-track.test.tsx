@@ -24,6 +24,11 @@ test("the whole approved text, in reading order, under an About heading", () => 
   }
 });
 
+test("the bands lead to the playground", () => {
+  render(<AboutTrack />);
+  expect(screen.getByRole("link", { name: "eight years managing two rock bands" })).toHaveAttribute("href", "/playground");
+});
+
 test("two colours: the highlights are the near-white spans", () => {
   render(<AboutTrack />);
   const his = [...document.querySelectorAll(".hi")].map((n) => n.textContent);

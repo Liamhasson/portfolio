@@ -4,7 +4,7 @@
  * two colours: each line a run of segments, `hi` the part in the near-white (Liam, 2026-10-12: "highlight the important
  * parts of the sentence"). A quote, the resume, the portrait or a detail is a one-line change here.
  */
-export type Seg = { t: string; hi?: boolean };
+export type Seg = { t: string; hi?: boolean; href?: string };
 export type Line = Seg[];
 export type Quote = { text: Line; name: string; role: string };
 export type Skill = { name: string; proof: string; href?: string };
@@ -15,8 +15,9 @@ export const plain = (l: Line) => l.map((s) => s.t).join("");
 export const ABOUT = {
   lines: [
     [{ t: "I’m Liam. I love crafting products", hi: true }, { t: " where design and user needs meet." }],
+    // (the bands link to the playground: their music, films and art; Liam, 2026-10-15)
     [
-      { t: "Before design, I spent " }, { t: "eight years managing two rock bands", hi: true },
+      { t: "Before design, I spent " }, { t: "eight years managing two rock bands", hi: true, href: "/playground" },
       { t: " and creative projects across a few industries: small teams of specialists " },
       { t: "making something out of nothing", hi: true }, { t: "." },
     ],

@@ -52,3 +52,8 @@ a.ab-proof:hover, a.ab-proof:focus-visible { color: #f4efe9; }
 .ab[data-mode="stack"] .ab-resume { position: fixed; bottom: max(20px, calc(env(safe-area-inset-bottom) + 14px)); opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
 .ab[data-mode="stack"] .ab-resume[data-on] { opacity: 1; pointer-events: auto; }
 .ab[data-mode="stack"] .ab-track { padding-bottom: 14vh; }
+
+/* a link inside the story's text (the bands, to the playground; Liam, 2026-10-15): lightly underlined, like the proofs */
+.ab-inline { color: inherit; text-decoration: underline; text-decoration-color: rgba(230, 191, 174, 0.45); text-decoration-thickness: 1px; text-underline-offset: 0.18em; transition: text-decoration-color var(--duration-ui) var(--ease-settle); }
+.ab-inline:hover, .ab-inline:focus-visible { text-decoration-color: rgba(230, 191, 174, 0.95); }
+.ab-inline::after { content: " \2197"; text-decoration: none; display: inline-block; margin-left: 0.15em; font-size: 0.6em; vertical-align: 0.5em; color: rgba(230, 191, 174, 0.8); }

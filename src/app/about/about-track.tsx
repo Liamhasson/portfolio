@@ -12,7 +12,13 @@ import "./about.css";
 /** A line in two colours: its highlights in the near-white, the rest in the darker tone (Liam, 2026-10-12). */
 function Words({ line }: { line: Line }) {
   // (one run of text: a stacked slide is a flex box, which would make each span its own line)
-  return <span>{line.map((s, i) => <span key={i} className={s.hi ? "hi" : undefined}>{s.t}</span>)}</span>;
+  return (
+    <span>
+      {line.map((s, i) => s.href
+        ? <Link key={i} href={s.href} className={`ab-inline${s.hi ? " hi" : ""}`}>{s.t}</Link>
+        : <span key={i} className={s.hi ? "hi" : undefined}>{s.t}</span>)}
+    </span>
+  );
 }
 
 /**
