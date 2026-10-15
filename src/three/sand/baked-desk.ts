@@ -578,6 +578,10 @@ function fitScreen(mesh: THREE.Mesh): THREE.Vector3[] {
   return [O, O.clone().add(U), O.clone().add(V), n];
 }
 
+/** The desk's bake, by name: its files are cached a day under fixed names, so a new bake changes this and every browser
+ *  fetches it fresh (Liam's Chrome kept the old desk; 2026-10-15). Change it with every publish of public/lab/desk3d. */
+export const DESK_VERSION = "drive-2026-10-15";
+
 export class BakedDesk {
   readonly group = new THREE.Group();
   readonly materials: THREE.MeshPhysicalMaterial[] = [];
@@ -716,12 +720,12 @@ export class BakedDesk {
 
   /** Downloads every file, counting their bytes into `progress`; no GPU work. */
   static async fetch(base = "/lab/desk3d", progress: LoadProgress | null = null, { half = false }: { half?: boolean } = {}): Promise<DeskDownload> {
-    const meta = (await (await fetch(`${base}/desk.json`)).json()) as BakedDeskMeta;
+    const meta = (await (await fetch(`${base}/desk.json?v=${DESK_VERSION}`)).json()) as BakedDeskMeta;
     const urls = new Map<string, string>();
     let glb: ArrayBuffer | null = null, lut: ArrayBuffer | null = null;
     try {
       await Promise.all(deskFiles(meta, { half }).map(async (f) => {
-        const res = await fetchTracked(`${base}/${f}`, f, progress);
+        const res = await fetchTracked(`${base}/${f}?v=${DESK_VERSION}`, f, progress);
         if (f === "desk.glb") glb = await res.arrayBuffer();
         else if (f === meta.lut) lut = await res.arrayBuffer();
         else urls.set(f, URL.createObjectURL(await res.blob()));
