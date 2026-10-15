@@ -84,19 +84,6 @@ export const ROWS: Piece[][] = [
       image: P("hello.jpg"), loop: P("hello-loop.mp4"), video: P("hello-loop.mp4"), w: 414,
     },
   ],
-  // drawings and paintings over the years (Liam, 2026-10-15): photographed, straightened and lightly graded; each tile's
-  // width follows its piece's shape, so the crop is slight
-  [
-    { id: "art-owl", kind: "Art", title: "Owl", meta: "Pencil drawing", credit: "Pencil drawing.", image: P("art-owl.jpg"), light: true, w: 154 },
-    { id: "art-horse", kind: "Art", title: "Horse", meta: "Pencil drawing", credit: "Pencil drawing.", image: P("art-horse.jpg"), light: true, w: 69 },
-    { id: "art-face", kind: "Art", title: "Portrait", meta: "Pencil drawing", credit: "Pencil drawing.", image: P("art-face.jpg"), w: 127 },
-  ],
-  [
-    { id: "art-collage", kind: "Art", title: "Collage", meta: "Oil painting", credit: "Oil painting.", image: P("art-goldfish.jpg"), light: true, w: 150 },
-    { id: "art-figures", kind: "Art", title: "Figure studies", meta: "Pencil sketch", credit: "Pencil sketches.", image: P("art-figures.jpg"), light: true, w: 65 },
-    { id: "art-cat", kind: "Art", title: "Cat", meta: "Oil painting", credit: "Oil painting.", image: P("art-cat.jpg"), w: 125 },
-    { id: "art-skull", kind: "Art", title: "Skull", meta: "Acrylic with spachtel", credit: "Acrylic, worked with a spachtel (palette knife).", image: P("art-skull.jpg"), w: 113 },
-  ],
   // (Liam, 2026-10-15: producing Marni Came in the band's studio)
   [
     {
@@ -110,9 +97,22 @@ export const ROWS: Piece[][] = [
     },
   ],
   [{ id: "marni-came-logotype", kind: "Art", title: "Marni Came · logotype", meta: "Identity", credit: "The band's logotype.", image: P("marni-came-logotype.png"), contain: true, w: 1328 }],
+  // drawings and paintings over the years (Liam, 2026-10-15): photographed, straightened and lightly graded; each tile's
+  // width follows its piece's shape, so the crop is slight
+  [
+    { id: "art-owl", kind: "Art", title: "Owl", meta: "Pencil drawing", credit: "Pencil drawing.", image: P("art-owl.jpg"), light: true, w: 154 },
+    { id: "art-horse", kind: "Art", title: "Horse", meta: "Pencil drawing", credit: "Pencil drawing.", image: P("art-horse.jpg"), light: true, w: 69 },
+    { id: "art-face", kind: "Art", title: "Portrait", meta: "Pencil drawing", credit: "Pencil drawing.", image: P("art-face.jpg"), w: 127 },
+  ],
+  [
+    { id: "art-collage", kind: "Art", title: "Collage", meta: "Oil painting", credit: "Oil painting.", image: P("art-goldfish.jpg"), light: true, w: 150 },
+    { id: "art-figures", kind: "Art", title: "Figure studies", meta: "Pencil sketch", credit: "Pencil sketches.", image: P("art-figures.jpg"), light: true, w: 65 },
+    { id: "art-cat", kind: "Art", title: "Cat", meta: "Oil painting", credit: "Oil painting.", image: P("art-cat.jpg"), w: 125 },
+    { id: "art-skull", kind: "Art", title: "Skull", meta: "Acrylic with spachtel", credit: "Acrylic, worked with a spachtel (palette knife).", image: P("art-skull.jpg"), w: 113 },
+  ],
 ];
 
 /** The rows' heights on a wide screen, as a share of the window's width (the mockup's 1440 frame). */
-export const ROW_HEIGHT_VW = [22.9, 20.3, 18, 26, 20.4, 24, 15.3];
+export const ROW_HEIGHT_VW = [22.9, 20.3, 18, 24, 15.3, 26, 20.4];
 
 export const PIECES: Piece[] = ROWS.flat();
