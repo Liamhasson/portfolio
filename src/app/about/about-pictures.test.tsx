@@ -1,6 +1,6 @@
 // src/app/about/about-pictures.test.tsx: the pictures in their places along the track (spec 2026-10-16-about-pictures-design.md §2)
-import { render, screen, within } from "@testing-library/react";
-import { beforeEach, expect, test, vi } from "vitest";
+import { act, render, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), prefetch: vi.fn() }) }));
 vi.mock("next/link", () => ({ default: ({ href, children, ...rest }: React.ComponentProps<"a">) => <a href={href} {...rest}>{children}</a> }));
@@ -8,6 +8,7 @@ vi.mock("next/link", () => ({ default: ({ href, children, ...rest }: React.Compo
 import { AboutTrack } from "./about-track";
 import { ABOUT } from "@/content/about";
 
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); Object.defineProperty(window, "scrollY", { value: 0, configurable: true }); });
 beforeEach(() => {
   window.matchMedia = vi.fn().mockReturnValue({ matches: false, addEventListener() {}, removeEventListener() {} }) as never;
 });
@@ -87,6 +88,60 @@ test("nothing appears twice", () => {
 test("stacked (phones, reduced motion): the Build it body is not held to the track's 60vw", async () => {
   const css = (await import("node:fs")).readFileSync(`${process.cwd()}/src/app/about/about.css`, "utf8");
   expect(css).toMatch(/\.ab\[data-mode="stack"\] \.ab-verb-body \{[^}]*max-width: none/);
+});
+
+/** jsdom has no layout: give the track a width, and the pictures their places along it (the track's own left stays 0) */
+function laidOut(places: Record<string, [left: number, width: number]>) {
+  vi.spyOn(Element.prototype, "scrollWidth", "get").mockReturnValue(5000);
+  vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => { cb(0); return 0; });
+  const rect = (left: number, width: number) => ({ left, right: left + width, width, top: 0, bottom: 0, height: 0, x: left, y: 0, toJSON() {} }) as DOMRect;
+  vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+    const id = this.closest<HTMLElement>(".ab-pic")?.dataset.pic;
+    const [left, width] = (id && places[id]) || [0, 0];
+    return this.classList.contains("ab-track") ? rect(0, 5000) : rect(left, width);
+  });
+}
+const scrollTo = (y: number) => { Object.defineProperty(window, "scrollY", { value: y, configurable: true }); act(() => { window.dispatchEvent(new Event("scroll")); }); };
+
+test("on the track a picture rises out of its line as it arrives and is cut at the margin line as it leaves", () => {
+  laidOut({ studio: [2000, 100], desk: [100, 100] });
+  const { container } = render(<AboutTrack />);
+  const studio = pic(container, "studio");
+  // at the start: the studio is far to the right: not there yet; the desk (at 100px, risen) is
+  expect(studio.style.visibility).toBe("hidden");
+  expect(studio.style.clipPath).toMatch(/^inset\(100% /);
+  expect(pic(container, "desk").style.visibility).toBe("");
+  // scrolled 1500px along: the studio is at 500px of the 1024px screen (under 70%): fully risen
+  scrollTo(1500);
+  expect(studio.style.visibility).toBe("");
+  expect(studio.style.clipPath).toMatch(/^inset\(0% -100vw 0 0px round /);
+  // scrolled until its left edge is 50px past the margin line (6% of 1024 = 61.44): half of its 100px is cut
+  scrollTo(2000 - 61.44 + 50);
+  expect(parseFloat(studio.style.clipPath.match(/^inset\(0% -100vw 0 ([\d.]+)px/)![1])).toBeCloseTo(50, 6);
+  // its right edge reached the margin line: gone
+  scrollTo(2000 - 61.44 + 100);
+  expect(studio.style.visibility).toBe("hidden");
+});
+
+test("a strip picture (inside its link) is clipped away, never visibility:hidden, so the link stays in the tab order", () => {
+  laidOut({ cyvore: [3000, 100] });
+  const { container } = render(<AboutTrack />);
+  const c = pic(container, "cyvore");
+  expect(c.style.clipPath).toMatch(/^inset\(100% /);
+  expect(c.style.visibility).toBe("");
+  // focusing it scrolls its slide to the margin: the picture is then in the shown range
+  scrollTo(3000 - 0.06 * 1024);
+  expect(c.style.clipPath).toMatch(/^inset\(0% -100vw 0 0px /);
+});
+
+test("stacked: the pictures' clip and visibility are cleared", () => {
+  laidOut({ studio: [2000, 100] });
+  const { container } = render(<AboutTrack />);
+  expect(pic(container, "studio").style.visibility).toBe("hidden");
+  window.matchMedia = vi.fn().mockReturnValue({ matches: true, addEventListener() {}, removeEventListener() {} }) as never;
+  act(() => { window.dispatchEvent(new Event("resize")); });
+  expect(pic(container, "studio").style.visibility).toBe("");
+  expect(pic(container, "studio").style.clipPath).toBe("");
 });
 
 test("a strip picture without a link fails loudly, not a quiet link to the home page", async () => {

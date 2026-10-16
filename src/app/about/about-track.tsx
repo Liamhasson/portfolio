@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Fragment, useEffect, useRef, type ReactNode } from "react";
 import { NextPagePull } from "@/components/shell/next-page-pull";
 import { ABOUT, type Line, type Picture } from "@/content/about";
+import { pictureState } from "./picture-motion";
 import { scrollForSlide, sectionHeight, trackLayout, trackProgress, trackX } from "./track";
 import "./about.css";
 
@@ -52,6 +53,11 @@ export function AboutTrack() {
     if (!sec || !tr || !clip) return;
     let raf = 0, height = 0, photoDist = 0;
     const photo = tr.querySelector<HTMLElement>(".ab-portrait");
+    // the pictures along the track: each one's left on the track, its width (picture + caption), its corner radius (measured in layout)
+    type Pic = { el: HTMLElement; left: number; width: number; radius: string; link: boolean };
+    let pics: Pic[] = [];
+    const allPics = [...tr.querySelectorAll<HTMLElement>(".ab-pic")];
+    const clearPics = () => allPics.forEach((el) => { el.style.clipPath = ""; el.style.visibility = ""; });
     // the track's window: the clip (the screen's width; read from the clip so it stays right if the clip is ever inset)
     const viewW = () => clip.clientWidth || window.innerWidth;
     const frame = () => {
@@ -65,6 +71,14 @@ export function AboutTrack() {
         photo.style.transform = `translate3d(${-x}px, 0, 0)`;
         photo.style.clipPath = `inset(0 0 0 ${k * 100}% round 10px)`;
       }
+      // each picture rises out of its line as it arrives and is cut at the margin line as it leaves (picture-motion.ts)
+      const vw = viewW();
+      for (const pic of pics) {
+        const { top, left, hidden } = pictureState(pic.left + x, pic.width, vw);
+        pic.el.style.clipPath = `inset(${top}% -100vw 0 ${(left / 100) * pic.width}px round ${pic.radius})`;
+        // (fully gone: hidden, not a hairline. A picture inside a link is only clipped away: visibility:hidden would take the link out of the tab order, and the focus handler below brings it into view)
+        pic.el.style.visibility = hidden && !pic.link ? "hidden" : "";
+      }
       if (bar.current) bar.current.style.transform = `scaleX(${p})`;
     };
     const layout = () => {
@@ -73,6 +87,7 @@ export function AboutTrack() {
       if (mode === "stack") {
         sec.style.height = ""; tr.style.transform = ""; tr.style.removeProperty("--ab-photo-h");
         if (photo) { photo.style.transform = ""; photo.style.clipPath = ""; }
+        pics = []; clearPics();
         return;
       }
       // the photo stands exactly as tall as the tallest text layer (Liam, 2026-10-15)
@@ -81,6 +96,13 @@ export function AboutTrack() {
       // the crop is done by the time the first line reaches the photo's right edge: the gap between them (rects: transform-proof)
       const fig = photo?.parentElement, next = fig?.nextElementSibling;
       if (fig && next) photoDist = next.getBoundingClientRect().left - fig.getBoundingClientRect().right;
+      // the pictures: left edge relative to the track and width including the caption, from rects (the track's own travel cancels out)
+      const t0 = tr.getBoundingClientRect().left;
+      pics = allPics.map((el) => {
+        const r = el.getBoundingClientRect();
+        const right = Math.max(r.right, ...[...el.children].map((c) => c.getBoundingClientRect().right));
+        return { el, left: r.left - t0, width: right - r.left, radius: getComputedStyle(el.querySelector(".ab-pic-f") ?? el).borderTopLeftRadius || "10px", link: !!el.closest("a") };
+      });
       height = sectionHeight(tr.scrollWidth, viewW(), window.innerHeight);
       sec.style.height = `${height}px`;
       frame();
