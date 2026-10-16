@@ -10,6 +10,7 @@ import type { GlassSlot, PendantScene } from "@/three/pendant/scene";
 import { SHOTS, shotAt, solveKeys, type Layer, type Shot } from "@/three/pendant/shots";
 import type { Outline } from "@/three/pendant/solve";
 import type { Spot } from "@/three/pendant/layout";
+import { leanFor } from "./glass-lean";
 import { pictureShown } from "./pendant-pictures";
 import { trackProgress } from "./track";
 
@@ -308,10 +309,11 @@ export function AboutPendant() {
       dragDX = dragDY = 0;
       look.x += (-mouse.y * LOOK - look.x) * LOOK_EASE;
       look.y += (-mouse.x * LOOK - look.y) * LOOK_EASE;
-      // (through the glass the lean is eased down: the ball magnifies it and turns it over, see PendantScene.glassLook)
-      const lk = 1 - (1 - sc.glassLook) * clamp01(f.glass);
-      leaned.x = look.x * lk;
-      leaned.y = look.y * lk;
+      // the glass ball, when the pendant draws it (it owns it, and the slot is there)
+      const ours = glassOwner() === "pendant";
+      const glass: GlassSlot | null = ours && f.glass > GLASS_MIN && L.glassMid !== null && L.glassR > 0 ? { x: gx, y: 0.5, r: L.glassR } : null;
+      // (through a drawn ball the lean is eased down: the ball magnifies it and turns it over, see PendantScene.glassLook)
+      leanFor(look, glass !== null, f.glass, sc.glassLook, leaned);
       cm.poseRig(f, motion, time, leaned, L.vw, L.vh, sc.camera, sc.outer, sc.inner, { still: reduced });
       const box = outline?.hull.length
         ? cm.outlineBox(outline.hull, sc.inner, sc.camera, L.vw, L.vh)
@@ -332,8 +334,6 @@ export function AboutPendant() {
       forcedK += (forced - forcedK) * (1 - FORCED_EASE ** dt);
       const shotDim = f.dim + (Math.min(f.dim, sv?.FORCED_DIM ?? f.dim) - f.dim) * forcedK;
       const dim = shotDim * (1 - o);
-      const ours = glassOwner() === "pendant";
-      const glass: GlassSlot | null = ours && f.glass > GLASS_MIN && L.glassMid !== null && L.glassR > 0 ? { x: gx, y: 0.5, r: L.glassR } : null;
       sc.draw(f, glass, dim, glass ? glassRim() : null);
       drawn = true;
       if (canvas.dataset.layer !== layer) canvas.dataset.layer = layer;

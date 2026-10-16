@@ -39,3 +39,9 @@ export function setGlassRim(rgb: Rgb | null): void {
 export function glassRim(): Rgb | null {
   return rim;
 }
+
+/** Tests only: every claim dropped and the rim cleared (the store is global, so a test must not leak a claim into the next). */
+export function resetGlassForTests(): void {
+  claims.length = 0;
+  rim = null;
+}

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 vi.mock("@/three/pendant/scene", () => ({ PendantScene: { load: vi.fn() } }));
 
 import { PendantScene } from "@/three/pendant/scene";
-import { glassOwner } from "@/lib/about-glass";
+import { glassOwner, resetGlassForTests } from "@/lib/about-glass";
 import { AboutPendant } from "./about-pendant";
 
 const load = vi.mocked(PendantScene.load);
@@ -47,6 +47,7 @@ function setup({ webgl2 = true, reduced = false } = {}) {
 
 beforeEach(() => { load.mockReset(); });
 afterEach(() => {
+  resetGlassForTests(); // (the glass store is global: a test that claimed it must not leave it claimed for the next)
   vi.restoreAllMocks();
   delete g.WebGL2RenderingContext;
   delete g.requestIdleCallback;

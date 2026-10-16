@@ -18,6 +18,7 @@ import {
   Vector3, WebGLRenderer, WebGLRenderTarget,
 } from "three";
 import type { BufferGeometry, Material, Texture } from "three";
+import type { Rgb } from "@/lib/about-glass";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
@@ -70,9 +71,6 @@ const DimShader = {
       gl_FragColor = vec4( c.rgb * dim, c.a );
     }`,
 };
-
-/** The testimonials' edge colour at the ball, sRGB 0..1 (about-glass.ts). */
-export type RimRgb = readonly [number, number, number];
 
 export interface GlassSlot {
   /** The slot's centre as a share of the viewport's width / height, and its radius as a share of the height. */
@@ -374,7 +372,7 @@ export class PendantScene {
    * viewport, radius as a share of its height), or null when it isn't on screen (or the testimonials draw it). `dim`: 0..1
    * brightness. `rim`: the testimonials' edge colour at the ball (about-glass.ts `glassRim()`), or null for no rim light.
    */
-  draw(f: Frame, glass: GlassSlot | null, dim: number, rim: RimRgb | null = null): void {
+  draw(f: Frame, glass: GlassSlot | null, dim: number, rim: Rgb | null = null): void {
     if (this.gone) return;
     const cam = this.camera;
     const dist = distanceFor(f.h, f.fov);
@@ -413,7 +411,7 @@ export class PendantScene {
   }
 
   /** The glass pass's uniforms for this frame: the ball, the camera it is seen from, the plane through the pendant, the rim. */
-  private placeGlass(glass: GlassSlot, f: Frame, dist: number, rim: RimRgb | null): void {
+  private placeGlass(glass: GlassSlot, f: Frame, dist: number, rim: Rgb | null): void {
     const cam = this.camera;
     const u = this.glass.uniforms;
     const gd = dist * glassAt(glass.r, f.fov);

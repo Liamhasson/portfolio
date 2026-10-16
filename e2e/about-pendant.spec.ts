@@ -117,11 +117,14 @@ test("the glass sits in the pictures' slot between the quotes and touches neithe
   expect(errors).toEqual([]);
 });
 
-/** The glass ball's inside, sorted into kinds of pixel: inside 0.8 of its radius (the rim's dark ring and edge left out). */
+/** The glass ball's inside, sorted into kinds of pixel: inside 0.8 of its radius (the rim's dark ring and edge left out).
+ *  "clear" is the page seen through clear glass: within a few levels of the page itself, measured just outside the ball (the
+ *  median of a ring from 1.1 to 1.3 radii, between the quotes), so an opaque black ball doesn't pass for it. */
 async function ballPixels(page: Page, g: { x: number; y: number; r: number }) {
   const vp = page.viewportSize()!;
   const cx = g.x * vp.width, cy = g.y * vp.height, R = g.r * vp.height;
-  const clip = { x: Math.round(cx - R), y: Math.round(cy - R), width: Math.round(2 * R), height: Math.round(2 * R) };
+  const S = 1.3 * R; // (the clip reaches the ring round the ball)
+  const clip = { x: Math.round(cx - S), y: Math.round(cy - S), width: Math.round(2 * S), height: Math.round(2 * S) };
   const png = (await page.screenshot({ clip })).toString("base64");
   return page.evaluate(async (src) => {
     const img = new Image();
@@ -133,19 +136,31 @@ async function ballPixels(page: Page, g: { x: number; y: number; r: number }) {
     const x = c.getContext("2d")!;
     x.drawImage(img, 0, 0);
     const d = x.getImageData(0, 0, c.width, c.height).data;
-    const r0 = c.width / 2;
-    let n = 0, brass = 0, grey = 0, dark = 0;
+    const mid = c.width / 2, r0 = mid / 1.3; // (the ball's radius in the clip)
+    const dist = (px: number, py: number) => Math.hypot(px + 0.5 - mid, py + 0.5 - mid);
+    // the page just outside the ball, channel by channel
+    const ring: number[][] = [[], [], []];
     for (let py = 0; py < c.height; py++) {
       for (let px = 0; px < c.width; px++) {
-        if (Math.hypot(px + 0.5 - r0, py + 0.5 - r0) > 0.8 * r0) continue;
+        const q = dist(px, py);
+        if (q < 1.1 * r0 || q > 1.3 * r0) continue;
+        const i = (py * c.width + px) * 4;
+        for (let k = 0; k < 3; k++) ring[k].push(d[i + k]);
+      }
+    }
+    const pageRgb = ring.map((v) => v.sort((a, b) => a - b)[v.length >> 1]);
+    let n = 0, brass = 0, grey = 0, clear = 0;
+    for (let py = 0; py < c.height; py++) {
+      for (let px = 0; px < c.width; px++) {
+        if (dist(px, py) > 0.8 * r0) continue;
         const i = (py * c.width + px) * 4, r = d[i], gg = d[i + 1], b = d[i + 2], sum = r + gg + b;
         n++;
         if (sum > 150 && r - b > 25) brass++; // (the pendant, warm)
         else if (sum > 210 && sum < 600 && Math.max(r, gg, b) - Math.min(r, gg, b) < 14) grey++; // (milk: a flat mid grey)
-        else if (sum < 90) dark++; // (the page, through clear glass)
+        else if (Math.max(Math.abs(r - pageRgb[0]), Math.abs(gg - pageRgb[1]), Math.abs(b - pageRgb[2])) <= 6) clear++;
       }
     }
-    return { n, brass: brass / n, grey: grey / n, dark: dark / n };
+    return { n, page: pageRgb, brass: brass / n, grey: grey / n, clear: clear / n };
   }, png);
 }
 
@@ -162,7 +177,8 @@ test("through the glass: the pendant inside, clear glass round it, no milk", asy
   const px = await ballPixels(page, g);
   expect(px.n).toBeGreaterThan(5000);
   expect(px.brass).toBeGreaterThan(0.08); // (the pendant, magnified, fills a good part of the ball)
-  expect(px.dark).toBeGreaterThan(0.2); // (and round it the page shows through)
+  expect(Math.max(...px.page)).toBeGreaterThan(8); // (the page is a warm near-black, not black: an opaque black ball would differ)
+  expect(px.clear).toBeGreaterThan(0.2); // (and round it the page shows through, as it is outside the ball)
   expect(px.grey).toBeLessThan(0.05); // (the placeholder's milky inside was about half flat grey)
   expect(errors).toEqual([]);
 });
