@@ -21,8 +21,10 @@ mkdir -p "$dst"
 # 1. Blender: the heads kept whole, everything else decimated; the three maps at 2048
 "$BLENDER" --background --python blender/amulet/amulet.py -- --web "$tmp" --ratio "${PENDANT_RATIO:-0.22}"
 
-# 2. the model: Blender already simplified it (no -si); -kv keeps the UVs on a mesh with no material, as desk3d-publish.py does
-npx gltfpack -i "$tmp/pendant.glb" -o "$dst/pendant.glb" -cc -kv
+# 2. the model: Blender already simplified it (no -si); -kv keeps the UVs on a mesh with no material, as desk3d-publish.py does;
+#    -vtf keeps them as floats: with no material to carry gltfpack's UV scale (KHR_texture_transform), its default 16-bit UVs
+#    come out all zero (every texel would read the map's corner). Costs about 0.2 MB.
+npx gltfpack -i "$tmp/pendant.glb" -o "$dst/pendant.glb" -cc -kv -vtf
 cp "$tmp/pendant-wire.glb" "$dst/pendant-wire.glb"
 
 # 3. the colour as GPU-compressed KTX2 (Blender's PNG has an alpha channel: the format wants plain RGB)
