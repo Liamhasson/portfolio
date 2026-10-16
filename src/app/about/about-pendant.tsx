@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Box, Look } from "@/three/pendant/camera";
-import type { TextRect } from "@/three/pendant/layout";
+import { hits, type TextRect } from "@/three/pendant/layout";
 import { REST, stepMotion, type MotionState } from "@/three/pendant/motion";
 import type { GlassSlot, PendantScene } from "@/three/pendant/scene";
 import { SHOTS, shotAt, solveKeys, type Layer } from "@/three/pendant/shots";
@@ -22,6 +22,8 @@ export interface PendantHook {
   box: Box;
   /** The glass ball as drawn (centre as a share of the viewport, radius as a share of its height), or null. */
   glass: GlassSlot | null;
+  /** This screen's solve (Task 8): the front shots nudged sideways (share of the width) and those resting behind the words. */
+  solve: { moved: { id: string; dx: number }[]; behind: string[] };
 }
 
 declare global {
@@ -46,10 +48,43 @@ const CONTROL = "a, button, input, select, textarea, [role=button]";
 /** The outro, as the pull to Contact rises: it shrinks by this share, sinks this share of the screen, and fades out. */
 const OUT_SHRINK = 0.6;
 const OUT_SINK = 0.5;
-/** The words the pendant must never cover while in front of them (Task 8 solves the layers from these boxes). */
+/** The words the pendant must never cover while in front of them (Task 8 solves the layers from their lines' boxes). */
 const TEXT = ".ab-big, .ab-quote blockquote, .ab-quote figcaption, .ab-verb .ab-mono, .ab-verb-title, .ab-skills li, .cap";
+/** What holds still on screen over the track, treated exactly as words: the site's wordmark, pill nav and burger (fixed to
+ *  the viewport), and About's resume pill and progress bar (fixed in the pinned frame). */
+const CHROME_SITE = ".sh-name, .sh-nav, .sh-burger";
+const CHROME_PIN = ".ab-resume, .ab-bar";
+/** How fast a solved-behind shot dims to solve.ts FORCED_DIM and comes back (what is left of the gap after a second): the
+ *  layer flips while the pendant is clear of the words, so the dim eases in behind them instead of popping. */
+const FORCED_EASE = 0.0001;
 
 const clamp01 = (v: number) => Math.min(Math.max(v, 0), 1);
+
+/**
+ * The lines of text inside an element, one box per line (viewport px): what the reader reads, not the element's block box
+ * (a label's block runs the slide's full width while its words take a fifth of it). Each text node's own rects (a range
+ * over it: block children's boxes are left out), merged where they share a line.
+ */
+function lineBoxes(el: Element): Box[] {
+  const frags: Box[] = [];
+  const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  const range = document.createRange();
+  for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+    if (!n.textContent?.trim()) continue;
+    range.selectNodeContents(n);
+    for (const r of range.getClientRects?.() ?? []) if (r.width > 0 && r.height > 0) frags.push({ l: r.left, t: r.top, r: r.right, b: r.bottom });
+  }
+  frags.sort((a, b) => a.t - b.t || a.l - b.l);
+  const lines: Box[] = [];
+  for (const f of frags) {
+    const cy = (f.t + f.b) / 2;
+    const line = lines.find((x) => cy > x.t && cy < x.b);
+    if (!line) { lines.push({ ...f }); continue; }
+    line.l = Math.min(line.l, f.l); line.r = Math.max(line.r, f.r);
+    line.t = Math.min(line.t, f.t); line.b = Math.max(line.b, f.b);
+  }
+  return lines;
+}
 
 /** WebGL2 on a throwaway canvas (freed at once): the real canvas gets its context, with three's settings, from the scene. */
 function hasWebGL2(): boolean {
@@ -100,12 +135,15 @@ export function AboutPendant() {
     const onReduced = () => { reduced = reducedQ.matches; canvas.dataset.mode = reduced ? "still" : "live"; };
     reducedQ.addEventListener?.("change", onReduced);
 
-    const hook: PendantHook = { ready: false, keys: [], s: 0, layer: "front", box: { l: 0, t: 0, r: 0, b: 0 }, glass: null };
+    const hook: PendantHook = {
+      ready: false, keys: [], s: 0, layer: "front", box: { l: 0, t: 0, r: 0, b: 0 }, glass: null, solve: { moved: [], behind: [] },
+    };
     window.__pendant = hook;
 
     let off = false, lost = false, drawn = false, inView = true;
     let scene: PendantScene | null = null;
     let cam: typeof import("@/three/pendant/camera") | null = null;
+    let sv: typeof import("@/three/pendant/solve") | null = null;
     let raf = 0;
 
     // ---------- layout: the track measured (on load, resize, fonts, and whenever the track or section changes size) ----------
@@ -117,6 +155,11 @@ export function AboutPendant() {
       glassR: 0,
       keys: [] as number[],
       texts: [] as TextRect[],
+      /** The chrome's boxes, in the pinned frame's px. */
+      fixed: [] as Box[],
+      /** This screen's solve: per shot nudges, and the layer as a function of travel (null until solved). */
+      shift: [] as number[],
+      layer: null as ((s: number) => Layer) | null,
     };
     let dirty = true;
     const anchor = (name: string) => tr?.querySelector<HTMLElement>(`[data-pendant="${name}"]`) ?? null;
@@ -151,11 +194,44 @@ export function AboutPendant() {
       L.keys = solveKeys(SHOTS, (a) => (typeof a === "object" ? centre(a.pendant) : null), viewW, L.travel);
       // (the section is a screen plus the travel, so travel px and scroll px are one to one)
       hook.keys = SHOTS.map((s, i) => ({ id: s.id, y: L.top + L.keys[i] }));
+      // The words and the chrome, as boxes. Rects relative to the track are proof against the track's own transform; the
+      // arrival animation (the first slides slide in for 1.1 s) and the nav's entrance move them too, so while either runs
+      // these boxes are provisional and everything is measured and solved again the moment they have finished.
+      settle();
       const trR = tr.getBoundingClientRect(), pinR = pin.getBoundingClientRect();
-      L.texts = [...tr.querySelectorAll<HTMLElement>(TEXT)].map((el) => {
-        const r = el.getBoundingClientRect();
-        return { l: r.left - trR.left, t: r.top - pinR.top, w: r.width, h: r.height };
+      L.texts = [...tr.querySelectorAll<HTMLElement>(TEXT)].flatMap(lineBoxes)
+        .map((r) => ({ l: r.l - trR.left, t: r.t - pinR.top, w: r.r - r.l, h: r.b - r.t }));
+      // (the site's chrome is fixed to the viewport and the pin sits at its top while it is a track: only the left offsets)
+      const site = [...document.querySelectorAll<HTMLElement>(CHROME_SITE)].map((el) => [el.getBoundingClientRect(), 0] as const);
+      const own = [...pin.querySelectorAll<HTMLElement>(CHROME_PIN)].map((el) => [el.getBoundingClientRect(), pinR.top] as const);
+      L.fixed = [...site, ...own].filter(([r]) => r.width > 0 && r.height > 0)
+        .map(([r, top]) => ({ l: r.left - pinR.left, t: r.top - top, r: r.right - pinR.left, b: r.bottom - top }));
+      L.layer = null;
+      L.shift = [];
+      hook.solve = { moved: [], behind: [] };
+      if (scene && sv && L.mode === "track") {
+        const glassMid = L.glassMid;
+        const solved = sv.solve({
+          shots: SHOTS, keys: L.keys, travel: L.travel, vw, vh, texts: L.texts, fixed: L.fixed, bounds: scene.bounds,
+          at: (s) => ({ line1: L.line1, glass: { x: glassMid === null ? 0.5 : (glassMid - s) / vw, y: 0.5 } }),
+        });
+        L.shift = solved.shift;
+        L.layer = solved.layer;
+        hook.solve = { moved: solved.moved, behind: solved.behind };
+      }
+    };
+    /** Measure and solve again once the arrival animation and the nav's entrance have finished (if either is running). */
+    let settling = false;
+    const settle = () => {
+      if (settling || !tr) return;
+      const els = [tr, ...document.querySelectorAll<HTMLElement>(CHROME_SITE)];
+      const running = els.flatMap((el) => el.getAnimations?.({ subtree: true }) ?? []).filter((a) => {
+        const end = a.effect?.getComputedTiming().endTime;
+        return a.playState === "running" && typeof end === "number" && Number.isFinite(end);
       });
+      if (running.length === 0) return;
+      settling = true;
+      void Promise.all(running.map((a) => a.finished.catch(() => undefined))).then(() => { settling = false; invalidate(); });
     };
 
     // ---------- the frame ----------
@@ -163,7 +239,7 @@ export function AboutPendant() {
     const look: Look = { x: 0, y: 0 };
     const mouse = { x: 0, y: 0 };
     let drag: { x: number; y: number } | null = null, dragDX = 0, dragDY = 0;
-    let last = 0, time = 0, sSm = 0, sPrev = 0, first = true;
+    let last = 0, time = 0, sSm = 0, sPrev = 0, first = true, forcedK = 0;
 
     const step = (now: number, sc: PendantScene, cm: NonNullable<typeof cam>) => {
       const dt = Math.min(Math.max((now - last) / 1000, 0), DT_MAX);
@@ -178,11 +254,11 @@ export function AboutPendant() {
       // the glass slot rides with the track as the page shows it (not the smoothed travel): it is a place in the page
       const gx = L.glassMid === null ? 0.5 : (L.glassMid - sTarget) / L.vw;
       const f = shotAt(sSm, L.keys, SHOTS, { line1: L.line1, glass: { x: gx, y: 0.5 } });
+      sv?.shiftAx(f, L.shift); // (this screen's nudges)
       // the pull to Contact: it falls away into the dark as the section scrolls off
       const o = clamp01((y - (L.top + L.H - vh)) / vh);
       f.h *= 1 - OUT_SHRINK * o;
       f.ay += OUT_SINK * o;
-      const dim = f.dim * (1 - o);
       motion = stepMotion(motion, {
         dt, spin: f.spin, tumble: f.tumble, lock: f.lock, scrollVel: vel, dragging: drag !== null, dragDX, dragDY, reduced,
       });
@@ -190,14 +266,24 @@ export function AboutPendant() {
       look.x += (-mouse.y * LOOK - look.x) * LOOK_EASE;
       look.y += (-mouse.x * LOOK - look.y) * LOOK_EASE;
       cm.poseRig(f, motion, time, look, L.vw, L.vh, sc.camera, sc.outer, sc.inner, { still: reduced });
+      const box = cm.screenBox(sc.bounds, sc.inner, sc.camera, L.vw, L.vh);
+      // The layer: the one solved for this screen at this travel, not the shot's own. Then a check of the live box against
+      // the words where the page shows them (they ride the real scroll, the pendant the eased one, so after a jump they part
+      // for a moment; and the cursor's lean and the motion are live): anything covered sends it behind for that frame.
+      let layer: Layer = L.layer ? L.layer(sSm) : f.layer;
+      if (layer === "front" && sv && hits(sv.onScreen(box, L.vw, L.vh, sv.GROW), L.texts, sTarget, L.fixed) > 0) layer = "back";
+      // a shot that wanted the front but is behind the words dims to the tumble's brightness, eased in behind them
+      const forced = layer === "back" && f.layer === "front" ? 1 : 0;
+      forcedK += (forced - forcedK) * (1 - FORCED_EASE ** dt);
+      const shotDim = f.dim + (Math.min(f.dim, sv?.FORCED_DIM ?? f.dim) - f.dim) * forcedK;
+      const dim = shotDim * (1 - o);
       const glass: GlassSlot | null = f.glass > GLASS_MIN && L.glassMid !== null && L.glassR > 0 ? { x: gx, y: 0.5, r: L.glassR } : null;
       sc.draw(f, glass, dim);
       drawn = true;
-      // (Task 8 replaces the shot's own layer with the one solved from the text boxes)
-      if (canvas.dataset.layer !== f.layer) canvas.dataset.layer = f.layer;
+      if (canvas.dataset.layer !== layer) canvas.dataset.layer = layer;
       hook.s = sSm;
-      hook.layer = f.layer;
-      hook.box = cm.screenBox(sc.bounds, sc.inner, sc.camera, L.vw, L.vh);
+      hook.layer = layer;
+      hook.box = box;
       hook.glass = glass && { x: glass.x, y: glass.y, r: glass.r * f.glass }; // (the scene grows the ball with f.glass)
       if (!hook.ready) { hook.ready = true; canvas.dataset.ready = ""; }
     };
@@ -205,7 +291,14 @@ export function AboutPendant() {
     const frame = (now: number) => {
       raf = 0;
       if (off || lost || !scene || !cam || !inView || document.hidden) return;
-      if (dirty) measure();
+      if (dirty) {
+        try {
+          measure(); // (and this screen's solve)
+        } catch {
+          fail();
+          return;
+        }
+      }
       if (L.mode !== "track") return; // stacked: about.css hides it; a resize back to the track restarts it
       raf = requestAnimationFrame(frame);
       try {
@@ -349,12 +442,15 @@ export function AboutPendant() {
         if (off) return;
         // (probed after the paint too: making a GL context costs a few ms the text shouldn't wait for)
         if (!hasWebGL2()) throw new Error("no WebGL2");
-        const [{ PendantScene: Scene }, camMod] = await Promise.all([import("@/three/pendant/scene"), import("@/three/pendant/camera")]);
+        const [{ PendantScene: Scene }, camMod, solveMod] = await Promise.all([
+          import("@/three/pendant/scene"), import("@/three/pendant/camera"), import("@/three/pendant/solve"),
+        ]);
         if (off) return;
         const loaded = await Scene.load(canvas);
         if (off) { loaded.dispose(); return; }
         scene = loaded;
         cam = camMod;
+        sv = solveMod;
         dirty = true; // (sizes the drawing buffer before the first draw or hit: the scene's warm-up left it at 16 x 16)
         run();
       } catch {

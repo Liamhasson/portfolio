@@ -126,3 +126,38 @@ describe("freeSpot", () => {
     expect(freeSpot(box(440, 540), t, 0, vw, 0.05)).toBeNull();
   });
 });
+
+// Task 8: the fixed site chrome (wordmark, pill nav, burger, resume pill, progress bar) holds still on screen while the
+// track moves, so its boxes are screen px and never shift with s.
+describe("fixed boxes (screen px, not moved by s)", () => {
+  const nav: Box = { l: 1000, t: 40, r: 1300, b: 90 };
+  it("hits counts a fixed box without the s shift", () => {
+    const b = box(1200, 1400, 60, 200);
+    expect(hits(b, [], 0, [nav])).toBe(1);
+    expect(hits(b, [], 5000, [nav])).toBe(1); // still there however far the track has gone
+    expect(hits(b, [{ l: 6200, t: 100, w: 100, h: 40 }], 5000, [nav])).toBe(2); // a text and the chrome
+  });
+  it("treats touching a fixed box's edge as not overlapping", () => {
+    expect(hits(box(1300, 1400, 60, 200), [], 0, [nav])).toBe(0);
+    expect(hits(box(1100, 1200, 90, 200), [], 0, [nav])).toBe(0);
+  });
+  it("defaults to no fixed boxes", () => {
+    expect(hits(box(1200, 1400, 60, 200), [], 0)).toBe(0);
+  });
+  it("layerTimeline never puts the pendant in front over a fixed box", () => {
+    const over = box(1200, 1400, 60, 200), free = box(0, 50);
+    const samples: Sample[] = [0, 10, 20, 30, 40].map((s) => ({ s, wanted: "front", box: s === 20 || s === 30 ? over : free }));
+    const tl = layerTimeline(samples, [], [nav]);
+    expect(tl(0)).toBe("front");
+    expect(tl(10)).toBe("back"); // (the switch lands on the clear sample before the chrome is reached)
+    expect(tl(20)).toBe("back");
+    expect(tl(30)).toBe("back");
+    expect(tl(40)).toBe("front");
+    expect(layerTimeline(samples, [])(20)).toBe("front"); // (without the chrome nothing is covered)
+  });
+  it("freeSpot moves the box off a fixed box", () => {
+    const d = freeSpot(box(1250, 1350, 60, 200), [], 3000, 1000, 0.25, [nav]); // right: +50 px; left: -350 px
+    expect(d as number).toBeCloseTo(0.05, 2);
+    expect(freeSpot(box(1250, 1350, 60, 200), [], 0, 1000, 0.02, [nav])).toBeNull();
+  });
+});

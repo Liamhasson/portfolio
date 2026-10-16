@@ -243,6 +243,8 @@ export class PendantScene {
       (brass.material as Material).onBeforeCompile = (shader) => {
         shader.fragmentShader = patchShadingR170(shader.fragmentShader, ShaderChunk);
       };
+      // (its own program: three must never share a compiled program between the patched brass and a plain standard material)
+      (brass.material as Material).customProgramCacheKey = () => "pendant-brass-r170";
       // the clay copy shares the geometry and the node's transform
       const clay = new Mesh(brass.geometry, keep(new MeshStandardMaterial({ color: 0xb9ada3, roughness: 0.78, metalness: 0, side: DoubleSide })));
       clay.position.copy(brass.position);
