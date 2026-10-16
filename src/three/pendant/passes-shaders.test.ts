@@ -8,7 +8,7 @@ import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import {
   BOKEH_BLUR, BOKEH_OPAQUE_ALPHA, BRDF_INCLUDE, BRDF_LUT, ENV_BEND, ENV_INCLUDE, LIGHTS_INCLUDE, LIGHTS_LUT, LIGHTS_MS, OUTPUT_READ,
-  patchBokeh, patchOutput, patchShadingR170,
+  BOKEH_EARLY_OUT, patchBokeh, patchOutput, patchShadingR170,
 } from "./passes";
 
 describe("three's shaders still hold the pendant's patch anchors", () => {
@@ -19,6 +19,9 @@ describe("three's shaders still hold the pendant's patch anchors", () => {
     const patched = patchBokeh(frag);
     expect(patched).not.toContain(BOKEH_OPAQUE_ALPHA);
     expect(patched).toContain("smoothstep( 0.0, 0.5, texture2D( tColor, vUv ).a )");
+    // the early out comes after the radius is final (the smoothstep), before the taps
+    expect(patched.indexOf(BOKEH_EARLY_OUT)).toBeGreaterThan(patched.indexOf("smoothstep( 0.0, 0.5"));
+    expect(patched.indexOf(BOKEH_EARLY_OUT)).toBeLessThan(patched.indexOf("dofblur9"));
   });
 
   it("OutputPass: the read line exists, once, and the patch un-premultiplies then premultiplies", () => {

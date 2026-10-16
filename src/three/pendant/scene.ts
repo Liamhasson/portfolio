@@ -7,8 +7,11 @@
  *   - depth of field is three's BokehPass with its "alpha = 1" line removed, so the page shows through the blur;
  *   - the dimming (behind the words) is a ShaderPass, never a CSS filter: a CSS filter on a canvas costs a compositor
  *     layer every frame;
- *   - the testimonials' glass ball is a pass after the depth of field (glass.ts): a true sphere, ray-traced per pixel, that
- *     looks up the pendant behind it in a zoomed render of it, so the pendant reads sharp, magnified and upside down in it.
+ *   - motion blur (motion-blur.ts) right after the depth of field, on the fast moves only: the pass is off while the
+ *     longest smear is under a pixel;
+ *   - the testimonials' glass ball is a pass after the motion blur (glass.ts): a true sphere, ray-traced per pixel, that
+ *     looks up the pendant behind it in a zoomed render of it, so the pendant reads sharp, magnified and upside down in it
+ *     (after the blur, so neither the ball nor its lens view is ever smeared).
  * The mount (Task 7) poses the rig itself, `poseRig(f, motion, t, look, vw, vh, scene.camera, scene.outer, scene.inner)`,
  * then calls `draw`. `draw` never moves the camera: it draws from the camera as posed.
  */
@@ -30,6 +33,7 @@ import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { distanceFor } from "./camera";
 import { GLASS_MAG, glassAt, glassMaterial, LENS_DENSITY, LENS_SPAN } from "./glass";
+import { MotionBlurPass, SHUTTER } from "./motion-blur";
 import { buildEdges, patchBokeh, patchOutput, patchShadingR170 } from "./passes";
 import type { Frame } from "./shots";
 
@@ -72,6 +76,23 @@ const DimShader = {
     }`,
 };
 
+/** One frame's step, for the motion blur: `dt` (s) scales the smear to a 1/60 s shutter; `reset` after a jump the mount
+ *  knows of (a scroll jump, a new solve, the loop resuming), so the move from the last frame isn't smeared; `tag` labels
+ *  the frame's GPU time when timing is on (enableGpuTiming). */
+export interface DrawStep {
+  dt: number;
+  reset?: boolean;
+  tag?: number;
+}
+
+/** The GPU timer (EXT_disjoint_timer_query_webgl2): a query per frame round the frame's draws, read back a few frames on. */
+interface GpuTimer {
+  gl: WebGL2RenderingContext;
+  ext: { TIME_ELAPSED_EXT: number; GPU_DISJOINT_EXT: number };
+  pending: { q: WebGLQuery; tag: number }[];
+  done: { ms: number; tag: number }[];
+}
+
 export interface GlassSlot {
   /** The slot's centre as a share of the viewport's width / height, and its radius as a share of the height. */
   x: number;
@@ -103,6 +124,10 @@ export class PendantScene {
   private readonly outputPass: OutputPass;
   private readonly renderPass: RenderPass;
   private readonly glassPass: ShaderPass;
+  private readonly blur: MotionBlurPass;
+  /** The motion blur's view-projection for this frame. */
+  private readonly viewProj = new Matrix4();
+  private timer: GpuTimer | null = null;
   private readonly glass: ReturnType<typeof glassMaterial>;
   /** Behind the ball, lighting only its rim (it is never added to the scene: the brass's lights and look stay as approved). */
   readonly rimLight = new DirectionalLight(0xffffff, 0);
@@ -166,6 +191,17 @@ export class PendantScene {
     this.bokeh.materialBokeh.fragmentShader = patchBokeh(this.bokeh.materialBokeh.fragmentShader);
     this.bokeh.materialBokeh.needsUpdate = true;
     this.composer.addPass(this.bokeh);
+    // motion blur after the depth of field and before the glass, so the ball and its lens view stay crisp; it honours the
+    // build's clipping planes (the same Plane objects), and is off until a frame moves enough to smear
+    const wireMeshes: Mesh[] = [];
+    wire.traverse((o) => { if ((o as Mesh).isMesh) wireMeshes.push(o as Mesh); });
+    this.blur = new MotionBlurPass(scene, camera, inner, [
+      { mesh: brass, clippingPlanes: [this.brassClip] },
+      { mesh: clay, clippingPlanes: [this.clayClipLeft, this.clayClipRight] },
+      ...wireMeshes.map((mesh) => ({ mesh, clippingPlanes: [this.wireClip], wireframe: true })),
+    ], outline);
+    this.blur.enabled = false;
+    this.composer.addPass(this.blur);
     // the glass after the depth of field, so the bokeh's depth pass never sees it (the focus stays on the pendant behind it)
     // and its blur never softens the pendant inside it; off while no ball is on screen
     this.lensTarget = new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples: hiDpi ? 0 : 4 });
@@ -342,11 +378,16 @@ export class PendantScene {
     this.clay.visible = true;
     this.wire.visible = true;
     this.glassPass.enabled = true;
+    this.scene.updateMatrixWorld();
+    this.viewProj.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
+    this.blur.track(this.viewProj, this.inner.matrixWorld, SHUTTER, true);
+    this.blur.enabled = true;
     for (const dimOn of [true, false]) {
       this.dimPass.enabled = dimOn;
       this.composer.render();
     }
     this.glassPass.enabled = false;
+    this.blur.enabled = false;
     this.dimPass.enabled = false;
     cam.position.set(0, 0, 0);
     cam.updateMatrixWorld(true);
@@ -359,6 +400,7 @@ export class PendantScene {
     this.vw = Math.max(1, vw);
     this.vh = Math.max(1, vh);
     this.dpr = d;
+    this.blur.pixelRatio = d; // (before the composer sizes its passes: the blur's cap and tiles are in CSS px)
     this.renderer.setPixelRatio(d);
     this.renderer.setSize(this.vw, this.vh, false);
     this.composer.setPixelRatio(d);
@@ -371,10 +413,13 @@ export class PendantScene {
    * Draws one frame from the camera as `poseRig` posed it. `glass`: the testimonials' ball (centre as a share of the
    * viewport, radius as a share of its height), or null when it isn't on screen (or the testimonials draw it). `dim`: 0..1
    * brightness. `rim`: the testimonials' edge colour at the ball (about-glass.ts `glassRim()`), or null for no rim light.
+   * `step`: the frame's dt and whether the pose jumped (the motion blur).
    */
-  draw(f: Frame, glass: GlassSlot | null, dim: number, rim: Rgb | null = null): void {
+  draw(f: Frame, glass: GlassSlot | null, dim: number, rim: Rgb | null = null, step: DrawStep = { dt: SHUTTER }): void {
     if (this.gone) return;
     const cam = this.camera;
+    this.scene.updateMatrixWorld(); // (fresh matrices for the blur's estimate; the camera's inverse too)
+    this.beginTimer(step.tag ?? 0);
     const dist = distanceFor(f.h, f.fov);
 
     // the build passes: a sweep left to right across the pendant on screen
@@ -407,7 +452,67 @@ export class PendantScene {
     this.dimPass.uniforms.dim.value = d;
     this.dimPass.enabled = d < 0.999;
 
+    // motion blur: the move since the last frame, camera and pendant together (off while it smears under a pixel)
+    this.viewProj.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
+    this.blur.enabled = this.blur.track(this.viewProj, this.inner.matrixWorld, step.dt, step.reset ?? false);
+
     this.composer.render();
+    this.blur.setPrevious(this.viewProj, this.inner.matrixWorld);
+    this.endTimer();
+  }
+
+  /** The motion blur's last estimate: the longest smear (CSS px), whether it is drawn, and whether the frame jumped. */
+  get blurState(): { smear: number; on: boolean; jump: boolean } {
+    return { smear: this.blur.lastSmear, on: this.blur.enabled, jump: this.blur.lastJump };
+  }
+
+  /** Times each frame's GPU work (the lens view and the composer) from now on. False if the GPU can't (no extension). */
+  enableGpuTiming(): boolean {
+    if (this.gone) return false;
+    if (this.timer) return true;
+    const gl = this.renderer.getContext() as WebGL2RenderingContext;
+    const ext = gl.getExtension("EXT_disjoint_timer_query_webgl2") as GpuTimer["ext"] | null;
+    if (!ext) return false;
+    this.timer = { gl, ext, pending: [], done: [] };
+    return true;
+  }
+
+  /** The GPU times (ms) read back since the last call, each with its frame's tag. */
+  takeGpuTimes(): { ms: number; tag: number }[] {
+    if (!this.timer) return [];
+    const out = this.timer.done;
+    this.timer.done = [];
+    return out;
+  }
+
+  /** Reads back the finished queries and starts this frame's (called at the top of a frame's draws). */
+  private beginTimer(tag: number): void {
+    const t = this.timer;
+    if (!t) return;
+    const { gl, ext } = t;
+    const disjoint = gl.getParameter(ext.GPU_DISJOINT_EXT) as boolean;
+    while (t.pending.length) {
+      const { q, tag: qt } = t.pending[0];
+      if (!gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE)) break;
+      const ns = gl.getQueryParameter(q, gl.QUERY_RESULT) as number;
+      if (!disjoint) t.done.push({ ms: ns / 1e6, tag: qt });
+      gl.deleteQuery(q);
+      t.pending.shift();
+    }
+    if (t.pending.length > 8) return; // (the GPU is far behind: skip timing this frame)
+    const q = gl.createQuery();
+    if (!q) return;
+    gl.beginQuery(ext.TIME_ELAPSED_EXT, q);
+    t.pending.push({ q, tag });
+    this.timing = true;
+  }
+
+  private timing = false;
+
+  private endTimer(): void {
+    if (!this.timer || !this.timing) return;
+    this.timing = false;
+    this.timer.gl.endQuery(this.timer.ext.TIME_ELAPSED_EXT);
   }
 
   /** The glass pass's uniforms for this frame: the ball, the camera it is seen from, the plane through the pendant, the rim. */
@@ -477,7 +582,9 @@ export class PendantScene {
   dispose(): void {
     if (this.gone) return;
     this.gone = true;
-    for (const p of [this.renderPass, this.bokeh, this.glassPass, this.outputPass, this.dimPass]) p.dispose(); // (a shader pass frees its material)
+    if (this.timer) for (const { q } of this.timer.pending) this.timer.gl.deleteQuery(q);
+    this.timer = null;
+    for (const p of [this.renderPass, this.bokeh, this.blur, this.glassPass, this.outputPass, this.dimPass]) p.dispose(); // (a shader pass frees its material)
     this.composer.dispose();
     this.lensTarget.dispose();
     for (const o of this.disposables) o.dispose();

@@ -4,6 +4,7 @@
 // `keys`: [{ id, y }] in scroll px).
 //   OUT=test-results/pendant BASE=http://localhost:3000 DPR=1 node scripts/about/pendant-frames.cjs
 // W, H: the viewport (1440 x 900 by default); ONLY: a comma list of key ids to grab (all by default), e.g. ONLY=glass.
+// STEP: a fixed frame step in ms (the mount's `window.__pendantStep`), e.g. STEP=30 to see the motion blur at 30 ms frames.
 const path = require("node:path");
 const fs = require("node:fs");
 const { chromium } = require("playwright"); // (resolved up from here: a worktree finds the main checkout's node_modules)
@@ -14,11 +15,13 @@ const DPR = Number(process.env.DPR) || 1; // (2 for a retina capture: the scene 
 const W = Number(process.env.W) || 1440;
 const H = Number(process.env.H) || 900;
 const ONLY = process.env.ONLY ? process.env.ONLY.split(",") : null;
+const STEP = Number(process.env.STEP) || 0;
 
 (async () => {
   fs.mkdirSync(OUT, { recursive: true });
   const browser = await chromium.launch({ args: ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"] });
   const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: DPR });
+  if (STEP > 0) await page.addInitScript((ms) => { window.__pendantStep = ms; }, STEP);
   page.on("console", (m) => m.type() === "error" && !m.text().includes("404") && console.error(m.text().slice(0, 400)));
   try {
     await page.goto(`${BASE}/about`);
@@ -30,9 +33,10 @@ const ONLY = process.env.ONLY ? process.env.ONLY.split(",") : null;
       if (ONLY && !ONLY.includes(id)) continue;
       await page.evaluate((y) => window.scrollTo(0, y), y);
       await page.waitForTimeout(2500); // (the scroll's ease and the pendant's motion settle)
-      const file = path.join(OUT, `pendant-${id}${process.env.W || process.env.H ? `-${W}x${H}` : ""}.jpg`);
+      const file = path.join(OUT, `pendant-${id}${process.env.W || process.env.H ? `-${W}x${H}` : ""}${STEP ? `-step${STEP}` : ""}.jpg`);
       await page.screenshot({ path: file, type: "jpeg", quality: 90 });
-      console.log(file);
+      const blur = await page.evaluate(() => window.__pendant.blur);
+      console.log(file, blur ? `blur: ${blur.on ? "on" : "off"}, smear ${blur.smear.toFixed(1)} css px` : "");
     }
   } finally {
     await browser.close();

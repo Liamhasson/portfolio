@@ -42,15 +42,19 @@ export const BOKEH_BLUR = "vec2 dofblur = vec2 ( clamp( factor * aperture, -maxb
 /** OutputShader's read of the previous pass. */
 export const OUTPUT_READ = "gl_FragColor = texture2D( tDiffuse, vUv );";
 
+/** Where the bokeh has no blur (nothing drawn there: most of the screen) it returns the pixel at once instead of reading it
+ *  41 times: the same result, a fraction of the cost (Task 10's performance pass). */
+export const BOKEH_EARLY_OUT = "if ( dofblur.x == 0.0 ) { gl_FragColor = texture2D( tColor, vUv ); return; }";
+
 /** The bokeh fragment shader with alpha left alone, and the blur off where nothing is drawn (an out-of-focus part of the
- *  pendant still blurs inwards). */
+ *  pendant still blurs inwards); a pixel with no blur skips the taps. */
 export function patchBokeh(frag: string): string {
   if (!frag.includes(BOKEH_OPAQUE_ALPHA) || !frag.includes(BOKEH_BLUR)) {
     throw new Error("BokehShader changed: update the patches in passes.ts");
   }
   return frag
     .replace(BOKEH_OPAQUE_ALPHA, "")
-    .replace(BOKEH_BLUR, `${BOKEH_BLUR}\n\t\t\tdofblur *= smoothstep( 0.0, 0.5, texture2D( tColor, vUv ).a );`);
+    .replace(BOKEH_BLUR, `${BOKEH_BLUR}\n\t\t\tdofblur *= smoothstep( 0.0, 0.5, texture2D( tColor, vUv ).a );\n\t\t\t${BOKEH_EARLY_OUT}`);
 }
 
 /** The output fragment shader seeing plain colour: the scene is drawn premultiplied (the blend gives rgb x alpha) and so is the

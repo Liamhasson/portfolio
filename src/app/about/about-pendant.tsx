@@ -6,6 +6,7 @@ import { claimGlass, glassOwner, glassRim } from "@/lib/about-glass";
 import type { Box, Look } from "@/three/pendant/camera";
 import { clipBox, hits, padBox, type TextRect } from "@/three/pendant/layout";
 import { REST, stepMotion, type MotionState } from "@/three/pendant/motion";
+import { PendantGovernor } from "@/three/pendant/governor";
 import type { GlassSlot, PendantScene } from "@/three/pendant/scene";
 import { SHOTS, shotAt, solveKeys, type Layer, type Shot } from "@/three/pendant/shots";
 import type { Outline } from "@/three/pendant/solve";
@@ -33,10 +34,24 @@ export interface PendantHook {
   /** The pendant's turn about its own axis (radians), and whether a hand is on it. */
   yaw: number;
   dragging: boolean;
+  /** The motion blur this frame: the longest smear (CSS px, scaled to a 1/60 s shutter), whether the pass drew, and whether
+   *  the frame counted as a jump (nothing smeared). */
+  blur: { smear: number; on: boolean; jump: boolean };
+  /** With `window.__pendantPerf` set before load: each frame's GPU time (ms), with the travel and the nearest shot it was
+   *  drawn at (scripts/about/pendant-perf.cjs); null if the GPU can't time (no EXT_disjoint_timer_query_webgl2). */
+  gpuMs: { ms: number; s: number; shot: string }[] | null;
+  /** The pixel ratio the pendant is drawn at (the governor's, under the screen's own). */
+  pixelRatio: number;
 }
 
 declare global {
-  interface Window { __pendant?: PendantHook }
+  interface Window {
+    __pendant?: PendantHook;
+    /** Diagnostics: time the GPU (set before the page loads). */
+    __pendantPerf?: boolean;
+    /** Diagnostics: a fixed frame step (ms) in place of the real one (the frame script's STEP). */
+    __pendantStep?: number;
+  }
 }
 
 /** The scroll follow: what is left of the gap after one second (pendant-film-v3: a soft follow, like Lenis). */
@@ -152,12 +167,12 @@ export function AboutPendant() {
     const reducedQ = window.matchMedia("(prefers-reduced-motion: reduce)");
     let reduced = reducedQ.matches;
     canvas.dataset.mode = reduced ? "still" : "live";
-    const onReduced = () => { reduced = reducedQ.matches; canvas.dataset.mode = reduced ? "still" : "live"; };
+    const onReduced = () => { reduced = reducedQ.matches; canvas.dataset.mode = reduced ? "still" : "live"; jumped = true; };
     reducedQ.addEventListener?.("change", onReduced);
 
     const hook: PendantHook = {
       ready: false, keys: [], s: 0, layer: "front", box: { l: 0, t: 0, r: 0, b: 0 }, glass: null, solve: { moved: [], behind: [] },
-      yaw: 0, dragging: false,
+      yaw: 0, dragging: false, blur: { smear: 0, on: false, jump: false }, gpuMs: null, pixelRatio: 1,
     };
     window.__pendant = hook;
 
@@ -174,8 +189,12 @@ export function AboutPendant() {
     const giveGlassBack = () => { releaseGlass?.(); releaseGlass = null; };
 
     // ---------- layout: the track measured (on load, resize, fonts, and whenever the track or section changes size) ----------
+    /** The sharpness follows the frame time, both ways, never under 1.5x (governor.ts). ?governor=0 holds the screen's own
+     *  ratio (diagnostics: scripts/about/pendant-perf.cjs measures each ratio's real cost with it). */
+    const govOn = new URLSearchParams(window.location.search).get("governor") !== "0";
+    const gov = new PendantGovernor(Math.min(window.devicePixelRatio || 1, 2));
     const L = {
-      vw: 1, vh: 1, dpr: 1, sized: false, mode: "track", top: 0, H: 0, travel: 0, line1: 0.5,
+      vw: 1, vh: 1, dpr: 1, pr: 1, sized: false, mode: "track", top: 0, H: 0, travel: 0, line1: 0.5,
       /** The glass slot's centre (track px). */
       glassMid: null as number | null,
       /** Its radius, as a share of the screen's height. */
@@ -201,8 +220,10 @@ export function AboutPendant() {
       L.mode = sec.dataset.mode ?? "track";
       const vw = pin.clientWidth || window.innerWidth, vh = pin.clientHeight || window.innerHeight;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      if (scene && (!L.sized || vw !== L.vw || vh !== L.vh || dpr !== L.dpr)) { scene.resize(vw, vh, dpr); L.sized = true; }
-      L.vw = vw; L.vh = vh; L.dpr = dpr;
+      gov.setMax(dpr);
+      const pr = govOn ? gov.pixelRatio : dpr;
+      if (scene && (!L.sized || vw !== L.vw || vh !== L.vh || pr !== L.pr)) { scene.resize(vw, vh, pr); L.sized = true; }
+      L.vw = vw; L.vh = vh; L.dpr = dpr; L.pr = pr;
       L.top = sec.offsetTop;
       L.H = sec.offsetHeight;
       const viewW = clip.clientWidth || vw;
@@ -259,6 +280,7 @@ export function AboutPendant() {
       L.shots = solved.shots;
       L.spots = solved.spots;
       L.layer = solved.layer;
+      jumped = true; // (new rest spots: the pose may step)
       hook.solve = { moved: solved.moved, behind: solved.behind };
     };
     /** Measure and solve again once the arrival animation and the nav's entrance have finished (if either is running). */
@@ -282,16 +304,35 @@ export function AboutPendant() {
     const mouse = { x: 0, y: 0 };
     let drag: { x: number; y: number } | null = null, dragDX = 0, dragDY = 0;
     let last = 0, time = 0, sSm = 0, sPrev = 0, first = true, forcedK = 0;
+    /** The motion blur's reset: the pose jumped since the last frame (the loop resumed, a new solve, reduced motion
+     *  toggled, the scroll jumped), so the move between the two frames is not smeared. */
+    let jumped = true, sTargetPrev = 0;
+    /** Diagnostics (window.__pendantPerf): the frames whose GPU time is still on its way back. */
+    let frameNo = 0;
+    const perfFrames = new Map<number, { s: number; shot: string }>();
+    /** The shot whose key is nearest this travel. */
+    const nearestShot = (s: number) => {
+      let best = 0;
+      for (let i = 1; i < L.keys.length; i++) if (Math.abs(L.keys[i] - s) < Math.abs(L.keys[best] - s)) best = i;
+      return L.shots[best]?.id ?? SHOTS[best]?.id ?? "";
+    };
     /** The live guard: behind since it last saw the pendant near a line, until it has been clear for GUARD_HOLD. */
     let guardBack = false, clearFor = 0;
 
     const step = (now: number, sc: PendantScene, cm: NonNullable<typeof cam>) => {
-      const dt = Math.min(Math.max((now - last) / 1000, 0), DT_MAX);
+      const fixedStep = window.__pendantStep;
+      const stepped = typeof fixedStep === "number" && fixedStep > 0;
+      // the governor's step first, then the frame: a resize clears the canvas, so one made after the draw would show blank
+      const nextPr = govOn && !stepped ? gov.sample(now - last) : null;
+      if (nextPr !== null && L.sized) { L.pr = nextPr; sc.resize(L.vw, L.vh, nextPr); }
+      const dt = stepped ? fixedStep / 1000 : Math.min(Math.max((now - last) / 1000, 0), DT_MAX);
       last = now;
       time += dt;
       const vh = window.innerHeight, y = window.scrollY;
       const sTarget = trackProgress(y, L.top, L.H, vh) * L.travel;
-      if (first) { sSm = sPrev = sTarget; first = false; } // (a page opened mid-track starts where it is, no fly-in)
+      if (first) { sSm = sPrev = sTargetPrev = sTarget; first = false; } // (a page opened mid-track starts where it is, no fly-in)
+      if (Math.abs(sTarget - sTargetPrev) > vh) jumped = true; // (a jump, not a scroll: an anchor, a key, a restore)
+      sTargetPrev = sTarget;
       sSm += (sTarget - sSm) * (1 - FOLLOW ** dt);
       const vel = (sSm - sPrev) / Math.max(dt, 1e-3);
       sPrev = sSm;
@@ -334,8 +375,21 @@ export function AboutPendant() {
       forcedK += (forced - forcedK) * (1 - FORCED_EASE ** dt);
       const shotDim = f.dim + (Math.min(f.dim, sv?.FORCED_DIM ?? f.dim) - f.dim) * forcedK;
       const dim = shotDim * (1 - o);
-      sc.draw(f, glass, dim, glass ? glassRim() : null);
+      const tag = ++frameNo;
+      if (hook.gpuMs) perfFrames.set(tag, { s: sSm, shot: nearestShot(sSm) });
+      sc.draw(f, glass, dim, glass ? glassRim() : null, { dt, reset: jumped, tag });
+      jumped = false;
       drawn = true;
+      hook.blur = sc.blurState;
+      hook.pixelRatio = L.pr;
+      if (hook.gpuMs) {
+        // (a query reads back a few frames late: each time goes to the frame it timed)
+        for (const t of sc.takeGpuTimes()) {
+          const at = perfFrames.get(t.tag);
+          if (at && hook.gpuMs.length < 100_000) hook.gpuMs.push({ ms: t.ms, ...at });
+        }
+        for (const k of perfFrames.keys()) if (k < tag - 64) perfFrames.delete(k); else break;
+      }
       if (canvas.dataset.layer !== layer) canvas.dataset.layer = layer;
       hook.s = sSm;
       hook.layer = layer;
@@ -369,6 +423,7 @@ export function AboutPendant() {
     const run = () => {
       if (raf || off || lost || !scene || !cam || !inView || document.hidden) return;
       last = performance.now();
+      jumped = true; // (the loop was stopped: the scroll may have moved meanwhile)
       raf = requestAnimationFrame(frame);
     };
     const invalidate = () => { dirty = true; run(); };
@@ -510,6 +565,7 @@ export function AboutPendant() {
         const loaded = await Scene.load(canvas);
         if (off) { loaded.dispose(); return; }
         scene = loaded;
+        if (window.__pendantPerf) hook.gpuMs = loaded.enableGpuTiming() ? [] : null;
         cam = camMod;
         sv = solveMod;
         const b = loaded.bounds;
