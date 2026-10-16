@@ -69,7 +69,12 @@ function expectRule(pics: Seen[], where: string) {
   return tally;
 }
 
+/** Every .mp4 requested since the page began to load (the listener is set before the first request, so a regression to preload="auto" shows). */
+let mp4s: string[] = [];
+
 test.beforeEach(async ({ page }) => {
+  mp4s = [];
+  page.on("request", (r) => { if (new URL(r.url()).pathname.endsWith(".mp4")) mp4s.push(new URL(r.url()).pathname); });
   await page.goto("/about");
   await expect(page.locator("section.ab")).toHaveAttribute("data-mode", "track");
   await page.evaluate(() => document.fonts.ready);
@@ -190,6 +195,8 @@ test("a link picture that is fully cut leaves no hairline", async ({ page }) => 
         const now = (await readPics(page)).find((x) => x.id === id)!;
         expect(now.left + now.width, `${id} just past the margin`).toBeLessThanOrEqual(margin + 1e-6);
         expect(now.clip, id).toBe("inset(50%)");
+      // (and only just past it: scrolled by whole pixels, 0 to `extra` + 1 px beyond the margin, so the case is not vacuous far away)
+      expect(margin - (now.left + now.width), `${id} how far past the margin`).toBeLessThan(extra + 2);
         const box = (await page.locator(`.ab-pic[data-pic="${id}"]`).boundingBox())!;
         const y0 = Math.max(box.y - 2, 0);
         const clip = { x: Math.floor(margin) - 8, y: y0, width: 12, height: Math.min(box.height + 4, h - y0) };
@@ -206,15 +213,13 @@ test("a link picture that is fully cut leaves no hairline", async ({ page }) => 
 });
 
 test("the loops play only while their picture is on screen", async ({ page }) => {
-  const fetched: string[] = [];
-  page.on("request", (r) => { if (r.url().endsWith(".mp4")) fetched.push(r.url().split("/").pop()!); });
   const paused = (id: string) => page.evaluate((id) => document.querySelector<HTMLVideoElement>(`.ab-pic[data-pic="${id}"] video`)!.paused, id);
   const playing = (id: string) => expect.poll(() => paused(id), { message: `${id} playing`, timeout: 5000 }).toBe(false);
   const stopped = (id: string) => expect.poll(() => paused(id), { message: `${id} paused`, timeout: 5000 }).toBe(true);
 
-  // the start of the page: the strip is far to the right and nothing has downloaded for it
+  // the start of the page, loaded and settled: no loop is visible yet (chips and strip are off to the right), so no video file has been requested at all
   await stopped("eventread");
-  expect(fetched.filter((f) => /eventread|cyvore|nordic|desk-build/.test(f))).toEqual([]);
+  expect(mp4s, "video files requested before any loop was visible").toEqual([]);
 
   // the band loops (in line 2) play while risen on screen, stop once cut away at the margin
   await scrollTrack(page, 0.1);
@@ -238,7 +243,7 @@ test("the loops play only while their picture is on screen", async ({ page }) =>
   await playing("desk");
   await scrollTrack(page, 0.3);
   await stopped("desk");
-  expect(fetched).toContain("eventread.mp4");
+  expect(mp4s).toContain("/work/eventread.mp4");
 });
 
 test("a loop whose file fails keeps its poster and says nothing", async ({ page }) => {
@@ -246,7 +251,8 @@ test("a loop whose file fails keeps its poster and says nothing", async ({ page 
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
   // nothing has been fetched yet (preload="none"), so a route set now catches the first request for the file
-  await page.route("**/work/eventread.mp4", (r) => r.abort());
+  let tries = 0;
+  await page.route("**/work/eventread.mp4", (r) => { tries++; return r.abort(); });
   await scrollTrack(page, 0.3);
   const state = () => page.evaluate(() => {
     const v = document.querySelector<HTMLVideoElement>('.ab-pic[data-pic="eventread"] video')!;
@@ -259,8 +265,12 @@ test("a loop whose file fails keeps its poster and says nothing", async ({ page 
   // its neighbours are not affected
   await expect.poll(() => page.evaluate(() => document.querySelector<HTMLVideoElement>('.ab-pic[data-pic="cyvore"] video')!.paused)).toBe(false);
   // leaving and coming back does not retry (no second request), and the picture is still shown (poster) in its place
+  expect(tries, "requests for the failed file so far").toBe(1);
   await scrollTrack(page, 0.5);
   await scrollTrack(page, 0.3);
+  await page.waitForTimeout(500);
+  expect(tries, "requests for the failed file after leaving and coming back").toBe(1);
+  expect(mp4s.filter((u) => u === "/work/eventread.mp4")).toHaveLength(1);
   expectRule(await readPics(page), "after the failure");
   // the only console line is the browser's own network error for the file
   expect(errors.filter((e) => !/Failed to load resource/.test(e))).toEqual([]);
