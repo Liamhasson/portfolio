@@ -1,0 +1,37 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- a CommonJS script */
+// The About page's pendant, held at each of its shots: one screenshot per key, to check each against the storyboard
+// (framing, angle, layer). Needs the dev server running and the mount's `window.__pendant` hook (Task 7: `ready`, and
+// `keys`: [{ id, y }] in scroll px).
+//   OUT=test-results/pendant BASE=http://localhost:3000 node scripts/about/pendant-frames.cjs
+const path = require("node:path");
+const fs = require("node:fs");
+const { chromium } = require("playwright"); // (resolved up from here: a worktree finds the main checkout's node_modules)
+
+const BASE = process.env.BASE || "http://localhost:3000";
+const OUT = process.env.OUT || "test-results/pendant";
+
+(async () => {
+  fs.mkdirSync(OUT, { recursive: true });
+  const browser = await chromium.launch({ args: ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"] });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+  page.on("console", (m) => m.type() === "error" && !m.text().includes("404") && console.error(m.text().slice(0, 400)));
+  try {
+    await page.goto(`${BASE}/about`);
+    await page.waitForFunction(() => window.__pendant?.ready, null, { timeout: 120000 });
+    await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
+    await page.mouse.move(1430, 890); // (the cursor parked in a corner: its lean stays out of the frame)
+    const keys = await page.evaluate(() => window.__pendant.keys);
+    for (const { id, y } of keys) {
+      await page.evaluate((y) => window.scrollTo(0, y), y);
+      await page.waitForTimeout(2500); // (the scroll's ease and the pendant's motion settle)
+      const file = path.join(OUT, `pendant-${id}.jpg`);
+      await page.screenshot({ path: file, type: "jpeg", quality: 90 });
+      console.log(file);
+    }
+  } finally {
+    await browser.close();
+  }
+})().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
