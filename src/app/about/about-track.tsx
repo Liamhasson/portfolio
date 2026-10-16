@@ -54,16 +54,19 @@ export function AboutTrack() {
     let raf = 0, height = 0, photoDist = 0;
     const photo = tr.querySelector<HTMLElement>(".ab-portrait");
     // the pictures along the track: each one's left on the track, its width (picture + caption), its corner radius (measured in layout)
-    type Pic = { el: HTMLElement; left: number; width: number; radius: string; link: boolean };
-    let pics: Pic[] = [];
+    // (clip/vis: the last strings written, so a frame that changes nothing writes nothing)
+    type PicBox = { el: HTMLElement; left: number; width: number; radius: string; link: boolean; clip?: string; vis?: string };
+    let pics: PicBox[] = [];
     const allPics = [...tr.querySelectorAll<HTMLElement>(".ab-pic")];
     const clearPics = () => allPics.forEach((el) => { el.style.clipPath = ""; el.style.visibility = ""; });
-    // the track's window: the clip (the screen's width; read from the clip so it stays right if the clip is ever inset)
+    // the track's window: the clip (the screen's width; read from the clip so it stays right if the clip is ever inset). (The focus scroll below
+    // uses innerWidth for its 6vw inset: the same unless the clip is inset, and then it errs on the safe side, scrolling the slide further in.)
     const viewW = () => clip.clientWidth || window.innerWidth;
     const frame = () => {
       if (sec.dataset.mode !== "track") return;
       const p = trackProgress(window.scrollY, sec.offsetTop, height, window.innerHeight);
-      const x = trackX(p, tr.scrollWidth, viewW());
+      const vw = viewW();
+      const x = trackX(p, tr.scrollWidth, vw);
       tr.style.transform = `translate3d(${x}px, 0, 0)`;
       // the photo stays where it is and is cropped away from its left edge, over the gap to the first line
       if (photo) {
@@ -72,12 +75,14 @@ export function AboutTrack() {
         photo.style.clipPath = `inset(0 0 0 ${k * 100}% round 10px)`;
       }
       // each picture rises out of its line as it arrives and is cut at the margin line as it leaves (picture-motion.ts)
-      const vw = viewW();
       for (const pic of pics) {
         const { top, left, hidden } = pictureState(pic.left + x, pic.width, vw);
-        pic.el.style.clipPath = `inset(${top}% -100vw 0 ${(left / 100) * pic.width}px round ${pic.radius})`;
-        // (fully gone: hidden, not a hairline. A picture inside a link is only clipped away: visibility:hidden would take the link out of the tab order, and the focus handler below brings it into view)
-        pic.el.style.visibility = hidden && !pic.link ? "hidden" : "";
+        // fully gone: hidden, not a hairline. A picture inside a link stays visible to the tab order (visibility:hidden would take the link out of
+        // it; the focus handler below brings it into view) and gets an empty clip instead: a zero-size box at the centre, so no sub-pixel remnant at an edge
+        const clip = hidden && pic.link ? "inset(50%)" : `inset(${top}% -100vw 0 ${(left / 100) * pic.width}px round ${pic.radius})`;
+        const vis = hidden && !pic.link ? "hidden" : "";
+        if (clip !== pic.clip) { pic.clip = clip; pic.el.style.clipPath = clip; }
+        if (vis !== pic.vis) { pic.vis = vis; pic.el.style.visibility = vis; }
       }
       if (bar.current) bar.current.style.transform = `scaleX(${p})`;
     };

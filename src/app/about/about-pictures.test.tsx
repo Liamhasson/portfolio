@@ -127,11 +127,17 @@ test("a strip picture (inside its link) is clipped away, never visibility:hidden
   laidOut({ cyvore: [3000, 100] });
   const { container } = render(<AboutTrack />);
   const c = pic(container, "cyvore");
-  expect(c.style.clipPath).toMatch(/^inset\(100% /);
+  expect(c.style.clipPath).toBe("inset(50%)");   // (unrisen: an empty clip, not a fractional-width sliver)
   expect(c.style.visibility).toBe("");
   // focusing it scrolls its slide to the margin: the picture is then in the shown range
   scrollTo(3000 - 0.06 * 1024);
   expect(c.style.clipPath).toMatch(/^inset\(0% -100vw 0 0px /);
+  // and as it leaves: part-cut is a left inset, fully cut (its right edge at the margin line) is the empty clip, still visible to the tab order
+  scrollTo(3000 - 0.06 * 1024 + 40);
+  expect(parseFloat(c.style.clipPath.match(/^inset\(0% -100vw 0 ([\d.]+)px/)![1])).toBeCloseTo(40, 6);
+  scrollTo(3000 - 0.06 * 1024 + 100.5);
+  expect(c.style.clipPath).toBe("inset(50%)");
+  expect(c.style.visibility).toBe("");
 });
 
 test("stacked: the pictures' clip and visibility are cleared", () => {
