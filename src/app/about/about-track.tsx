@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Fragment, useEffect, useRef, type ReactNode } from "react";
 import { NextPagePull } from "@/components/shell/next-page-pull";
 import { ABOUT, type Line, type Picture } from "@/content/about";
+import { watchLoops } from "./loops";
 import { pictureState } from "./picture-motion";
 import { scrollForSlide, sectionHeight, trackLayout, trackProgress, trackX } from "./track";
 import "./about.css";
@@ -55,10 +56,12 @@ export function AboutTrack() {
     const photo = tr.querySelector<HTMLElement>(".ab-portrait");
     // the pictures along the track: each one's left on the track, its width (picture + caption), its corner radius (measured in layout)
     // (clip/vis: the last strings written, so a frame that changes nothing writes nothing)
-    type PicBox = { el: HTMLElement; left: number; width: number; radius: string; link: boolean; clip?: string; vis?: string };
+    type PicBox = { el: HTMLElement; left: number; width: number; radius: string; link: boolean; video: HTMLVideoElement | null; clip?: string; vis?: string };
     let pics: PicBox[] = [];
     const allPics = [...tr.querySelectorAll<HTMLElement>(".ab-pic")];
-    const clearPics = () => allPics.forEach((el) => { el.style.clipPath = ""; el.style.visibility = ""; });
+    const clearPics = () => { allPics.forEach((el) => { el.style.clipPath = ""; el.style.visibility = ""; }); allPics.forEach((el) => loops.setShown(el.querySelector("video"), true)); };
+    // the loops (video pictures) play only while on screen (loops.ts)
+    const loops = watchLoops([...tr.querySelectorAll("video")]);
     // the track's window: the clip (the screen's width; read from the clip so it stays right if the clip is ever inset). (The focus scroll below
     // uses innerWidth for its 6vw inset: the same unless the clip is inset, and then it errs on the safe side, scrolling the slide further in.)
     const viewW = () => clip.clientWidth || window.innerWidth;
@@ -83,6 +86,8 @@ export function AboutTrack() {
         const vis = hidden && !pic.link ? "hidden" : "";
         if (clip !== pic.clip) { pic.clip = clip; pic.el.style.clipPath = clip; }
         if (vis !== pic.vis) { pic.vis = vis; pic.el.style.visibility = vis; }
+        // a loop cut away (or not yet risen) does not play, though its layout box may be on screen
+        loops.setShown(pic.video, !hidden);
       }
       if (bar.current) bar.current.style.transform = `scaleX(${p})`;
     };
@@ -106,7 +111,7 @@ export function AboutTrack() {
       pics = allPics.map((el) => {
         const r = el.getBoundingClientRect();
         const right = Math.max(r.right, ...[...el.children].map((c) => c.getBoundingClientRect().right));
-        return { el, left: r.left - t0, width: right - r.left, radius: getComputedStyle(el.querySelector(".ab-pic-f") ?? el).borderTopLeftRadius || "10px", link: !!el.closest("a") };
+        return { el, left: r.left - t0, width: right - r.left, radius: getComputedStyle(el.querySelector(".ab-pic-f") ?? el).borderTopLeftRadius || "10px", link: !!el.closest("a"), video: el.querySelector("video") };
       });
       height = sectionHeight(tr.scrollWidth, viewW(), window.innerHeight);
       sec.style.height = `${height}px`;
@@ -139,7 +144,7 @@ export function AboutTrack() {
     void document.fonts?.ready.then(layout);
     window.addEventListener("resize", layout);
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => { cancelAnimationFrame(raf); io?.disconnect(); ioSec?.disconnect(); sec.removeEventListener("focusin", onFocus); window.removeEventListener("resize", layout); window.removeEventListener("scroll", onScroll); };
+    return () => { cancelAnimationFrame(raf); loops.destroy(); io?.disconnect(); ioSec?.disconnect(); sec.removeEventListener("focusin", onFocus); window.removeEventListener("resize", layout); window.removeEventListener("scroll", onScroll); };
   }, []);
   return (
     <>

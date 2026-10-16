@@ -163,3 +163,151 @@ test("a strip picture without a link fails loudly, not a quiet link to the home 
   err.mockRestore();
   vi.doUnmock("@/content/about");
 });
+
+/** the loops (task 5): jsdom has no IntersectionObserver or media playback; a mock IO we can fire, and a play/pause we can watch */
+type IOCallback = (entries: Partial<IntersectionObserverEntry>[]) => void;
+function mockLoops(reduced = false) {
+  const observers: { cb: IOCallback; els: Set<Element>; disconnected: boolean }[] = [];
+  vi.stubGlobal("IntersectionObserver", class {
+    rec: (typeof observers)[number];
+    constructor(cb: IOCallback) { this.rec = { cb, els: new Set(), disconnected: false }; observers.push(this.rec); }
+    observe(el: Element) { this.rec.els.add(el); }
+    unobserve(el: Element) { this.rec.els.delete(el); }
+    disconnect() { this.rec.disconnected = true; this.rec.els.clear(); }
+  });
+  const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(function (this: HTMLMediaElement) { return Promise.resolve(); });
+  const pause = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+  const mq = { matches: reduced, listeners: new Set<() => void>(), addEventListener(_: string, l: () => void) { this.listeners.add(l); }, removeEventListener(_: string, l: () => void) { this.listeners.delete(l); } };
+  window.matchMedia = vi.fn().mockReturnValue(mq) as never;
+  const loopObserver = () => observers.find((o) => [...o.els].some((e) => e.tagName === "VIDEO"))!;
+  const see = (v: Element, isIntersecting: boolean) => act(() => { loopObserver().cb([{ target: v, isIntersecting }]); });
+  return { observers, play, pause, mq, loopObserver, see };
+}
+const flush = () => act(async () => { await Promise.resolve(); });
+const videoOf = (c: ParentNode, id: string) => pic(c, id).querySelector("video")!;
+/** every loop sits in the shown range of the 1024px screen (on the track the pictures are otherwise 0px wide: cut away) */
+const allShown = () => laidOut(Object.fromEntries(["marni-came", "sanskrit", "cyvore", "eventread", "nordic-logic", "desk"].map((id) => [id, [300, 100] as [number, number]])));
+
+test("a loop plays when it enters the screen and pauses when it leaves; off screen it is never started", () => {
+  allShown();
+  const m = mockLoops();
+  const { container } = render(<AboutTrack />);
+  // all six loops are watched, none started (preload none: no play, no load, so nothing downloads)
+  expect(m.loopObserver().els.size).toBe(6);
+  expect(m.play).not.toHaveBeenCalled();
+  const v = videoOf(container, "desk");
+  m.see(v, true);
+  expect(m.play).toHaveBeenCalledTimes(1);
+  expect(m.play.mock.contexts[0]).toBe(v);
+  m.see(v, false);
+  expect(m.pause).toHaveBeenCalledTimes(1);
+  expect(m.pause.mock.contexts[0]).toBe(v);
+});
+
+test("under reduced motion loops never play; their posters show", () => {
+  const m = mockLoops(true);
+  const { container } = render(<AboutTrack />);
+  const v = videoOf(container, "desk");
+  m.see(v, true);
+  expect(m.play).not.toHaveBeenCalled();
+  expect(v).toHaveAttribute("poster", ABOUT.pictures.desk.poster);
+  expect(v).toHaveAttribute("preload", "none");
+});
+
+test("choosing reduced motion while a loop plays pauses it; choosing it away lets the visible ones play again", () => {
+  allShown();
+  const m = mockLoops();
+  const { container } = render(<AboutTrack />);
+  const v = videoOf(container, "desk");
+  m.see(v, true);
+  expect(m.play).toHaveBeenCalledTimes(1);
+  m.mq.matches = true; act(() => { m.mq.listeners.forEach((l) => l()); });
+  expect(m.pause).toHaveBeenCalledTimes(1);
+  m.mq.matches = false; act(() => { m.mq.listeners.forEach((l) => l()); });
+  expect(m.play).toHaveBeenCalledTimes(2);
+});
+
+test("a loop that fails to play keeps its poster and logs nothing", async () => {
+  allShown();
+  const m = mockLoops();
+  m.play.mockImplementation(() => Promise.reject(new DOMException("not allowed", "NotAllowedError")));
+  const err = vi.spyOn(console, "error").mockImplementation(() => {});
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  const unhandled = vi.fn();
+  process.on("unhandledRejection", unhandled);
+  const { container } = render(<AboutTrack />);
+  const v = videoOf(container, "desk");
+  m.see(v, true);
+  await flush(); await new Promise((r) => setTimeout(r, 0));
+  process.off("unhandledRejection", unhandled);
+  expect(m.play).toHaveBeenCalled();
+  expect(v).toHaveAttribute("poster", ABOUT.pictures.desk.poster);
+  expect(err).not.toHaveBeenCalled();
+  expect(warn).not.toHaveBeenCalled();
+  expect(unhandled).not.toHaveBeenCalled();
+  // a play() that throws outright is as quiet
+  m.play.mockImplementation(() => { throw new Error("boom"); });
+  expect(() => m.see(videoOf(container, "sanskrit"), true)).not.toThrow();
+});
+
+test("a video error leaves the poster, logs nothing, and is not retried", () => {
+  const m = mockLoops();
+  const err = vi.spyOn(console, "error").mockImplementation(() => {});
+  const { container } = render(<AboutTrack />);
+  const v = videoOf(container, "desk");
+  act(() => { v.dispatchEvent(new Event("error")); });
+  m.see(v, true);
+  expect(m.play).not.toHaveBeenCalled();
+  expect(v).toHaveAttribute("poster", ABOUT.pictures.desk.poster);
+  expect(err).not.toHaveBeenCalled();
+});
+
+test("the tab hidden pauses every loop; coming back resumes the visible ones only", () => {
+  allShown();
+  const m = mockLoops();
+  const { container } = render(<AboutTrack />);
+  const a = videoOf(container, "desk"), b = videoOf(container, "cyvore");
+  m.see(a, true); m.see(b, true); m.see(b, false);
+  m.play.mockClear(); m.pause.mockClear();
+  let hidden = true;
+  Object.defineProperty(document, "hidden", { get: () => hidden, configurable: true });
+  act(() => { document.dispatchEvent(new Event("visibilitychange")); });
+  expect(m.pause.mock.contexts).toEqual([a]);
+  hidden = false;
+  act(() => { document.dispatchEvent(new Event("visibilitychange")); });
+  expect(m.play.mock.contexts).toEqual([a]);
+  delete (document as { hidden?: boolean }).hidden;
+});
+
+test("a loop whose picture is cut away or not yet risen does not play even if its box is on screen", () => {
+  laidOut({ desk: [3000, 100] });
+  const m = mockLoops();
+  const { container } = render(<AboutTrack />);
+  const v = videoOf(container, "desk");
+  // the desk film is far to the right: hidden by the track's clip; the observer sees its box (inside the viewport, say) but it must not play
+  expect(pic(container, "desk").style.visibility).toBe("hidden");
+  m.see(v, true);
+  expect(m.play).not.toHaveBeenCalled();
+  // scrolled until it has risen: it plays
+  scrollTo(3000 - 0.06 * 1024);
+  expect(pic(container, "desk").style.visibility).toBe("");
+  expect(m.play).toHaveBeenCalledTimes(1);
+  // and cut away at the margin again: it pauses
+  scrollTo(3000 - 0.06 * 1024 + 100.5);
+  expect(m.pause).toHaveBeenCalledTimes(1);
+});
+
+test("on unmount the loops' observer and listeners are gone", () => {
+  allShown();
+  const m = mockLoops();
+  const remove = vi.spyOn(document, "removeEventListener");
+  const { container, unmount } = render(<AboutTrack />);
+  const v = videoOf(container, "desk");
+  m.see(v, true);
+  const obs = m.loopObserver();
+  unmount();
+  expect(obs.disconnected).toBe(true);
+  expect(m.mq.listeners.size).toBe(0);
+  expect(remove).toHaveBeenCalledWith("visibilitychange", expect.any(Function));
+  expect(m.pause.mock.contexts).toContain(v);
+});
