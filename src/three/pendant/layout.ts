@@ -38,6 +38,7 @@ export function hits(box: Box, texts: readonly TextRect[], s: number, fixed: rea
       if (c === null) continue;
       l = Math.max(l, c.x);
       t = Math.max(t, c.y);
+      if (l >= r || t >= b) continue; // (cut past its own edge: none of it shows)
     }
     if (box.l < r && box.r > l && box.t < b && box.b > t) n++;
   }

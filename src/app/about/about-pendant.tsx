@@ -9,7 +9,7 @@ import type { GlassSlot, PendantScene } from "@/three/pendant/scene";
 import { SHOTS, shotAt, solveKeys, type Layer, type Shot } from "@/three/pendant/shots";
 import type { Outline } from "@/three/pendant/solve";
 import type { Spot } from "@/three/pendant/layout";
-import { pictureState } from "./picture-motion";
+import { pictureShown } from "./pendant-pictures";
 import { trackProgress } from "./track";
 
 /** What the page tells the e2e tests and the frame script (scripts/about/pendant-frames.cjs), rewritten every frame. */
@@ -57,10 +57,11 @@ const OUT_SHRINK = 0.6;
 const OUT_SINK = 0.5;
 /** The words the pendant must never cover while in front of them (Task 8 solves the layers from their lines' boxes). */
 const TEXT = ".ab-big, .ab-quote blockquote, .ab-quote figcaption, .ab-verb .ab-mono:not(.ab-pic-cap), .ab-verb-title, .ab-skills li, .cap";
-/** The pictures along the track (about-track.tsx `.ab-pic`), content exactly like the words: each frame (a still or a loop)
- *  is one box, the whole frame (a picture has no lines to read between), and its caption's lines are words. Each counts only
- *  where the picture is drawn at that point of the track: it rises out of its line as it arrives and is cut at the margin as
- *  it leaves (picture-motion.ts, the same maths the track runs), and a picture not yet risen or already gone covers nothing. */
+/** The pictures along the track (about-track.tsx `.ab-pic`), content like the words: each frame (a still or a loop) is one
+ *  box, the whole frame (a picture has no lines to read between), plus its caption's lines. Each counts only where it is
+ *  drawn at that point of the track (pendant-pictures.ts): risen so far as it arrives, nothing before; and a picture whose
+ *  exit cut at the margin has started no longer counts at all, caption included (Liam's ruling: the hero may pass over the
+ *  desk film as it leaves). */
 const PIC = ".ab-pic", PIC_FRAME = ".ab-pic-f", PIC_CAP = ".ab-pic-cap";
 /** What holds still on screen over the track, treated exactly as words: the site's wordmark, pill nav and burger (fixed to
  *  the viewport), and About's resume pill (fixed in the pinned frame). The 1 px progress bar is not avoided (Liam's ruling). */
@@ -220,19 +221,14 @@ export function AboutPendant() {
       const trR = tr.getBoundingClientRect(), pinR = pin.getBoundingClientRect();
       const rect = (r: Box, shown?: TextRect["shown"]): TextRect => ({ l: r.l - trR.left, t: r.t - pinR.top, w: r.r - r.l, h: r.b - r.t, shown });
       const words = [...tr.querySelectorAll<HTMLElement>(TEXT)].flatMap(lineBoxes).map((r) => rect(r));
-      // a picture's clip, as the track sets it (about-track.tsx): its left and width include the caption, its rise is a share of its height
+      // a picture's place as the track measures it for its clip (about-track.tsx): its width includes the caption, its rise is a share of its height
       const pics = [...tr.querySelectorAll<HTMLElement>(PIC)].flatMap((el) => {
         const r = el.getBoundingClientRect();
         if (r.width <= 0 || r.height <= 0) return [];
-        const pl = r.left - trR.left, pt = r.top - pinR.top, ph = r.height;
-        const pw = Math.max(r.right, ...[...el.children].map((c) => c.getBoundingClientRect().right)) - r.left;
-        const shown = (s: number) => {
-          const st = pictureState(pl - s, pw, viewW);
-          return st.hidden ? null : { x: pl - s + (st.left / 100) * pw, y: pt + (st.top / 100) * ph };
-        };
+        const place = { l: r.left - trR.left, t: r.top - pinR.top, h: r.height, w: Math.max(r.right, ...[...el.children].map((c) => c.getBoundingClientRect().right)) - r.left };
         const frame = [...el.querySelectorAll<HTMLElement>(PIC_FRAME)].map((f) => f.getBoundingClientRect()).filter((f) => f.width > 0 && f.height > 0)
-          .map((f) => rect({ l: f.left, t: f.top, r: f.right, b: f.bottom }, shown));
-        const cap = [...el.querySelectorAll<HTMLElement>(PIC_CAP)].flatMap(lineBoxes).map((b) => rect(b, shown));
+          .map((f) => rect({ l: f.left, t: f.top, r: f.right, b: f.bottom }, pictureShown(place, viewW)));
+        const cap = [...el.querySelectorAll<HTMLElement>(PIC_CAP)].flatMap(lineBoxes).map((b) => rect(b, pictureShown(place, viewW)));
         return [...frame, ...cap];
       });
       L.texts = [...words, ...pics];

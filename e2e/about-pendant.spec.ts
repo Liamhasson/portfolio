@@ -153,12 +153,14 @@ function coveredNow({ TEXT, CHROME }: { TEXT: string; CHROME: string }): string[
     if (r.width > 0 && r.height > 0) boxes.push({ r, what: `.${el.className.split(" ")[0]}` });
   }
   // the pictures, where the track draws them: not when hidden or emptied (inset(50%)), else from its clip's top and left in
-  // (about-track.tsx writes `inset(T% -100vw 0 Lpx round R)`: T% of the picture's height, L px from its left)
+  // (about-track.tsx writes `inset(T% -100vw 0 Lpx round R)`: T% of the picture's height, L px from its left). A frame whose
+  // exit cut has started (L > 0) may be passed over, its caption with it (Liam, 2026-10-16: the hero over the leaving desk film).
   for (const pic of document.querySelectorAll<HTMLElement>(".ab-pic")) {
     if (pic.style.visibility === "hidden" || pic.style.clipPath === "inset(50%)") continue;
     const m = /^inset\(([-\d.e+]+)% -100vw 0(?:px)? ([-\d.e+]+)px/.exec(pic.style.clipPath);
     const p = pic.getBoundingClientRect();
     const minX = p.left + (m ? parseFloat(m[2]) : 0), minY = p.top + (m ? (parseFloat(m[1]) / 100) * p.height : 0);
+    if (m !== null && parseFloat(m[2]) > 0) continue;
     const parts: DOMRect[] = [...pic.querySelectorAll<HTMLElement>(".ab-pic-f")].map((f) => f.getBoundingClientRect());
     for (const cap of pic.querySelectorAll<HTMLElement>(".ab-pic-cap")) {
       const walk = document.createTreeWalker(cap, NodeFilter.SHOW_TEXT);
@@ -202,6 +204,24 @@ for (const [w, h] of [[1440, 900], [1280, 800], [1920, 1080], [1024, 768]] as co
       }
       expect(bad).toEqual([]);
       expect(errors).toEqual([]);
+    });
+    test("the hero plays its storyboard framing: in front, at the left edge", async ({ page }) => {
+      test.setTimeout(60_000);
+      await page.goto("/about");
+      await ready(page, 30_000);
+      await page.waitForTimeout(1500);
+      await page.mouse.move(w - 2, h - 2);
+      const solve = await page.evaluate(() => window.__pendant!.solve);
+      // the shot as written (alt 0, perhaps nudged and scaled clear of the site's name), never the bottom-right alternate
+      expect(solve.behind).not.toContain("hero");
+      expect(solve.moved.find((m) => m.id === "hero")?.alt ?? 0).toBe(0);
+      const y = await page.evaluate(() => window.__pendant!.keys.find((k) => k.id === "hero")!.y);
+      await page.evaluate((y) => window.scrollTo(0, y), y);
+      await page.waitForTimeout(2500);
+      const hk = await page.evaluate(() => ({ box: window.__pendant!.box, layer: window.__pendant!.layer }));
+      expect(hk.layer).toBe("front");
+      expect(hk.box.l).toBeLessThan(0.02 * w); // (cut by the left edge)
+      expect(hk.box.r).toBeLessThan(0.4 * w); // (left of the closing line's middle: the left side)
     });
   });
 }

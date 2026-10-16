@@ -43,6 +43,8 @@ describe("hits", () => {
     expect(hits(box(0, 300, 100, 201), rising, 1000)).toBe(1);
     expect(hits(box(0, 300), pic(() => null), 1000)).toBe(0); // (gone: nothing of it shows)
     expect(hits(box(0, 300), pic(() => ({ x: 500, y: 0 })), 1000)).toBe(0); // (cut past its right edge)
+    expect(hits(box(0, 900), pic(() => ({ x: 500, y: 0 })), 1000)).toBe(0); // (even for a box reaching over both edges)
+    expect(hits(box(0, 300, 0, 900), pic(() => ({ x: -Infinity, y: 400 })), 1000)).toBe(0); // (risen past its bottom: nothing)
   });
 });
 
