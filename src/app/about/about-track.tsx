@@ -25,7 +25,7 @@ function Words({ line }: { line: Line }) {
 /**
  * About (spec 2026-10-12-about-contact-design.md §3): Liam's text, the quotes as its proof, What I do under his three
  * verbs, the resume, then the pull to Contact. A pinned sideways track scrubbed by scroll (track.ts); stacked on portrait
- * phones and under reduced motion. No WebGL: the quiet reading page.
+ * phones and under reduced motion. The text is plain HTML; the brass pendant (about-pendant.tsx) is an optional WebGL layer.
  */
 export function AboutTrack() {
   const section = useRef<HTMLElement>(null), track = useRef<HTMLDivElement>(null), bar = useRef<HTMLSpanElement>(null), resume = useRef<HTMLAnchorElement>(null);

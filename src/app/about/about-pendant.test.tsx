@@ -12,14 +12,18 @@ const load = vi.mocked(PendantScene.load);
 // (loosely typed: the tests add and remove these browser globals)
 const g = globalThis as unknown as Record<string, unknown>;
 
-/** About's pinned frame, as about-track.tsx renders it, with the pendant mounted inside `.ab-pin`. */
-const Page = () => (
-  <section className="ab" data-mode="track">
-    <div className="ab-pin">
-      <div className="ab-clip"><div className="ab-track" /></div>
-      <AboutPendant />
-    </div>
-  </section>
+/** About's pinned frame, as about-track.tsx renders it, with the pendant mounted inside `.ab-pin`; the site nav above it
+ *  and a proof link on the track. */
+const Page = ({ mode = "track" }: { mode?: "track" | "stack" }) => (
+  <>
+    <nav><a href="/contact">Contact</a></nav>
+    <section className="ab" data-mode={mode}>
+      <div className="ab-pin">
+        <div className="ab-clip"><div className="ab-track"><a href="/pulse">a proof</a></div></div>
+        <AboutPendant />
+      </div>
+    </section>
+  </>
 );
 
 function setup({ webgl2 = true, reduced = false } = {}) {
@@ -107,4 +111,75 @@ test("a scene that arrives after About has gone is freed at once", async () => {
   unmount();
   await act(async () => { arrive({ dispose, resize() {}, draw() {}, hit: () => false }); });
   expect(dispose).toHaveBeenCalledTimes(1);
+});
+
+test("stacked, it waits for the track before loading three and the files", async () => {
+  load.mockReturnValue(new Promise(() => {}));
+  const { fontsDone, runIdle } = setup();
+  const { container } = render(<Page mode="stack" />);
+  await fontsDone();
+  await runIdle();
+  await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+  expect(load).not.toHaveBeenCalled();
+  await act(async () => { container.querySelector<HTMLElement>(".ab")!.dataset.mode = "track"; });
+  await waitFor(() => expect(load).toHaveBeenCalledTimes(1));
+});
+
+test("unmounting removes the page hook", () => {
+  setup();
+  const { unmount } = render(<Page />);
+  expect(window.__pendant).toBeDefined();
+  unmount();
+  expect(window.__pendant).toBeUndefined();
+});
+
+/** A scene stand-in with real three objects (the frame poses them), whose every press hits the pendant. */
+async function liveScene() {
+  const { Box3, Object3D, PerspectiveCamera, Vector3 } = await import("three");
+  const outer = new Object3D(), inner = new Object3D();
+  outer.add(inner);
+  const scene = {
+    camera: new PerspectiveCamera(), outer, inner, bounds: new Box3(new Vector3(-0.2, -0.5, -0.2), new Vector3(0.2, 0.5, 0.2)),
+    resize: vi.fn(), draw: vi.fn(), hit: vi.fn(() => true), dispose: vi.fn(),
+  };
+  load.mockResolvedValue(scene as never);
+  vi.spyOn(HTMLCanvasElement.prototype, "getBoundingClientRect").mockReturnValue(
+    { left: 0, top: 0, right: 1440, bottom: 900, width: 1440, height: 900, x: 0, y: 0, toJSON() {} } as DOMRect,
+  );
+  return scene;
+}
+const press = (el: Element) => {
+  const down = new PointerEvent("pointerdown", { bubbles: true, cancelable: true, isPrimary: true, button: 0, clientX: 200, clientY: 200 });
+  el.dispatchEvent(down);
+  window.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, isPrimary: true, button: 0, clientX: 200, clientY: 200 }));
+  const click = new MouseEvent("click", { bubbles: true, cancelable: true, clientX: 200, clientY: 200 });
+  el.dispatchEvent(click);
+  return { grabbed: down.defaultPrevented, followed: !click.defaultPrevented };
+};
+
+test("a press on a link painted above the pendant (the site nav, or the track behind it) still follows the link", async () => {
+  const scene = await liveScene();
+  const { fontsDone, runIdle } = setup();
+  const { getByRole, container } = render(<Page />);
+  await fontsDone();
+  await runIdle();
+  await waitFor(() => expect(window.__pendant?.ready).toBe(true));
+  // the site nav is above the canvas: never a grab, even over the pendant
+  expect(press(getByRole("link", { name: "Contact" }))).toEqual({ grabbed: false, followed: true });
+  expect(scene.hit).not.toHaveBeenCalled();
+  // a track link with the pendant behind the words: the words are on top
+  container.querySelector<HTMLElement>(".ab-pendant")!.dataset.layer = "back";
+  expect(press(getByRole("link", { name: "a proof" }))).toEqual({ grabbed: false, followed: true });
+});
+
+test("a press on the pendant in front of a track link grabs it, and that link doesn't follow", async () => {
+  const scene = await liveScene();
+  const { fontsDone, runIdle } = setup();
+  const { getByRole, container } = render(<Page />);
+  await fontsDone();
+  await runIdle();
+  await waitFor(() => expect(window.__pendant?.ready).toBe(true));
+  container.querySelector<HTMLElement>(".ab-pendant")!.dataset.layer = "front";
+  expect(press(getByRole("link", { name: "a proof" }))).toEqual({ grabbed: true, followed: false });
+  expect(scene.hit).toHaveBeenCalledTimes(1);
 });

@@ -1,4 +1,4 @@
-/* src/app/about/about.css (spec 2026-10-12 §3): the graded black, Geist in two colours, no WebGL, no glow */
+/* src/app/about/about.css (spec 2026-10-12 §3): the graded black, Geist in two colours, no glow; the pendant canvas at the end */
 .ab { position: relative; background: #0b0908; color: rgba(244, 239, 233, 0.42); font-family: var(--font-sans); }
 .ab .hi { color: #f4efe9; }
 .ab-pin { position: relative; }

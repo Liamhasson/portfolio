@@ -20,6 +20,8 @@ export interface PendantHook {
   layer: Layer;
   /** The pendant's projected bounds on screen (px from the pinned frame's top-left). */
   box: Box;
+  /** The glass ball as drawn (centre as a share of the viewport, radius as a share of its height), or null. */
+  glass: GlassSlot | null;
 }
 
 declare global {
@@ -33,11 +35,14 @@ const DT_MAX = 0.05;
 /** The cursor's lean (radians at the screen's edge) and its ease per frame (Lusion's values). */
 const LOOK = 0.035;
 const LOOK_EASE = 0.1;
-/** The glass between the quotes (a basic slot until the testimonials thread tags it, Task 9): 17vw wide, its radius 0.44 of
- *  that, drawn while the shot is at least this much "through the glass". */
-const GLASS_W = 0.17;
-const GLASS_R = 0.44;
+/** The glass between the quotes (a basic slot until the testimonials thread tags it, Task 9): it fills the real gap between
+ *  the two quotes, less quote 2's hanging open-quote (0.6em left of its text) and this margin (px) on each side, so it never
+ *  touches either quote; drawn while the shot is at least GLASS_MIN "through the glass". */
+const GLASS_HANG = 0.6;
+const GLASS_MARGIN = 12;
 const GLASS_MIN = 0.02;
+/** What is painted above the canvas and must keep its press (links, buttons, fields). */
+const CONTROL = "a, button, input, select, textarea, [role=button]";
 /** The outro, as the pull to Contact rises: it shrinks by this share, sinks this share of the screen, and fades out. */
 const OUT_SHRINK = 0.6;
 const OUT_SINK = 0.5;
@@ -95,7 +100,7 @@ export function AboutPendant() {
     const onReduced = () => { reduced = reducedQ.matches; canvas.dataset.mode = reduced ? "still" : "live"; };
     reducedQ.addEventListener?.("change", onReduced);
 
-    const hook: PendantHook = { ready: false, keys: [], s: 0, layer: "front", box: { l: 0, t: 0, r: 0, b: 0 } };
+    const hook: PendantHook = { ready: false, keys: [], s: 0, layer: "front", box: { l: 0, t: 0, r: 0, b: 0 }, glass: null };
     window.__pendant = hook;
 
     let off = false, lost = false, drawn = false, inView = true;
@@ -108,6 +113,8 @@ export function AboutPendant() {
       vw: 1, vh: 1, dpr: 1, sized: false, mode: "track", top: 0, H: 0, travel: 0, line1: 0.5,
       /** The gap between the two quotes (track px): the glass slot's centre. */
       glassMid: null as number | null,
+      /** Its radius, as a share of the screen's height. */
+      glassR: 0,
       keys: [] as number[],
       texts: [] as TextRect[],
     };
@@ -131,7 +138,16 @@ export function AboutPendant() {
       const c1 = centre("line1");
       L.line1 = c1 === null ? 0.5 : c1 / vw;
       const q1 = anchor("quote1"), q2 = anchor("quote2");
-      L.glassMid = q1 && q2 ? (left(q1) + q1.offsetWidth + left(q2)) / 2 : null;
+      if (q1 && q2) {
+        const bq = q2.querySelector("blockquote");
+        const hang = bq ? GLASS_HANG * (parseFloat(getComputedStyle(bq).fontSize) || 0) : 0;
+        const from = left(q1) + q1.offsetWidth, to = left(q2) - hang;
+        L.glassMid = (from + to) / 2;
+        L.glassR = Math.max(to - from - 2 * GLASS_MARGIN, 0) / 2 / vh;
+      } else {
+        L.glassMid = null;
+        L.glassR = 0;
+      }
       L.keys = solveKeys(SHOTS, (a) => (typeof a === "object" ? centre(a.pendant) : null), viewW, L.travel);
       // (the section is a screen plus the travel, so travel px and scroll px are one to one)
       hook.keys = SHOTS.map((s, i) => ({ id: s.id, y: L.top + L.keys[i] }));
@@ -174,7 +190,7 @@ export function AboutPendant() {
       look.x += (-mouse.y * LOOK - look.x) * LOOK_EASE;
       look.y += (-mouse.x * LOOK - look.y) * LOOK_EASE;
       cm.poseRig(f, motion, time, look, L.vw, L.vh, sc.camera, sc.outer, sc.inner, { still: reduced });
-      const glass: GlassSlot | null = f.glass > GLASS_MIN && L.glassMid !== null ? { x: gx, y: 0.5, r: (GLASS_R * GLASS_W * L.vw) / L.vh } : null;
+      const glass: GlassSlot | null = f.glass > GLASS_MIN && L.glassMid !== null && L.glassR > 0 ? { x: gx, y: 0.5, r: L.glassR } : null;
       sc.draw(f, glass, dim);
       drawn = true;
       // (Task 8 replaces the shot's own layer with the one solved from the text boxes)
@@ -182,6 +198,7 @@ export function AboutPendant() {
       hook.s = sSm;
       hook.layer = f.layer;
       hook.box = cm.screenBox(sc.bounds, sc.inner, sc.camera, L.vw, L.vh);
+      hook.glass = glass && { x: glass.x, y: glass.y, r: glass.r * f.glass }; // (the scene grows the ball with f.glass)
       if (!hook.ready) { hook.ready = true; canvas.dataset.ready = ""; }
     };
 
@@ -209,6 +226,10 @@ export function AboutPendant() {
     let swallow = false, swallowT = 0;
     const onDown = (e: PointerEvent) => {
       swallow = false;
+      // a control painted above the canvas keeps its press: the site nav, the resume pill, and the track's own links while
+      // the pendant is behind the words. Only a link under a pendant in front of the track gives way to the grab.
+      const ctl = e.target instanceof Element ? e.target.closest(CONTROL) : null;
+      if (ctl && (canvas.dataset.layer === "back" || !tr?.contains(ctl))) return;
       if (!scene || !drawn || lost || L.mode !== "track" || !e.isPrimary || e.button !== 0) return;
       const r = canvas.getBoundingClientRect();
       const x = e.clientX - r.left, y = e.clientY - r.top;
@@ -273,11 +294,26 @@ export function AboutPendant() {
     canvas.addEventListener("webglcontextlost", onLost);
     canvas.addEventListener("webglcontextrestored", onRestored);
 
+    /** Resolves once the section is a track (at once if it is, or if there is no section to judge by). */
+    let modeObs: MutationObserver | null = null;
+    const untilTrack = () => new Promise<void>((done) => {
+      if (!sec || sec.dataset.mode !== "stack") { done(); return; }
+      modeObs = new MutationObserver(() => {
+        if (sec.dataset.mode === "stack") return;
+        modeObs?.disconnect();
+        modeObs = null;
+        done();
+      });
+      modeObs.observe(sec, { attributes: true, attributeFilter: ["data-mode"] });
+    });
+
     let torn = false;
     const teardown = () => {
       if (torn) return;
       torn = true;
       off = true;
+      modeObs?.disconnect();
+      if (window.__pendant === hook) delete window.__pendant;
       cancelAnimationFrame(raf);
       window.clearTimeout(swallowT);
       io?.disconnect();
@@ -308,6 +344,8 @@ export function AboutPendant() {
     void (async () => {
       try {
         await afterPaint();
+        if (off) return;
+        await untilTrack(); // (stacked, the canvas is hidden until Task 11: three and the files wait for the track)
         if (off) return;
         // (probed after the paint too: making a GL context costs a few ms the text shouldn't wait for)
         if (!hasWebGL2()) throw new Error("no WebGL2");

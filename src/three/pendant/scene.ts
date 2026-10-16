@@ -14,7 +14,7 @@
 import {
   AgXToneMapping, Box3, Color, DirectionalLight, HalfFloatType, Mesh, MeshBasicMaterial, MeshPhysicalMaterial,
   MeshStandardMaterial, NoColorSpace, Object3D, PMREMGenerator, PerspectiveCamera, Plane, Raycaster, Scene,
-  SphereGeometry, SRGBColorSpace, TextureLoader, Vector2, Vector3, WebGLRenderer, WebGLRenderTarget,
+  SphereGeometry, SRGBColorSpace, DoubleSide, TextureLoader, Vector2, Vector3, WebGLRenderer, WebGLRenderTarget,
 } from "three";
 import type { BufferGeometry, Material, Texture } from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -230,9 +230,14 @@ export class PendantScene {
 
       // brass
       (brass.material as Material).dispose(); // (the loader's default: the file has no materials)
-      brass.material = keep(new MeshStandardMaterial({ map: color, normalMap: normal, roughnessMap: rough, metalness: 1 }));
+      // (normalScale y -1: the file has no tangents, so the shader derives them, and glTF's tangent-space normals then need
+      // their green flipped, as GLTFLoader itself does for a mesh without tangents; the prototype got this from the loader)
+      brass.material = keep(new MeshStandardMaterial({
+        map: color, normalMap: normal, normalScale: new Vector2(1, -1), roughnessMap: rough, metalness: 1,
+        side: DoubleSide, // (thin, open shell edges at the hood: single-sided, their backs vanish and read as notches)
+      }));
       // the clay copy shares the geometry and the node's transform
-      const clay = new Mesh(brass.geometry, keep(new MeshStandardMaterial({ color: 0xb9ada3, roughness: 0.78, metalness: 0 })));
+      const clay = new Mesh(brass.geometry, keep(new MeshStandardMaterial({ color: 0xb9ada3, roughness: 0.78, metalness: 0, side: DoubleSide })));
       clay.position.copy(brass.position);
       clay.quaternion.copy(brass.quaternion);
       clay.scale.copy(brass.scale);
