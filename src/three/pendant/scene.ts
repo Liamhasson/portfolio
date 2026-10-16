@@ -14,7 +14,7 @@
 import {
   AgXToneMapping, Box3, Color, DirectionalLight, HalfFloatType, Mesh, MeshBasicMaterial, MeshPhysicalMaterial,
   MeshStandardMaterial, NoColorSpace, Object3D, PMREMGenerator, PerspectiveCamera, Plane, Raycaster, Scene,
-  SphereGeometry, SRGBColorSpace, DoubleSide, TextureLoader, Vector2, Vector3, WebGLRenderer, WebGLRenderTarget,
+  ShaderChunk, SphereGeometry, SRGBColorSpace, DoubleSide, TextureLoader, Vector2, Vector3, WebGLRenderer, WebGLRenderTarget,
 } from "three";
 import type { BufferGeometry, Material, Texture } from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -27,7 +27,7 @@ import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { distanceFor } from "./camera";
-import { buildEdges, patchBokeh, patchOutput } from "./passes";
+import { buildEdges, patchBokeh, patchOutput, patchShadingR170 } from "./passes";
 import type { Frame } from "./shots";
 
 /** Cache-busting token for the pendant's files (Liam's browser keeps old ones: bump it whenever a file in
@@ -172,6 +172,9 @@ export class PendantScene {
       const scene = new Scene();
       const pmrem = new PMREMGenerator(renderer);
       const room = new RoomEnvironment();
+      // (r186 moved the whole room 3.5 down, so its lights sit lower round the capture point and stripe the flutes; Liam
+      // approved the brass lit by r170's room: put it back. See passes.ts, patchShadingR170, for the rest of the r170 look.)
+      room.position.y = 0;
       const env = pmrem.fromScene(room, 0.04);
       room.dispose();
       pmrem.dispose();
@@ -236,6 +239,10 @@ export class PendantScene {
         map: color, normalMap: normal, normalScale: new Vector2(1, -1), roughnessMap: rough, metalness: 1,
         side: DoubleSide, // (thin, open shell edges at the hood: single-sided, their backs vanish and read as notches)
       }));
+      // (shaded as three r170 shaded it, the look Liam approved: see passes.ts)
+      (brass.material as Material).onBeforeCompile = (shader) => {
+        shader.fragmentShader = patchShadingR170(shader.fragmentShader, ShaderChunk);
+      };
       // the clay copy shares the geometry and the node's transform
       const clay = new Mesh(brass.geometry, keep(new MeshStandardMaterial({ color: 0xb9ada3, roughness: 0.78, metalness: 0, side: DoubleSide })));
       clay.position.copy(brass.position);

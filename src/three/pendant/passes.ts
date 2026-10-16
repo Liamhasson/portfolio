@@ -64,3 +64,60 @@ export function patchOutput(frag: string): string {
     "\n\t\t\tgl_FragColor.rgb *= gl_FragColor.a;\n\t\t}"
   );
 }
+
+/*
+ * The brass as Liam approved it (storyboard about-pendant-storyboard-v1, about-pendant-opening-v2) was drawn by the
+ * prototype on three r170. Between r170 and r186 three changed how a rough metal is shaded, and the brass came out paler:
+ * more of it in the bright bands (the pale stripes down the flutes), its shadows lifted. Measured (lookfix-report.md): three
+ * shading changes, plus RoomEnvironment's move (scene.ts), account for all of it; with them put back r186 draws what r170
+ * drew. These patches put the three shading changes back, on the brass's own program only (via onBeforeCompile):
+ *   1. the environment reflection bends toward the normal by roughness^2 (r186: roughness^4);
+ *   2. the split-sum DFG term is r170's analytic fit (r186: a lookup table);
+ *   3. no multiple-scattering boost on the direct lights (new in r186: up to +25% on a rough metal, tinted by its colour).
+ */
+
+/** Where the three chunks sit in MeshStandardMaterial's fragment shader. */
+export const ENV_INCLUDE = "#include <envmap_physical_pars_fragment>";
+export const BRDF_INCLUDE = "#include <lights_physical_pars_fragment>";
+export const LIGHTS_INCLUDE = "#include <lights_fragment_begin>";
+/** r186's reflection bend (1), its two DFG lookups (2), and its direct-light compensation (3). */
+export const ENV_BEND = "reflectVec = normalize( mix( reflectVec, normal, pow4( roughness ) ) );";
+export const BRDF_LUT = "texture2D( dfgLUT, vec2( roughness, dotNV ) ).rg";
+export const LIGHTS_LUT = "texture2D( dfgLUT, vec2( material.roughness, dotNVms ) ).rg";
+export const LIGHTS_MS = "material.multiScatteringCompensation = 1.0 + material.specularColorBlended * ( 1.0 / EssMs - 1.0 );";
+const DFG_UNIFORM = "uniform sampler2D dfgLUT;";
+
+/** r170's DFGApprox ("Physically Based Shading on Mobile", Karis), as r170 shipped it. */
+const DFG_APPROX = /* glsl */ `
+vec2 dfgApproxR170( const in float dotNV, const in float roughness ) {
+	const vec4 c0 = vec4( - 1, - 0.0275, - 0.572, 0.022 );
+	const vec4 c1 = vec4( 1, 0.0425, 1.04, - 0.04 );
+	vec4 r = roughness * c0 + c1;
+	float a004 = min( r.x * r.x, exp2( - 9.28 * dotNV ) ) * r.x + r.y;
+	return vec2( - 1.04, 1.04 ) * a004 + r.zw;
+}`;
+
+/** The three chunks three would include, as the material needs them (three's ShaderChunk, passed in so a test can use it). */
+export interface ShadingChunks {
+  envmap_physical_pars_fragment: string;
+  lights_physical_pars_fragment: string;
+  lights_fragment_begin: string;
+}
+
+const swap = (src: string, anchor: string, by: string, what: string): string => {
+  if (src.split(anchor).length !== 2) throw new Error(`three's ${what} changed: update the r170 shading patch in passes.ts`);
+  return src.replace(anchor, () => by); // (a function: GLSL is never read as a $-pattern)
+};
+
+/** MeshStandardMaterial's fragment shader (from onBeforeCompile, includes not yet resolved) shaded as three r170 shaded it. */
+export function patchShadingR170(frag: string, chunk: ShadingChunks): string {
+  const env = swap(chunk.envmap_physical_pars_fragment, ENV_BEND,
+    "reflectVec = normalize( mix( reflectVec, normal, roughness * roughness ) );", "envmap_physical_pars_fragment");
+  const brdf = swap(swap(chunk.lights_physical_pars_fragment, DFG_UNIFORM, DFG_UNIFORM + DFG_APPROX, "lights_physical_pars_fragment"),
+    BRDF_LUT, "dfgApproxR170( dotNV, roughness )", "lights_physical_pars_fragment");
+  const lights = swap(swap(chunk.lights_fragment_begin, LIGHTS_LUT, "dfgApproxR170( dotNVms, material.roughness )", "lights_fragment_begin"),
+    LIGHTS_MS, "material.multiScatteringCompensation = vec3( 1.0 );", "lights_fragment_begin");
+  let out = swap(frag, ENV_INCLUDE, env, "MeshStandardMaterial shader");
+  out = swap(out, BRDF_INCLUDE, brdf, "MeshStandardMaterial shader");
+  return swap(out, LIGHTS_INCLUDE, lights, "MeshStandardMaterial shader");
+}
