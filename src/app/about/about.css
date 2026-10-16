@@ -3,7 +3,7 @@
 .ab .hi { color: #f4efe9; }
 .ab-pin { position: relative; }
 .ab[data-mode="track"] .ab-pin { position: sticky; top: 0; height: 100svh; overflow: clip; }
-.ab-clip { position: absolute; inset: 0; overflow: clip; }   /* (clip, not hidden: never a scroll container that focus or find could scroll) */
+.ab-clip { position: absolute; inset: 0; overflow: clip; z-index: 1; }   /* (clip, not hidden: never a scroll container that focus or find could scroll) */
 .ab-track { display: flex; align-items: center; gap: 7vw; height: 100%; width: max-content; padding: 0 12vw 0 6vw; will-change: transform; }
 .ab-slide { flex: 0 0 auto; margin: 0; max-width: 52vw; }
 .ab-big { font-size: clamp(28px, 4vw, 72px); line-height: 1.15; letter-spacing: -0.01em; }
@@ -23,7 +23,7 @@ a.ab-proof:hover, a.ab-proof:focus-visible { color: #f4efe9; }
 .ab-photo { max-width: none; }
 /* a long, narrow crop (~3:5), as tall as the tallest text layer (about-track.tsx sets --ab-photo-h); the corners as the work index's thumbnails */
 .ab-portrait { display: block; height: var(--ab-photo-h, 56svh); width: auto; border-radius: 10px; }
-.ab-bar { position: absolute; left: 6vw; right: 6vw; bottom: 4.5vw; height: 1px; background: rgba(255, 255, 255, 0.1); }
+.ab-bar { position: absolute; left: 6vw; right: 6vw; bottom: 4.5vw; height: 1px; background: rgba(255, 255, 255, 0.1); z-index: 3; }
 .ab-bar > span { position: absolute; inset: 0; background: rgba(230, 191, 174, 0.7); transform-origin: left; transform: scaleX(0); }
 .ab-end { background: #0b0908; padding: 10vh 6vw 30vh; font-size: clamp(14px, 1.2vw, 20px); }
 /* stacked: portrait phones and reduced motion (track.ts) */
@@ -48,7 +48,7 @@ a.ab-proof:hover, a.ab-proof:focus-visible { color: #f4efe9; }
   .ab[data-mode="stack"] .ab-slide { transform: none; transition: opacity 0.6s ease; }
 }
 /* View resume: centred, holding still for the whole of About (Liam, 2026-10-12) */
-.ab-resume { position: absolute; left: 50%; bottom: calc(4.5vw + 22px); transform: translateX(-50%); z-index: 2; white-space: nowrap; }
+.ab-resume { position: absolute; left: 50%; bottom: calc(4.5vw + 22px); transform: translateX(-50%); z-index: 3; white-space: nowrap; }
 .ab-resume:hover, .ab-resume:focus-visible { border-color: rgba(230, 191, 174, 0.6); outline: none; }
 /* stacked (phones, reduced motion): fixed at the bottom centre while About is on screen */
 .ab[data-mode="stack"] .ab-resume { position: fixed; bottom: max(20px, calc(env(safe-area-inset-bottom) + 14px)); opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
@@ -59,3 +59,11 @@ a.ab-proof:hover, a.ab-proof:focus-visible { color: #f4efe9; }
 .ab-inline { color: inherit; text-decoration: underline; text-decoration-color: rgba(230, 191, 174, 0.45); text-decoration-thickness: 1px; text-underline-offset: 0.18em; transition: text-decoration-color var(--duration-ui) var(--ease-settle); }
 .ab-inline:hover, .ab-inline:focus-visible { text-decoration-color: rgba(230, 191, 174, 0.95); }
 .ab-inline::after { content: " \2197"; text-decoration: none; display: inline-block; margin-left: 0.15em; font-size: 0.6em; vertical-align: 0.5em; color: rgba(230, 191, 174, 0.8); }
+
+/* the pendant (about-pendant.tsx, spec 2026-10-16-about-pendant-design.md §5): one see-through canvas, in front of the track
+   (2) or behind it (0, under the track's 1); never takes the pointer, so the links underneath keep working. It fades in on
+   its opening spot once drawn. Stacked (phones, reduced motion) it waits for its own framing (plan Task 11). */
+.ab-pendant { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; opacity: 0; transition: opacity 0.6s ease; }
+.ab-pendant[data-layer="back"] { z-index: 0; }
+.ab-pendant[data-ready] { opacity: 1; }
+.ab[data-mode="stack"] .ab-pendant { display: none; }

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { NextPagePull } from "@/components/shell/next-page-pull";
 import { ABOUT, type Line } from "@/content/about";
+import { AboutPendant } from "./about-pendant";
 import { scrollForSlide, sectionHeight, trackLayout, trackProgress, trackX } from "./track";
 import "./about.css";
 
@@ -108,17 +109,17 @@ export function AboutTrack() {
                   <Image className="ab-portrait" src={ABOUT.portrait.src} alt={ABOUT.portrait.alt} width={ABOUT.portrait.width} height={ABOUT.portrait.height} sizes="(max-width: 1023px) 70vw, 30vw" priority />
                 </figure>
               )}
-              {ABOUT.lines.map((l, i) => <p key={i} className="ab-slide ab-big"><Words line={l} /></p>)}
+              {ABOUT.lines.map((l, i) => <p key={i} className="ab-slide ab-big" data-pendant={["line1", "band", "how"][i]}><Words line={l} /></p>)}
               {/* End to end, straight after "That's still how I work…": the story's conclusion (Liam, 2026-10-12) */}
-              <p className="ab-slide ab-big"><Words line={ABOUT.opening.text} /></p>
-              {ABOUT.quotes.map((q) => (
-                <figure key={q.name} className="ab-slide ab-quote">
+              <p className="ab-slide ab-big" data-pendant="e2e"><Words line={ABOUT.opening.text} /></p>
+              {ABOUT.quotes.map((q, i) => (
+                <figure key={q.name} className="ab-slide ab-quote" data-pendant={`quote${i + 1}`}>
                   <blockquote><Words line={q.text} /></blockquote>
                   <figcaption className="ab-mono">{q.name} · {q.role}</figcaption>
                 </figure>
               ))}
               {ABOUT.verbs.map((v, i) => (
-                <div key={v.title} className="ab-slide ab-verb">
+                <div key={v.title} className="ab-slide ab-verb" data-pendant={["find", "check", "build"][i]}>
                   <div className="ab-mono">What I do · {i + 1} of {ABOUT.verbs.length}</div>
                   <h2 className="ab-verb-title">{v.title}</h2>
                   <ul className="ab-skills">
@@ -134,6 +135,7 @@ export function AboutTrack() {
               <p className="ab-slide ab-big"><Words line={ABOUT.closing} /></p>
             </div>
           </div>
+          <AboutPendant />
           <span className="ab-bar" aria-hidden><span ref={bar} /></span>
           {/* the resume holds still in the middle for the whole of About (Liam, 2026-10-12): above the progress line on the
               pinned track, fixed at the bottom on phones while About is on screen */}
