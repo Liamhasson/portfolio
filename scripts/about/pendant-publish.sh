@@ -5,7 +5,7 @@
 #   pendant-wire.glb  about 5k triangles, positions only, the same frame (Y-up, 1 unit tall, feet at y 0, axis at x = z = 0)
 #   color.ktx2        sRGB ETC1S with mips (GPU-compressed: a JPEG would sit in memory at 16 MB on a phone)
 #   normal.jpg        tangent space, OpenGL convention (as Blender bakes it); ffmpeg keeps it 4:4:4
-#   rough.jpg         roughness in G (glTF's convention; Blender bakes it into R, G and B alike)
+#   rough.jpg         roughness in G (glTF's convention; Blender bakes it into R, G and B alike), 1024 x 1024 (the others 2048)
 # Needs Blender (env BLENDER), KTX-Software's `ktx` (env KTX; ~/.local/bin/ktx), ffmpeg, and gltfpack (via npx).
 # The non-head decimation ratio is 0.22 (the plan's 0.35 came to 2.65 MB; 2.5 MB is the budget, and the heads are never touched):
 #   PENDANT_RATIO=0.3 bash scripts/about/pendant-publish.sh
@@ -34,9 +34,10 @@ ffmpeg -v error -y -i "$tmp/color.png" -pix_fmt rgb24 "$tmp/color-rgb.png"
 
 # 4. the normal and roughness maps as JPEG
 ffmpeg -v error -y -i "$tmp/normal.png" -q:v 2 "$dst/normal.jpg"
-ffmpeg -v error -y -i "$tmp/rough.png" -q:v 3 "$dst/rough.jpg"
+# (the roughness is a smooth, low-frequency map: half size, 1024, keeps the five under the 2.5 MB budget; the others stay 2048)
+ffmpeg -v error -y -i "$tmp/rough.png" -vf scale=1024:1024:flags=lanczos -q:v 3 "$dst/rough.jpg"
 
-# 5. the budget: 2.5 MB for the five
+# 5. the budget: 2.5 MB (2,500,000 bytes) for the five
 ls -l "$dst" | awk 'NR>1 {printf "%9d  %s\n", $5, $9}'
 total=$(cat "$dst"/{pendant.glb,pendant-wire.glb,color.ktx2,normal.jpg,rough.jpg} | wc -c | tr -d ' ')
 echo "total $total bytes ($(awk -v t="$total" 'BEGIN {printf "%.2f", t/1048576}') MiB)"

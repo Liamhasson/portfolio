@@ -2,18 +2,19 @@
 // The About page's pendant, held at each of its shots: one screenshot per key, to check each against the storyboard
 // (framing, angle, layer). Needs the dev server running and the mount's `window.__pendant` hook (Task 7: `ready`, and
 // `keys`: [{ id, y }] in scroll px).
-//   OUT=test-results/pendant BASE=http://localhost:3000 node scripts/about/pendant-frames.cjs
+//   OUT=test-results/pendant BASE=http://localhost:3000 DPR=1 node scripts/about/pendant-frames.cjs
 const path = require("node:path");
 const fs = require("node:fs");
 const { chromium } = require("playwright"); // (resolved up from here: a worktree finds the main checkout's node_modules)
 
 const BASE = process.env.BASE || "http://localhost:3000";
 const OUT = process.env.OUT || "test-results/pendant";
+const DPR = Number(process.env.DPR) || 1; // (2 for a retina capture: the scene then runs without multisampling)
 
 (async () => {
   fs.mkdirSync(OUT, { recursive: true });
   const browser = await chromium.launch({ args: ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"] });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: DPR });
   page.on("console", (m) => m.type() === "error" && !m.text().includes("404") && console.error(m.text().slice(0, 400)));
   try {
     await page.goto(`${BASE}/about`);

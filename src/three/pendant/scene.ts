@@ -27,12 +27,12 @@ import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { distanceFor } from "./camera";
-import { buildEdges } from "./passes";
+import { buildEdges, patchBokeh, patchOutput } from "./passes";
 import type { Frame } from "./shots";
 
 /** Cache-busting token for the pendant's files (Liam's browser keeps old ones: bump it whenever a file in
  *  public/about/pendant changes). */
-export const PENDANT_VERSION = "2026-10-16";
+export const PENDANT_VERSION = "2026-10-16.2";
 
 const BASE = "/about/pendant/";
 const D = Math.PI / 180;
@@ -65,9 +65,6 @@ const DimShader = {
       gl_FragColor = vec4( c.rgb * dim, c.a );
     }`,
 };
-
-/** The BokehPass's own shader writes alpha 1 on every pixel, which would paint the see-through canvas opaque. */
-const BOKEH_OPAQUE_ALPHA = "gl_FragColor.a = 1.0;";
 
 export interface GlassSlot {
   /** The slot's centre as a share of the viewport's width / height, and its radius as a share of the height. */
@@ -138,29 +135,14 @@ export class PendantScene {
     this.renderPass = new RenderPass(scene, camera);
     this.composer.addPass(this.renderPass);
     this.bokeh = new BokehPass(scene, camera, { focus: 3, aperture: 0.001, maxblur: MAX_BLUR });
-    // Two patches to the bokeh shader, both for a see-through canvas:
-    //  - it ends with alpha = 1 on every pixel, which would paint the whole canvas opaque;
-    //  - the empty background is "far", so it gets the widest blur and gathers the pendant into a halo round it. Where
-    //    there is nothing drawn the blur is off (an out-of-focus part of the pendant still blurs inwards).
-    const blur = "vec2 dofblur = vec2 ( clamp( factor * aperture, -maxblur, maxblur ) );";
-    let frag = this.bokeh.materialBokeh.fragmentShader;
-    if (!frag.includes(BOKEH_OPAQUE_ALPHA) || !frag.includes(blur)) throw new Error("BokehShader changed: update the patches in scene.ts");
-    frag = frag.replace(BOKEH_OPAQUE_ALPHA, "");
-    frag = frag.replace(blur, `${blur}\n\t\t\tdofblur *= smoothstep( 0.0, 0.5, texture2D( tColor, vUv ).a );`);
-    this.bokeh.materialBokeh.fragmentShader = frag;
+    // (see passes.ts: alpha left alone, and no blur where nothing is drawn, so the see-through canvas gets no halo)
+    this.bokeh.materialBokeh.fragmentShader = patchBokeh(this.bokeh.materialBokeh.fragmentShader);
     this.bokeh.materialBokeh.needsUpdate = true;
     this.composer.addPass(this.bokeh);
-    // The scene is drawn premultiplied (the blend gives rgb x alpha), and the canvas is premultiplied too. Tone mapping and
-    // the sRGB curve are not linear, so they must see the plain colour: take the alpha off before them and put it back
-    // after, or every soft edge (blur, antialiasing) comes out bright, a halo round the pendant.
+    // (see passes.ts: the tone mapping and the sRGB curve see the plain colour, not the premultiplied one)
     this.outputPass = new OutputPass();
     const out = this.outputPass.material;
-    const read = "gl_FragColor = texture2D( tDiffuse, vUv );";
-    const end = out.fragmentShader.lastIndexOf("}");
-    if (!out.fragmentShader.includes(read) || end < 0) throw new Error("OutputShader changed: update the premultiply patch in scene.ts");
-    out.fragmentShader =
-      out.fragmentShader.slice(0, end).replace(read, `${read}\n\t\t\tgl_FragColor.rgb /= max( gl_FragColor.a, 1e-4 );`) +
-      "\n\t\t\tgl_FragColor.rgb *= gl_FragColor.a;\n\t\t}";
+    out.fragmentShader = patchOutput(out.fragmentShader);
     out.needsUpdate = true;
     this.composer.addPass(this.outputPass);
     // the dim goes after the tone mapping, on what the screen will show, so `dim` means what a CSS brightness() meant
@@ -178,7 +160,13 @@ export class PendantScene {
     renderer.toneMapping = AgXToneMapping;
     renderer.localClippingEnabled = true;
     const owned: { dispose(): void }[] = [];
-    const keep = <T extends { dispose(): void }>(o: T): T => { owned.push(o); return o; };
+    // `failed`: once a load has rejected, a file still on its way (Promise.all doesn't wait for the others) is freed as it arrives
+    let failed = false;
+    const keep = <T extends { dispose(): void }>(o: T): T => {
+      if (failed) o.dispose();
+      else owned.push(o);
+      return o;
+    };
     const ktx = new KTX2Loader().setTranscoderPath("/lab/basis/").detectSupport(renderer);
     try {
       const scene = new Scene();
@@ -273,22 +261,49 @@ export class PendantScene {
       glassBall.visible = false;
       scene.add(glassBall);
 
-      // upload now, with every pass showing, so no program compiles and no map uploads while the page is scrolling
       for (const t of [color, normal, rough]) renderer.initTexture(t);
-      glassBall.visible = true;
-      await renderer.compileAsync(scene, camera);
-      glassBall.visible = false;
-
       const hiDpi = (typeof window !== "undefined" ? window.devicePixelRatio : 1) > 1.25;
-      return new PendantScene(renderer, scene, camera, outer, inner, bounds, brass, clay, wireModel.scene, glassBall, owned, hiDpi);
+      const built = new PendantScene(renderer, scene, camera, outer, inner, bounds, brass, clay, wireModel.scene, glassBall, owned, hiDpi);
+      built.warm();
+      return built;
     } catch (e) {
+      failed = true;
       for (const o of owned) o.dispose();
       renderer.dispose();
+      renderer.forceContextLoss();
       // (a texture's load error is a bare Event)
       throw e instanceof Error ? e : new Error("the pendant's files did not load");
     } finally {
       ktx.dispose(); // (its transcoding workers)
     }
+  }
+
+  /**
+   * Compiles every program the scene will ever draw with, and uploads the maps, while the page is still loading: one
+   * frame with everything showing (the clay, the wire and the glass are hidden at the opening, so their programs would
+   * otherwise compile mid-scroll) and the dim pass on, then one with the dim pass off (the output pass then draws to the
+   * screen, a different program from drawing to a target). Run after the clip planes are on the materials: three keys a
+   * program on how many planes it has. Draws at 16 x 16, then leaves the rig as it found it.
+   */
+  private warm(): void {
+    const cam = this.camera;
+    const glassWas = this.glassBall.visible;
+    this.resize(16, 16, 1);
+    cam.position.set(0, 0, 3); // (in front of the pendant: an object outside the view is never compiled)
+    cam.updateMatrixWorld(true);
+    this.clay.visible = true;
+    this.wire.visible = true;
+    this.glassBall.visible = true;
+    this.glassBall.position.set(0, 0, 0);
+    this.glassBall.scale.setScalar(0.2);
+    for (const dimOn of [true, false]) {
+      this.dimPass.enabled = dimOn;
+      this.composer.render();
+    }
+    this.glassBall.visible = glassWas;
+    this.dimPass.enabled = false;
+    cam.position.set(0, 0, 0);
+    cam.updateMatrixWorld(true);
   }
 
   /** Sizes the canvas's drawing buffer to `vw` x `vh` CSS px at `dpr` (clamped to 2). The canvas's CSS size is the mount's. */
@@ -371,5 +386,6 @@ export class PendantScene {
     // (the clay's material and the loader's own are in `disposables`; the brass's geometry is shared with the clay's)
     (this.brass.geometry as BufferGeometry).dispose();
     this.renderer.dispose();
+    this.renderer.forceContextLoss(); // (the canvas can't be given a new context: the mount makes a fresh canvas)
   }
 }
