@@ -54,10 +54,15 @@ describe("solveKeys", () => {
     expect(keys[2]).toBeCloseTo(1700 - 0.42 * VW, 9); // tumble
   });
 
-  test("keys stay inside 0..travel", () => {
-    const keys = solveKeys(SHOTS, centres({ ...ALL, band: 200, deskfilm: 99999 }), VW, TRAVEL);
-    for (const k of keys.slice(0, -1)) expect(k).toBeGreaterThanOrEqual(0);
-    for (const k of keys.slice(1)) expect(k).toBeLessThanOrEqual(TRAVEL + SHOTS.length);
+  test("anchors crowded at the end of the track keep every key inside 0..travel and the hero reachable", () => {
+    const keys = solveKeys(SHOTS, centres({ ...ALL, deskfilm: 99999 }), VW, TRAVEL);
+    expect(keys.at(-1)).toBe(TRAVEL);
+    for (const k of keys) {
+      expect(k).toBeGreaterThanOrEqual(0);
+      expect(k).toBeLessThanOrEqual(TRAVEL);
+    }
+    for (let i = 1; i < keys.length; i++) expect(keys[i]).toBeGreaterThan(keys[i - 1]);
+    expect(shotAt(TRAVEL, keys, SHOTS, AT).az).toBe(-62);
   });
 
   test("uses the fallback when an anchor is missing", () => {
@@ -68,6 +73,12 @@ describe("solveKeys", () => {
     const k2 = solveKeys(SHOTS, centres(without("glass")), VW, TRAVEL);
     const glass = SHOTS.findIndex((s) => s.id === "glass");
     expect(k2[glass]).toBeCloseTo((ALL.quote1 + ALL.quote2) / 2 - 0.5 * VW, 9);
+  });
+
+  test("a pair fallback with only one member present uses that one's centre", () => {
+    const k = solveKeys(SHOTS, centres(without("glass", "quote2")), VW, TRAVEL);
+    const glass = SHOTS.findIndex((s) => s.id === "glass");
+    expect(k[glass]).toBeCloseTo(ALL.quote1 - 0.5 * VW, 9);
   });
 
   test("a primary that exists wins over its fallback", () => {
@@ -136,6 +147,12 @@ describe("shotAt", () => {
     expect(f.aim[0]).toBeCloseTo(0.1, 9);
     expect(f.aim[1]).toBeCloseTo(0.2, 9);
     expect(f.aim[2]).toBeCloseTo(-0.1, 9);
+  });
+
+  test("a zero-width segment (equal keys) does not divide by zero", () => {
+    const f = shotAt(100, [0, 100, 100], [SHOTS[0], SHOTS[1], SHOTS[2]], AT);
+    expect(Number.isFinite(f.az)).toBe(true);
+    expect(Number.isFinite(f.h)).toBe(true);
   });
 
   test('resolves "line1" and "glass"', () => {

@@ -56,7 +56,8 @@ export interface Shot {
 
 /** What the camera and the pendant do at one scroll position: the blend of the two shots around it. */
 export interface Frame extends Omit<Shot, "id" | "anchor" | "fx" | "ax" | "ay"> {
-  /** The earlier of the two shots (the last shot's own index once past the end). */
+  /** The earlier of the two shots (the last shot's own index once past the end). The shot currently showing is
+   *  `t >= 0.5 ? index + 1 : index`, the same halfway point where `layer` and `lock` switch. */
   index: number;
   /** 0..1 eased progress from that shot to the next. */
   t: number;
@@ -65,16 +66,21 @@ export interface Frame extends Omit<Shot, "id" | "anchor" | "fx" | "ax" | "ay"> 
 }
 
 /** Every field a shot leaves out inherits from the shot before it; the first inherits these. */
-const DEF = {
+type ShotBody = Omit<Shot, "id" | "anchor">;
+const DEF: ShotBody = {
   fx: 0.5, az: 0, el: 0, roll: 0, fov: 30, h: 0.4, ax: 0.5, ay: 0.5, aim: [0, 0, 0],
   spin: 0.05, tumble: 0, rz: 0, lock: null, layer: "front", dim: 1, aperture: 0.001, glass: 0, wire: 1,
-} as const satisfies Omit<Shot, "id" | "anchor">;
+};
 
-type Partial12 = Pick<Shot, "id" | "anchor"> & Partial<Omit<Shot, "id" | "anchor">>;
+/** A shot as written below: its name and anchor, plus only the fields that change. */
+type ShotInput = Pick<Shot, "id" | "anchor"> & Partial<ShotBody>;
 
-const fill = (parts: readonly Partial12[]): readonly Shot[] => {
+const fill = (inputs: readonly ShotInput[]): readonly Shot[] => {
   const out: Shot[] = [];
-  for (const p of parts) out.push({ ...(out.at(-1) ?? DEF), ...p } as Shot);
+  for (const input of inputs) {
+    const before: ShotBody = out.at(-1) ?? DEF;
+    out.push({ ...before, ...input });
+  }
   return out;
 };
 
@@ -115,7 +121,8 @@ const lerp = (a: number, b: number, t: number) => (t <= 0 ? a : t >= 1 ? b : a +
  * centre in track px, or null when the page doesn't have it. An anchor the page lacks falls back to its `fallback` (one
  * anchor's centre, or the midpoint of a pair); with neither, the key sits one px after the previous one (Liam, 2026-10-16:
  * the camera keeps moving instead of the shot vanishing). Keys always stay strictly increasing, so a shot can never be
- * skipped or divide by zero: that wins over the clamp at the very end.
+ * skipped or divide by zero. When anchors crowd the end of the track, a backward pass pulls the earlier keys left (each at
+ * most one px before the next) rather than pushing the last ones past `travel`, so the last shot is always reachable.
  */
 export function solveKeys(shots: readonly Shot[], centreX: (a: Anchor) => number | null, vw: number, travel: number): number[] {
   const named = (name: string) => centreX({ pendant: name });
@@ -142,6 +149,9 @@ export function solveKeys(shots: readonly Shot[], centreX: (a: Anchor) => number
     }
     keys.push(i === 0 ? key : Math.max(key, prev + 1));
   });
+  // Forward strictness can push the tail past the track's end; pin the last key there and crowd the rest before it.
+  if (keys.length > 0) keys[keys.length - 1] = Math.min(keys[keys.length - 1], travel);
+  for (let i = keys.length - 2; i >= 0; i--) keys[i] = Math.min(keys[i], keys[i + 1] - 1);
   return keys;
 }
 
@@ -156,7 +166,8 @@ export function shotAt(s: number, keys: readonly number[], shots: readonly Shot[
   while (i < last && s > keys[i + 1]) i++;
   const A = shots[i];
   const B = shots[Math.min(i + 1, last)];
-  const t = i >= last ? 1 : smoothstep(clamp((s - keys[i]) / (keys[i + 1] - keys[i]), 0, 1));
+  const span = i >= last ? 0 : keys[i + 1] - keys[i];
+  const t = i >= last ? 1 : smoothstep(span > 0 ? clamp((s - keys[i]) / span, 0, 1) : 1);
   const x = (v: ScreenX) => (v === "line1" ? at.line1 : v === "glass" ? at.glass.x : v);
   const y = (v: ScreenY) => (v === "glass" ? at.glass.y : v);
   const pick = <T,>(a: T, b: T) => (t < 0.5 ? a : b);
