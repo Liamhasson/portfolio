@@ -13,11 +13,13 @@
  * under GOOD x base, and between them it holds (the hysteresis band).
  *
  * A step down has to earn its keep: the first full window after it is compared with the window that caused it, and if it
- * isn't meaningfully faster (NO_GAIN) the slowness isn't the pendant's (a 30 fps cap, a throttled tab, a busy page), so the
- * step is undone and the next step down waits, a wait that doubles each time (to DOWN_WAIT_MAX). A step that helps stays,
+ * isn't meaningfully faster (NO_GAIN), the bottom level is tried once (on a vsync-capped screen one step may not get a frame
+ * under the next vsync where two do: 2x and 1.75x both at 30 fps, 1.5x at 60). If the bottom helps it stays, and the usual
+ * step up climbs back to the highest level that holds; if not, the slowness isn't the pendant's (a 30 fps cap, a throttled
+ * tab, a busy page), so the step is undone and the next step down waits, a wait that doubles each time (to DOWN_WAIT_MAX). A step that helps stays,
  * and while frames are still slow it keeps stepping. A step up needs good frames for UP_AFTER, and a climb that brings slow
  * frames back within FAIL_WITHIN doubles that wait (to BACKOFF_MAX): no pumping, never stuck low. `resume()` after a pause
- * (a hidden tab, About scrolled away) starts its measuring afresh.
+ * (a hidden tab, About scrolled away) starts its measuring afresh, and returns any step still being judged.
  */
 export interface PendantGovernorOptions {
   /** Frames are ignored for this long after the start (loading, shader compiles), ms. */
@@ -89,8 +91,9 @@ export class PendantGovernor {
   private upAfter: number;
   /** Time since the last step up (Infinity: none yet). */
   private sinceUp = Infinity;
-  /** The step down being judged: the window average that caused it and the level it left (null: none pending). */
-  private pending: { before: number; from: number } | null = null;
+  /** The step down being judged: the window average that caused it, the level it left, and whether this is already the
+   *  try at the bottom (null: none pending). */
+  private pending: { before: number; from: number; bottom: boolean } | null = null;
   /** The next step down waits this long more, ms; and the wait after the next undone step. */
   private downBlocked = 0;
   private downWait: number;
@@ -144,20 +147,28 @@ export class PendantGovernor {
     if (maxPr === this.levels[0].pr) return;
     this.levels = ladder(maxPr);
     this.at = 0;
+    this.pending = null; // (its levels were the old ladder's)
     this.resume();
     this.upAfter = this.o.upAfterMs;
     this.downWait = this.o.downWaitMs;
     this.downBlocked = 0;
   }
 
-  /** After a pause (the loop stopped: a hidden tab, About off screen): the partial window, the good run and the step being
-   *  judged are dropped, and it settles for a cooldown. The pause itself never counts (only sampled frames move its clocks). */
-  resume(): void {
+  /** After a pause (the loop stopped: a hidden tab, About off screen): the partial window and the good run are dropped, a
+   *  step still being judged is returned (untested, it goes back to the level it left), the step-down wait starts over
+   *  (conditions may have changed), and it settles for a cooldown. The pause itself never counts (only sampled frames move
+   *  its clocks). Returns the new level if that changed it, else null. */
+  resume(): PendantLevel | null {
+    const was = this.at;
+    if (this.pending) this.at = this.pending.from;
+    this.pending = null;
     this.samples = 0;
     this.elapsed = 0;
     this.good = 0;
-    this.pending = null;
+    this.downWait = this.o.downWaitMs;
+    this.downBlocked = Math.min(this.downBlocked, this.o.downWaitMs);
     this.cooldown = this.o.cooldownMs;
+    return this.at === was ? null : this.level;
   }
 
   /** One frame's time (ms). Returns the new level when it changes, else null. */
@@ -190,10 +201,19 @@ export class PendantGovernor {
     const slow = average > this.o.slowRatio * this.baseMs;
 
     if (this.pending) {
-      const { before, from } = this.pending;
+      const { before, from, bottom } = this.pending;
       this.pending = null;
+      const last = this.levels.length - 1;
+      if (average >= this.o.noGainRatio * before && !bottom && this.at < last) {
+        // no gain from one step: maybe one step can't get a frame under the next vsync where more would. Try the bottom
+        // once, judged against the same window.
+        this.at = last;
+        this.pending = { before, from, bottom: true };
+        return this.changed(was);
+      }
       if (average >= this.o.noGainRatio * before) {
-        // the step down didn't help: not the pendant's slowness. Undo it, and wait longer before the next step down.
+        // the step down didn't help, nor the bottom: not the pendant's slowness. Undo it, and wait longer before the next
+        // step down.
         this.at = from;
         this.downBlocked = this.downWait;
         this.downWait = Math.min(this.o.downWaitMaxMs, this.downWait * 2);
@@ -207,7 +227,7 @@ export class PendantGovernor {
       if (this.at < this.levels.length - 1 && this.downBlocked <= 0) {
         // a climb that brought slow frames straight back: wait longer before the next one
         this.upAfter = this.sinceUp < this.o.failWithinMs ? Math.min(this.o.backoffMaxMs, this.upAfter * 2) : this.o.upAfterMs;
-        this.pending = { before: average, from: this.at };
+        this.pending = { before: average, from: this.at, bottom: false };
         this.at += 1;
       }
     } else if (average <= this.o.goodRatio * this.baseMs) {

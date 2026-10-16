@@ -348,15 +348,20 @@ export function AboutPendant() {
     /** The live guard: behind since it last saw the pendant near a line, until it has been clear for GUARD_HOLD. */
     let guardBack = false, clearFor = 0;
 
+    /** A governor level onto the scene: a resize only when the pixel ratio changes, the bokeh's scale only when its step
+     *  does (that never resizes). Before the first measure there is nothing to apply: measure reads the governor itself. */
+    const applyLevel = (next: { pr: number; bokehHalf: boolean }, sc: PendantScene) => {
+      if (!L.sized) return;
+      if (next.pr !== L.pr) { L.pr = next.pr; sc.resize(L.vw, L.vh, next.pr); }
+      if (next.bokehHalf !== L.half) { L.half = next.bokehHalf; sc.setBokehScale(next.bokehHalf ? 0.5 : 1); }
+    };
+
     const step = (now: number, sc: PendantScene, cm: NonNullable<typeof cam>) => {
       const fixedStep = window.__pendantStep;
       const stepped = typeof fixedStep === "number" && fixedStep > 0;
       // the governor's step first, then the frame: a resize clears the canvas, so one made after the draw would show blank
       const next = govOn && !stepped ? gov.sample(now - last) : null;
-      if (next !== null && L.sized) {
-        if (next.pr !== L.pr) { L.pr = next.pr; sc.resize(L.vw, L.vh, next.pr); }
-        if (next.bokehHalf !== L.half) { L.half = next.bokehHalf; sc.setBokehScale(next.bokehHalf ? 0.5 : 1); } // (no resize)
-      }
+      if (next !== null) applyLevel(next, sc);
       const dt = stepped ? fixedStep / 1000 : Math.min(Math.max((now - last) / 1000, 0), DT_MAX);
       last = now;
       time += dt;
@@ -458,7 +463,10 @@ export function AboutPendant() {
       if (raf || off || lost || !scene || !cam || !inView || document.hidden) return;
       last = performance.now();
       jumped = true; // (the loop was stopped: the scroll may have moved meanwhile)
-      gov.resume(); // (a pause isn't a frame: the governor starts its reading afresh)
+      // (a pause isn't a frame: the governor starts its reading afresh, and returns a step it hadn't finished judging; the
+      // resize, if any, lands before the next frame is drawn)
+      const back = gov.resume();
+      if (back !== null && govOn) applyLevel(back, scene);
       raf = requestAnimationFrame(frame);
     };
     const invalidate = () => { dirty = true; run(); };

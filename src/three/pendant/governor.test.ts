@@ -172,13 +172,13 @@ describe("PendantGovernor (the level follows the frame time, both ways)", () => 
   });
 
   test("a steady 30 fps cap isn't load: at most a rare probe, never stuck low", () => {
-    // the display probed at 60 Hz while loading, then capped at 30 fps (Low Power Mode, a throttled tab): every step down is
-    // undone (it didn't help), and the waits between tries double to a minute
+    // the display probed at 60 Hz while loading, then capped at 30 fps (Low Power Mode, a throttled tab): every step down,
+    // and the try at the bottom after it, is undone (neither helped), and the waits between tries double to a minute
     const g = new PendantGovernor(2);
     g.setBase(16.7);
     const r = run(g, () => 33.3, 600_000);
-    expect(r.changes).toBeLessThanOrEqual(30);
-    expect(r.share["2"]).toBeGreaterThan(0.95);
+    expect(r.changes).toBeLessThanOrEqual(45);
+    expect(r.share["2"]).toBeGreaterThan(0.9);
     expect(L(g.level)).toBe("2");
     expect(g.base).toBeCloseTo(16.7, 5);
     // a screen at 30 fps (or 50 Hz) from the start: nothing at all
@@ -186,6 +186,16 @@ describe("PendantGovernor (the level follows the frame time, both ways)", () => 
       const h = new PendantGovernor(2);
       expect(run(h, () => ms, 600_000).changes).toBe(0);
     }
+  });
+
+  test("load one step can't pull under a vsync boundary is still shed: it tries the bottom, then climbs to what holds", () => {
+    // a 60 Hz laptop whose GPU makes 2x and 1.75x miss every other vsync (30 fps) and 1.5x make every one
+    const cost: Record<string, number> = { "2": 33.3, "1.75": 33.3, "1.5": 16.7, "1.5+half": 16.7 };
+    const g = at60();
+    const r = run(g, (l) => cost[l], 1_800_000);
+    expect(r.share["1.5"]).toBeGreaterThan(0.9); // (the highest level at 60 fps; the rest is step-up tries at 1.75x)
+    expect(r.share["2"] ?? 0).toBeLessThan(0.01);
+    expect(L(g.level)).toBe("1.5");
   });
 
   test("HEAVY load sheds to the right level and stays there, the base unchanged", () => {
@@ -234,11 +244,13 @@ describe("PendantGovernor (the level follows the frame time, both ways)", () => 
     expect(feed(g, 40, 600)).toEqual([]); // (600 ms of slow frames: not a full window yet)
     g.resume();
     expect(feed(g, 16.7, 20_000)).toEqual([]);
-    // a step down judged after the pause isn't undone by the pause's own frames: it is simply a new reading
+    // a pause during a step still being judged returns it, untested, to the level it left (resume says so, for the mount)
     const h = at60();
     expect(feedUntilChange(h, 33)).toBe("1.75");
-    h.resume();
-    expect(feedUntilChange(h, 33)).toBe("1.5"); // (not undone back to 2: nothing was pending)
+    expect(L(h.resume())).toBe("2");
+    expect(L(h.level)).toBe("2");
+    expect(h.resume()).toBeNull(); // (nothing pending now: no change)
+    expect(feedUntilChange(h, 33)).toBe("1.75"); // (a fresh reading, the step-down wait back at its start)
     // and a good run doesn't carry over a pause
     const k = at60();
     feedLoad(k, HEAVY, 60_000);
