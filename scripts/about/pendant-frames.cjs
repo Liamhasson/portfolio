@@ -3,6 +3,7 @@
 // (framing, angle, layer). Needs the dev server running and the mount's `window.__pendant` hook (Task 7: `ready`, and
 // `keys`: [{ id, y }] in scroll px).
 //   OUT=test-results/pendant BASE=http://localhost:3000 DPR=1 node scripts/about/pendant-frames.cjs
+// W, H: the viewport (1440 x 900 by default); ONLY: a comma list of key ids to grab (all by default), e.g. ONLY=glass.
 const path = require("node:path");
 const fs = require("node:fs");
 const { chromium } = require("playwright"); // (resolved up from here: a worktree finds the main checkout's node_modules)
@@ -10,22 +11,26 @@ const { chromium } = require("playwright"); // (resolved up from here: a worktre
 const BASE = process.env.BASE || "http://localhost:3000";
 const OUT = process.env.OUT || "test-results/pendant";
 const DPR = Number(process.env.DPR) || 1; // (2 for a retina capture: the scene then runs without multisampling)
+const W = Number(process.env.W) || 1440;
+const H = Number(process.env.H) || 900;
+const ONLY = process.env.ONLY ? process.env.ONLY.split(",") : null;
 
 (async () => {
   fs.mkdirSync(OUT, { recursive: true });
   const browser = await chromium.launch({ args: ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"] });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: DPR });
+  const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: DPR });
   page.on("console", (m) => m.type() === "error" && !m.text().includes("404") && console.error(m.text().slice(0, 400)));
   try {
     await page.goto(`${BASE}/about`);
     await page.waitForFunction(() => window.__pendant?.ready, null, { timeout: 120000 });
     await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
-    await page.mouse.move(1430, 890); // (the cursor parked in a corner: its lean stays out of the frame)
+    await page.mouse.move(W - 10, H - 10); // (the cursor parked in a corner: its lean stays out of the frame)
     const keys = await page.evaluate(() => window.__pendant.keys);
     for (const { id, y } of keys) {
+      if (ONLY && !ONLY.includes(id)) continue;
       await page.evaluate((y) => window.scrollTo(0, y), y);
       await page.waitForTimeout(2500); // (the scroll's ease and the pendant's motion settle)
-      const file = path.join(OUT, `pendant-${id}.jpg`);
+      const file = path.join(OUT, `pendant-${id}${process.env.W || process.env.H ? `-${W}x${H}` : ""}.jpg`);
       await page.screenshot({ path: file, type: "jpeg", quality: 90 });
       console.log(file);
     }

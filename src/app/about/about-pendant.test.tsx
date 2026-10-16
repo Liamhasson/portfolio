@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 vi.mock("@/three/pendant/scene", () => ({ PendantScene: { load: vi.fn() } }));
 
 import { PendantScene } from "@/three/pendant/scene";
+import { glassOwner } from "@/lib/about-glass";
 import { AboutPendant } from "./about-pendant";
 
 const load = vi.mocked(PendantScene.load);
@@ -140,7 +141,7 @@ async function liveScene() {
   outer.add(inner);
   const scene = {
     camera: new PerspectiveCamera(), outer, inner, bounds: new Box3(new Vector3(-0.2, -0.5, -0.2), new Vector3(0.2, 0.5, 0.2)),
-    resize: vi.fn(), draw: vi.fn(), hit: vi.fn(() => true), dispose: vi.fn(),
+    resize: vi.fn(), draw: vi.fn(), hit: vi.fn(() => true), dispose: vi.fn(), glassLook: 1 / 2.2,
   };
   load.mockResolvedValue(scene as never);
   vi.spyOn(HTMLCanvasElement.prototype, "getBoundingClientRect").mockReturnValue(
@@ -182,4 +183,31 @@ test("a press on the pendant in front of a track link grabs it, and that link do
   container.querySelector<HTMLElement>(".ab-pendant")!.dataset.layer = "front";
   expect(press(getByRole("link", { name: "a proof" }))).toEqual({ grabbed: true, followed: false });
   expect(scene.hit).toHaveBeenCalledTimes(1);
+});
+
+test("the pendant claims the glass once its scene is ready, and gives it back when it goes", async () => {
+  await liveScene();
+  const { fontsDone, runIdle } = setup();
+  const { unmount } = render(<Page />);
+  expect(glassOwner()).toBe("testimonials"); // (nothing loaded yet: the testimonials draw the ball)
+  await fontsDone();
+  await runIdle();
+  await waitFor(() => expect(window.__pendant?.ready).toBe(true));
+  expect(glassOwner()).toBe("pendant");
+  unmount();
+  expect(glassOwner()).toBe("testimonials");
+});
+
+test("a lost context gives the glass back to the testimonials", async () => {
+  await liveScene();
+  const { fontsDone, runIdle } = setup();
+  const { container, unmount } = render(<Page />);
+  await fontsDone();
+  await runIdle();
+  await waitFor(() => expect(window.__pendant?.ready).toBe(true));
+  expect(glassOwner()).toBe("pendant");
+  act(() => { container.querySelector(".ab-pendant")!.dispatchEvent(new Event("webglcontextlost", { cancelable: true })); });
+  expect(glassOwner()).toBe("testimonials");
+  unmount();
+  expect(glassOwner()).toBe("testimonials");
 });

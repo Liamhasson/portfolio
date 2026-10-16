@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { claimGlass, glassOwner, glassRim } from "@/lib/about-glass";
 import type { Box, Look } from "@/three/pendant/camera";
 import { clipBox, hits, padBox, type TextRect } from "@/three/pendant/layout";
 import { REST, stepMotion, type MotionState } from "@/three/pendant/motion";
@@ -166,6 +167,10 @@ export function AboutPendant() {
     /** The pendant's outline (the wire copy's vertices; the bounds' corners if the scene has none). */
     let outline: Outline | null = null;
     let raf = 0;
+    /** The glass ball is one ball: the pendant claims it once its scene is ready (the testimonials then don't draw theirs),
+     *  and gives it back on unmount or a lost context (about-glass.ts). */
+    let releaseGlass: (() => void) | null = null;
+    const giveGlassBack = () => { releaseGlass?.(); releaseGlass = null; };
 
     // ---------- layout: the track measured (on load, resize, fonts, and whenever the track or section changes size) ----------
     const L = {
@@ -272,6 +277,7 @@ export function AboutPendant() {
     // ---------- the frame ----------
     let motion: MotionState = REST;
     const look: Look = { x: 0, y: 0 };
+    const leaned: Look = { x: 0, y: 0 };
     const mouse = { x: 0, y: 0 };
     let drag: { x: number; y: number } | null = null, dragDX = 0, dragDY = 0;
     let last = 0, time = 0, sSm = 0, sPrev = 0, first = true, forcedK = 0;
@@ -302,7 +308,11 @@ export function AboutPendant() {
       dragDX = dragDY = 0;
       look.x += (-mouse.y * LOOK - look.x) * LOOK_EASE;
       look.y += (-mouse.x * LOOK - look.y) * LOOK_EASE;
-      cm.poseRig(f, motion, time, look, L.vw, L.vh, sc.camera, sc.outer, sc.inner, { still: reduced });
+      // (through the glass the lean is eased down: the ball magnifies it and turns it over, see PendantScene.glassLook)
+      const lk = 1 - (1 - sc.glassLook) * clamp01(f.glass);
+      leaned.x = look.x * lk;
+      leaned.y = look.y * lk;
+      cm.poseRig(f, motion, time, leaned, L.vw, L.vh, sc.camera, sc.outer, sc.inner, { still: reduced });
       const box = outline?.hull.length
         ? cm.outlineBox(outline.hull, sc.inner, sc.camera, L.vw, L.vh)
         : cm.screenBox(sc.bounds, sc.inner, sc.camera, L.vw, L.vh);
@@ -322,8 +332,9 @@ export function AboutPendant() {
       forcedK += (forced - forcedK) * (1 - FORCED_EASE ** dt);
       const shotDim = f.dim + (Math.min(f.dim, sv?.FORCED_DIM ?? f.dim) - f.dim) * forcedK;
       const dim = shotDim * (1 - o);
-      const glass: GlassSlot | null = f.glass > GLASS_MIN && L.glassMid !== null && L.glassR > 0 ? { x: gx, y: 0.5, r: L.glassR } : null;
-      sc.draw(f, glass, dim);
+      const ours = glassOwner() === "pendant";
+      const glass: GlassSlot | null = ours && f.glass > GLASS_MIN && L.glassMid !== null && L.glassR > 0 ? { x: gx, y: 0.5, r: L.glassR } : null;
+      sc.draw(f, glass, dim, glass ? glassRim() : null);
       drawn = true;
       if (canvas.dataset.layer !== layer) canvas.dataset.layer = layer;
       hook.s = sSm;
@@ -409,6 +420,7 @@ export function AboutPendant() {
       e.preventDefault(); // (lets the browser restore it)
       lost = true;
       drag = null;
+      giveGlassBack(); // (the testimonials draw the ball until the pendant is back)
       canvas.hidden = true;
       hook.ready = false;
       cancelAnimationFrame(raf);
@@ -472,6 +484,7 @@ export function AboutPendant() {
       canvas.removeEventListener("webglcontextlost", onLost);
       canvas.removeEventListener("webglcontextrestored", onRestored);
       hook.ready = false;
+      giveGlassBack();
       try { scene?.dispose(); } catch { /* the GPU is already gone */ }
       scene = null;
     };
@@ -502,6 +515,7 @@ export function AboutPendant() {
         const b = loaded.bounds;
         const corners = new Float32Array([b.min.x, b.max.x].flatMap((x) => [b.min.y, b.max.y].flatMap((y) => [b.min.z, b.max.z].flatMap((z) => [x, y, z]))));
         outline = solveMod.outlineOf(loaded.outline?.length ? loaded.outline : corners);
+        releaseGlass = claimGlass("pendant");
         dirty = true; // (sizes the drawing buffer before the first draw or hit: the scene's warm-up left it at 16 x 16)
         run();
       } catch {

@@ -7,14 +7,15 @@
  *   - depth of field is three's BokehPass with its "alpha = 1" line removed, so the page shows through the blur;
  *   - the dimming (behind the words) is a ShaderPass, never a CSS filter: a CSS filter on a canvas costs a compositor
  *     layer every frame;
- *   - the testimonials' glass ball is a placeholder refracting sphere here (Task 9 finishes it).
+ *   - the testimonials' glass ball is a pass after the depth of field (glass.ts): a true sphere, ray-traced per pixel, that
+ *     looks up the pendant behind it in a zoomed render of it, so the pendant reads sharp, magnified and upside down in it.
  * The mount (Task 7) poses the rig itself, `poseRig(f, motion, t, look, vw, vh, scene.camera, scene.outer, scene.inner)`,
  * then calls `draw`. `draw` never moves the camera: it draws from the camera as posed.
  */
 import {
-  AgXToneMapping, Box3, Color, DirectionalLight, HalfFloatType, Mesh, MeshBasicMaterial, MeshPhysicalMaterial,
-  MeshStandardMaterial, NoColorSpace, Object3D, PMREMGenerator, PerspectiveCamera, Plane, Raycaster, Scene,
-  ShaderChunk, SphereGeometry, SRGBColorSpace, DoubleSide, TextureLoader, Vector2, Vector3, WebGLRenderer, WebGLRenderTarget,
+  AgXToneMapping, Box3, DirectionalLight, HalfFloatType, Mesh, MeshBasicMaterial, MeshStandardMaterial, NoColorSpace, Object3D,
+  Matrix4, PMREMGenerator, PerspectiveCamera, Plane, Raycaster, Scene, ShaderChunk, SRGBColorSpace, DoubleSide, TextureLoader, Vector2,
+  Vector3, WebGLRenderer, WebGLRenderTarget,
 } from "three";
 import type { BufferGeometry, Material, Texture } from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -27,21 +28,25 @@ import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { distanceFor } from "./camera";
+import { GLASS_MAG, glassAt, glassMaterial, LENS_DENSITY, LENS_SPAN } from "./glass";
 import { buildEdges, patchBokeh, patchOutput, patchShadingR170 } from "./passes";
 import type { Frame } from "./shots";
 
 /** Cache-busting token for the pendant's files (Liam's browser keeps old ones: bump it whenever a file in
  *  public/about/pendant changes). */
-export const PENDANT_VERSION = "2026-10-16.3";
+export const PENDANT_VERSION = "2026-10-16.4";
 
 const BASE = "/about/pendant/";
 const D = Math.PI / 180;
 /** The depth-of-field blur's ceiling (a share of the screen). */
 const MAX_BLUR = 0.012;
-/** The glass sphere sits this share of the camera's distance in front of the camera. */
-const GLASS_AT = 0.42;
 /** Below this the glass is faded out: not drawn at all. */
 const GLASS_MIN = 0.02;
+/** The rim light (brief: a DirectionalLight behind the ball, intensity 1.2), tinted by the testimonials' edge colour. */
+const RIM_INTENSITY = 1.2;
+/** Where it stands, as seen from the ball: behind it, a little to the right and up (toward Andrada's quote), so the colour
+ *  catches the rim as an arc, heavier on one side, not a ring. Camera space. */
+const RIM_FROM = new Vector3(0.38, 0.18, -1).normalize();
 /** Where a clip plane parks to clip nothing (keeps the program the same, so nothing recompiles mid-scroll). */
 const CLIP_OFF = 1e6;
 
@@ -66,6 +71,9 @@ const DimShader = {
     }`,
 };
 
+/** The testimonials' edge colour at the ball, sRGB 0..1 (about-glass.ts). */
+export type RimRgb = readonly [number, number, number];
+
 export interface GlassSlot {
   /** The slot's centre as a share of the viewport's width / height, and its radius as a share of the height. */
   x: number;
@@ -85,6 +93,10 @@ export class PendantScene {
    *  solve (solve.ts) projects these instead of the bounds' eight corners, which in strong perspective cover far more of the
    *  screen than the pendant does. */
   readonly outline: Float32Array;
+  /** How much of the cursor's lean to keep while filmed through the glass: the ball turns the pendant's every move upside
+   *  down and GLASS_MAG times larger, so at 1 / GLASS_MAG its image swings as far as the pendant leans anywhere else (the
+   *  full lean would swing it into the ball's rim). The mount blends to this by the shot's `glass`. */
+  readonly glassLook = 1 / GLASS_MAG;
 
   private readonly renderer: WebGLRenderer;
   private readonly composer: EffectComposer;
@@ -92,10 +104,18 @@ export class PendantScene {
   private readonly dimPass: ShaderPass;
   private readonly outputPass: OutputPass;
   private readonly renderPass: RenderPass;
+  private readonly glassPass: ShaderPass;
+  private readonly glass: ReturnType<typeof glassMaterial>;
+  /** Behind the ball, lighting only its rim (it is never added to the scene: the brass's lights and look stay as approved). */
+  readonly rimLight = new DirectionalLight(0xffffff, 0);
+  /** The lens view (glass.ts): the pendant drawn again, zoomed onto the ball, for the magnified image inside it. */
+  private readonly lensTarget: WebGLRenderTarget;
+  private readonly lensCam = new PerspectiveCamera();
+  private readonly scene: Scene;
+  private dpr = 1;
   private readonly brass: Mesh;
   private readonly clay: Mesh;
   private readonly wire: Object3D;
-  private readonly glassBall: Mesh;
   /** brass | clay | wire, in world space (the pendant stands at the origin). */
   private readonly brassClip = new Plane(new Vector3(-1, 0, 0), CLIP_OFF);
   private readonly clayClipLeft = new Plane(new Vector3(1, 0, 0), CLIP_OFF);
@@ -109,13 +129,17 @@ export class PendantScene {
   private readonly right = new Vector3();
   private readonly tmp = new Vector3();
   private readonly ndc = new Vector2();
+  private readonly fwd = new Vector3();
+  private readonly centre = new Vector3();
+  private readonly zoom = new Matrix4();
 
   private constructor(
     renderer: WebGLRenderer, scene: Scene, camera: PerspectiveCamera, outer: Object3D, inner: Object3D, bounds: Box3,
-    brass: Mesh, clay: Mesh, wire: Object3D, glassBall: Mesh, disposables: { dispose(): void }[], hiDpi: boolean,
+    brass: Mesh, clay: Mesh, wire: Object3D, disposables: { dispose(): void }[], hiDpi: boolean,
     outline: Float32Array,
   ) {
     this.renderer = renderer;
+    this.scene = scene;
     this.outline = outline;
     this.camera = camera;
     this.outer = outer;
@@ -124,7 +148,6 @@ export class PendantScene {
     this.brass = brass;
     this.clay = clay;
     this.wire = wire;
-    this.glassBall = glassBall;
     this.disposables = disposables;
 
     // the clip planes are on the three materials for good (a plane parked far away clips nothing), so the programs never
@@ -145,6 +168,14 @@ export class PendantScene {
     this.bokeh.materialBokeh.fragmentShader = patchBokeh(this.bokeh.materialBokeh.fragmentShader);
     this.bokeh.materialBokeh.needsUpdate = true;
     this.composer.addPass(this.bokeh);
+    // the glass after the depth of field, so the bokeh's depth pass never sees it (the focus stays on the pendant behind it)
+    // and its blur never softens the pendant inside it; off while no ball is on screen
+    this.lensTarget = new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples: hiDpi ? 0 : 4 });
+    this.glass = glassMaterial();
+    this.glass.uniforms.tLens.value = this.lensTarget.texture;
+    this.glassPass = new ShaderPass(this.glass);
+    this.glassPass.enabled = false;
+    this.composer.addPass(this.glassPass);
     // (see passes.ts: the tone mapping and the sRGB curve see the plain colour, not the premultiplied one)
     this.outputPass = new OutputPass();
     const out = this.outputPass.material;
@@ -281,20 +312,9 @@ export class PendantScene {
       }
       const outline = new Float32Array(pts);
 
-      // the placeholder glass (Task 9 finishes it): a real refracting sphere, only placed while the shot looks through it
-      const glassBall = new Mesh(
-        keep(new SphereGeometry(1, 96, 64)),
-        keep(new MeshPhysicalMaterial({
-          transmission: 1, roughness: 0.03, ior: 1.5, thickness: 2.2, color: 0xfff3ea,
-          attenuationColor: new Color(0xffdcc8), attenuationDistance: 4, envMapIntensity: 1.1, specularIntensity: 1,
-        })),
-      );
-      glassBall.visible = false;
-      scene.add(glassBall);
-
       for (const t of [color, normal, rough]) renderer.initTexture(t);
       const hiDpi = (typeof window !== "undefined" ? window.devicePixelRatio : 1) > 1.25;
-      const built = new PendantScene(renderer, scene, camera, outer, inner, bounds, brass, clay, wireModel.scene, glassBall, owned, hiDpi, outline);
+      const built = new PendantScene(renderer, scene, camera, outer, inner, bounds, brass, clay, wireModel.scene, owned, hiDpi, outline);
       built.warm();
       return built;
     } catch (e) {
@@ -311,27 +331,24 @@ export class PendantScene {
 
   /**
    * Compiles every program the scene will ever draw with, and uploads the maps, while the page is still loading: one
-   * frame with everything showing (the clay, the wire and the glass are hidden at the opening, so their programs would
+   * frame with everything showing (the clay, the wire and the glass pass are off at the opening, so their programs would
    * otherwise compile mid-scroll) and the dim pass on, then one with the dim pass off (the output pass then draws to the
    * screen, a different program from drawing to a target). Run after the clip planes are on the materials: three keys a
    * program on how many planes it has. Draws at 16 x 16, then leaves the rig as it found it.
    */
   private warm(): void {
     const cam = this.camera;
-    const glassWas = this.glassBall.visible;
     this.resize(16, 16, 1);
     cam.position.set(0, 0, 3); // (in front of the pendant: an object outside the view is never compiled)
     cam.updateMatrixWorld(true);
     this.clay.visible = true;
     this.wire.visible = true;
-    this.glassBall.visible = true;
-    this.glassBall.position.set(0, 0, 0);
-    this.glassBall.scale.setScalar(0.2);
+    this.glassPass.enabled = true;
     for (const dimOn of [true, false]) {
       this.dimPass.enabled = dimOn;
       this.composer.render();
     }
-    this.glassBall.visible = glassWas;
+    this.glassPass.enabled = false;
     this.dimPass.enabled = false;
     cam.position.set(0, 0, 0);
     cam.updateMatrixWorld(true);
@@ -343,6 +360,7 @@ export class PendantScene {
     const d = Math.min(2, Math.max(0.5, dpr));
     this.vw = Math.max(1, vw);
     this.vh = Math.max(1, vh);
+    this.dpr = d;
     this.renderer.setPixelRatio(d);
     this.renderer.setSize(this.vw, this.vh, false);
     this.composer.setPixelRatio(d);
@@ -353,9 +371,10 @@ export class PendantScene {
 
   /**
    * Draws one frame from the camera as `poseRig` posed it. `glass`: the testimonials' ball (centre as a share of the
-   * viewport, radius as a share of its height), or null when it isn't on screen. `dim`: 0..1 brightness.
+   * viewport, radius as a share of its height), or null when it isn't on screen (or the testimonials draw it). `dim`: 0..1
+   * brightness. `rim`: the testimonials' edge colour at the ball (about-glass.ts `glassRim()`), or null for no rim light.
    */
-  draw(f: Frame, glass: GlassSlot | null, dim: number): void {
+  draw(f: Frame, glass: GlassSlot | null, dim: number, rim: RimRgb | null = null): void {
     if (this.gone) return;
     const cam = this.camera;
     const dist = distanceFor(f.h, f.fov);
@@ -374,16 +393,11 @@ export class PendantScene {
       this.brassClip.constant = CLIP_OFF; // (parked: clips nothing)
     }
 
-    // the glass: a sphere between the camera and the pendant, exactly over the slot
+    // the glass: a sphere between the camera and the pendant, exactly over the slot, as far out as makes the pendant
+    // behind it look GLASS_MAG times its size (upside down); it grows in with f.glass where it stands
     const showGlass = glass !== null && f.glass > GLASS_MIN;
-    this.glassBall.visible = showGlass;
-    if (showGlass) {
-      const gd = dist * GLASS_AT;
-      this.tmp.set(glass.x * 2 - 1, 1 - glass.y * 2, 0.5).unproject(cam).sub(cam.position).normalize();
-      this.glassBall.position.copy(cam.position).addScaledVector(this.tmp, gd);
-      this.glassBall.scale.setScalar(glass.r * 2 * gd * Math.tan(f.fov * D / 2) * f.glass);
-      this.glassBall.updateMatrixWorld();
-    }
+    this.glassPass.enabled = showGlass;
+    if (showGlass) this.placeGlass(glass, f, dist, rim);
 
     // depth of field, focused on the aim point
     this.bokeh.materialBokeh.uniforms.focus.value = dist;
@@ -396,6 +410,60 @@ export class PendantScene {
     this.dimPass.enabled = d < 0.999;
 
     this.composer.render();
+  }
+
+  /** The glass pass's uniforms for this frame: the ball, the camera it is seen from, the plane through the pendant, the rim. */
+  private placeGlass(glass: GlassSlot, f: Frame, dist: number, rim: RimRgb | null): void {
+    const cam = this.camera;
+    const u = this.glass.uniforms;
+    const gd = dist * glassAt(glass.r, f.fov);
+    this.tmp.set(glass.x * 2 - 1, 1 - glass.y * 2, 0.5).unproject(cam).sub(cam.position).normalize();
+    this.centre.copy(cam.position).addScaledVector(this.tmp, gd);
+    u.centre.value.copy(this.centre);
+    u.radius.value = glass.r * 2 * gd * Math.tan((f.fov * D) / 2) * f.glass;
+    u.camPos.value.copy(cam.position);
+    u.camWorld.value.copy(cam.matrixWorld);
+    u.projInv.value.copy(cam.projectionMatrixInverse);
+    u.view.value.copy(cam.matrixWorldInverse);
+    u.viewProj.value.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
+    // the plane through the pendant (it stands at the origin), square to the camera
+    cam.getWorldDirection(this.fwd);
+    u.planeNormal.value.copy(this.fwd);
+    u.planePoint.value.set(0, 0, 0);
+    this.drawLens(glass);
+    // the rim light: behind the ball, its colour the testimonials' edge (none when they give none)
+    const light = this.rimLight;
+    light.intensity = rim ? RIM_INTENSITY : 0;
+    if (rim) light.color.setRGB(rim[0], rim[1], rim[2], SRGBColorSpace);
+    light.target.position.copy(this.centre);
+    light.position.copy(RIM_FROM).transformDirection(cam.matrixWorld).multiplyScalar(gd).add(this.centre);
+    u.rimDir.value.copy(light.position).sub(light.target.position).transformDirection(cam.matrixWorldInverse);
+    u.rimColor.value.copy(light.color).multiplyScalar(light.intensity);
+  }
+
+  /**
+   * The lens view: the scene drawn from the camera as posed, its projection zoomed onto a square LENS_SPAN x the ball's
+   * full radius round the ball's centre on screen, at LENS_DENSITY pixels per screen pixel. The same view as the frame,
+   * only sharper where the ball magnifies it, so the glass pass looks the pendant up here and falls back to the frame.
+   */
+  private drawLens(glass: GlassSlot): void {
+    const cam = this.camera, lens = this.lensCam, r = this.renderer;
+    const halfPx = LENS_SPAN * glass.r * this.vh; // (CSS px; the full radius, so the view holds still as the ball grows in)
+    const size = Math.min(2048, Math.max(256, Math.ceil((2 * halfPx * this.dpr * LENS_DENSITY) / 64) * 64));
+    if (this.lensTarget.width !== size) this.lensTarget.setSize(size, size);
+    cam.matrixWorld.decompose(lens.position, lens.quaternion, lens.scale);
+    // NDC zoom: x' = (x - cx) / sx, applied to clip space (before the divide) as rows 0 and 1 minus cx, cy times row 3
+    const cx = glass.x * 2 - 1, cy = 1 - glass.y * 2, sx = halfPx / (this.vw / 2), sy = halfPx / (this.vh / 2);
+    this.zoom.set(1 / sx, 0, 0, -cx / sx, 0, 1 / sy, 0, -cy / sy, 0, 0, 1, 0, 0, 0, 0, 1);
+    lens.projectionMatrix.multiplyMatrices(this.zoom, cam.projectionMatrix);
+    lens.projectionMatrixInverse.copy(lens.projectionMatrix).invert();
+    lens.updateMatrixWorld(true);
+    this.glass.uniforms.lensViewProj.value.multiplyMatrices(lens.projectionMatrix, lens.matrixWorldInverse);
+    const was = r.getRenderTarget();
+    r.setRenderTarget(this.lensTarget);
+    r.clear();
+    r.render(this.scene, lens);
+    r.setRenderTarget(was);
   }
 
   /** Does the pendant (the full mesh) lie under this point? `x`, `y`: CSS px from the canvas's top-left. Uses the pose of
@@ -411,8 +479,9 @@ export class PendantScene {
   dispose(): void {
     if (this.gone) return;
     this.gone = true;
-    for (const p of [this.renderPass, this.bokeh, this.outputPass, this.dimPass]) p.dispose();
+    for (const p of [this.renderPass, this.bokeh, this.glassPass, this.outputPass, this.dimPass]) p.dispose(); // (a shader pass frees its material)
     this.composer.dispose();
+    this.lensTarget.dispose();
     for (const o of this.disposables) o.dispose();
     // (the clay's material and the loader's own are in `disposables`; the brass's geometry is shared with the clay's)
     (this.brass.geometry as BufferGeometry).dispose();

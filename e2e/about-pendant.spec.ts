@@ -117,6 +117,56 @@ test("the glass sits in the pictures' slot between the quotes and touches neithe
   expect(errors).toEqual([]);
 });
 
+/** The glass ball's inside, sorted into kinds of pixel: inside 0.8 of its radius (the rim's dark ring and edge left out). */
+async function ballPixels(page: Page, g: { x: number; y: number; r: number }) {
+  const vp = page.viewportSize()!;
+  const cx = g.x * vp.width, cy = g.y * vp.height, R = g.r * vp.height;
+  const clip = { x: Math.round(cx - R), y: Math.round(cy - R), width: Math.round(2 * R), height: Math.round(2 * R) };
+  const png = (await page.screenshot({ clip })).toString("base64");
+  return page.evaluate(async (src) => {
+    const img = new Image();
+    img.src = `data:image/png;base64,${src}`;
+    await img.decode();
+    const c = document.createElement("canvas");
+    c.width = img.width;
+    c.height = img.height;
+    const x = c.getContext("2d")!;
+    x.drawImage(img, 0, 0);
+    const d = x.getImageData(0, 0, c.width, c.height).data;
+    const r0 = c.width / 2;
+    let n = 0, brass = 0, grey = 0, dark = 0;
+    for (let py = 0; py < c.height; py++) {
+      for (let px = 0; px < c.width; px++) {
+        if (Math.hypot(px + 0.5 - r0, py + 0.5 - r0) > 0.8 * r0) continue;
+        const i = (py * c.width + px) * 4, r = d[i], gg = d[i + 1], b = d[i + 2], sum = r + gg + b;
+        n++;
+        if (sum > 150 && r - b > 25) brass++; // (the pendant, warm)
+        else if (sum > 210 && sum < 600 && Math.max(r, gg, b) - Math.min(r, gg, b) < 14) grey++; // (milk: a flat mid grey)
+        else if (sum < 90) dark++; // (the page, through clear glass)
+      }
+    }
+    return { n, brass: brass / n, grey: grey / n, dark: dark / n };
+  }, png);
+}
+
+test("through the glass: the pendant inside, clear glass round it, no milk", async ({ page }) => {
+  const errors = collectErrors(page);
+  await page.goto("/about");
+  await ready(page);
+  await page.mouse.move(1430, 890);
+  const y = await page.evaluate(() => window.__pendant!.keys.find((k) => k.id === "glass")!.y);
+  await page.evaluate((y) => window.scrollTo(0, y), y);
+  await page.waitForTimeout(2500);
+  const g = await page.evaluate(() => window.__pendant!.glass!);
+  expect(g).not.toBeNull();
+  const px = await ballPixels(page, g);
+  expect(px.n).toBeGreaterThan(5000);
+  expect(px.brass).toBeGreaterThan(0.08); // (the pendant, magnified, fills a good part of the ball)
+  expect(px.dark).toBeGreaterThan(0.2); // (and round it the page shows through)
+  expect(px.grey).toBeLessThan(0.05); // (the placeholder's milky inside was about half flat grey)
+  expect(errors).toEqual([]);
+});
+
 // ---------- Task 8: readability, solved per screen ----------
 
 /** The words the pendant must never cover in front of them (Task 7's selectors, as in about-pendant.tsx), the chrome that
