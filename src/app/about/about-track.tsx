@@ -140,9 +140,11 @@ export function AboutTrack() {
               <div className="ab-slide ab-lead">
                 <p className="ab-big"><Words line={ABOUT.opening.text} /></p>
                 <div className="ab-strip" data-pendant="strip">
-                  {ABOUT.pictures.strip.map((s) => (
-                    <Link key={s.id} href={s.href ?? "/"} className="ab-strip-link"><Pic p={s} decor /></Link>
-                  ))}
+                  {ABOUT.pictures.strip.map((s) => {
+                    // (every strip picture leads to its case study: a missing link is a content mistake, not a link to "/")
+                    if (!s.href) throw new Error(`about strip picture "${s.id}" has no href`);
+                    return <Link key={s.id} href={s.href} className="ab-strip-link"><Pic p={s} decor /></Link>;
+                  })}
                 </div>
               </div>
               {ABOUT.quotes.map((q, i) => (

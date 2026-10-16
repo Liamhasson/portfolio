@@ -97,3 +97,4 @@ a.ab-proof:hover, a.ab-proof:focus-visible { color: #f4efe9; }
 .ab[data-mode="stack"] .ab-pic-cap { margin-top: 1.6vw; white-space: normal; }
 .ab[data-mode="stack"] .ab-deskvid { width: min(100%, 520px); margin: 0; align-self: flex-start; }
 .ab[data-mode="stack"] .ab-glass { display: none; }
+.ab[data-mode="stack"] .ab-verb-body { max-width: none; }   /* (the 60vw cap is the track's; the slide itself is already uncapped) */

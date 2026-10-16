@@ -83,3 +83,22 @@ test("nothing appears twice", () => {
   expect(srcs).toHaveLength(7);
   expect(new Set(srcs).size).toBe(srcs.length);
 });
+
+test("stacked (phones, reduced motion): the Build it body is not held to the track's 60vw", async () => {
+  const css = (await import("node:fs")).readFileSync(`${process.cwd()}/src/app/about/about.css`, "utf8");
+  expect(css).toMatch(/\.ab\[data-mode="stack"\] \.ab-verb-body \{[^}]*max-width: none/);
+});
+
+test("a strip picture without a link fails loudly, not a quiet link to the home page", async () => {
+  vi.resetModules();
+  vi.doMock("@/content/about", async (orig) => {
+    const m = await orig<typeof import("@/content/about")>();
+    const strip = m.ABOUT.pictures.strip.map((s, i) => (i === 1 ? { ...s, href: undefined } : s));
+    return { ...m, ABOUT: { ...m.ABOUT, pictures: { ...m.ABOUT.pictures, strip } } };
+  });
+  const { AboutTrack: Broken } = await import("./about-track");
+  const err = vi.spyOn(console, "error").mockImplementation(() => {});
+  expect(() => render(<Broken />)).toThrow(/eventread/);
+  err.mockRestore();
+  vi.doUnmock("@/content/about");
+});
