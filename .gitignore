@@ -66,3 +66,9 @@ blender/lookdev/renders/deskmove-push/
 blender/lookdev/renders/bake/
 blender/lookdev/renders/targets/
 blender/lookdev/renders/*-plate/
+
+# the pendant model (Blender): its renders and its generated outputs
+blender/amulet/out/
+blender/amulet/renders/
+blender/amulet/head.npz
+blender/amulet/__pycache__/
