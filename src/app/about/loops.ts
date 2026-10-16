@@ -4,7 +4,7 @@ type Loop = { el: HTMLVideoElement; seen: boolean; shown: boolean; failed: boole
 
 /**
  * Starts and stops the silent loops. A loop plays only when ALL of these hold, and is paused the moment one stops:
- *  - it is on screen (an IntersectionObserver on the video: layout boxes, so it does not see the track's clip-path);
+ *  - it is on screen (an IntersectionObserver on the video; Chromium counts the track's clip-path in it, so a picture still mostly cut away or unrisen does not start yet, about 25% visible);
  *  - its picture is not cut away or waiting to rise (`setShown`, from the state the track's frame already computes: no second measure);
  *  - the tab is visible (`document.hidden`) and the visitor has not asked for reduced motion (`prefers-reduced-motion`, also when it changes).
  * Until the first moment a loop is wanted nothing is called on it: the videos are `preload="none"`, and play() is what starts a download,
