@@ -66,6 +66,7 @@ blender/lookdev/renders/deskmove-push/
 blender/lookdev/renders/bake/
 blender/lookdev/renders/targets/
 blender/lookdev/renders/*-plate/
+blender/lookdev/renders/desk-passes/
 
 # the pendant model (Blender): its renders and its generated outputs
 blender/amulet/out/
