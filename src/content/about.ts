@@ -9,6 +9,8 @@ export type Line = Seg[];
 export type Quote = { text: Line; name: string; role: string };
 export type Skill = { name: string; proof: string; href?: string };
 export type Verb = { title: string; skills: Skill[] };
+/** A picture along the track: a still, or a short silent loop with its poster; `href` makes it a link (title = the hover text). */
+export type Picture = { id: string; src: string; poster?: string; alt: string; caption?: string; href?: string; title?: string; loop: boolean };
 
 export const plain = (l: Line) => l.map((s) => s.t).join("");
 
@@ -77,6 +79,29 @@ export const ABOUT = {
   // (Liam's graduation photo, cropped to him: left of the first line, travelling with the track; mirrored so he faces the text,
   // not walks away from it (Liam, 2026-10-16); replacing it is one file swap)
   portrait: { src: "/about/portrait-facing.jpg", alt: "Liam walking across the stage at his graduation, a rolled certificate in his hand", width: 760, height: 1273 } as { src: string; alt: string; width: number; height: number } | null,
+  // (the pictures along the track, spec 2026-10-16-about-pictures-design.md §2; Liam, 2026-10-16. Pulse stays out of About.)
+  pictures: {
+    // word-sized loops, inline right after "two rock bands", part of the link to /playground; the title shows on hover
+    bands: [
+      { id: "marni-came", src: "/playground/after-heartbreaks-loop.mp4", poster: "/playground/after-heartbreaks-film.jpg", alt: "Marni Came on stage", title: "Marni Came", loop: true },
+      { id: "sanskrit", src: "/playground/my-small-world-loop.mp4", poster: "/playground/my-small-world.jpg", alt: "Sanskrit, my band before Marni Came", title: "Sanskrit", loop: true },
+    ],
+    // right of the second paragraph, a still
+    studio: { id: "studio", src: "/playground/studio-overhead.jpg", alt: "The studio desk from above, mid-session", caption: "Producing · Marni Came", loop: false },
+    // under "End to end", each loop captioned and linking to its case study
+    strip: [
+      { id: "cyvore", src: "/work/cyvore.mp4", poster: "/work/cyvore.jpg", alt: "The Cyvore investor site", caption: "Cyvore", href: "/cyvore", loop: true },
+      { id: "eventread", src: "/work/eventread.mp4", poster: "/work/eventread.jpg", alt: "Eventread, the night's risk read in the app", caption: "Eventread", href: "/eventread", loop: true },
+      { id: "nordic-logic", src: "/work/nordic-logic-live.mp4", poster: "/work/nordic-logic-live.jpg", alt: "The Nordic Logic site, live", caption: "Nordic Logic", href: "/nordic-logic", loop: true },
+    ],
+    // right of "Build it.": the desk film, wire to final
+    desk: { id: "desk", src: "/about/desk-build.mp4", poster: "/about/desk-build.jpg", alt: "The desk on this site being built, from wireframe to the final render", caption: "This desk · wire to final", loop: true },
+  } as {
+    bands: [Picture, Picture];
+    studio: Picture;
+    strip: [Picture, Picture, Picture];
+    desk: Picture;
+  },
 };
 
 export const CONTACT = {

@@ -53,4 +53,39 @@ describe("About and Contact content (spec 2026-10-12-about-contact-design.md)", 
     expect(existsSync(join(process.cwd(), "public/Liam-Hasson-Resume.pdf"))).toBe(true);
     expect(CONTACT).toEqual({ headline: "Got something on your mind?", email: "Liamhasson@gmail.com", linkedin: "https://www.linkedin.com/in/liamhasson/", phone: "+49 160 771 0652" });
   });
+  // the pictures along the track (spec 2026-10-16-about-pictures-design.md §2)
+  const pictures = () => [...ABOUT.pictures.bands, ABOUT.pictures.studio, ...ABOUT.pictures.strip, ABOUT.pictures.desk];
+  test("every picture's source is unique (the portrait included)", () => {
+    const srcs = [ABOUT.portrait!.src, ...pictures().map((p) => p.src)];
+    expect(srcs).toHaveLength(8);
+    expect(new Set(srcs).size).toBe(srcs.length);
+  });
+  test("the strip links to the three case studies, in order", () => {
+    expect(ABOUT.pictures.strip.map((p) => p.href)).toEqual(["/cyvore", "/eventread", "/nordic-logic"]);
+    expect(ABOUT.pictures.strip.map((p) => p.caption)).toEqual(["Cyvore", "Eventread", "Nordic Logic"]);
+  });
+  test("Pulse is not in About's pictures", () => {
+    for (const p of pictures()) {
+      for (const v of [p.src, p.poster, p.caption, p.title, p.alt, p.href]) expect(v ?? "").not.toMatch(/pulse/i);
+    }
+  });
+  test("the bands, the studio and the desk are the spec's table, verbatim", () => {
+    expect(ABOUT.pictures.bands.map((p) => [p.src, p.poster, p.title])).toEqual([
+      ["/playground/after-heartbreaks-loop.mp4", "/playground/after-heartbreaks-film.jpg", "Marni Came"],
+      ["/playground/my-small-world-loop.mp4", "/playground/my-small-world.jpg", "Sanskrit"],
+    ]);
+    expect(ABOUT.pictures.studio).toMatchObject({ src: "/playground/studio-overhead.jpg", caption: "Producing · Marni Came", loop: false });
+    expect(ABOUT.pictures.desk).toMatchObject({ src: "/about/desk-build.mp4", poster: "/about/desk-build.jpg", caption: "This desk · wire to final", loop: true });
+  });
+  test("videos loop and have a poster; every file exists under public/; every picture has an alt", () => {
+    for (const p of pictures()) {
+      expect(p.alt.length).toBeGreaterThan(5);
+      expect(existsSync(join(process.cwd(), "public", p.src))).toBe(true);
+      if (p.src.endsWith(".mp4")) {
+        expect(p.loop).toBe(true);
+        expect(p.poster).toBeTruthy();
+      }
+      if (p.poster) expect(existsSync(join(process.cwd(), "public", p.poster))).toBe(true);
+    }
+  });
 });
