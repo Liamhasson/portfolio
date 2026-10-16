@@ -420,7 +420,7 @@ P = node("ShaderNodeTexCoord").outputs["Object"]      # (the model is 1 unit tal
 # where the light can't reach: the recesses (patina, rust), and the finer cavities (grime). Baked first as their own AO
 # passes (the AO shader node reads almost nothing inside a bake), then read back through the UVs
 out = node("ShaderNodeOutputMaterial")
-scene.render.bake.margin = 8
+scene.render.bake.margin = 16; scene.render.bake.margin_type = "EXTEND"   # (the islands run on into the gutter between them)
 scene.cycles.samples = 64
 
 
@@ -518,6 +518,14 @@ link(rgb.outputs["Color"], emit.inputs["Color"])
 r_img = bake("rough", "EMIT", emit.outputs["Emission"], "Non-Color")
 n_img = bake("normal", "NORMAL", bsdf.outputs["BSDF"], "Non-Color")
 
+# where the islands are (a white bake at no margin), for filling the rest of the maps (--web)
+if WEB:
+    for l in list(emit.inputs["Color"].links):
+        nt.links.remove(l)
+    emit.inputs["Color"].default_value = (1, 1, 1, 1)
+    scene.render.bake.margin = 0
+    bake("mask", "EMIT", emit.outputs["Emission"], "Non-Color")
+
 # the exported material: the three maps on a plain metal
 nt.nodes.clear()
 bsdf = node("ShaderNodeBsdfPrincipled"); bsdf.inputs["Metallic"].default_value = 1.0
@@ -547,9 +555,40 @@ def export_glb(ob, path, **kw):
 
 if WEB:
     # the three baked maps, at TEX (roughness is baked into all three channels, so it is in G as glTF wants it)
-    for name in ("color", "normal", "rough"):
-        shutil.copy(os.path.join(WEB, f"amulet_{name}.png"), os.path.join(WEB, f"{name}.png"))
+    # ...with every island run out into the empty atlas around it, so that no black reaches an edge texel, a mip level, or a
+    # compressor's block (the gutters bled dark smears into the hood's edge). The pixels are read and written RAW (each
+    # file loaded as Non-Color: the baked bytes in, the same bytes out; the colour stays sRGB-encoded exactly once, as baked).
+    def raw(path):
+        im = bpy.data.images.load(path); im.colorspace_settings.name = "Non-Color"
+        a = np.empty(im.size[0] * im.size[1] * 4, dtype=np.float32); im.pixels.foreach_get(a)
+        return im, a.reshape(im.size[1], im.size[0], 4)
+
+    _, mk = raw(os.path.join(WEB, "amulet_mask.png"))
+    covered = mk[..., 0] > 0.5
+    print("ATLAS covered", round(float(covered.mean()), 3), flush=True)
+    for name, neutral in (("color", None), ("normal", (0.5, 0.5, 1.0)), ("rough", None)):
+        im, a = raw(os.path.join(WEB, f"amulet_{name}.png"))
+        rgb = a[..., :3]
+        known = covered.copy()
+        for _ in range(48):                       # a pixel at a time out from the islands' edges, averaging what it touches
+            if known.all():
+                break
+            acc = np.zeros_like(rgb); cnt = np.zeros(known.shape, np.float32)
+            for dy in (-1, 0, 1):
+                for dx in (-1, 0, 1):
+                    if dy or dx:
+                        k = np.roll(known, (dy, dx), (0, 1))
+                        acc += np.roll(rgb, (dy, dx), (0, 1)) * k[..., None]; cnt += k
+            new = ~known & (cnt > 0)
+            rgb[new] = acc[new] / cnt[new][:, None]
+            known |= new
+        rest = ~known                             # (what is left, far from any island: the maps' mean, or a flat normal)
+        rgb[rest] = neutral if neutral else rgb[covered].mean(0)
+        a[..., 3] = 1.0
+        im.pixels.foreach_set(a.ravel())
+        im.filepath_raw = os.path.join(WEB, f"{name}.png"); im.file_format = "PNG"; im.save()
         os.remove(os.path.join(WEB, f"amulet_{name}.png"))
+        print("FILLED", name, "covered", round(float(covered.mean()), 3), "->", round(float(known.mean()), 3), flush=True)
     # the wire copy first, from the whole joined object: about 5k triangles, positions only
     wire = am.copy(); wire.data = am.data.copy(); wire.name = "wire"; wire.data.materials.clear()
     scene.collection.objects.link(wire)

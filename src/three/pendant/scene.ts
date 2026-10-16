@@ -32,7 +32,7 @@ import type { Frame } from "./shots";
 
 /** Cache-busting token for the pendant's files (Liam's browser keeps old ones: bump it whenever a file in
  *  public/about/pendant changes). */
-export const PENDANT_VERSION = "2026-10-16.2";
+export const PENDANT_VERSION = "2026-10-16.3";
 
 const BASE = "/about/pendant/";
 const D = Math.PI / 180;

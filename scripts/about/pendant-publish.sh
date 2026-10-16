@@ -6,6 +6,7 @@
 #   color.ktx2        sRGB ETC1S with mips (GPU-compressed: a JPEG would sit in memory at 16 MB on a phone)
 #   normal.jpg        tangent space, OpenGL convention (as Blender bakes it); ffmpeg keeps it 4:4:4
 #   rough.jpg         roughness in G (glTF's convention; Blender bakes it into R, G and B alike), 1024 x 1024 (the others 2048)
+# Every map has its islands run out into the empty atlas (amulet.py --web), so no black gutter bleeds into a mip or a block.
 # Needs Blender (env BLENDER), KTX-Software's `ktx` (env KTX; ~/.local/bin/ktx), ffmpeg, and gltfpack (via npx).
 # The non-head decimation ratio is 0.22 (the plan's 0.35 came to 2.65 MB; 2.5 MB is the budget, and the heads are never touched):
 #   PENDANT_RATIO=0.3 bash scripts/about/pendant-publish.sh
