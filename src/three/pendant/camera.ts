@@ -6,7 +6,7 @@
  * Rig: `outer` holds `inner`, which holds the model with its origin at mid-height. `outer` carries the screen-relative
  * lay / tumble / lean; `inner` carries the spin about the pendant's own axis.
  */
-import { Euler, Quaternion, Vector3 } from "three";
+import { Euler, Matrix4, Quaternion, Vector3 } from "three";
 import type { Box3, Object3D, PerspectiveCamera } from "three";
 import { breath, type MotionState } from "./motion";
 import type { Frame } from "./shots";
@@ -37,6 +37,7 @@ export function distanceFor(h: number, fovDeg: number): number {
 }
 
 const camQ = new Quaternion();
+const mvp = new Matrix4();
 const tmpQ = new Quaternion();
 const tmpE = new Euler();
 const dir = new Vector3();
@@ -121,4 +122,47 @@ export function screenBox(bounds: Box3, inner: Object3D, camera: PerspectiveCame
     }
   }
   return { l, t, r, b };
+}
+
+/**
+ * The pendant's outline as a box on screen: `points` (xyz triples in `inner`'s space, e.g. the wire copy's vertices),
+ * projected through one composed matrix. Call after `poseRig`. A point behind the lens is skipped. With no points it answers
+ * an empty box at the origin.
+ */
+export function outlineBox(points: Float32Array, inner: Object3D, camera: PerspectiveCamera, vw: number, vh: number): Box {
+  mvp.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).multiply(inner.matrixWorld);
+  const m = mvp.elements;
+  let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
+  for (let i = 0; i + 2 < points.length; i += 3) {
+    const x = points[i], y = points[i + 1], z = points[i + 2];
+    const w = m[3] * x + m[7] * y + m[11] * z + m[15];
+    if (w <= 1e-6) continue;
+    const sx = ((((m[0] * x + m[4] * y + m[8] * z + m[12]) / w) + 1) / 2) * vw;
+    const sy = ((1 - (m[1] * x + m[5] * y + m[9] * z + m[13]) / w) / 2) * vh;
+    if (sx < l) l = sx;
+    if (sx > r) r = sx;
+    if (sy < t) t = sy;
+    if (sy > b) b = sy;
+  }
+  return l <= r ? { l, t, r, b } : { l: 0, t: 0, r: 0, b: 0 };
+}
+
+/**
+ * How far (px, either way on either axis) the always-on motion can carry the pendant's outline from where a held frame
+ * (`poseRig` with `still`, no lean) puts it: the camera's drift and the cursor's lean at the screen's edge (`lookMax`, the
+ * eased lean's limit) move the whole picture by their angle over the lens; the breathing and the roll wander rock the
+ * pendant about its aim point, moving the outline's furthest point (`reach`: px from the aim point on screen to the held
+ * outline's furthest corner) by their angle times that distance. The readability solve keeps this much clear of every line
+ * (plus its own padding), so the live pendant can move all it does and stay clear.
+ */
+export function motionMargin(fov: number, reach: number, vh: number, lookMax: number): number {
+  const lens = Math.tan((fov * D) / 2);
+  const camera = ((DRIFT + LOOK_GAIN * lookMax) / lens) * (vh / 2);
+  const body = (BREATH_ROLL + BREATH_PITCH + ROLL_WANDER) * reach;
+  return camera + body;
+}
+
+/** The px from a screen point to a box's furthest corner (a held outline's `reach` about its aim point). */
+export function reachOf(box: Box, cx: number, cy: number): number {
+  return Math.hypot(Math.max(Math.abs(box.l - cx), Math.abs(box.r - cx)), Math.max(Math.abs(box.t - cy), Math.abs(box.b - cy)));
 }

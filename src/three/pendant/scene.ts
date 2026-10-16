@@ -81,6 +81,10 @@ export class PendantScene {
   readonly inner: Object3D;
   /** The model's bounds, in `inner`'s space. */
   readonly bounds: Box3;
+  /** The pendant's outline: every vertex of the low-poly wire copy (about 5k), xyz in `inner`'s space. The readability
+   *  solve (solve.ts) projects these instead of the bounds' eight corners, which in strong perspective cover far more of the
+   *  screen than the pendant does. */
+  readonly outline: Float32Array;
 
   private readonly renderer: WebGLRenderer;
   private readonly composer: EffectComposer;
@@ -109,8 +113,10 @@ export class PendantScene {
   private constructor(
     renderer: WebGLRenderer, scene: Scene, camera: PerspectiveCamera, outer: Object3D, inner: Object3D, bounds: Box3,
     brass: Mesh, clay: Mesh, wire: Object3D, glassBall: Mesh, disposables: { dispose(): void }[], hiDpi: boolean,
+    outline: Float32Array,
   ) {
     this.renderer = renderer;
+    this.outline = outline;
     this.camera = camera;
     this.outer = outer;
     this.inner = inner;
@@ -263,6 +269,17 @@ export class PendantScene {
       scene.add(outer);
       outer.updateMatrixWorld(true);
       const bounds = new Box3().setFromObject(holder);
+      // (outer and inner are still at rest here, so world space is inner's space)
+      const pts: number[] = [];
+      const v = new Vector3();
+      for (const m of wireMeshes) {
+        const pos = m.geometry.getAttribute("position");
+        for (let i = 0; i < pos.count; i++) {
+          v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+          pts.push(v.x, v.y, v.z);
+        }
+      }
+      const outline = new Float32Array(pts);
 
       // the placeholder glass (Task 9 finishes it): a real refracting sphere, only placed while the shot looks through it
       const glassBall = new Mesh(
@@ -277,7 +294,7 @@ export class PendantScene {
 
       for (const t of [color, normal, rough]) renderer.initTexture(t);
       const hiDpi = (typeof window !== "undefined" ? window.devicePixelRatio : 1) > 1.25;
-      const built = new PendantScene(renderer, scene, camera, outer, inner, bounds, brass, clay, wireModel.scene, glassBall, owned, hiDpi);
+      const built = new PendantScene(renderer, scene, camera, outer, inner, bounds, brass, clay, wireModel.scene, glassBall, owned, hiDpi, outline);
       built.warm();
       return built;
     } catch (e) {

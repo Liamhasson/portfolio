@@ -1,6 +1,6 @@
 // src/three/pendant/shots.test.ts
-import { describe, expect, test } from "vitest";
-import { SHOTS, shotAt, solveKeys, type Anchor, type Shot } from "./shots";
+import { describe, expect, it, test } from "vitest";
+import { SHOTS, shotAt, solveKeys, variants, type Anchor, type Shot } from "./shots";
 
 const VW = 1440;
 const TRAVEL = 9000;
@@ -184,5 +184,26 @@ describe("shotAt", () => {
     const after = shotAt(51, [0, 100], [a, b], AT);
     expect(after.layer).toBe("back");
     expect(after.lock).toBe(-62);
+  });
+});
+
+// Task 8, fix round 1: a shot may carry alternates the readability solve tries in order when the shot as written can't be
+// cleared on a screen (Liam's ruling: the hero's mirror, top right, until the layout frees the left).
+describe("alternates", () => {
+  it("the hero carries one alternate: the storyboard's framing mirrored to the top right", () => {
+    const hero = SHOTS.find((s) => s.id === "hero")!;
+    expect(hero.alt).toEqual([{ az: 62, lock: 62, roll: -6, ax: 0.97, ay: 0.85, h: 0.8 }]);
+  });
+  it("no other shot inherits it (alternates are a shot's own, never filled forward)", () => {
+    for (const s of SHOTS) if (s.id !== "hero") expect(s.alt).toBeUndefined();
+  });
+  it("variants: the shot as written first, then each alternate laid over it", () => {
+    const hero = SHOTS.find((s) => s.id === "hero")!;
+    const v = variants(hero);
+    expect(v).toHaveLength(2);
+    expect(v[0]).toBe(hero);
+    expect(v[1]).toMatchObject({ id: "hero", anchor: "end", az: 62, lock: 62, roll: -6, ax: 0.97, ay: 0.85, h: 0.8, el: -12, fov: 24 });
+    expect(v[1].aim).toEqual(hero.aim);
+    expect(variants(SHOTS[0])).toEqual([SHOTS[0]]);
   });
 });

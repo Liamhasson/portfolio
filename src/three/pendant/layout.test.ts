@@ -1,7 +1,7 @@
 // src/three/pendant/layout.test.ts
 import { describe, expect, it } from "vitest";
 import type { Box } from "./camera";
-import { freeSpot, hits, layerTimeline, type Sample, type TextRect } from "./layout";
+import { clipBox, findSpot, freeSpot, hits, layerTimeline, padBox, placeBox, SAME, shownShare, type Probe, type Sample, type SpotLimits, type TextRect } from "./layout";
 
 const box = (l: number, r: number, t = 100, b = 300): Box => ({ l, t, r, b });
 
@@ -159,5 +159,88 @@ describe("fixed boxes (screen px, not moved by s)", () => {
     const d = freeSpot(box(1250, 1350, 60, 200), [], 3000, 1000, 0.25, [nav]); // right: +50 px; left: -350 px
     expect(d as number).toBeCloseTo(0.05, 2);
     expect(freeSpot(box(1250, 1350, 60, 200), [], 0, 1000, 0.02, [nav])).toBeNull();
+  });
+});
+
+// Task 8, fix round 1: the 2D search (sideways, up or down, smaller) used by the solver.
+describe("findSpot", () => {
+  const lim: SpotLimits = { vw: 1000, vh: 1000, maxX: 0.25, maxY: 0.2, minK: 0.7, edgeLoss: 0.25, minShown: 0.35 };
+  // a 100 x 200 box centred at (500, 500), scaling about its centre, needing 10 px of clearance
+  const probe = (over: Partial<Probe> = {}): Probe => ({ s: 0, box: { l: 450, t: 400, r: 550, b: 600 }, cx: 500, cy: 500, pad: 10, ...over });
+
+  it("keeps the shot as written when it is clear", () => {
+    expect(findSpot([probe()], [{ l: 700, t: 0, w: 100, h: 1000 }], [], lim)).toEqual(SAME);
+  });
+  it("counts the padding: a line 5 px away is too close", () => {
+    const d = findSpot([probe()], [{ l: 555, t: 450, w: 100, h: 20 }], [], lim)!;
+    expect(d).not.toEqual(SAME);
+  });
+  it("moves sideways when that is nearest", () => {
+    // a short line under the right half: 50 px left (+10 pad) clears it, nothing vertical is as near
+    const d = findSpot([probe()], [{ l: 520, t: 300, w: 100, h: 400 }], [], lim)!;
+    expect(d.dy).toBe(0);
+    expect(d.k).toBe(1);
+    expect(d.dx).toBeCloseTo(-0.04, 5); // (box right 550 + 10 pad must be <= 520: -40 px; touching edges don't overlap)
+  });
+  it("moves down when a band across the whole screen blocks the top", () => {
+    const band: TextRect = { l: -5000, t: 300, w: 20000, h: 120 }; // y 300..420: the box's top 400 (-10 pad) is in it
+    const d = findSpot([probe()], [band], [], lim)!;
+    expect(d.dx).toBe(0);
+    expect(d.dy).toBeGreaterThan(0);
+    expect(d.dy).toBeLessThanOrEqual(0.04);
+  });
+  it("shrinks when nothing nearer clears", () => {
+    // walls left, right, above and below, each just inside the box's padded edge, and too wide or tall to move around
+    const walls: TextRect[] = [
+      { l: -5000, t: 380, w: 5445, h: 1000 }, { l: 555, t: 380, w: 5000, h: 1000 }, // x < 445 and x > 555, below y 380
+      { l: -5000, t: -1000, w: 20000, h: 1380 }, // everything above y 380
+      { l: -5000, t: 615, w: 20000, h: 1000 }, // everything below y 615
+    ];
+    const d = findSpot([probe()], walls, [], lim)!;
+    expect(d).not.toBeNull();
+    expect(d.k).toBeLessThan(1);
+    expect(d.k).toBeGreaterThanOrEqual(0.7);
+  });
+  it("answers null when nothing within the limits is clear", () => {
+    expect(findSpot([probe()], [{ l: -5000, t: -5000, w: 20000, h: 20000 }], [], lim)).toBeNull();
+  });
+  it("treats fixed boxes like lines and ignores s for them", () => {
+    const d = findSpot([probe({ s: 3000 })], [], [{ l: 520, t: 300, r: 620, b: 700 }], lim)!;
+    expect(d.dx).toBeCloseTo(-0.04, 5);
+  });
+  it("must clear every probe at once (a shot's whole rest window)", () => {
+    // the same line seen at two travels: at s 0 it is right of the box, at s 100 it has moved 100 px left onto it
+    const line: TextRect = { l: 600, t: 300, w: 300, h: 400 };
+    expect(findSpot([probe()], [line], [], lim)).toEqual(SAME);
+    const d = findSpot([probe(), probe({ s: 100 })], [line], [], lim)!;
+    expect(d).not.toEqual(SAME);
+    for (const s of [0, 100]) {
+      const placed = placeBox(probe({ s }), d, 1000, 1000);
+      expect(hits(padBox(placed, 10), [line], s)).toBe(0);
+    }
+  });
+  it("never pushes the pendant off the screen: at least 35% stays on, and no more than a quarter more is lost", () => {
+    // the box sits at the left edge, half on screen; a wall covers everything right of x 20 (even shrunk to 70% it needs
+    // to move 25 px left, which leaves 14% of it on screen)
+    const edge = probe({ box: { l: -50, t: 400, r: 50, b: 600 }, cx: 0 });
+    const wall: TextRect = { l: 20, t: -5000, w: 20000, h: 20000 };
+    expect(findSpot([edge], [wall], [], lim)).toBeNull(); // (only moving it off the screen to the left would clear it)
+    const lax = findSpot([edge], [wall], [], { ...lim, minShown: 0, edgeLoss: 1 });
+    expect(lax).not.toBeNull();
+    expect(lax!.dx).toBeLessThan(0);
+  });
+});
+
+describe("box helpers", () => {
+  it("pads, clips and measures the on-screen share", () => {
+    expect(padBox({ l: 10, t: 10, r: 20, b: 20 }, 5)).toEqual({ l: 5, t: 5, r: 25, b: 25 });
+    expect(clipBox({ l: -10, t: 5, r: 10, b: 2000 }, 100, 100)).toEqual({ l: 0, t: 5, r: 10, b: 100 });
+    expect(clipBox({ l: 200, t: 5, r: 300, b: 50 }, 100, 100).r > 0).toBe(false);
+    expect(shownShare({ l: -50, t: 0, r: 50, b: 100 }, 100, 100)).toBeCloseTo(0.5, 9);
+    expect(shownShare({ l: -150, t: 0, r: -50, b: 100 }, 100, 100)).toBe(0); // (wholly off screen: 0, not NaN)
+  });
+  it("places a box: scaled about the aim point, then moved", () => {
+    const p: Probe = { s: 0, box: { l: 400, t: 400, r: 600, b: 600 }, cx: 500, cy: 500, pad: 0 };
+    expect(placeBox(p, { dx: 0.1, dy: -0.1, k: 0.5 }, 1000, 1000)).toEqual({ l: 550, t: 350, r: 650, b: 450 });
   });
 });

@@ -52,10 +52,16 @@ export interface Shot {
   glass: number;
   /** 0..1: the build passes (wire, clay, brass). */
   wire: number;
+  /** Other framings of this shot, tried in order by the readability solve (solve.ts) when the shot as written can't be
+   *  cleared of the words on a screen; each is laid over the shot. Never filled forward to the next shot. */
+  alt?: readonly ShotChange[];
 }
 
+/** What an alternate may change: any of a shot's framing fields (not its name, anchor or own alternates). */
+export type ShotChange = Partial<Omit<Shot, "id" | "anchor" | "alt">>;
+
 /** What the camera and the pendant do at one scroll position: the blend of the two shots around it. */
-export interface Frame extends Omit<Shot, "id" | "anchor" | "fx" | "ax" | "ay"> {
+export interface Frame extends Omit<Shot, "id" | "anchor" | "fx" | "ax" | "ay" | "alt"> {
   /** The earlier of the two shots (the last shot's own index once past the end). The shot currently showing is
    *  `t >= 0.5 ? index + 1 : index`, the same halfway point where `layer` and `lock` switch. */
   index: number;
@@ -66,20 +72,21 @@ export interface Frame extends Omit<Shot, "id" | "anchor" | "fx" | "ax" | "ay"> 
 }
 
 /** Every field a shot leaves out inherits from the shot before it; the first inherits these. */
-type ShotBody = Omit<Shot, "id" | "anchor">;
+type ShotBody = Omit<Shot, "id" | "anchor" | "alt">;
 const DEF: ShotBody = {
   fx: 0.5, az: 0, el: 0, roll: 0, fov: 30, h: 0.4, ax: 0.5, ay: 0.5, aim: [0, 0, 0],
   spin: 0.05, tumble: 0, rz: 0, lock: null, layer: "front", dim: 1, aperture: 0.001, glass: 0, wire: 1,
 };
 
 /** A shot as written below: its name and anchor, plus only the fields that change. */
-type ShotInput = Pick<Shot, "id" | "anchor"> & Partial<ShotBody>;
+type ShotInput = Pick<Shot, "id" | "anchor" | "alt"> & Partial<ShotBody>;
 
 const fill = (inputs: readonly ShotInput[]): readonly Shot[] => {
   const out: Shot[] = [];
   for (const input of inputs) {
-    const before: ShotBody = out.at(-1) ?? DEF;
-    out.push({ ...before, ...input });
+    const { id: _id, anchor: _anchor, alt: _alt, ...before } = out.at(-1) ?? { id: "", anchor: "start" as Anchor, ...DEF };
+    void _id; void _anchor; void _alt; // (a shot's own alternates are never inherited)
+    out.push({ ...DEF, ...before, ...input });
   }
   return out;
 };
@@ -107,8 +114,18 @@ export const SHOTS: readonly Shot[] = fill([
   { id: "build", anchor: { pendant: "deskfilm", fallback: "build" }, fx: 0.62, az: -25, el: 12, roll: 0, fov: 32, h: 0.28, ax: 0.5, ay: 0.15, spin: 0.08, aperture: 0.0008, wire: 0 },
   { id: "buildEnd", anchor: { pendant: "deskfilm", fallback: "build" }, fx: 0.36, az: 10, wire: 1 },
   // 10 Hero: close and low, cut by the left edge, its face turned to the last line (the aim is the face)
-  { id: "hero", anchor: "end", fx: 0, az: -62, el: -12, roll: 6, fov: 24, h: 1.35, ax: 0.03, ay: 0.5, aim: [0, 0.02, -0.1], spin: 0, lock: -62, aperture: 0.0016 },
+  { id: "hero", anchor: "end", fx: 0, az: -62, el: -12, roll: 6, fov: 24, h: 1.35, ax: 0.03, ay: 0.5, aim: [0, 0.02, -0.1], spin: 0, lock: -62, aperture: 0.0016,
+    // while About's layout leaves words beside the left edge at the end: the same shot mirrored, close at the right, cut by
+    // the right edge, its face turned to the closing line on its left (Liam's ruling, 2026-10-16). Its ay / h tuned from the
+    // asked 0.3 / 1.0 (there it sits on the pill nav and the closing line on every screen) to the one free area big enough
+    // for it on all four tested screens, the bottom right: it rises from the corner, cut by the right and bottom edges.
+    alt: [{ az: 62, lock: 62, roll: -6, ax: 0.97, ay: 0.85, h: 0.8 }] },
 ]);
+
+/** A shot and its alternates, in the order the solve tries them: the shot as written, then each alternate laid over it. */
+export function variants(shot: Shot): Shot[] {
+  return [shot, ...(shot.alt ?? []).map((c) => ({ ...shot, ...c }))];
+}
 
 const clamp = (v: number, a: number, b: number) => Math.min(Math.max(v, a), b);
 const smoothstep = (t: number) => t * t * (3 - 2 * t);

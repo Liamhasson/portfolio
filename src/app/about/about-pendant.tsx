@@ -3,10 +3,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Box, Look } from "@/three/pendant/camera";
-import { hits, type TextRect } from "@/three/pendant/layout";
+import { clipBox, hits, padBox, type TextRect } from "@/three/pendant/layout";
 import { REST, stepMotion, type MotionState } from "@/three/pendant/motion";
 import type { GlassSlot, PendantScene } from "@/three/pendant/scene";
-import { SHOTS, shotAt, solveKeys, type Layer } from "@/three/pendant/shots";
+import { SHOTS, shotAt, solveKeys, type Layer, type Shot } from "@/three/pendant/shots";
+import type { Outline } from "@/three/pendant/solve";
+import type { Spot } from "@/three/pendant/layout";
 import { trackProgress } from "./track";
 
 /** What the page tells the e2e tests and the frame script (scripts/about/pendant-frames.cjs), rewritten every frame. */
@@ -22,8 +24,12 @@ export interface PendantHook {
   box: Box;
   /** The glass ball as drawn (centre as a share of the viewport, radius as a share of its height), or null. */
   glass: GlassSlot | null;
-  /** This screen's solve (Task 8): the front shots nudged sideways (share of the width) and those resting behind the words. */
-  solve: { moved: { id: string; dx: number }[]; behind: string[] };
+  /** This screen's solve (Task 8): the front shots whose rest changed (the alternate used, 0 = as written; the move as shares
+   *  of the width / height and the scale) and those resting behind the words. */
+  solve: { moved: { id: string; alt: number; dx: number; dy: number; k: number }[]; behind: string[] };
+  /** The pendant's turn about its own axis (radians), and whether a hand is on it. */
+  yaw: number;
+  dragging: boolean;
 }
 
 declare global {
@@ -51,9 +57,14 @@ const OUT_SINK = 0.5;
 /** The words the pendant must never cover while in front of them (Task 8 solves the layers from their lines' boxes). */
 const TEXT = ".ab-big, .ab-quote blockquote, .ab-quote figcaption, .ab-verb .ab-mono, .ab-verb-title, .ab-skills li, .cap";
 /** What holds still on screen over the track, treated exactly as words: the site's wordmark, pill nav and burger (fixed to
- *  the viewport), and About's resume pill and progress bar (fixed in the pinned frame). */
+ *  the viewport), and About's resume pill (fixed in the pinned frame). The 1 px progress bar is not avoided (Liam's ruling). */
 const CHROME_SITE = ".sh-name, .sh-nav, .sh-burger";
-const CHROME_PIN = ".ab-resume, .ab-bar";
+const CHROME_PIN = ".ab-resume";
+/** The solve waits for this long a quiet spell after a resize (the words are measured again at once; the live guard keeps
+ *  them readable meanwhile). */
+const SOLVE_QUIET = 150;
+/** The live guard hands the front back only after the pendant has been clear for this long (s): no pumping at an edge. */
+const GUARD_HOLD = 0.2;
 /** How fast a solved-behind shot dims to solve.ts FORCED_DIM and comes back (what is left of the gap after a second): the
  *  layer flips while the pendant is clear of the words, so the dim eases in behind them instead of popping. */
 const FORCED_EASE = 0.0001;
@@ -137,6 +148,7 @@ export function AboutPendant() {
 
     const hook: PendantHook = {
       ready: false, keys: [], s: 0, layer: "front", box: { l: 0, t: 0, r: 0, b: 0 }, glass: null, solve: { moved: [], behind: [] },
+      yaw: 0, dragging: false,
     };
     window.__pendant = hook;
 
@@ -144,6 +156,8 @@ export function AboutPendant() {
     let scene: PendantScene | null = null;
     let cam: typeof import("@/three/pendant/camera") | null = null;
     let sv: typeof import("@/three/pendant/solve") | null = null;
+    /** The pendant's outline (the wire copy's vertices; the bounds' corners if the scene has none). */
+    let outline: Outline | null = null;
     let raf = 0;
 
     // ---------- layout: the track measured (on load, resize, fonts, and whenever the track or section changes size) ----------
@@ -155,10 +169,12 @@ export function AboutPendant() {
       glassR: 0,
       keys: [] as number[],
       texts: [] as TextRect[],
-      /** The chrome's boxes, in the pinned frame's px. */
-      fixed: [] as Box[],
-      /** This screen's solve: per shot nudges, and the layer as a function of travel (null until solved). */
-      shift: [] as number[],
+      /** The site's chrome (viewport px, fixed to the viewport) and About's own (the pinned frame's px). */
+      site: [] as Box[],
+      own: [] as Box[],
+      /** This screen's solve: the shots as solved, their rest spots, the layer as a function of travel (null until solved). */
+      shots: SHOTS as readonly Shot[],
+      spots: [] as Spot[],
       layer: null as ((s: number) => Layer) | null,
     };
     let dirty = true;
@@ -201,24 +217,28 @@ export function AboutPendant() {
       const trR = tr.getBoundingClientRect(), pinR = pin.getBoundingClientRect();
       L.texts = [...tr.querySelectorAll<HTMLElement>(TEXT)].flatMap(lineBoxes)
         .map((r) => ({ l: r.l - trR.left, t: r.t - pinR.top, w: r.r - r.l, h: r.b - r.t }));
-      // (the site's chrome is fixed to the viewport and the pin sits at its top while it is a track: only the left offsets)
-      const site = [...document.querySelectorAll<HTMLElement>(CHROME_SITE)].map((el) => [el.getBoundingClientRect(), 0] as const);
-      const own = [...pin.querySelectorAll<HTMLElement>(CHROME_PIN)].map((el) => [el.getBoundingClientRect(), pinR.top] as const);
-      L.fixed = [...site, ...own].filter(([r]) => r.width > 0 && r.height > 0)
-        .map(([r, top]) => ({ l: r.left - pinR.left, t: r.top - top, r: r.right - pinR.left, b: r.bottom - top }));
-      L.layer = null;
-      L.shift = [];
-      hook.solve = { moved: [], behind: [] };
-      if (scene && sv && L.mode === "track") {
-        const glassMid = L.glassMid;
-        const solved = sv.solve({
-          shots: SHOTS, keys: L.keys, travel: L.travel, vw, vh, texts: L.texts, fixed: L.fixed, bounds: scene.bounds,
-          at: (s) => ({ line1: L.line1, glass: { x: glassMid === null ? 0.5 : (glassMid - s) / vw, y: 0.5 } }),
-        });
-        L.shift = solved.shift;
-        L.layer = solved.layer;
-        hook.solve = { moved: solved.moved, behind: solved.behind };
-      }
+      const box = (r: DOMRect, top: number): Box => ({ l: r.left - pinR.left, t: r.top - top, r: r.right - pinR.left, b: r.bottom - top });
+      const seen = (el: HTMLElement) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 ? r : null; };
+      L.site = [...document.querySelectorAll<HTMLElement>(CHROME_SITE)].map(seen).filter((r) => r !== null).map((r) => box(r, 0));
+      L.own = [...pin.querySelectorAll<HTMLElement>(CHROME_PIN)].map(seen).filter((r) => r !== null).map((r) => box(r, pinR.top));
+      // the solve: at once the first time, then after a quiet spell (a window being dragged wider measures every frame)
+      window.clearTimeout(solveT);
+      if (L.layer === null) solveNow();
+      else solveT = window.setTimeout(() => { try { solveNow(); } catch { fail(); } }, SOLVE_QUIET);
+    };
+    let solveT = 0;
+    /** This screen's spots and layers, from the words and chrome as last measured (the pinned frame at the screen's top). */
+    const solveNow = () => {
+      if (!scene || !sv || !outline || L.mode !== "track") return;
+      const glassMid = L.glassMid, vw = L.vw;
+      const solved = sv.solve({
+        shots: SHOTS, keys: L.keys, travel: L.travel, vw, vh: L.vh, texts: L.texts, fixed: [...L.site, ...L.own], outline, lookMax: LOOK,
+        at: (s) => ({ line1: L.line1, glass: { x: glassMid === null ? 0.5 : (glassMid - s) / vw, y: 0.5 } }),
+      });
+      L.shots = solved.shots;
+      L.spots = solved.spots;
+      L.layer = solved.layer;
+      hook.solve = { moved: solved.moved, behind: solved.behind };
     };
     /** Measure and solve again once the arrival animation and the nav's entrance have finished (if either is running). */
     let settling = false;
@@ -240,6 +260,8 @@ export function AboutPendant() {
     const mouse = { x: 0, y: 0 };
     let drag: { x: number; y: number } | null = null, dragDX = 0, dragDY = 0;
     let last = 0, time = 0, sSm = 0, sPrev = 0, first = true, forcedK = 0;
+    /** The live guard: behind since it last saw the pendant near a line, until it has been clear for GUARD_HOLD. */
+    let guardBack = false, clearFor = 0;
 
     const step = (now: number, sc: PendantScene, cm: NonNullable<typeof cam>) => {
       const dt = Math.min(Math.max((now - last) / 1000, 0), DT_MAX);
@@ -253,8 +275,8 @@ export function AboutPendant() {
       sPrev = sSm;
       // the glass slot rides with the track as the page shows it (not the smoothed travel): it is a place in the page
       const gx = L.glassMid === null ? 0.5 : (L.glassMid - sTarget) / L.vw;
-      const f = shotAt(sSm, L.keys, SHOTS, { line1: L.line1, glass: { x: gx, y: 0.5 } });
-      sv?.shiftAx(f, L.shift); // (this screen's nudges)
+      const f = shotAt(sSm, L.keys, L.shots, { line1: L.line1, glass: { x: gx, y: 0.5 } });
+      sv?.applySpot(f, L.spots); // (this screen's rest spots)
       // the pull to Contact: it falls away into the dark as the section scrolls off
       const o = clamp01((y - (L.top + L.H - vh)) / vh);
       f.h *= 1 - OUT_SHRINK * o;
@@ -266,12 +288,20 @@ export function AboutPendant() {
       look.x += (-mouse.y * LOOK - look.x) * LOOK_EASE;
       look.y += (-mouse.x * LOOK - look.y) * LOOK_EASE;
       cm.poseRig(f, motion, time, look, L.vw, L.vh, sc.camera, sc.outer, sc.inner, { still: reduced });
-      const box = cm.screenBox(sc.bounds, sc.inner, sc.camera, L.vw, L.vh);
-      // The layer: the one solved for this screen at this travel, not the shot's own. Then a check of the live box against
-      // the words where the page shows them (they ride the real scroll, the pendant the eased one, so after a jump they part
-      // for a moment; and the cursor's lean and the motion are live): anything covered sends it behind for that frame.
-      let layer: Layer = L.layer ? L.layer(sSm) : f.layer;
-      if (layer === "front" && sv && hits(sv.onScreen(box, L.vw, L.vh, sv.GROW), L.texts, sTarget, L.fixed) > 0) layer = "back";
+      const box = outline?.hull.length
+        ? cm.outlineBox(outline.hull, sc.inner, sc.camera, L.vw, L.vh)
+        : cm.screenBox(sc.bounds, sc.inner, sc.camera, L.vw, L.vh);
+      // The layer: the one solved for this screen at this travel, not the shot's own. Then the live guard: the live outline,
+      // grown by half the solve's padding, against the words where the page shows them (they ride the real scroll, the
+      // pendant the eased one, so after a jump they part for a moment) and the chrome where it is (the site's chrome holds to
+      // the viewport while the pinned frame moves off in the outro). Near a line it goes behind while still clear, and only
+      // comes back once it has been clear for GUARD_HOLD: the solve keeps the motion's whole reach clear, so this only steps
+      // in when something the solve can't see (a jump, a fast scroll's lean, a hand) carries it close.
+      const pinTop = y < L.top ? L.top - y : Math.min(0, L.top + L.H - vh - y);
+      const fixed = [...L.own, ...L.site.map((b) => ({ l: b.l, r: b.r, t: b.t - pinTop, b: b.b - pinTop }))];
+      const near = sv !== null && hits(clipBox(padBox(box, sv.PAD / 2), L.vw, L.vh), L.texts, sTarget, fixed) > 0;
+      if (near) { guardBack = true; clearFor = 0; } else if (guardBack && (clearFor += dt) >= GUARD_HOLD) guardBack = false;
+      const layer: Layer = (L.layer ? L.layer(sSm) : f.layer) === "front" && !guardBack ? "front" : "back";
       // a shot that wanted the front but is behind the words dims to the tumble's brightness, eased in behind them
       const forced = layer === "back" && f.layer === "front" ? 1 : 0;
       forcedK += (forced - forcedK) * (1 - FORCED_EASE ** dt);
@@ -284,6 +314,8 @@ export function AboutPendant() {
       hook.s = sSm;
       hook.layer = layer;
       hook.box = box;
+      hook.yaw = motion.yaw;
+      hook.dragging = drag !== null;
       hook.glass = glass && { x: glass.x, y: glass.y, r: glass.r * f.glass }; // (the scene grows the ball with f.glass)
       if (!hook.ready) { hook.ready = true; canvas.dataset.ready = ""; }
     };
@@ -409,6 +441,7 @@ export function AboutPendant() {
       if (window.__pendant === hook) delete window.__pendant;
       cancelAnimationFrame(raf);
       window.clearTimeout(swallowT);
+      window.clearTimeout(solveT);
       io?.disconnect();
       ro?.disconnect();
       reducedQ.removeEventListener?.("change", onReduced);
@@ -451,6 +484,9 @@ export function AboutPendant() {
         scene = loaded;
         cam = camMod;
         sv = solveMod;
+        const b = loaded.bounds;
+        const corners = new Float32Array([b.min.x, b.max.x].flatMap((x) => [b.min.y, b.max.y].flatMap((y) => [b.min.z, b.max.z].flatMap((z) => [x, y, z]))));
+        outline = solveMod.outlineOf(loaded.outline?.length ? loaded.outline : corners);
         dirty = true; // (sizes the drawing buffer before the first draw or hit: the scene's warm-up left it at 16 x 16)
         run();
       } catch {

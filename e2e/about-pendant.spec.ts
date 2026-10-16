@@ -116,9 +116,10 @@ test("the glass sits in the gap between the quotes and touches neither", async (
 // ---------- Task 8: readability, solved per screen ----------
 
 /** The words the pendant must never cover in front of them (Task 7's selectors, as in about-pendant.tsx), and the chrome that
- *  holds still on screen over the track: the wordmark, the pill nav, the burger (phones), the resume pill and progress bar. */
+ *  holds still on screen over the track: the wordmark, the pill nav, the burger (phones) and the resume pill (the 1 px
+ *  progress bar is not avoided: Liam's ruling). */
 const TEXT = ".ab-big, .ab-quote blockquote, .ab-quote figcaption, .ab-verb .ab-mono, .ab-verb-title, .ab-skills li, .cap";
-const CHROME = ".sh-name, .sh-nav, .sh-burger, .ab-resume, .ab-bar";
+const CHROME = ".sh-name, .sh-nav, .sh-burger, .ab-resume";
 
 /** What the pendant covers right now while in front of the words: each line of text (one box per line, as the mount
  *  measures them: the text's own rects, not the element's block box) or chrome box its on-screen box overlaps by more than
@@ -204,16 +205,21 @@ test("follows a resize from track to stack and back", async ({ page }) => {
 });
 
 /** Every painted frame for `ms`: what the pendant covers in front, read after the frame's own updates (a task queued from
- *  the frame runs after every animation-frame callback, the track's transform included, has run). */
-const watchFrames = (page: Page, ms: number) => page.evaluate(({ ms, TEXT, CHROME, fn }) => new Promise<string[]>((done) => {
+ *  the frame runs after every animation-frame callback, the track's transform included, has run), and the travel the
+ *  pendant was drawn at, lowest and highest. */
+const watchFrames = (page: Page, ms: number) => page.evaluate(({ ms, TEXT, CHROME, fn }) => new Promise<{ bad: string[]; sMin: number; sMax: number }>((done) => {
   // (coveredNow travels as source: a function can't be handed into the page inside another)
   const covered = new Function(`return (${fn});`)() as (a: { TEXT: string; CHROME: string }) => string[];
-  const out: string[] = [];
+  const bad: string[] = [];
+  let sMin = Infinity, sMax = -Infinity;
   const t0 = performance.now();
   const check = () => {
-    out.push(...covered({ TEXT, CHROME }).map((m) => `${Math.round(performance.now() - t0)} ms, ${m}`));
+    bad.push(...covered({ TEXT, CHROME }).map((m) => `${Math.round(performance.now() - t0)} ms, ${m}`));
+    const s = window.__pendant?.s ?? NaN;
+    sMin = Math.min(sMin, s);
+    sMax = Math.max(sMax, s);
     if (performance.now() - t0 < ms) requestAnimationFrame(() => setTimeout(check, 0));
-    else done(out);
+    else done({ bad, sMin, sMax });
   };
   requestAnimationFrame(() => setTimeout(check, 0));
 }), { ms, TEXT, CHROME, fn: coveredNow.toString() });
@@ -224,14 +230,55 @@ test("a jump doesn't put it over the words", async ({ page }) => {
   await page.goto("/about");
   await ready(page, 30_000);
   await page.waitForTimeout(1500);
+  const travel = await page.evaluate(() => { const k = window.__pendant!.keys; return k[k.length - 1].y - k[0].y; });
+  const bottom = () => page.evaluate(() => document.documentElement.scrollHeight - innerHeight);
   await page.keyboard.press("End");
   const down = await watchFrames(page, 1500);
+  expect(Math.abs((await page.evaluate(() => scrollY)) - (await bottom()))).toBeLessThan(5); // (it really jumped to the end)
+  expect(down.sMax - down.sMin).toBeGreaterThan(0.8 * travel); // (and the pendant swept the track while it was watched)
   await page.waitForTimeout(3000);
   await page.keyboard.press("Home");
   const up = await watchFrames(page, 1500);
-  expect(down).toEqual([]);
-  expect(up).toEqual([]);
+  expect(await page.evaluate(() => scrollY)).toBeLessThan(5);
+  expect(up.sMax - up.sMin).toBeGreaterThan(0.8 * travel);
+  expect(down.bad).toEqual([]);
+  expect(up.bad).toEqual([]);
   expect(errors).toEqual([]);
+});
+
+test("a cursor parked in any corner doesn't make a moved shot pump between layers", async ({ page }) => {
+  test.setTimeout(180_000);
+  await page.goto("/about");
+  await ready(page, 30_000);
+  await page.waitForTimeout(1500);
+  // every shot the solve moved to keep it in front on this screen
+  const shots = await page.evaluate(() => {
+    const h = window.__pendant!;
+    return h.solve.moved.filter((m) => !h.solve.behind.includes(m.id)).map((m) => ({ id: m.id, y: h.keys.find((k) => k.id === m.id)!.y }));
+  });
+  expect(shots.length).toBeGreaterThan(0);
+  const vp = page.viewportSize()!;
+  const seen: { id: string; corner: number[]; layers: string[] }[] = [];
+  for (const { id, y } of shots) {
+    await page.mouse.move(vp.width / 2, vp.height / 2);
+    await page.evaluate((y) => window.scrollTo(0, y), y);
+    await page.waitForTimeout(2500);
+    for (const [x, cy] of [[2, 2], [vp.width - 2, 2], [2, vp.height - 2], [vp.width - 2, vp.height - 2]]) {
+      await page.mouse.move(x, cy, { steps: 5 });
+      await page.waitForTimeout(800); // (the lean eases in)
+      const layers = await page.evaluate(() => new Promise<string[]>((done) => {
+        const out: string[] = [];
+        const t0 = performance.now();
+        const tick = () => {
+          out.push(window.__pendant!.layer);
+          if (performance.now() - t0 < 2000) requestAnimationFrame(tick); else done(out);
+        };
+        requestAnimationFrame(tick);
+      }));
+      seen.push({ id, corner: [x, cy], layers: [...new Set(layers)] });
+    }
+  }
+  expect(seen.filter((x) => x.layers.length !== 1 || x.layers[0] !== "front")).toEqual([]);
 });
 
 test("a press on the pendant drags; elsewhere links work", async ({ page }) => {
@@ -244,9 +291,17 @@ test("a press on the pendant drags; elsewhere links work", async ({ page }) => {
   expect(await page.evaluate(() => window.__pendant!.layer)).toBe("front");
   const cx = (box.l + box.r) / 2, cy = (box.t + box.b) / 2;
   await page.mouse.move(cx, cy);
+  const yaw0 = await page.evaluate(() => window.__pendant!.yaw);
+  const t0 = Date.now();
   await page.mouse.down();
-  for (let i = 1; i <= 8; i++) await page.mouse.move(cx + i * 10, cy);
+  for (let i = 1; i <= 12; i++) await page.mouse.move(cx + i * 10, cy);
+  await page.waitForTimeout(100);
+  const held = await page.evaluate(() => ({ dragging: window.__pendant!.dragging, yaw: window.__pendant!.yaw }));
+  const secs = (Date.now() - t0) / 1000;
   await page.mouse.up();
+  // the hand turned it: held, and turned well beyond what its own spin (0.22 turns a second at the opening) gives
+  expect(held.dragging).toBe(true);
+  expect(held.yaw - yaw0 - 0.22 * 2 * Math.PI * secs).toBeGreaterThan(0.6); // (120 px of drag: 1.44 rad)
   await page.mouse.click(cx, cy); // (a plain press and release on it too)
   await page.waitForTimeout(500);
   expect(new URL(page.url()).pathname).toBe("/about");

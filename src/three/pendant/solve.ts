@@ -1,48 +1,114 @@
 // src/three/pendant/solve.ts
 /**
  * Readability, solved per screen (spec 2026-10-16-about-pendant-design.md §5; plan Task 8). At layout time (never per frame)
- * the mount hands this the measured words and chrome; it walks the whole track every STEP px of travel, poses a scratch copy
- * of the rig at rest for each sample (motion.ts REST, no cursor lean, no drift: camera.ts `still`), and from the pendant's
- * projected boxes works out
- *   1. a sideways nudge per shot (a share of the screen's width added to the shot's `ax`): a shot that wants to be in front
- *      of the words but whose resting spot covers a line or a piece of chrome moves to the nearest clear spot within
- *      MAX_SHIFT (layout.ts `freeSpot`'s search, over every sample of the shot's rest window at once). A nudge that pushes
- *      the pendant off the screen is no spot at all: it may hide at most EDGE_LOSS more of the box past the screen's edge
- *      than the shot itself does (the hero is cut by the left edge by design; it is not cut further to dodge a line);
- *   2. the layer timeline (layout.ts `layerTimeline`): in front only where the box covers nothing, switching only where it
- *      is clear. A shot no nudge can clear goes behind the words (the mount then dims it, FORCED_DIM there).
- * The box at each sample is the union over the turns the pendant can show there (it spins: its section is square-ish, so its
- * outline is narrowest face-on and widest at 45 degrees, and the box at those two yaws holds every yaw between; a locked face
- * uses the lock; a tumbling one adds four pitches), grown by GROW to cover the
- * breathing, the lean into the scroll and the cursor's lean, then clipped to the screen (what is past the edge covers
- * nothing anyone can read).
+ * the mount hands this the measured lines and chrome; it walks the whole track every STEP px of travel, poses a scratch copy
+ * of the rig at rest for each sample (motion.ts REST, no cursor lean, no drift: camera.ts `still`), projects the pendant's
+ * real outline (the wire copy's vertices, outlineOf) and from those boxes works out
+ *   1. each front shot's resting spot on this screen: the shot as written, else its nearest clear spot (layout.ts findSpot:
+ *      moved up to MAX_X / MAX_Y and scaled down to MIN_K together, kept on screen; the glass shot, pinned to the ball, may
+ *      only scale), else the same for each of its
+ *      alternates (shots.ts `alt`) in order; only if none clears does it rest behind the words (the mount dims it there);
+ *   2. the layer timeline (layout.ts layerTimeline): in front only where the outline is clear, switching only where clear.
+ * "Clear" means clear by the motion's own reach (camera.ts motionMargin: the drift, the cursor's lean at the screen's edge,
+ * the breathing) plus PAD, so the live pendant can move all it does without touching a line; the mount's live guard backs
+ * this up and only steps in past PAD / 2.
+ * The outline at a sample: a spinning pendant shows every side, so its spin-proof outline is used (the wire copy turned
+ * about its axis: `ring`); a face locked to the camera (the hero) uses all its real vertices at the lock (`all`); a tumbling one
+ * adds four pitches. Boxes are clipped to the screen: what is past the edge covers nothing anyone can read.
  */
-import { Object3D, PerspectiveCamera, type Box3 } from "three";
-import { poseRig, screenBox, type Box } from "./camera";
-import { hits, layerTimeline, type Sample, type TextRect } from "./layout";
+import { Object3D, PerspectiveCamera } from "three";
+import { motionMargin, outlineBox, poseRig, reachOf, type Box } from "./camera";
+import { clipBox, findSpot, hits, layerTimeline, padBox, SAME, type Probe, type Sample, type Spot, type TextRect } from "./layout";
 import { REST } from "./motion";
-import { shotAt, type Frame, type Layer, type Shot } from "./shots";
+import { shotAt, variants, type Frame, type Layer, type Shot } from "./shots";
 
 /** Px of travel between samples. */
 export const STEP = 8;
-/** How much the box grows (a share of its width and height, half on each side) to cover the breathing, spin and leans. */
-export const GROW = 0.03;
-/** The furthest a shot is nudged sideways (a share of the screen's width) before it goes behind the words instead. */
-export const MAX_SHIFT = 0.25;
-/** The most a nudge may add to the share of the pendant's box past the screen's edge. */
+/** Clearance (px) kept beyond the motion's reach; the live guard steps in at half of it. */
+export const PAD = 8;
+/** The free-spot search's reach: a share of the width sideways, of the height up or down, and the smallest scale. */
+export const MAX_X = 0.25;
+export const MAX_Y = 0.2;
+export const MIN_K = 0.7;
+/** A change may hide at most this much more of the pendant past the screen's edge than its shot does... */
 export const EDGE_LOSS = 0.25;
+/** ...and must leave at least this much of it on screen (else the shot goes behind the words instead). */
+export const MIN_SHOWN = 0.35;
 /** A shot is at rest where its blend is this close to it (smoothstep t at or below this, or at or above 1 minus it). */
 export const REST_T = 0.02;
-/** Brightness of a shot that wanted to be in front but is solved behind the words (the tumble's own dim, Liam 2026-10-16). */
+/** At most this many samples of a rest window are tested (evenly spread, the key always among them). */
+const PROBES = 9;
+/** Brightness of a shot that wanted to be in front but rests behind the words (the tumble's own dim, Liam 2026-10-16). */
 export const FORCED_DIM = 0.4;
 
 const D = Math.PI / 180;
-const YAWS = [0, 45].map((d) => d * D);
 const PITCHES = [0, 45, 90, 135].map((d) => d * D);
 /** Below this many turns per second the motion rights the pendant (motion.ts TUMBLE_OFF). */
 const TUMBLE_OFF = 0.02;
-const NOWHERE: Box = { l: -Infinity, t: -Infinity, r: -Infinity, b: -Infinity };
 const NO_LOOK = { x: 0, y: 0 };
+
+/** The pendant's outline, three ways (xyz triples in `inner`'s space). */
+export interface Outline {
+  /** Every vertex of the wire copy (for a set yaw, at solve time). */
+  all: Float32Array;
+  /** Spin-proof: rings round the pendant's axis, as wide at each height as the widest vertex there (any yaw fits inside). */
+  ring: Float32Array;
+  /** Real vertices, a few hundred: the outermost at each height and side (and the very top and bottom). For a set yaw. */
+  hull: Float32Array;
+}
+
+const BANDS = 24;
+const SIDES = 24;
+const RING_SIDES = 12;
+
+/** Builds the outline from the wire copy's vertices (scene.ts `outline`). */
+export function outlineOf(points: Float32Array): Outline {
+  const n = Math.floor(points.length / 3);
+  if (n === 0) return { all: points, ring: new Float32Array(0), hull: new Float32Array(0) };
+  let y0 = Infinity, y1 = -Infinity;
+  for (let i = 0; i < n; i++) { const y = points[i * 3 + 1]; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  const span = Math.max(y1 - y0, 1e-9);
+  const band = (y: number) => Math.min(BANDS - 1, Math.floor(((y - y0) / span) * BANDS));
+  const R = new Float64Array(BANDS);
+  const best = new Int32Array(BANDS * SIDES).fill(-1);
+  const bestR = new Float64Array(BANDS * SIDES);
+  let top = 0, bottom = 0;
+  for (let i = 0; i < n; i++) {
+    const x = points[i * 3], y = points[i * 3 + 1], z = points[i * 3 + 2];
+    const r = Math.hypot(x, z), b = band(y);
+    if (r > R[b]) R[b] = r;
+    const side = Math.min(SIDES - 1, Math.floor(((Math.atan2(z, x) + Math.PI) / (2 * Math.PI)) * SIDES));
+    const c = b * SIDES + side;
+    if (best[c] < 0 || r > bestR[c]) { best[c] = i; bestR[c] = r; }
+    if (y > points[top * 3 + 1]) top = i;
+    if (y < points[bottom * 3 + 1]) bottom = i;
+  }
+  // a band with no vertex lies on edges between the bands round it: no wider than the wider of its nearest filled ones
+  const has = Array.from(R, (r) => r > 0);
+  for (let j = 0; j < BANDS; j++) {
+    if (has[j]) continue;
+    let lo = j - 1, hi = j + 1;
+    while (lo >= 0 && !has[lo]) lo--;
+    while (hi < BANDS && !has[hi]) hi++;
+    R[j] = Math.max(lo >= 0 ? R[lo] : 0, hi < BANDS ? R[hi] : 0);
+  }
+  // rings at every band edge, as wide as the bands either side, on a polygon drawn round the circle (it holds the circle)
+  const ring: number[] = [];
+  const out = 1 / Math.cos(Math.PI / RING_SIDES);
+  for (let j = 0; j <= BANDS; j++) {
+    const r = Math.max(j > 0 ? R[j - 1] : 0, j < BANDS ? R[j] : 0) * out;
+    const y = y0 + (span * j) / BANDS;
+    for (let a = 0; a < RING_SIDES; a++) {
+      const t = (a / RING_SIDES) * 2 * Math.PI;
+      ring.push(r * Math.cos(t), y, r * Math.sin(t));
+    }
+  }
+  const hull: number[] = [];
+  const keep = new Set<number>([top, bottom]);
+  for (const i of best) if (i >= 0) keep.add(i);
+  for (const i of keep) hull.push(points[i * 3], points[i * 3 + 1], points[i * 3 + 2]);
+  return { all: points, ring: new Float32Array(ring), hull: new Float32Array(hull) };
+}
 
 export interface SolveInput {
   shots: readonly Shot[];
@@ -52,47 +118,49 @@ export interface SolveInput {
   vh: number;
   /** The live screen spots for the "line1" and "glass" aims at travel `s`. */
   at: (s: number) => { line1: number; glass: { x: number; y: number } };
-  /** The words: `l` in track px, `t` in the pinned frame's px. */
+  /** The lines of text: `l` in track px, `t` in the pinned frame's px. */
   texts: readonly TextRect[];
   /** The chrome that holds still on screen, in the pinned frame's px. */
   fixed: readonly Box[];
-  /** The model's bounds in `inner`'s space (scene.ts). */
-  bounds: Box3;
+  outline: Outline;
+  /** The cursor's lean at the screen's edge (radians: the mount's LOOK). */
+  lookMax: number;
 }
 
 export interface Solved {
-  /** Per shot: the share of the screen's width added to its `ax` on this screen (0 = where the shot puts it). */
-  shift: number[];
+  /** The shots as solved on this screen: each as written or as the alternate chosen. */
+  shots: Shot[];
+  /** Per shot: the resting spot's change (shares of the width / height, and a scale of its size). */
+  spots: Spot[];
   /** The layer at travel `s`. */
   layer: (s: number) => Layer;
-  /** The shots that want to be in front, nudged: their id and nudge. */
-  moved: { id: string; dx: number }[];
-  /** The shots that want to be in front but rest behind the words on this screen (no nudge within MAX_SHIFT clears them). */
+  /** The front shots whose rest was changed: the alternate used (0 = as written) and the spot. */
+  moved: { id: string; alt: number; dx: number; dy: number; k: number }[];
+  /** The front shots that rest behind the words on this screen (nothing within the limits clears them). */
   behind: string[];
 }
 
-/** Adds the per-shot nudges to a frame's `ax`, blended exactly as shotAt blends `ax` (so it equals nudging the shots). */
-export function shiftAx(f: Frame, shift: readonly number[]): void {
-  if (shift.length === 0) return;
-  const a = shift[f.index] ?? 0;
-  const b = shift[Math.min(f.index + 1, shift.length - 1)] ?? 0;
-  f.ax += f.t <= 0 ? a : f.t >= 1 ? b : a + (b - a) * f.t;
+/** Adds the per-shot spots to a frame, blended exactly as shotAt blends `ax`, `ay` and `h` between the two shots. */
+export function applySpot(f: Frame, spots: readonly Spot[]): void {
+  if (spots.length === 0) return;
+  const a = spots[f.index] ?? SAME;
+  const b = spots[Math.min(f.index + 1, spots.length - 1)] ?? SAME;
+  const mix = (p: number, q: number) => (f.t <= 0 ? p : f.t >= 1 ? q : p + (q - p) * f.t);
+  f.ax += mix(a.dx, b.dx);
+  f.ay += mix(a.dy, b.dy);
+  f.h *= mix(a.k, b.k);
 }
 
-/** A box grown by `grow` of its size (half on each side), moved `dx` px sideways, and clipped to the screen. A box wholly off
- *  screen comes back as one that overlaps nothing. */
-export function onScreen(box: Box, vw: number, vh: number, grow = 0, dx = 0): Box {
-  const gx = ((box.r - box.l) * grow) / 2, gy = ((box.b - box.t) * grow) / 2;
-  const l = Math.max(box.l - gx + dx, 0), r = Math.min(box.r + gx + dx, vw);
-  const t = Math.max(box.t - gy, 0), b = Math.min(box.b + gy, vh);
-  return l < r && t < b ? { l, t, r, b } : NOWHERE;
+/** The clearance (px) the solve keeps round a held outline `box` whose aim sits at (cx, cy): the motion's reach plus PAD. */
+export function clearance(f: Frame, box: Box, cx: number, cy: number, vh: number, lookMax: number): number {
+  return motionMargin(f.fov, reachOf(box, cx, cy), vh, lookMax) + PAD;
 }
 
-interface At { s: number; f: Frame; box: Box }
+interface At extends Probe { f: Frame }
 
 /** Solves one screen. Pure apart from its scratch rig: the same input always gives the same answer. */
 export function solve(input: SolveInput): Solved {
-  const { shots, keys, travel, vw, vh, at, texts, fixed, bounds } = input;
+  const { keys, travel, vw, vh, at, texts, fixed, outline, lookMax } = input;
   const camera = new PerspectiveCamera();
   const outer = new Object3D(), inner = new Object3D();
   outer.add(inner);
@@ -104,61 +172,73 @@ export function solve(input: SolveInput): Solved {
   for (const k of keys) if (k >= 0 && k <= travel) ss.add(k);
   const xs = [...ss].sort((a, b) => a - b);
 
-  /** The raw (unclipped, ungrown) box at `s` with these nudges: the union over the turns the pendant can show there. */
-  const sample = (s: number, shift: readonly number[]): At => {
+  /** The outline's box at `s` (unpadded, unclipped), its aim point on screen and the clearance it needs. */
+  const sample = (s: number, shots: readonly Shot[], spots: readonly Spot[]): At => {
     const f = shotAt(s, keys, shots, at(s));
-    shiftAx(f, shift);
-    const yaws = f.lock !== null ? [f.lock * D] : YAWS;
+    applySpot(f, spots);
+    const locked = f.lock !== null;
+    const pts = locked ? outline.all : outline.ring;
     const pitches = f.tumble > TUMBLE_OFF ? PITCHES : [0];
     let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
-    for (const yaw of yaws) {
-      for (const pitch of pitches) {
-        poseRig(f, { ...REST, yaw, pitch }, 0, NO_LOOK, vw, vh, camera, outer, inner, { still: true });
-        const x = screenBox(bounds, inner, camera, vw, vh);
-        if (x.l < l) l = x.l;
-        if (x.t < t) t = x.t;
-        if (x.r > r) r = x.r;
-        if (x.b > b) b = x.b;
-      }
+    for (const pitch of pitches) {
+      poseRig(f, { ...REST, yaw: locked ? (f.lock as number) * D : 0, pitch }, 0, NO_LOOK, vw, vh, camera, outer, inner, { still: true });
+      const x = outlineBox(pts, inner, camera, vw, vh);
+      if (x.l < l) l = x.l;
+      if (x.t < t) t = x.t;
+      if (x.r > r) r = x.r;
+      if (x.b > b) b = x.b;
     }
-    return { s, f, box: { l, t, r, b } };
+    const box = { l, t, r, b }, cx = f.ax * vw, cy = f.ay * vh;
+    return { s, f, box, cx, cy, pad: clearance(f, box, cx, cy, vh, lookMax) };
   };
-  const covers = (a: At, dx = 0) => hits(onScreen(a.box, vw, vh, GROW, dx), texts, a.s, fixed) > 0;
-  /** The share of the box on screen, moved `dx` px. */
-  const shown = (a: At, dx = 0) => {
-    const area = (x: Box) => Math.max(x.r - x.l, 0) * Math.max(x.b - x.t, 0);
-    const full = area(a.box);
-    return full > 0 ? area(onScreen(a.box, vw, vh, 0, dx)) / full : 0;
-  };
+  const covered = (a: At) => hits(clipBox(padBox(a.box, a.pad), vw, vh), texts, a.s, fixed) > 0;
 
-  const none = shots.map(() => 0);
-  const first = xs.map((s) => sample(s, none));
-
-  // 1. the nudges: each front shot's rest window must be clear at one and the same nudge
+  const shots = [...input.shots];
+  const spots: Spot[] = shots.map(() => SAME);
+  const first = xs.map((s) => sample(s, shots, spots));
   const last = shots.length - 1;
-  const shift = shots.map(() => 0);
+  const inWindow = (f: Frame, i: number) => (f.index === i && (f.t <= REST_T || i === last)) || (f.index === i - 1 && f.t >= 1 - REST_T);
+  /** A rest window's samples, at most PROBES of them, evenly spread with the key (the middle one) kept. */
+  const spread = (win: At[]): At[] => {
+    if (win.length <= PROBES) return win;
+    return Array.from({ length: PROBES }, (_, j) => win[Math.round((j * (win.length - 1)) / (PROBES - 1))]);
+  };
+
+  // 1. each front shot's rest on this screen
   const moved: Solved["moved"] = [];
-  shots.forEach((shot, i) => {
+  const unsolved: number[] = [];
+  input.shots.forEach((shot, i) => {
     if (shot.layer !== "front") return;
-    const win = first.filter(({ f }) =>
-      (f.index === i && (f.t <= REST_T || i === last)) || (f.index === i - 1 && f.t >= 1 - REST_T));
-    if (win.length === 0 || !win.some((a) => covers(a))) return;
-    for (let k = 1; k * 0.01 <= MAX_SHIFT + 1e-9; k++) {
-      for (const d of [k * 0.01, -k * 0.01]) { // (as freeSpot: nearest first, the positive side first at equal distance)
-        if (win.every((a) => !covers(a, d * vw) && shown(a, d * vw) >= shown(a) - EDGE_LOSS)) {
-          shift[i] = d;
-          moved.push({ id: shot.id, dx: d });
-          return;
-        }
+    const win0 = first.filter((a) => inWindow(a.f, i));
+    if (win0.length === 0 || !win0.some(covered)) return;
+    const vs = variants(shot);
+    for (let v = 0; v < vs.length; v++) {
+      const trial = shots.map((s, j) => (j === i ? vs[v] : s));
+      const win = v === 0 ? win0 : win0.map((a) => sample(a.s, trial, spots));
+      // (a shot pinned to a live place in the page, the glass ball between the quotes, may only grow smaller: moved, it
+      // would no longer be seen through the ball)
+      const pinned = typeof vs[v].ax === "string" && vs[v].ax !== "line1";
+      const spot = findSpot(spread(win), texts, fixed, {
+        vw, vh, maxX: pinned ? 0 : MAX_X, maxY: pinned ? 0 : MAX_Y, minK: MIN_K, edgeLoss: EDGE_LOSS, minShown: MIN_SHOWN,
+      });
+      if (spot) {
+        shots[i] = vs[v];
+        spots[i] = spot;
+        moved.push({ id: shot.id, alt: v, ...spot });
+        return;
       }
     }
+    unsolved.push(i);
   });
 
-  // 2. the layers, from the boxes as nudged (only the samples a nudged shot reaches are posed again)
-  const nudged = (f: Frame) => shift[f.index] !== 0 || shift[Math.min(f.index + 1, last)] !== 0;
-  const final = first.map((a) => (nudged(a.f) ? sample(a.s, shift) : a));
-  const samples: Sample[] = final.map(({ s, f, box }) => ({ s, wanted: f.layer, box: onScreen(box, vw, vh, GROW) }));
+  // 2. the layers, from the outlines as solved (only the samples a changed shot reaches are posed again)
+  const changed = shots.map((s, i) => s !== input.shots[i] || spots[i] !== SAME);
+  const touches = (f: Frame) => changed[f.index] || changed[Math.min(f.index + 1, last)];
+  const final = first.map((a) => (touches(a.f) ? sample(a.s, shots, spots) : a));
+  const samples: Sample[] = final.map((a) => ({ s: a.s, wanted: a.f.layer, box: clipBox(padBox(a.box, a.pad), vw, vh) }));
   const layer = layerTimeline(samples, texts, fixed);
-  const behind = shots.filter((sh, i) => sh.layer === "front" && keys[i] >= 0 && keys[i] <= travel && layer(keys[i]) === "back").map((sh) => sh.id);
-  return { shift, layer, moved, behind };
+  const behind = input.shots
+    .filter((sh, i) => sh.layer === "front" && keys[i] >= 0 && keys[i] <= travel && (unsolved.includes(i) || layer(keys[i]) === "back"))
+    .map((sh) => sh.id);
+  return { shots, spots, layer, moved, behind };
 }

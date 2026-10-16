@@ -1,7 +1,7 @@
 // src/three/pendant/camera.test.ts
 import { describe, expect, it } from "vitest";
 import { Box3, Object3D, PerspectiveCamera, Vector3 } from "three";
-import { distanceFor, poseRig, screenBox } from "./camera";
+import { distanceFor, motionMargin, outlineBox, poseRig, reachOf, screenBox } from "./camera";
 import type { Frame } from "./shots";
 import { REST, type MotionState } from "./motion";
 
@@ -141,6 +141,49 @@ describe("screenBox", () => {
       expect(p.x).toBeLessThanOrEqual(box.r + 1e-6);
       expect(p.y).toBeGreaterThanOrEqual(box.t - 1e-6);
       expect(p.y).toBeLessThanOrEqual(box.b + 1e-6);
+    }
+  });
+});
+
+// Task 8, fix round 1: the outline's box, and how far the live motion can carry it.
+describe("outlineBox", () => {
+  const bounds = new Box3(new Vector3(-0.2, -0.5, -0.15), new Vector3(0.2, 0.5, 0.15));
+  const corners = new Float32Array([-0.2, 0.2].flatMap((x) => [-0.5, 0.5].flatMap((y) => [-0.15, 0.15].flatMap((z) => [x, y, z]))));
+  it("projects points exactly as screenBox projects the bounds' corners", () => {
+    for (const f of [frame(), frame({ az: -62, el: -12, roll: 6, fov: 24, h: 1.35, ax: 0.03 }), frame({ el: 89, fov: 30, h: 0.8, ax: 0.81, ay: 0.76 })]) {
+      const r = pose(f, { ...REST, yaw: 0.7, pitch: 0.3 });
+      const a = outlineBox(corners, r.inner, r.camera, VW, VH), b = screenBox(bounds, r.inner, r.camera, VW, VH);
+      for (const k of ["l", "t", "r", "b"] as const) expect(a[k]).toBeCloseTo(b[k], 3);
+    }
+  });
+  it("answers an empty box for no points", () => {
+    const r = pose(frame());
+    expect(outlineBox(new Float32Array(0), r.inner, r.camera, VW, VH)).toEqual({ l: 0, t: 0, r: 0, b: 0 });
+  });
+});
+
+describe("motionMargin", () => {
+  it("adds the lens's share of the drift and the cursor's lean to the rocking's share of the outline's reach", () => {
+    const lens = Math.tan(15 * D);
+    expect(motionMargin(30, 200, 900, 0.035)).toBeCloseTo(((0.006 + 0.4 * 0.035) / lens) * 450 + (0.04 + 0.05 + 0.012) * 200, 6);
+    expect(reachOf({ l: 100, t: 100, r: 400, b: 200 }, 200, 150)).toBeCloseTo(Math.hypot(200, 50), 9);
+  });
+  it("holds the live motion: drift, breathing and the cursor's lean at a screen corner never carry the box further", () => {
+    const corners = new Float32Array([-0.2, 0.2].flatMap((x) => [-0.5, 0.5].flatMap((y) => [-0.2, 0.2].flatMap((z) => [x, y, z]))));
+    for (const f of [frame({ h: 0.3, ax: 0.13, ay: 0.17, az: 20, el: 10, fov: 34 }), frame({ az: 30, el: -62, roll: -8, fov: 62, h: 1.15, ax: 0.84, ay: 1.08 })]) {
+      const held = pose(f);
+      const a = outlineBox(corners, held.inner, held.camera, VW, VH);
+      const m = motionMargin(f.fov, reachOf(a, f.ax * VW, f.ay * VH), VH, 0.035);
+      let worst = 0;
+      for (let time = 0; time < 60; time += 0.37) {
+        for (const look of [{ x: 0.035, y: 0.035 }, { x: -0.035, y: 0.035 }, { x: 0.035, y: -0.035 }, { x: -0.035, y: -0.035 }]) {
+          const live = pose(f, REST, look, time, false);
+          const b = outlineBox(corners, live.inner, live.camera, VW, VH);
+          worst = Math.max(worst, Math.abs(b.l - a.l), Math.abs(b.r - a.r), Math.abs(b.t - a.t), Math.abs(b.b - a.b));
+        }
+      }
+      expect(worst).toBeLessThanOrEqual(m);
+      expect(worst).toBeGreaterThan(m * 0.3); // (and the margin is not wildly loose)
     }
   });
 });

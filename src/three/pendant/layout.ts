@@ -93,3 +93,121 @@ export function freeSpot(
   }
   return null;
 }
+
+// ---------- the free-spot search (Task 8, fix round 1): sideways, up or down, and smaller, searched together ----------
+
+/** A box that overlaps nothing (every comparison with it fails). */
+export const NOWHERE: Box = { l: -Infinity, t: -Infinity, r: -Infinity, b: -Infinity };
+
+/** A box grown by `px` on every side. */
+export function padBox(box: Box, px: number): Box {
+  return { l: box.l - px, t: box.t - px, r: box.r + px, b: box.b + px };
+}
+
+/** The part of a box on screen; a box wholly off screen comes back as NOWHERE (what is past the edge covers nothing). */
+export function clipBox(box: Box, vw: number, vh: number): Box {
+  const l = Math.max(box.l, 0), r = Math.min(box.r, vw), t = Math.max(box.t, 0), b = Math.min(box.b, vh);
+  return l < r && t < b ? { l, t, r, b } : NOWHERE;
+}
+
+/** The share of a box's area that is on screen (0 for an empty box). */
+export function shownShare(box: Box, vw: number, vh: number): number {
+  const area = (x: Box) => (x.r > x.l && x.b > x.t ? (x.r - x.l) * (x.b - x.t) : 0); // (NOWHERE included: no NaN)
+  const full = area(box);
+  return full > 0 ? area(clipBox(box, vw, vh)) / full : 0;
+}
+
+/** A change to a shot's resting spot: moved by `dx` / `dy` (shares of the screen's width / height) and scaled by `k`. */
+export interface Spot { dx: number; dy: number; k: number }
+export const SAME: Spot = { dx: 0, dy: 0, k: 1 };
+
+/** One look at a shot at rest: the outline's box at travel `s`, the screen point it scales about (where the shot puts its aim,
+ *  px), and the clearance it needs from every line (px). */
+export interface Probe { s: number; box: Box; cx: number; cy: number; pad: number }
+
+/** Where a probe's box lands with a spot: scaled by `k` about its aim point, then moved. */
+export function placeBox(p: Probe, spot: Spot, vw: number, vh: number): Box {
+  const { box, cx, cy } = p, { dx, dy, k } = spot;
+  return {
+    l: cx + (box.l - cx) * k + dx * vw, r: cx + (box.r - cx) * k + dx * vw,
+    t: cy + (box.t - cy) * k + dy * vh, b: cy + (box.b - cy) * k + dy * vh,
+  };
+}
+
+export interface SpotLimits {
+  vw: number;
+  vh: number;
+  /** The furthest move sideways / up or down (share of the width / height). */
+  maxX: number;
+  maxY: number;
+  /** The smallest scale. */
+  minK: number;
+  /** A change may hide at most this much more of the box past the screen's edge than the shot as written does... */
+  edgeLoss: number;
+  /** ...and must leave at least this share of it on screen. */
+  minShown: number;
+}
+
+/** The search's grid: a hundredth of the screen for moves, five percent for scale. */
+const MOVE_STEP = 0.01;
+const SCALE_STEP = 0.05;
+
+/** The search's candidates, nearest first (see findSpot), for a screen shape and reach: built once and kept. */
+const grids = new Map<string, readonly Spot[]>();
+function candidates(aspect: number, maxX: number, maxY: number, minK: number): readonly Spot[] {
+  const key = `${aspect.toFixed(4)} ${maxX} ${maxY} ${minK}`;
+  const kept = grids.get(key);
+  if (kept) return kept;
+  const n = (v: number) => Math.round(v / MOVE_STEP);
+  const cands: (Spot & { cost: number })[] = [];
+  for (let ix = -n(maxX); ix <= n(maxX); ix++) {
+    for (let iy = -n(maxY); iy <= n(maxY); iy++) {
+      for (let j = 0; 1 - j * SCALE_STEP >= minK - 1e-9; j++) {
+        const dx = ix * MOVE_STEP, dy = iy * MOVE_STEP, k = Math.round((1 - j * SCALE_STEP) * 100) / 100;
+        cands.push({ dx, dy, k, cost: Math.hypot(dx * aspect, dy) + (1 - k) });
+      }
+    }
+  }
+  cands.sort((a, b) => a.cost - b.cost || Math.abs(a.dx) - Math.abs(b.dx) || b.dx - a.dx || b.dy - a.dy || b.k - a.k);
+  const out = cands.map(({ dx, dy, k }) => ({ dx, dy, k }));
+  if (grids.size > 16) grids.clear();
+  grids.set(key, out);
+  return out;
+}
+
+/**
+ * The nearest spot where the pendant covers no line and no fixed box at any of the probes (a shot's whole rest window at
+ * once): moves up to `maxX` / `maxY` and scales down to `minK`, searched together, nearest first by one cost (the move's
+ * length as a share of the screen's height, plus the scale given up). At equal cost the smaller sideways move, then right
+ * before left, then down before up. The shot as written (SAME) comes first and needs no screen rule; any change must keep
+ * `minShown` of the box on screen and lose at most `edgeLoss` to the edge. Null when nothing within the limits is clear.
+ * Each probe's box is padded by its `pad` and clipped to the screen before it is tested.
+ */
+export function findSpot(probes: readonly Probe[], texts: readonly TextRect[], fixed: readonly Box[], lim: SpotLimits): Spot | null {
+  const { vw, vh, maxX, maxY, minK, edgeLoss, minShown } = lim;
+  if (probes.length === 0) return SAME;
+  // only the lines and boxes some candidate could reach, per probe
+  const reach = probes.map((p) => {
+    const kx = Math.max(Math.abs(p.box.l - p.cx), Math.abs(p.box.r - p.cx));
+    const ky = Math.max(Math.abs(p.box.t - p.cy), Math.abs(p.box.b - p.cy));
+    const area = padBox({ l: p.cx - kx - maxX * vw, r: p.cx + kx + maxX * vw, t: p.cy - ky - maxY * vh, b: p.cy + ky + maxY * vh }, p.pad);
+    return {
+      texts: texts.filter((x) => hits(area, [x], p.s) > 0),
+      fixed: fixed.filter((f) => hits(area, [], 0, [f]) > 0),
+      shown: shownShare(p.box, vw, vh),
+    };
+  });
+  const clear = (spot: Spot, same: boolean) => probes.every((p, i) => {
+    const placed = placeBox(p, spot, vw, vh);
+    if (!same) {
+      const shown = shownShare(placed, vw, vh);
+      if (shown < minShown || shown < reach[i].shown - edgeLoss) return false;
+    }
+    return hits(clipBox(padBox(placed, p.pad), vw, vh), reach[i].texts, p.s, reach[i].fixed) === 0;
+  });
+  for (const c of candidates(vw / vh, maxX, maxY, minK)) {
+    const same = c.dx === 0 && c.dy === 0 && c.k === 1;
+    if (clear(c, same)) return { dx: c.dx, dy: c.dy, k: c.k };
+  }
+  return null;
+}
