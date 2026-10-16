@@ -4,7 +4,8 @@
  * canvas over (or under) the About page. Plain three.js: no React, no DOM beyond the canvas.
  *   - lights ride with the camera (a warm key, a rose rim, a dim cool fill) over a PMREM'd RoomEnvironment;
  *   - the build passes (brass | clay | wire) are clipping planes along the camera's right vector;
- *   - depth of field is three's BokehPass with its "alpha = 1" line removed, so the page shows through the blur;
+ *   - depth of field is three's BokehPass with its "alpha = 1" line removed, so the page shows through the blur (bokeh.ts:
+ *     it can run at half resolution, the governor's last step, setBokehScale);
  *   - the dimming (behind the words) is a ShaderPass, never a CSS filter: a CSS filter on a canvas costs a compositor
  *     layer every frame;
  *   - motion blur (motion-blur.ts) right after the depth of field, on the fast moves only: the pass is off while the
@@ -28,11 +29,11 @@ import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
-import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { distanceFor } from "./camera";
 import { GLASS_MAG, glassAt, glassMaterial, LENS_DENSITY, LENS_SPAN } from "./glass";
+import { ScaledBokehPass } from "./bokeh";
 import { MotionBlurPass, SHUTTER } from "./motion-blur";
 import { buildEdges, patchBokeh, patchOutput, patchShadingR170 } from "./passes";
 import type { Frame } from "./shots";
@@ -119,7 +120,7 @@ export class PendantScene {
 
   private readonly renderer: WebGLRenderer;
   private readonly composer: EffectComposer;
-  private readonly bokeh: BokehPass;
+  private readonly bokeh: ScaledBokehPass;
   private readonly dimPass: ShaderPass;
   private readonly outputPass: OutputPass;
   private readonly renderPass: RenderPass;
@@ -186,7 +187,8 @@ export class PendantScene {
     this.composer = new EffectComposer(renderer, target);
     this.renderPass = new RenderPass(scene, camera);
     this.composer.addPass(this.renderPass);
-    this.bokeh = new BokehPass(scene, camera, { focus: 3, aperture: 0.001, maxblur: MAX_BLUR });
+    // (bokeh.ts: three's BokehPass, with a half-resolution step for the governor that never resizes the canvas)
+    this.bokeh = new ScaledBokehPass(scene, camera, { focus: 3, aperture: 0.001, maxblur: MAX_BLUR });
     // (see passes.ts: alpha left alone, and no blur where nothing is drawn, so the see-through canvas gets no halo)
     this.bokeh.materialBokeh.fragmentShader = patchBokeh(this.bokeh.materialBokeh.fragmentShader);
     this.bokeh.materialBokeh.needsUpdate = true;
@@ -386,6 +388,9 @@ export class PendantScene {
       this.dimPass.enabled = dimOn;
       this.composer.render();
     }
+    this.bokeh.setScale(0.5); // (the governor's half-resolution bokeh: its program too)
+    this.composer.render();
+    this.bokeh.setScale(1);
     this.glassPass.enabled = false;
     this.blur.enabled = false;
     this.dimPass.enabled = false;
@@ -409,6 +414,13 @@ export class PendantScene {
     this.camera.updateProjectionMatrix();
   }
 
+  /** The depth of field's resolution, as a share of the frame's: 1, or 0.5 (the governor's last step, governor.ts). Never
+   *  resizes the canvas or the composer. */
+  setBokehScale(scale: 0.5 | 1): void {
+    if (this.gone) return;
+    this.bokeh.setScale(scale);
+  }
+
   /**
    * Draws one frame from the camera as `poseRig` posed it. `glass`: the testimonials' ball (centre as a share of the
    * viewport, radius as a share of its height), or null when it isn't on screen (or the testimonials draw it). `dim`: 0..1
@@ -417,9 +429,17 @@ export class PendantScene {
    */
   draw(f: Frame, glass: GlassSlot | null, dim: number, rim: Rgb | null = null, step: DrawStep = { dt: SHUTTER }): void {
     if (this.gone) return;
-    const cam = this.camera;
     this.scene.updateMatrixWorld(); // (fresh matrices for the blur's estimate; the camera's inverse too)
     this.beginTimer(step.tag ?? 0);
+    try {
+      this.drawFrame(f, glass, dim, rim, step);
+    } finally {
+      this.endTimer(); // (a draw that throws must not leave the GPU query open: the next beginQuery would fail)
+    }
+  }
+
+  private drawFrame(f: Frame, glass: GlassSlot | null, dim: number, rim: Rgb | null, step: DrawStep): void {
+    const cam = this.camera;
     const dist = distanceFor(f.h, f.fov);
 
     // the build passes: a sweep left to right across the pendant on screen
@@ -458,7 +478,6 @@ export class PendantScene {
 
     this.composer.render();
     this.blur.setPrevious(this.viewProj, this.inner.matrixWorld);
-    this.endTimer();
   }
 
   /** The motion blur's last estimate: the longest smear (CSS px), whether it is drawn, and whether the frame jumped. */

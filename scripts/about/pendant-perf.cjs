@@ -6,9 +6,13 @@
 //   node scripts/about/pendant-perf.cjs
 // It builds and starts its own server (port PORT, 3105 by default) and stops it, by its own PID, when done. BASE: measure a
 // server already running instead (nothing is started or stopped). SKIP_BUILD=1: start on the existing .next build.
+// The build writes this worktree's shared .next: it refuses to build while any Next server (dev or start) is listening from
+// this worktree (a listening-port check: lsof, then each listener's working directory), since rebuilding under a running
+// server breaks it. Stop that server, or measure it with BASE, or pass SKIP_BUILD=1.
 // DPR: the pixel ratio (2 by default: a retina laptop); W, H: the viewport; SCROLL_S: the scroll's length (s); DWELL_S: each
 // dwell (s); OUT: write the samples as JSON there. The governor (governor.ts) is held (?governor=0), so the numbers are the
-// cost at DPR itself; GOVERNOR=1 leaves it on (it then reports the ratios it chose).
+// cost at DPR itself; GOVERNOR=1 leaves it on (it then reports the levels it chose). QUERY: more of the page's query, e.g.
+// QUERY=bokehHalf=1 (the governor's last step held on, to measure it).
 // Measure with nothing else on the GPU: a Blender render makes the numbers meaningless (perf-lessons). This script checks
 // `pgrep -fl Blender` and labels the run CONTAMINATED if one is running (it never stops it).
 const fs = require("node:fs");
@@ -28,6 +32,34 @@ const SCROLL_S = Number(process.env.SCROLL_S) || 30;
 const DWELL_S = Number(process.env.DWELL_S) || 5;
 const DWELL = ["opening", "whirl", "glass", "tumble", "hero"];
 const GOVERNOR = process.env.GOVERNOR === "1";
+
+/** Next servers listening from this worktree: [{ pid, cmd }] (lsof's listening TCP sockets, then each one's cwd). */
+function serversHere() {
+  let out = "";
+  try {
+    out = execSync("lsof -nP -iTCP -sTCP:LISTEN -Fpc", { encoding: "utf8" });
+  } catch {
+    return []; // (lsof exits 1 when nothing listens)
+  }
+  const pids = new Set();
+  let pid = null;
+  for (const line of out.split("\n")) {
+    if (line[0] === "p") pid = line.slice(1);
+    else if (line[0] === "c" && /node|next/i.test(line) && pid) pids.add(pid);
+  }
+  const here = [];
+  for (const p of pids) {
+    try {
+      const cwd = execSync(`lsof -a -p ${p} -d cwd -Fn`, { encoding: "utf8" }).split("\n").find((l) => l[0] === "n")?.slice(1);
+      if (cwd && (cwd === ROOT || cwd.startsWith(ROOT + path.sep))) {
+        here.push({ pid: p, cmd: execSync(`ps -o command= -p ${p}`, { encoding: "utf8" }).trim() });
+      }
+    } catch {
+      /* gone meanwhile */
+    }
+  }
+  return here;
+}
 /** Frames dropped at the start (the first frames compile and upload). */
 const WARMUP = 60;
 
@@ -39,11 +71,18 @@ const pct = (xs, p) => {
 const fmt = (v) => (Number.isFinite(v) ? v.toFixed(2) : "  -  ");
 
 function blender() {
+  let out = "";
   try {
-    return execSync("pgrep -fl Blender", { encoding: "utf8" }).trim();
+    out = execSync("pgrep -fl Blender", { encoding: "utf8" });
   } catch {
     return ""; // (pgrep exits 1 when nothing matches)
   }
+  // (-f matches whole command lines, so a shell whose command merely mentions Blender, this check's own included, would
+  // count: keep only processes that are Blender itself)
+  return out.split("\n").filter((l) => {
+    const cmd = l.replace(/^\s*\d+\s+/, "");
+    return /Blender\.app\//.test(cmd) || /(^|\/)[Bb]lender(\s|$)/.test(cmd.split(/\s+/)[0] ?? "");
+  }).join("\n").trim();
 }
 
 function portFree(port) {
@@ -88,6 +127,13 @@ for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => { stopServer(); p
   if (OWN_SERVER) {
     if (!(await portFree(PORT))) throw new Error(`port ${PORT} is taken: set PORT, or BASE to measure a running server`);
     if (!process.env.SKIP_BUILD) {
+      const busy = serversHere();
+      if (busy.length) {
+        throw new Error(
+          `a Next server is running from this worktree, and the build would rewrite the .next it serves:\n${busy.map((b) => `  pid ${b.pid}: ${b.cmd}`).join("\n")}\n` +
+          "stop it, measure it with BASE=http://localhost:<port>, or pass SKIP_BUILD=1",
+        );
+      }
       console.log("building (next build --webpack)...");
       execSync("npx next build --webpack", { cwd: ROOT, stdio: ["ignore", "ignore", "inherit"] });
     }
@@ -102,7 +148,8 @@ for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => { stopServer(); p
     const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: DPR });
     await page.addInitScript(() => { window.__pendantPerf = true; });
     page.on("console", (m) => m.type() === "error" && !m.text().includes("404") && console.error(m.text().slice(0, 400)));
-    await page.goto(`${BASE}/about${GOVERNOR ? "" : "?governor=0"}`);
+    const query = [GOVERNOR ? "" : "governor=0", process.env.QUERY ?? ""].filter(Boolean).join("&");
+    await page.goto(`${BASE}/about${query ? `?${query}` : ""}`);
     await page.waitForFunction(() => window.__pendant?.ready, null, { timeout: 120_000 });
     await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
     await page.mouse.move(W - 10, H - 10);
@@ -126,7 +173,7 @@ for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => { stopServer(); p
       let last = t0;
       const tick = (now) => {
         gaps.push(now - last);
-        window.__perfPr.push(window.__pendant.pixelRatio);
+        window.__perfPr.push(`${window.__pendant.pixelRatio}x${window.__pendant.bokehHalf ? "+half" : ""}`);
         last = now;
         const k = Math.min(1, (now - t0) / ms);
         window.scrollTo(0, y0 + (y1 - y0) * k);
@@ -152,14 +199,22 @@ for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => { stopServer(); p
       await page.waitForTimeout(2500); // (the follow settles)
       await page.evaluate(() => window.__pendant.gpuMs.splice(0));
       const blurOn = [];
+      const levels = {};
       const end = Date.now() + DWELL_S * 1000;
       while (Date.now() < end) {
-        blurOn.push(await page.evaluate(() => window.__pendant.blur.on));
+        const [on, level] = await page.evaluate(() => [window.__pendant.blur.on, `${window.__pendant.pixelRatio}x${window.__pendant.bokehHalf ? "+half" : ""}`]);
+        blurOn.push(on);
+        levels[level] = (levels[level] ?? 0) + 1;
         await page.waitForTimeout(250);
       }
-      dwell[id] = { ms: (await page.evaluate(() => window.__pendant.gpuMs.splice(0))).map((x) => x.ms), blurShare: blurOn.filter(Boolean).length / blurOn.length };
+      dwell[id] = {
+        ms: (await page.evaluate(() => window.__pendant.gpuMs.splice(0))).map((x) => x.ms),
+        blurShare: blurOn.filter(Boolean).length / blurOn.length,
+        levels: Object.keys(levels).join("/"),
+      };
     }
-    result = { gpu, scrolled: scrolled.slice(WARMUP), rafMs: rafMs.slice(5), dwell, ratios };
+    const baseMs = await page.evaluate(() => window.__pendant.baseMs);
+    result = { gpu, scrolled: scrolled.slice(WARMUP), rafMs: rafMs.slice(5), dwell, ratios, baseMs };
   } finally {
     await browser.close();
     stopServer();
@@ -171,14 +226,14 @@ for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => { stopServer(); p
   console.log(`full track scroll (${SCROLL_S} s, ${all.length} frames): median ${fmt(pct(all, 50))}  p95 ${fmt(pct(all, 95))}  max ${fmt(Math.max(...all))}`);
   console.log(`  frame interval during the scroll: median ${fmt(pct(result.rafMs, 50))} ms  p95 ${fmt(pct(result.rafMs, 95))} ms`);
   const total = Object.values(result.ratios).reduce((a, b) => a + b, 0) || 1;
-  console.log(`  pixel ratio drawn (frames): ${Object.entries(result.ratios).map(([r, n]) => `${r}x ${Math.round((100 * n) / total)}%`).join(", ")}${GOVERNOR ? " (governor on)" : " (governor held)"}`);
+  console.log(`  level drawn (frames): ${Object.entries(result.ratios).map(([r, n]) => `${r} ${Math.round((100 * n) / total)}%`).join(", ")}${GOVERNOR ? ` (governor on; the screen's pace it reads load against: ${fmt(result.baseMs)} ms)` : " (governor held)"}`);
   console.log("\n  per shot (nearest key, during the scroll)       median     p95   frames");
   const byShot = {};
   for (const x of result.scrolled) (byShot[x.shot] ??= []).push(x.ms);
   for (const [id, xs] of Object.entries(byShot)) console.log(`    ${id.padEnd(44)} ${fmt(pct(xs, 50)).padStart(6)}  ${fmt(pct(xs, 95)).padStart(6)}  ${String(xs.length).padStart(6)}`);
-  console.log(`\n  dwell at the key (${DWELL_S} s each)                 median     p95   frames  blur on`);
+  console.log(`\n  dwell at the key (${DWELL_S} s each)                 median     p95   frames  blur on  level`);
   for (const [id, d] of Object.entries(result.dwell)) {
-    console.log(`    ${id.padEnd(44)} ${fmt(pct(d.ms, 50)).padStart(6)}  ${fmt(pct(d.ms, 95)).padStart(6)}  ${String(d.ms.length).padStart(6)}  ${Math.round(d.blurShare * 100)}%`);
+    console.log(`    ${id.padEnd(44)} ${fmt(pct(d.ms, 50)).padStart(6)}  ${fmt(pct(d.ms, 95)).padStart(6)}  ${String(d.ms.length).padStart(6)}  ${`${Math.round(d.blurShare * 100)}%`.padStart(7)}  ${d.levels}`);
   }
   const med = pct(all, 50);
   console.log(`\nbudget: median < 6 ms: ${med < 6 ? "PASS" : "OVER"} (${fmt(med)} ms)${label}`);

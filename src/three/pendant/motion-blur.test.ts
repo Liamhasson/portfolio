@@ -52,6 +52,30 @@ describe("gating and jumps", () => {
   });
 });
 
+describe("the jump threshold is judged per shutter, not per frame", () => {
+  test("a fast fly after a hitch (a long frame) isn't a jump; the same move in one 1/60 s frame is", async () => {
+    const { MotionBlurPass } = await import("./motion-blur");
+    const { Mesh, BoxGeometry, MeshBasicMaterial, Object3D, Scene } = await import("three");
+    const root = new Object3D();
+    const mesh = new Mesh(new BoxGeometry(0.4, 1, 0.1), new MeshBasicMaterial());
+    root.add(mesh);
+    const pass = new MotionBlurPass(new Scene(), new PerspectiveCamera(), root, [{ mesh, clippingPlanes: [] }], new Float32Array([0, 0, 0]));
+    pass.setSize(1440, 900);
+    // the camera slides 0.5 sideways: about 0.3 of the screen's height on screen
+    const move = longestMove(new Float32Array([0, 0, 0]), viewProj(0), viewProj(0.5), 1440, 900);
+    expect(move / 900).toBeGreaterThan(JUMP_SHARE);
+    expect(move * blurScale(0.05) / 900).toBeLessThan(JUMP_SHARE);
+    pass.setPrevious(viewProj(0), new Matrix4());
+    expect(pass.track(viewProj(0.5), new Matrix4(), 0.05)).toBe(true); // (50 ms frame: a fast fly, smeared)
+    expect(pass.lastJump).toBe(false);
+    expect(pass.lastSmear).toBe(MAX_SMEAR); // (capped)
+    pass.setPrevious(viewProj(0), new Matrix4());
+    expect(pass.track(viewProj(0.5), new Matrix4(), SHUTTER)).toBe(false); // (the same move in 1/60 s: a jump)
+    expect(pass.lastJump).toBe(true);
+    pass.dispose();
+  });
+});
+
 describe("longestMove (the CPU estimate: camera and object motion)", () => {
   const pts = new Float32Array([0, 0, 0, 0.2, 0.5, 0, -0.2, -0.5, 0]);
   const W = 1440, H = 900;

@@ -18,7 +18,7 @@
  * pose) is under GATE_CSS, so a slow shot costs nothing.
  */
 import {
-  DataTexture, HalfFloatType, LinearFilter, Matrix4, NearestFilter, RedFormat, RepeatWrapping, ShaderMaterial, UnsignedByteType,
+  DataTexture, HalfFloatType, Matrix4, NearestFilter, RedFormat, RepeatWrapping, ShaderMaterial, UnsignedByteType,
   Vector2, Vector3, Vector4, WebGLRenderTarget, Color,
 } from "three";
 import type { Camera, Material, Mesh, Object3D, Plane, Scene, Texture, WebGLRenderer } from "three";
@@ -31,7 +31,7 @@ export const MAX_SMEAR = 24;
 export const GATE_CSS = 1;
 /** The shutter the smear is scaled to (s). */
 export const SHUTTER = 1 / 60;
-/** A pose that moves more than this share of the screen's height in one frame has jumped (a scroll jump, a new solve, a
+/** A pose that moves more than this share of the screen's height in one SHUTTER (a frame's move scaled by blurScale) has jumped (a scroll jump, a new solve, a
  *  restore): there is nothing to smear between the two, so the previous pose is reset to this one. */
 export const JUMP_SHARE = 0.25;
 /** The gather's taps. */
@@ -316,7 +316,8 @@ export class MotionBlurPass extends Pass {
       return { mesh, material, local: new Matrix4().multiplyMatrices(rootInv, mesh.matrixWorld) };
     });
     const half = { type: HalfFloatType, depthBuffer: false, magFilter: NearestFilter, minFilter: NearestFilter };
-    this.velTarget = new WebGLRenderTarget(1, 1, { type: HalfFloatType, magFilter: LinearFilter, minFilter: LinearFilter });
+    // (nearest: a linear read at the pendant's edge would average its move with the empty background's zero, halving it)
+    this.velTarget = new WebGLRenderTarget(1, 1, { type: HalfFloatType, magFilter: NearestFilter, minFilter: NearestFilter });
     this.velTarget.texture.name = "MotionBlurPass.velocity";
     this.tileTarget = new WebGLRenderTarget(1, 1, half);
     this.maxTarget = new WebGLRenderTarget(1, 1, half);
@@ -362,7 +363,8 @@ export class MotionBlurPass extends Pass {
     this.mvp.multiplyMatrices(viewProj, model);
     this.prevMvp.multiplyMatrices(this.prevViewProj, this.prevModel);
     const frame = longestMove(this.probe, this.prevMvp, this.mvp, w, h);
-    if (isJump(frame, h)) {
+    // (judged per shutter, not per frame: after a hitch a long frame covers more ground at the same speed)
+    if (isJump(frame * blurScale(dt), h)) {
       this.lastJump = true;
       this.setPrevious(viewProj, model);
       this.lastSmear = 0;

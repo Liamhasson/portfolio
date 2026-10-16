@@ -40,8 +40,12 @@ export interface PendantHook {
   /** With `window.__pendantPerf` set before load: each frame's GPU time (ms), with the travel and the nearest shot it was
    *  drawn at (scripts/about/pendant-perf.cjs); null if the GPU can't time (no EXT_disjoint_timer_query_webgl2). */
   gpuMs: { ms: number; s: number; shot: string }[] | null;
-  /** The pixel ratio the pendant is drawn at (the governor's, under the screen's own). */
+  /** The pixel ratio the pendant is drawn at (the governor's, under the screen's own), and whether its depth of field runs at
+   *  half resolution (the governor's last step). */
   pixelRatio: number;
+  bokehHalf: boolean;
+  /** The screen's frame interval the governor reads load against (ms), null until known. */
+  baseMs: number | null;
 }
 
 declare global {
@@ -173,6 +177,7 @@ export function AboutPendant() {
     const hook: PendantHook = {
       ready: false, keys: [], s: 0, layer: "front", box: { l: 0, t: 0, r: 0, b: 0 }, glass: null, solve: { moved: [], behind: [] },
       yaw: 0, dragging: false, blur: { smear: 0, on: false, jump: false }, gpuMs: null, pixelRatio: 1,
+      bokehHalf: false, baseMs: null,
     };
     window.__pendant = hook;
 
@@ -189,12 +194,34 @@ export function AboutPendant() {
     const giveGlassBack = () => { releaseGlass?.(); releaseGlass = null; };
 
     // ---------- layout: the track measured (on load, resize, fonts, and whenever the track or section changes size) ----------
-    /** The sharpness follows the frame time, both ways, never under 1.5x (governor.ts). ?governor=0 holds the screen's own
-     *  ratio (diagnostics: scripts/about/pendant-perf.cjs measures each ratio's real cost with it). */
-    const govOn = new URLSearchParams(window.location.search).get("governor") !== "0";
+    /** The quality follows the frame time, both ways: the sharpness down to 1.5x, then the depth of field at half resolution
+     *  (governor.ts). Diagnostics: ?governor=0 holds the screen's own ratio and full bokeh (scripts/about/pendant-perf.cjs
+     *  measures each level's real cost with it); ?bokehHalf=1 holds the half-resolution bokeh on. */
+    const query = new URLSearchParams(window.location.search);
+    const forceHalf = query.get("bokehHalf") === "1";
+    const govOn = query.get("governor") !== "0" && !forceHalf;
     const gov = new PendantGovernor(Math.min(window.devicePixelRatio || 1, 2));
+    /** The display's own pace, probed while the scene loads (before the pendant costs anything): the governor reads load
+     *  against it, so a device slow from the first frame isn't taken for a slow screen. */
+    let probeRaf = 0;
+    const probe: number[] = [];
+    const startProbe = () => {
+      let at = performance.now();
+      const tick = (now: number) => {
+        probe.push(now - at);
+        at = now;
+        probeRaf = probe.length < 90 ? requestAnimationFrame(tick) : 0;
+      };
+      probeRaf = requestAnimationFrame(tick);
+    };
+    const endProbe = () => {
+      cancelAnimationFrame(probeRaf);
+      probeRaf = 0;
+      const good = probe.slice(1).filter((ms) => ms > 0 && ms <= 250).sort((a, b) => a - b);
+      if (good.length >= 10) gov.setBase(good[good.length >> 1]); // (the median: a long task or two while loading doesn't count)
+    };
     const L = {
-      vw: 1, vh: 1, dpr: 1, pr: 1, sized: false, mode: "track", top: 0, H: 0, travel: 0, line1: 0.5,
+      vw: 1, vh: 1, dpr: 1, pr: 1, half: false, sized: false, mode: "track", top: 0, H: 0, travel: 0, line1: 0.5,
       /** The glass slot's centre (track px). */
       glassMid: null as number | null,
       /** Its radius, as a share of the screen's height. */
@@ -224,6 +251,8 @@ export function AboutPendant() {
       const pr = govOn ? gov.pixelRatio : dpr;
       if (scene && (!L.sized || vw !== L.vw || vh !== L.vh || pr !== L.pr)) { scene.resize(vw, vh, pr); L.sized = true; }
       L.vw = vw; L.vh = vh; L.dpr = dpr; L.pr = pr;
+      const half = forceHalf || (govOn && gov.bokehHalf);
+      if (scene && half !== L.half) { scene.setBokehScale(half ? 0.5 : 1); L.half = half; }
       L.top = sec.offsetTop;
       L.H = sec.offsetHeight;
       const viewW = clip.clientWidth || vw;
@@ -323,8 +352,11 @@ export function AboutPendant() {
       const fixedStep = window.__pendantStep;
       const stepped = typeof fixedStep === "number" && fixedStep > 0;
       // the governor's step first, then the frame: a resize clears the canvas, so one made after the draw would show blank
-      const nextPr = govOn && !stepped ? gov.sample(now - last) : null;
-      if (nextPr !== null && L.sized) { L.pr = nextPr; sc.resize(L.vw, L.vh, nextPr); }
+      const next = govOn && !stepped ? gov.sample(now - last) : null;
+      if (next !== null && L.sized) {
+        if (next.pr !== L.pr) { L.pr = next.pr; sc.resize(L.vw, L.vh, next.pr); }
+        if (next.bokehHalf !== L.half) { L.half = next.bokehHalf; sc.setBokehScale(next.bokehHalf ? 0.5 : 1); } // (no resize)
+      }
       const dt = stepped ? fixedStep / 1000 : Math.min(Math.max((now - last) / 1000, 0), DT_MAX);
       last = now;
       time += dt;
@@ -382,6 +414,8 @@ export function AboutPendant() {
       drawn = true;
       hook.blur = sc.blurState;
       hook.pixelRatio = L.pr;
+      hook.bokehHalf = L.half;
+      hook.baseMs = gov.base;
       if (hook.gpuMs) {
         // (a query reads back a few frames late: each time goes to the frame it timed)
         for (const t of sc.takeGpuTimes()) {
@@ -522,6 +556,7 @@ export function AboutPendant() {
       modeObs?.disconnect();
       if (window.__pendant === hook) delete window.__pendant;
       cancelAnimationFrame(raf);
+      cancelAnimationFrame(probeRaf);
       window.clearTimeout(swallowT);
       window.clearTimeout(solveT);
       io?.disconnect();
@@ -558,12 +593,14 @@ export function AboutPendant() {
         if (off) return;
         // (probed after the paint too: making a GL context costs a few ms the text shouldn't wait for)
         if (!hasWebGL2()) throw new Error("no WebGL2");
+        startProbe(); // (the display's pace, while three and the files load)
         const [{ PendantScene: Scene }, camMod, solveMod] = await Promise.all([
           import("@/three/pendant/scene"), import("@/three/pendant/camera"), import("@/three/pendant/solve"),
         ]);
         if (off) return;
         const loaded = await Scene.load(canvas);
         if (off) { loaded.dispose(); return; }
+        endProbe();
         scene = loaded;
         if (window.__pendantPerf) hook.gpuMs = loaded.enableGpuTiming() ? [] : null;
         cam = camMod;
