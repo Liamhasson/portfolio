@@ -50,9 +50,16 @@ test("as the track rolls left the portrait holds still and is cropped from its l
   const rect = HTMLElement.prototype.getBoundingClientRect;
   Object.defineProperty(HTMLElement.prototype, "scrollWidth", { configurable: true, get() { return this.classList.contains("ab-track") ? 6000 : 0; } });
   Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, get() { return this.classList.contains("ab-clip") ? 1440 : 0; } });
-  // the photo's box ends 400px along the track and the first line starts 100px after it: the crop is done after 100px of travel
+  // the photo's box ends 400px along the track and the first line starts 100px after it: the crop is done after 100px of travel.
+  // The rects are what the opening animation has them at right now (the photo slid 80px, the line 300px): the offsets must be what counts.
+  const ol = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetLeft");
+  const ow = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetWidth");
+  const isPhoto = (el: HTMLElement) => el.classList.contains("ab-photo");
+  const isFirstLine = (el: HTMLElement) => !!el.previousElementSibling?.classList.contains("ab-photo");
+  Object.defineProperty(HTMLElement.prototype, "offsetLeft", { configurable: true, get() { return isPhoto(this) ? 100 : isFirstLine(this) ? 500 : 0; } });
+  Object.defineProperty(HTMLElement.prototype, "offsetWidth", { configurable: true, get() { return isPhoto(this) ? 300 : 0; } });
   HTMLElement.prototype.getBoundingClientRect = function () {
-    const r = this.classList.contains("ab-photo") ? { left: 100, right: 400 } : this.previousElementSibling?.classList.contains("ab-photo") ? { left: 500, right: 900 } : { left: 0, right: 0 };
+    const r = isPhoto(this) ? { left: 20, right: 320 } : isFirstLine(this) ? { left: 800, right: 1200 } : { left: 0, right: 0 };
     return r as DOMRect;
   };
   try {
@@ -63,6 +70,8 @@ test("as the track rolls left the portrait holds still and is cropped from its l
     expect(img.style.clipPath).toContain("inset(0 0 0 25%");
   } finally {
     HTMLElement.prototype.getBoundingClientRect = rect;
+    if (ol) Object.defineProperty(HTMLElement.prototype, "offsetLeft", ol);
+    if (ow) Object.defineProperty(HTMLElement.prototype, "offsetWidth", ow);
     Object.defineProperty(window, "scrollY", { configurable: true, value: 0 });
     if (sw) Object.defineProperty(HTMLElement.prototype, "scrollWidth", sw);
     if (cw) Object.defineProperty(HTMLElement.prototype, "clientWidth", cw);

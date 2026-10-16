@@ -103,9 +103,11 @@ export function AboutTrack() {
       // the photo stands exactly as tall as the tallest text layer (Liam, 2026-10-15)
       const tallest = Math.max(0, ...[...tr.querySelectorAll<HTMLElement>(".ab-slide:not(.ab-photo)")].map((s) => s.offsetHeight));
       if (tallest) tr.style.setProperty("--ab-photo-h", `${tallest}px`);
-      // the crop is done by the time the first line reaches the photo's right edge: the gap between them (rects: transform-proof)
+      // the crop is done by the time the first line reaches the photo's right edge: the gap between them. Layout offsets, not rects: the opening
+      // animations (the photo slides in, the first line after it) move rects for over a second after load, offsets ignore transforms. (Siblings in the
+      // track, so the same offsetParent: the difference is the gap whatever that is.)
       const fig = photo?.parentElement, next = fig?.nextElementSibling;
-      if (fig && next) photoDist = next.getBoundingClientRect().left - fig.getBoundingClientRect().right;
+      if (fig && next instanceof HTMLElement) photoDist = next.offsetLeft - (fig.offsetLeft + fig.offsetWidth);
       // the pictures: left edge relative to the track and width including the caption, from rects (the track's own travel cancels out)
       const t0 = tr.getBoundingClientRect().left;
       pics = allPics.map((el) => {
@@ -172,11 +174,8 @@ export function AboutTrack() {
               <div className="ab-slide ab-lead">
                 <p className="ab-big"><Words line={ABOUT.opening.text} /></p>
                 <div className="ab-strip" data-pendant="strip">
-                  {ABOUT.pictures.strip.map((s) => {
-                    // (every strip picture leads to its case study: a missing link is a content mistake, not a link to "/")
-                    if (!s.href) throw new Error(`about strip picture "${s.id}" has no href`);
-                    return <Link key={s.id} href={s.href} className="ab-strip-link"><Pic p={s} decor /></Link>;
-                  })}
+                  {/* (every strip picture leads to its case study: the type requires the href) */}
+                  {ABOUT.pictures.strip.map((s) => <Link key={s.id} href={s.href} className="ab-strip-link"><Pic p={s} decor /></Link>)}
                 </div>
               </div>
               {ABOUT.quotes.map((q, i) => (

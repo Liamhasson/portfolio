@@ -276,3 +276,34 @@ test("a loop whose file fails keeps its poster and says nothing", async ({ page 
   expect(errors.filter((e) => !/Failed to load resource/.test(e))).toEqual([]);
   expect(errors.length).toBeLessThanOrEqual(1);
 });
+
+test("the portrait is fully cropped by the time the first line reaches it, even when the page hydrates mid-animation", async ({ page }) => {
+  // The opening animations (the photo slides in from 0.15 s, the first line from 0.30 s, 1.1 s each) move the boxes while the page hydrates;
+  // the crop distance must come from layout offsets, not from rects read then. Delaying the scripts puts hydration inside the animations.
+  await page.route("**/_next/static/chunks/**", async (route) => { await new Promise((r) => setTimeout(r, 700)); await route.continue(); });
+  await page.goto("/about");
+  await expect(page.locator("section.ab")).toHaveAttribute("data-mode", "track");
+  // hydrated (the track has its pinned height) and the animations over
+  await expect.poll(() => page.evaluate(() => (document.querySelector<HTMLElement>("section.ab")!.style.height)), { timeout: 15000 }).not.toBe("");
+  await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => null))));
+  await settle(page);
+  // scroll by the gap between the portrait's box and the first line (layout): then the line's left edge is at the portrait's right edge
+  const gap = await page.evaluate(() => {
+    const fig = document.querySelector<HTMLElement>(".ab-photo")!, next = fig.nextElementSibling as HTMLElement;
+    return next.offsetLeft - (fig.offsetLeft + fig.offsetWidth);
+  });
+  expect(gap).toBeGreaterThan(50);
+  await page.evaluate((gap) => window.scrollTo(0, document.querySelector<HTMLElement>("section.ab")!.offsetTop + gap), gap);
+  await settle(page);
+  const s = await page.evaluate(() => {
+    const img = document.querySelector<HTMLElement>(".ab-portrait")!, next = (img.parentElement!.nextElementSibling as HTMLElement);
+    // (computed clip-path keeps the unit it was written in: "inset(0px 0px 0px 36.5% round 10px)")
+    const m = /inset\(\S+ \S+ \S+ ([\d.e+-]+)(px|%)/.exec(getComputedStyle(img).clipPath);
+    const width = img.getBoundingClientRect().width;
+    return { line: next.getBoundingClientRect().left, photoRight: img.getBoundingClientRect().right, cropped: m ? (m[2] === "%" ? (+m[1] / 100) * width : +m[1]) : null, width, raw: getComputedStyle(img).clipPath };
+  });
+  // the first line's left edge is at the portrait's right edge (within a pixel), and nothing of the portrait is left showing
+  expect(Math.abs(s.line - s.photoRight), `line ${s.line} vs portrait right ${s.photoRight}`).toBeLessThanOrEqual(1.5);
+  expect(s.cropped, `clip-path left inset in ${s.raw}`).not.toBeNull();
+  expect(s.cropped!, `portrait cropped ${s.cropped}px of ${s.width}px`).toBeGreaterThanOrEqual(s.width - 1);
+});

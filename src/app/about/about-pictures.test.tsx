@@ -1,12 +1,12 @@
 // src/app/about/about-pictures.test.tsx: the pictures in their places along the track (spec 2026-10-16-about-pictures-design.md §2)
 import { act, render, screen, within } from "@testing-library/react";
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, expectTypeOf, test, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), prefetch: vi.fn() }) }));
 vi.mock("next/link", () => ({ default: ({ href, children, ...rest }: React.ComponentProps<"a">) => <a href={href} {...rest}>{children}</a> }));
 
 import { AboutTrack } from "./about-track";
-import { ABOUT } from "@/content/about";
+import { ABOUT, type Linked } from "@/content/about";
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); Object.defineProperty(window, "scrollY", { value: 0, configurable: true }); });
 beforeEach(() => {
@@ -150,18 +150,13 @@ test("stacked: the pictures' clip and visibility are cleared", () => {
   expect(pic(container, "studio").style.clipPath).toBe("");
 });
 
-test("a strip picture without a link fails loudly, not a quiet link to the home page", async () => {
-  vi.resetModules();
-  vi.doMock("@/content/about", async (orig) => {
-    const m = await orig<typeof import("@/content/about")>();
-    const strip = m.ABOUT.pictures.strip.map((s, i) => (i === 1 ? { ...s, href: undefined } : s));
-    return { ...m, ABOUT: { ...m.ABOUT, pictures: { ...m.ABOUT.pictures, strip } } };
-  });
-  const { AboutTrack: Broken } = await import("./about-track");
-  const err = vi.spyOn(console, "error").mockImplementation(() => {});
-  expect(() => render(<Broken />)).toThrow(/eventread/);
-  err.mockRestore();
-  vi.doUnmock("@/content/about");
+test("every strip picture has an href, by type: a missing one does not compile", () => {
+  expectTypeOf(ABOUT.pictures.strip).toEqualTypeOf<[Linked, Linked, Linked]>();
+  expectTypeOf<Linked["href"]>().toEqualTypeOf<string>();
+  // @ts-expect-error a strip picture without its href is a compile error
+  const broken: Linked = { id: "x", src: "/x.mp4", alt: "x", loop: true };
+  void broken;
+  expect(ABOUT.pictures.strip.every((s) => s.href.startsWith("/"))).toBe(true);
 });
 
 /** the loops (task 5): jsdom has no IntersectionObserver or media playback; a mock IO we can fire, and a play/pause we can watch */
@@ -310,4 +305,29 @@ test("on unmount the loops' observer and listeners are gone", () => {
   expect(m.mq.listeners.size).toBe(0);
   expect(remove).toHaveBeenCalledWith("visibilitychange", expect.any(Function));
   expect(m.pause.mock.contexts).toContain(v);
+});
+
+test("a late play() rejection (the AbortError of an earlier pause) does not strand a loop that plays: it still pauses when it leaves", async () => {
+  allShown();
+  const m = mockLoops();
+  const { container } = render(<AboutTrack />);
+  const v = videoOf(container, "desk");
+  // a video that tracks `paused` the way a browser does: play() un-pauses at once, pause() pauses
+  let isPaused = true;
+  Object.defineProperty(v, "paused", { configurable: true, get: () => isPaused });
+  m.play.mockImplementation(() => { isPaused = false; return new Promise<void>((res, rej) => pending.push({ res, rej })); });
+  m.pause.mockImplementation(() => { isPaused = true; });
+  const pending: { res: () => void; rej: (e: unknown) => void }[] = [];
+  m.see(v, true);          // play #1, pending
+  m.see(v, false);         // pause (play #1 will be rejected with an AbortError)
+  m.see(v, true);          // play #2
+  expect(m.play).toHaveBeenCalledTimes(2);
+  pending[1].res();        // play #2 resolves: playing
+  await flush();
+  pending[0].rej(new DOMException("interrupted by a call to pause()", "AbortError"));   // play #1's rejection lands late
+  await flush();
+  expect(m.pause).toHaveBeenCalledTimes(1);
+  m.see(v, false);         // it leaves: it must be paused
+  expect(m.pause).toHaveBeenCalledTimes(2);
+  expect(isPaused).toBe(true);
 });
