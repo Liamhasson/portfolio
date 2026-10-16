@@ -9,6 +9,7 @@ import type { GlassSlot, PendantScene } from "@/three/pendant/scene";
 import { SHOTS, shotAt, solveKeys, type Layer, type Shot } from "@/three/pendant/shots";
 import type { Outline } from "@/three/pendant/solve";
 import type { Spot } from "@/three/pendant/layout";
+import { pictureState } from "./picture-motion";
 import { trackProgress } from "./track";
 
 /** What the page tells the e2e tests and the frame script (scripts/about/pendant-frames.cjs), rewritten every frame. */
@@ -43,11 +44,11 @@ const DT_MAX = 0.05;
 /** The cursor's lean (radians at the screen's edge) and its ease per frame (Lusion's values). */
 const LOOK = 0.035;
 const LOOK_EASE = 0.1;
-/** The glass between the quotes (a basic slot until the testimonials thread tags it, Task 9): it fills the real gap between
- *  the two quotes, less quote 2's hanging open-quote (0.6em left of its text) and this margin (px) on each side, so it never
- *  touches either quote; drawn while the shot is at least GLASS_MIN "through the glass". */
-const GLASS_HANG = 0.6;
-const GLASS_MARGIN = 12;
+/** The glass between the quotes: the pictures' empty 17vw slot (about-track.tsx `.ab-glass`, data-pendant="glass"), the
+ *  ball's radius this share of the slot's width (spec §3: 0.44 x slot, so it never reaches either quote); drawn while the
+ *  shot is at least GLASS_MIN "through the glass". (The slot is rendered whenever there are two quotes, the only case the
+ *  old quote-gap sizing covered, so that fallback is gone.) */
+const GLASS_SLOT_R = 0.44;
 const GLASS_MIN = 0.02;
 /** What is painted above the canvas and must keep its press (links, buttons, fields). */
 const CONTROL = "a, button, input, select, textarea, [role=button]";
@@ -55,7 +56,12 @@ const CONTROL = "a, button, input, select, textarea, [role=button]";
 const OUT_SHRINK = 0.6;
 const OUT_SINK = 0.5;
 /** The words the pendant must never cover while in front of them (Task 8 solves the layers from their lines' boxes). */
-const TEXT = ".ab-big, .ab-quote blockquote, .ab-quote figcaption, .ab-verb .ab-mono, .ab-verb-title, .ab-skills li, .cap";
+const TEXT = ".ab-big, .ab-quote blockquote, .ab-quote figcaption, .ab-verb .ab-mono:not(.ab-pic-cap), .ab-verb-title, .ab-skills li, .cap";
+/** The pictures along the track (about-track.tsx `.ab-pic`), content exactly like the words: each frame (a still or a loop)
+ *  is one box, the whole frame (a picture has no lines to read between), and its caption's lines are words. Each counts only
+ *  where the picture is drawn at that point of the track: it rises out of its line as it arrives and is cut at the margin as
+ *  it leaves (picture-motion.ts, the same maths the track runs), and a picture not yet risen or already gone covers nothing. */
+const PIC = ".ab-pic", PIC_FRAME = ".ab-pic-f", PIC_CAP = ".ab-pic-cap";
 /** What holds still on screen over the track, treated exactly as words: the site's wordmark, pill nav and burger (fixed to
  *  the viewport), and About's resume pill (fixed in the pinned frame). The 1 px progress bar is not avoided (Liam's ruling). */
 const CHROME_SITE = ".sh-name, .sh-nav, .sh-burger";
@@ -163,7 +169,7 @@ export function AboutPendant() {
     // ---------- layout: the track measured (on load, resize, fonts, and whenever the track or section changes size) ----------
     const L = {
       vw: 1, vh: 1, dpr: 1, sized: false, mode: "track", top: 0, H: 0, travel: 0, line1: 0.5,
-      /** The gap between the two quotes (track px): the glass slot's centre. */
+      /** The glass slot's centre (track px). */
       glassMid: null as number | null,
       /** Its radius, as a share of the screen's height. */
       glassR: 0,
@@ -196,13 +202,10 @@ export function AboutPendant() {
       L.travel = Math.max(tr.scrollWidth - viewW, 0);
       const c1 = centre("line1");
       L.line1 = c1 === null ? 0.5 : c1 / vw;
-      const q1 = anchor("quote1"), q2 = anchor("quote2");
-      if (q1 && q2) {
-        const bq = q2.querySelector("blockquote");
-        const hang = bq ? GLASS_HANG * (parseFloat(getComputedStyle(bq).fontSize) || 0) : 0;
-        const from = left(q1) + q1.offsetWidth, to = left(q2) - hang;
-        L.glassMid = (from + to) / 2;
-        L.glassR = Math.max(to - from - 2 * GLASS_MARGIN, 0) / 2 / vh;
+      const slot = anchor("glass");
+      if (slot && slot.offsetWidth > 0) {
+        L.glassMid = left(slot) + slot.offsetWidth / 2;
+        L.glassR = (GLASS_SLOT_R * slot.offsetWidth) / vh;
       } else {
         L.glassMid = null;
         L.glassR = 0;
@@ -215,8 +218,24 @@ export function AboutPendant() {
       // these boxes are provisional and everything is measured and solved again the moment they have finished.
       settle();
       const trR = tr.getBoundingClientRect(), pinR = pin.getBoundingClientRect();
-      L.texts = [...tr.querySelectorAll<HTMLElement>(TEXT)].flatMap(lineBoxes)
-        .map((r) => ({ l: r.l - trR.left, t: r.t - pinR.top, w: r.r - r.l, h: r.b - r.t }));
+      const rect = (r: Box, shown?: TextRect["shown"]): TextRect => ({ l: r.l - trR.left, t: r.t - pinR.top, w: r.r - r.l, h: r.b - r.t, shown });
+      const words = [...tr.querySelectorAll<HTMLElement>(TEXT)].flatMap(lineBoxes).map((r) => rect(r));
+      // a picture's clip, as the track sets it (about-track.tsx): its left and width include the caption, its rise is a share of its height
+      const pics = [...tr.querySelectorAll<HTMLElement>(PIC)].flatMap((el) => {
+        const r = el.getBoundingClientRect();
+        if (r.width <= 0 || r.height <= 0) return [];
+        const pl = r.left - trR.left, pt = r.top - pinR.top, ph = r.height;
+        const pw = Math.max(r.right, ...[...el.children].map((c) => c.getBoundingClientRect().right)) - r.left;
+        const shown = (s: number) => {
+          const st = pictureState(pl - s, pw, viewW);
+          return st.hidden ? null : { x: pl - s + (st.left / 100) * pw, y: pt + (st.top / 100) * ph };
+        };
+        const frame = [...el.querySelectorAll<HTMLElement>(PIC_FRAME)].map((f) => f.getBoundingClientRect()).filter((f) => f.width > 0 && f.height > 0)
+          .map((f) => rect({ l: f.left, t: f.top, r: f.right, b: f.bottom }, shown));
+        const cap = [...el.querySelectorAll<HTMLElement>(PIC_CAP)].flatMap(lineBoxes).map((b) => rect(b, shown));
+        return [...frame, ...cap];
+      });
+      L.texts = [...words, ...pics];
       const box = (r: DOMRect, top: number): Box => ({ l: r.left - pinR.left, t: r.top - top, r: r.right - pinR.left, b: r.bottom - top });
       const seen = (el: HTMLElement) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 ? r : null; };
       L.site = [...document.querySelectorAll<HTMLElement>(CHROME_SITE)].map(seen).filter((r) => r !== null).map((r) => box(r, 0));

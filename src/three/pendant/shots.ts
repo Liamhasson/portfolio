@@ -99,8 +99,9 @@ export const SHOTS: readonly Shot[] = fill([
   { id: "letgo", anchor: { pendant: "band" }, fx: 0.92, az: -50, el: 14, roll: 7, fov: 38, h: 0.25, ax: 0.64, ay: 0.13, spin: 0.09, aperture: 0.0008 },
   // 03 Tumble: end over end, sinking behind "eight years managing two rock bands"
   { id: "tumble", anchor: { pendant: "band" }, fx: 0.42, az: -70, el: 0, roll: 0, fov: 32, h: 0.5, ax: 0.46, ay: 0.56, spin: 0.05, tumble: 0.32, layer: "back", dim: 0.4, aperture: 0.001 },
-  // 04 Worm's eye, cropped by the bottom edge
-  { id: "worm", anchor: { pendant: "how" }, fx: 0.5, az: 30, el: -62, roll: -8, fov: 62, h: 1.15, ax: 0.84, ay: 1.08, aim: [0, -0.08, 0], spin: 0.1, tumble: 0, layer: "front", dim: 1, aperture: 0.0012 },
+  // 04 Worm's eye, cropped by the bottom edge (ay 1.10, not the prototype's 1.08: its head then tops out at 0.83 of the
+  // screen as in the storyboard, clear of the work strip's captions above it; at 1.08 it rose to 0.81: the pictures merge, 2026-10-16)
+  { id: "worm", anchor: { pendant: "how" }, fx: 0.5, az: 30, el: -62, roll: -8, fov: 62, h: 1.15, ax: 0.84, ay: 1.1, aim: [0, -0.08, 0], spin: 0.1, tumble: 0, layer: "front", dim: 1, aperture: 0.0012 },
   // 05 From above: the four faces like a compass, turning like a record (the aim is the crown)
   { id: "above", anchor: { pendant: "strip", fallback: "e2e" }, fx: 0.5, az: 0, el: 89, roll: 0, fov: 30, h: 0.8, ax: 0.81, ay: 0.76, aim: [0, 0.28, 0], spin: 0.12, aperture: 0.0012 },
   // 06 Through the glass: magnified, bent, upside down

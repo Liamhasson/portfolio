@@ -1,7 +1,8 @@
 // src/three/pendant/layout.ts
 /**
  * Readability (spec 2026-10-16-about-pendant-design.md §5): while you read a line, the pendant never sits on top of it.
- * Pure rules, no DOM and no three: where the pendant's screen box overlaps a text, which layer (in front of the words or
+ * Pure rules, no DOM and no three: where the pendant's screen box overlaps a text (or a picture: a box like a line, counted
+ * only where it is drawn), which layer (in front of the words or
  * behind them) it may be on at each point of the scroll, and where to nudge a shot whose spot is taken.
  * Coordinates: a text's `l` is in TRACK px (the sideways track's own x, before it moves) and its `t` is viewport px (the
  * track only moves sideways). At travel `s` (px of the track gone by) a text's screen left is `l - s`. Boxes are screen px.
@@ -12,7 +13,13 @@ import type { Box } from "./camera";
 import type { Layer } from "./shots";
 
 /** A text block: `l` in track px, `t` in viewport px, `w` and `h` its size. */
-export interface TextRect { l: number; t: number; w: number; h: number }
+export interface TextRect {
+  l: number; t: number; w: number; h: number;
+  /** For what is only partly drawn as the track moves (a picture rising out of its line, or cut at the margin as it leaves:
+   *  about/picture-motion.ts): at travel `s`, the screen point (px) left of and above which none of it shows, or null when
+   *  none of it shows at all. Without it the whole box always counts. */
+  shown?: (s: number) => { x: number; y: number } | null;
+}
 /** One look ahead along the scroll: the layer the shots want at travel `s`, and the pendant's projected bounds there. */
 export interface Sample { s: number; wanted: Layer; box: Box }
 
@@ -24,8 +31,15 @@ export interface Sample { s: number; wanted: Layer; box: Box }
 export function hits(box: Box, texts: readonly TextRect[], s: number, fixed: readonly Box[] = []): number {
   let n = 0;
   for (const x of texts) {
-    const l = x.l - s;
-    if (box.l < l + x.w && box.r > l && box.t < x.t + x.h && box.b > x.t) n++;
+    let l = x.l - s, t = x.t;
+    const r = l + x.w, b = x.t + x.h;
+    if (x.shown) {
+      const c = x.shown(s);
+      if (c === null) continue;
+      l = Math.max(l, c.x);
+      t = Math.max(t, c.y);
+    }
+    if (box.l < r && box.r > l && box.t < b && box.b > t) n++;
   }
   for (const f of fixed) if (box.l < f.r && box.r > f.l && box.t < f.b && box.b > f.t) n++;
   return n;

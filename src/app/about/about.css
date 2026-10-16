@@ -84,7 +84,7 @@ a.ab-proof:hover, a.ab-proof:focus-visible { color: #f4efe9; }
 .ab-studio { width: 12vw; flex: 0 0 auto; margin-bottom: 0.25vw; }
 .ab-studio .ab-pic-f { aspect-ratio: 3 / 4; border-radius: 10px; }
 /* End to end, and the three case studies under it */
-.ab-strip { display: flex; gap: 1.6vw; margin-top: 3vw; }
+.ab-strip { display: flex; gap: 1.6vw; margin-top: 3vw; width: fit-content; }   /* (as wide as its pictures: the pendant's "above" shot centres on it) */
 .ab-strip-link { display: block; color: inherit; text-decoration: none; }
 .ab-strip .ab-pic { width: 9vw; }
 .ab-strip .ab-pic-f { aspect-ratio: 16 / 10; border-radius: 10px; }

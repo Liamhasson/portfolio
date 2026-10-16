@@ -91,7 +91,7 @@ test("a lost WebGL context hides the canvas without errors", async ({ page }) =>
   expect(errors).toEqual([]);
 });
 
-test("the glass sits in the gap between the quotes and touches neither", async ({ page }) => {
+test("the glass sits in the pictures' slot between the quotes and touches neither", async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto("/about");
   await ready(page);
@@ -105,9 +105,13 @@ test("the glass sits in the gap between the quotes and touches neither", async (
     const bq = document.querySelector("[data-pendant='quote2'] blockquote")!;
     const hang = 0.6 * parseFloat(getComputedStyle(bq).fontSize);
     const cx = g.x * innerWidth, R = g.r * innerHeight;
-    return { left: cx - R, right: cx + R, R, q1: q1.right, q2: bq.getBoundingClientRect().left - hang };
+    const slot = document.querySelector("[data-pendant='glass']")!.getBoundingClientRect();
+    return { left: cx - R, right: cx + R, R, q1: q1.right, q2: bq.getBoundingClientRect().left - hang, slotMid: (slot.left + slot.right) / 2, slotW: slot.width };
   });
   expect(m.R).toBeGreaterThan(20);
+  // the ball is the slot's: centred on it (the page's scroll, not the eased follow), radius 0.44 of its width
+  expect(Math.abs((m.left + m.right) / 2 - m.slotMid)).toBeLessThan(2);
+  expect(Math.abs(m.R - 0.44 * m.slotW)).toBeLessThan(2);
   expect(m.left).toBeGreaterThan(m.q1);
   expect(m.right).toBeLessThan(m.q2);
   expect(errors).toEqual([]);
@@ -115,14 +119,15 @@ test("the glass sits in the gap between the quotes and touches neither", async (
 
 // ---------- Task 8: readability, solved per screen ----------
 
-/** The words the pendant must never cover in front of them (Task 7's selectors, as in about-pendant.tsx), and the chrome that
+/** The words the pendant must never cover in front of them (Task 7's selectors, as in about-pendant.tsx), the chrome that
  *  holds still on screen over the track: the wordmark, the pill nav, the burger (phones) and the resume pill (the 1 px
- *  progress bar is not avoided: Liam's ruling). */
-const TEXT = ".ab-big, .ab-quote blockquote, .ab-quote figcaption, .ab-verb .ab-mono, .ab-verb-title, .ab-skills li, .cap";
+ *  progress bar is not avoided: Liam's ruling), and the pictures (coveredNow: each frame whole and its caption's lines,
+ *  where the track draws them). */
+const TEXT = ".ab-big, .ab-quote blockquote, .ab-quote figcaption, .ab-verb .ab-mono:not(.ab-pic-cap), .ab-verb-title, .ab-skills li, .cap";
 const CHROME = ".sh-name, .sh-nav, .sh-burger, .ab-resume";
 
 /** What the pendant covers right now while in front of the words: each line of text (one box per line, as the mount
- *  measures them: the text's own rects, not the element's block box) or chrome box its on-screen box overlaps by more than
+ *  measures them: the text's own rects, not the element's block box) or picture / chrome box its on-screen box overlaps by more than
  *  1 px both ways (sub-pixel rounding aside). Empty when it is behind, not drawn, or clear. The box is clipped to the
  *  screen: a part of the pendant past the screen's edge covers nothing anyone can read. Runs in the page. */
 function coveredNow({ TEXT, CHROME }: { TEXT: string; CHROME: string }): string[] {
@@ -146,6 +151,23 @@ function coveredNow({ TEXT, CHROME }: { TEXT: string; CHROME: string }): string[
   for (const el of document.querySelectorAll<HTMLElement>(CHROME)) {
     const r = el.getBoundingClientRect();
     if (r.width > 0 && r.height > 0) boxes.push({ r, what: `.${el.className.split(" ")[0]}` });
+  }
+  // the pictures, where the track draws them: not when hidden or emptied (inset(50%)), else from its clip's top and left in
+  // (about-track.tsx writes `inset(T% -100vw 0 Lpx round R)`: T% of the picture's height, L px from its left)
+  for (const pic of document.querySelectorAll<HTMLElement>(".ab-pic")) {
+    if (pic.style.visibility === "hidden" || pic.style.clipPath === "inset(50%)") continue;
+    const m = /^inset\(([-\d.e+]+)% -100vw 0(?:px)? ([-\d.e+]+)px/.exec(pic.style.clipPath);
+    const p = pic.getBoundingClientRect();
+    const minX = p.left + (m ? parseFloat(m[2]) : 0), minY = p.top + (m ? (parseFloat(m[1]) / 100) * p.height : 0);
+    const parts: DOMRect[] = [...pic.querySelectorAll<HTMLElement>(".ab-pic-f")].map((f) => f.getBoundingClientRect());
+    for (const cap of pic.querySelectorAll<HTMLElement>(".ab-pic-cap")) {
+      const walk = document.createTreeWalker(cap, NodeFilter.SHOW_TEXT);
+      for (let n = walk.nextNode(); n; n = walk.nextNode()) { range.selectNodeContents(n); parts.push(...range.getClientRects()); }
+    }
+    for (const r of parts) {
+      const left = Math.max(r.left, minX), top = Math.max(r.top, minY);
+      if (r.right > left && r.bottom > top) boxes.push({ r: { left, top, right: r.right, bottom: r.bottom }, what: `picture ${pic.dataset.pic}` });
+    }
   }
   const out: string[] = [];
   for (const { r, what } of boxes) {

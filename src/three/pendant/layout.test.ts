@@ -30,6 +30,20 @@ describe("hits", () => {
     ];
     expect(hits(box(500, 600), texts, 0)).toBe(2);
   });
+  it("counts a partly drawn box (a picture) only where it shows, and not at all when it is gone", () => {
+    // a picture at track x 1000..1200, screen y 100..300: cut at screen x 60 as it leaves, risen to y 200 as it arrives
+    const pic = (shown: TextRect["shown"]): TextRect[] => [{ l: 1000, t: 100, w: 200, h: 200, shown }];
+    const seen: number[] = [];
+    const cut = pic((s) => { seen.push(s); return { x: 60, y: 0 }; });
+    expect(hits(box(0, 100), cut, 1000)).toBe(1); // (screen 0..200, showing from 60: the box 0..100 covers 60..100)
+    expect(hits(box(0, 60), cut, 1000)).toBe(0); // (only the cut part)
+    expect(seen).toEqual([1000, 1000]); // (asked at the travel tested)
+    const rising = pic(() => ({ x: -Infinity, y: 200 }));
+    expect(hits(box(0, 300, 100, 200), rising, 1000)).toBe(0); // (above where it has risen to)
+    expect(hits(box(0, 300, 100, 201), rising, 1000)).toBe(1);
+    expect(hits(box(0, 300), pic(() => null), 1000)).toBe(0); // (gone: nothing of it shows)
+    expect(hits(box(0, 300), pic(() => ({ x: 500, y: 0 })), 1000)).toBe(0); // (cut past its right edge)
+  });
 });
 
 // Samples every 10 px of travel. A "hitting" sample's box sits over a text; a clear sample's box is far from every text.
