@@ -74,8 +74,8 @@ export const ABOUT = {
   // (hosted on the site: Liam's new resume, 2026-10-12; replacing it later is one file swap)
   resume: { href: "/Liam-Hasson-Resume.pdf", label: "View resume" },
   closing: [{ t: "If you’re working on something that really matters to people, " }, { t: "I’d like to hear about it.", hi: true }] as Line,
-  // (Liam's photo, graded to the site, when he sends it: { src: "/about/portrait.jpg", alt, width, height })
-  portrait: null as { src: string; alt: string; width: number; height: number } | null,
+  // (Liam's graduation photo, cropped to him: left of the first line, travelling with the track; replacing it is one file swap)
+  portrait: { src: "/about/portrait.jpg", alt: "Liam walking across the stage at his graduation, a rolled certificate in his hand", width: 760, height: 1273 } as { src: string; alt: string; width: number; height: number } | null,
 };
 
 export const CONTACT = {

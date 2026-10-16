@@ -12,7 +12,17 @@ vi.mock("@/content/about", async (orig) => {
 
 import { AboutTrack } from "./about-track";
 
-test("with the portrait beside it, the track travels its overflow past the clip, not the window: the closing line still arrives (final review I5)", () => {
+test("the portrait opens the track, left of the first line", () => {
+  window.matchMedia = vi.fn().mockReturnValue({ matches: false, addEventListener() {}, removeEventListener() {} }) as never;
+  const { container } = render(<AboutTrack />);
+  const slides = container.querySelectorAll(".ab-track > .ab-slide");
+  expect(slides[0].classList.contains("ab-photo")).toBe(true);
+  expect(slides[0].querySelector("img")).toHaveAttribute("src", "/about/portrait.jpg");
+  expect(slides[1].textContent).toContain("I’m Liam.");
+  expect(container.querySelector(".ab > .ab-pin > .ab-portrait")).toBeNull();
+});
+
+test("the track travels its overflow past the clip, not the window: the closing line still arrives (final review I5)", () => {
   window.matchMedia = vi.fn().mockReturnValue({ matches: false, addEventListener() {}, removeEventListener() {} }) as never;
   Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
   Object.defineProperty(window, "innerHeight", { configurable: true, value: 900 });
@@ -25,6 +35,35 @@ test("with the portrait beside it, the track travels its overflow past the clip,
     const sec = container.querySelector<HTMLElement>(".ab")!;
     expect(sec.style.height).toBe(`${900 + (6000 - 965)}px`);
   } finally {
+    if (sw) Object.defineProperty(HTMLElement.prototype, "scrollWidth", sw);
+    if (cw) Object.defineProperty(HTMLElement.prototype, "clientWidth", cw);
+  }
+});
+
+test("as the track rolls left the portrait holds still and is cropped from its left edge", () => {
+  window.matchMedia = vi.fn().mockReturnValue({ matches: false, addEventListener() {}, removeEventListener() {} }) as never;
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
+  Object.defineProperty(window, "innerHeight", { configurable: true, value: 900 });
+  Object.defineProperty(window, "scrollY", { configurable: true, value: 25 });
+  const sw = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollWidth");
+  const cw = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
+  const rect = HTMLElement.prototype.getBoundingClientRect;
+  Object.defineProperty(HTMLElement.prototype, "scrollWidth", { configurable: true, get() { return this.classList.contains("ab-track") ? 6000 : 0; } });
+  Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, get() { return this.classList.contains("ab-clip") ? 1440 : 0; } });
+  // the photo's box ends 400px along the track and the first line starts 100px after it: the crop is done after 100px of travel
+  HTMLElement.prototype.getBoundingClientRect = function () {
+    const r = this.classList.contains("ab-photo") ? { left: 100, right: 400 } : this.previousElementSibling?.classList.contains("ab-photo") ? { left: 500, right: 900 } : { left: 0, right: 0 };
+    return r as DOMRect;
+  };
+  try {
+    const { container } = render(<AboutTrack />);
+    const img = container.querySelector<HTMLElement>(".ab-portrait")!;
+    // 25px of scroll = 25px of travel: held in place by the opposite movement, a quarter of the way cropped
+    expect(img.style.transform).toBe("translate3d(25px, 0, 0)");
+    expect(img.style.clipPath).toContain("inset(0 0 0 25%");
+  } finally {
+    HTMLElement.prototype.getBoundingClientRect = rect;
+    Object.defineProperty(window, "scrollY", { configurable: true, value: 0 });
     if (sw) Object.defineProperty(HTMLElement.prototype, "scrollWidth", sw);
     if (cw) Object.defineProperty(HTMLElement.prototype, "clientWidth", cw);
   }
