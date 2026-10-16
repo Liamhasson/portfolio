@@ -34,6 +34,26 @@ function feedLoad(g: PendantGovernor, cost: Record<string, number>, forMs: numbe
   return out;
 }
 
+/** A seeded random (Park-Miller), as the review's simulation used. */
+function seeded(seed: number): () => number {
+  let x = seed;
+  return () => (x = (x * 16807) % 2147483647) / 2147483647;
+}
+
+/** Frames costing `costAt(level)` for `forMs`: the number of level changes and the share of time at each level. */
+function run(g: PendantGovernor, costAt: (level: string) => number, forMs: number): { changes: number; share: Record<string, number> } {
+  let changes = 0;
+  const time: Record<string, number> = {};
+  for (let t = 0; t < forMs;) {
+    const lv = L(g.level)!;
+    const ms = costAt(lv);
+    if (g.sample(ms) !== null) changes++;
+    time[lv] = (time[lv] ?? 0) + ms;
+    t += ms;
+  }
+  return { changes, share: Object.fromEntries(Object.entries(time).map(([k, v]) => [k, v / forMs])) };
+}
+
 /** Slow at every level, but less so the lower it goes (stepping down helps, not enough). */
 const HEAVY = { "2": 40, "1.75": 37, "1.5": 33, "1.5+half": 30 };
 
@@ -66,7 +86,10 @@ describe("PendantGovernor (the level follows the frame time, both ways)", () => 
 
   test("under load it steps down to the 1.5 floor, then turns the half-resolution bokeh on, and no further", () => {
     const g = at60();
-    expect(feedLoad(g, HEAVY, 60_000)).toEqual(["1.75", "1.5", "1.5+half"]);
+    // (the window that saw the load start was part good frames, so the first step can look like no gain and be undone
+    // once; the next reading sees the whole load and it steps on down)
+    expect(feedLoad(g, HEAVY, 60_000).slice(-3)).toEqual(["1.75", "1.5", "1.5+half"]);
+    expect(feedLoad(g, HEAVY, 60_000)).toEqual([]);
     expect(g.pixelRatio).toBe(PR_FLOOR);
     expect(g.bokehHalf).toBe(true);
   });
@@ -116,44 +139,10 @@ describe("PendantGovernor (the level follows the frame time, both ways)", () => 
     expect(feed(g, 16.7, 2000)).toEqual(["1.5"]);
   });
 
-  test("a steady 30 fps cap (or a 50 Hz screen) isn't load: it never steps down", () => {
-    const g = new PendantGovernor(2);
-    expect(feed(g, 33.3, 120_000)).toEqual([]);
-    expect(g.base).toBeCloseTo(33.3, 5);
-    const h = new PendantGovernor(2);
-    expect(feed(h, 20, 120_000)).toEqual([]);
-  });
-
   test("load is read against that pace: on a 30 fps cap, 45 ms frames step down", () => {
     const g = new PendantGovernor(2);
     feed(g, 33.3, 3000);
     expect(feedUntilChange(g, 45)).toBe("1.75");
-  });
-
-  test("a slowdown that stepping down doesn't help (a 30 fps cap switched on mid-session) becomes the base: it climbs back", () => {
-    const g = at60();
-    const changes = feed(g, 33.3, 120_000);
-    expect(changes.slice(0, 3)).toEqual(["1.75", "1.5", "1.5+half"]);
-    expect(L(g.level)).toBe("2"); // (back at the top, and staying there)
-    expect(g.base).toBeCloseTo(33.3, 5);
-    expect(feed(g, 33.3, 60_000)).toEqual([]);
-    // and the cap switched off again: the base comes back down, so load is read against 60 Hz once more
-    feed(g, 16.7, 3000);
-    expect(g.base).toBeCloseTo(16.7, 5);
-    expect(feedUntilChange(g, 33.3)).toBe("1.75");
-  });
-
-  test("load the pendant does cause (frames speed up as it steps down) is shed, never re-based away", () => {
-    // a device whose frame time follows the level: 2x 30 ms, 1.75x 24 ms, 1.5x 17 ms, 1.5x + half 16.7 ms
-    const cost: Record<string, number> = { "2": 30, "1.75": 24, "1.5": 17, "1.5+half": 16.7 };
-    const g = at60();
-    for (let t = 0; t < 120_000;) {
-      const ms = cost[L(g.level)!];
-      g.sample(ms);
-      t += ms;
-    }
-    expect(g.base).toBeCloseTo(16.7, 5);
-    expect(["1.5", "1.5+half"]).toContain(L(g.level));
   });
 
   test("a base measured before the pendant drew wins over the warm-up's (a device slow from the first frame)", () => {
@@ -180,6 +169,82 @@ describe("PendantGovernor (the level follows the frame time, both ways)", () => 
     const h = at60();
     expect(feed(h, 400, 20_000)).toEqual([]); // (a hidden tab's gaps)
     expect(h.sample(Number.NaN)).toBeNull();
+  });
+
+  test("a steady 30 fps cap isn't load: at most a rare probe, never stuck low", () => {
+    // the display probed at 60 Hz while loading, then capped at 30 fps (Low Power Mode, a throttled tab): every step down is
+    // undone (it didn't help), and the waits between tries double to a minute
+    const g = new PendantGovernor(2);
+    g.setBase(16.7);
+    const r = run(g, () => 33.3, 600_000);
+    expect(r.changes).toBeLessThanOrEqual(30);
+    expect(r.share["2"]).toBeGreaterThan(0.95);
+    expect(L(g.level)).toBe("2");
+    expect(g.base).toBeCloseTo(16.7, 5);
+    // a screen at 30 fps (or 50 Hz) from the start: nothing at all
+    for (const ms of [33.3, 20]) {
+      const h = new PendantGovernor(2);
+      expect(run(h, () => ms, 600_000).changes).toBe(0);
+    }
+  });
+
+  test("HEAVY load sheds to the right level and stays there, the base unchanged", () => {
+    const g = at60();
+    feedLoad(g, HEAVY, 60_000);
+    expect(L(g.level)).toBe("1.5+half");
+    expect(feedLoad(g, HEAVY, 540_000)).toEqual([]);
+    expect(g.base).toBeCloseTo(16.7, 5);
+  });
+
+  test("one 25 ms spike doesn't change the long-run level", () => {
+    const cost: Record<string, number> = { "2": 30, "1.75": 24, "1.5": 19.5, "1.5+half": 17 };
+    const g = at60();
+    feedLoad(g, cost, 60_000);
+    feed(g, 25, 1000);
+    const r = run(g, (l) => cost[l], 300_000);
+    expect(r.share["1.5+half"]).toBeGreaterThan(0.9);
+    expect(L(g.level)).toBe("1.5+half");
+  });
+
+  test("120 Hz: the base is never under 60 fps, so 2x at 9 to 10 ms frames stays 2x", () => {
+    const g = new PendantGovernor(2);
+    g.setBase(8.3);
+    const rnd = seeded(3);
+    const r = run(g, () => 9 + rnd(), 600_000);
+    expect(g.base).toBeCloseTo(1000 / 60, 5);
+    expect(r.changes).toBe(0);
+    expect(L(g.level)).toBe("2");
+  });
+
+  test("noisy vsync-quantised load (frames miss vsync at a rate the level sets): few changes in 30 minutes", () => {
+    // the review's simulation: each frame is 16.7 or 33.3 ms, missing with these odds per level
+    const miss: Record<string, number> = { "2": 0.6, "1.75": 0.4, "1.5": 0.2, "1.5+half": 0.17 };
+    for (const seed of [1, 2, 3, 4]) {
+      const rnd = seeded(seed);
+      const g = at60();
+      expect(run(g, (l) => (rnd() < miss[l] ? 33.3 : 16.7), 1_800_000).changes).toBeLessThanOrEqual(15);
+    }
+  });
+
+  test("resume() drops the partial window, the good run and the step being judged", () => {
+    // a partial slow window before a pause doesn't count after it
+    const g = at60();
+    g.resume();
+    feed(g, 16.7, 750); // (past the cooldown: a fresh window has begun)
+    expect(feed(g, 40, 600)).toEqual([]); // (600 ms of slow frames: not a full window yet)
+    g.resume();
+    expect(feed(g, 16.7, 20_000)).toEqual([]);
+    // a step down judged after the pause isn't undone by the pause's own frames: it is simply a new reading
+    const h = at60();
+    expect(feedUntilChange(h, 33)).toBe("1.75");
+    h.resume();
+    expect(feedUntilChange(h, 33)).toBe("1.5"); // (not undone back to 2: nothing was pending)
+    // and a good run doesn't carry over a pause
+    const k = at60();
+    feedLoad(k, HEAVY, 60_000);
+    feed(k, 16.7, 2500);
+    k.resume();
+    expect(feed(k, 16.7, 2000)).toEqual([]);
   });
 
   test("a new screen ratio starts over from its own ladder", () => {

@@ -8,7 +8,8 @@
 // server already running instead (nothing is started or stopped). SKIP_BUILD=1: start on the existing .next build.
 // The build writes this worktree's shared .next: it refuses to build while any Next server (dev or start) is listening from
 // this worktree (a listening-port check: lsof, then each listener's working directory), since rebuilding under a running
-// server breaks it. Stop that server, or measure it with BASE, or pass SKIP_BUILD=1.
+// server breaks it. Stop that server, or measure it with BASE, or pass SKIP_BUILD=1. If that check can't be made (lsof
+// missing or failing for any reason other than "nothing is listening"), it refuses to build too.
 // DPR: the pixel ratio (2 by default: a retina laptop); W, H: the viewport; SCROLL_S: the scroll's length (s); DWELL_S: each
 // dwell (s); OUT: write the samples as JSON there. The governor (governor.ts) is held (?governor=0), so the numbers are the
 // cost at DPR itself; GOVERNOR=1 leaves it on (it then reports the levels it chose). QUERY: more of the page's query, e.g.
@@ -33,13 +34,17 @@ const DWELL_S = Number(process.env.DWELL_S) || 5;
 const DWELL = ["opening", "whirl", "glass", "tumble", "hero"];
 const GOVERNOR = process.env.GOVERNOR === "1";
 
-/** Next servers listening from this worktree: [{ pid, cmd }] (lsof's listening TCP sockets, then each one's cwd). */
+/** Next servers listening from this worktree: [{ pid, cmd }] (lsof's listening TCP sockets, then each one's cwd). Throws if
+ *  that can't be told for sure (lsof missing or failing, a listener whose directory can't be read): the build then refuses. */
 function serversHere() {
   let out = "";
   try {
-    out = execSync("lsof -nP -iTCP -sTCP:LISTEN -Fpc", { encoding: "utf8" });
-  } catch {
-    return []; // (lsof exits 1 when nothing listens)
+    out = execSync("lsof -nP -iTCP -sTCP:LISTEN -Fpc", { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  } catch (e) {
+    // lsof exits 1 with no output when nothing listens; anything else (not installed, an error, a signal) is not knowing
+    const quiet = !String(e.stdout ?? "").trim() && !String(e.stderr ?? "").trim();
+    if (e.status === 1 && quiet) return [];
+    throw new Error(`can't check for servers running from this worktree (lsof: ${String(e.stderr || e.message).trim().split("\n")[0]})`);
   }
   const pids = new Set();
   let pid = null;
@@ -49,13 +54,17 @@ function serversHere() {
   }
   const here = [];
   for (const p of pids) {
+    let cwd;
     try {
-      const cwd = execSync(`lsof -a -p ${p} -d cwd -Fn`, { encoding: "utf8" }).split("\n").find((l) => l[0] === "n")?.slice(1);
-      if (cwd && (cwd === ROOT || cwd.startsWith(ROOT + path.sep))) {
-        here.push({ pid: p, cmd: execSync(`ps -o command= -p ${p}`, { encoding: "utf8" }).trim() });
-      }
+      cwd = execSync(`lsof -a -p ${p} -d cwd -Fn`, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).split("\n").find((l) => l[0] === "n")?.slice(1);
     } catch {
-      /* gone meanwhile */
+      let alive = true;
+      try { process.kill(Number(p), 0); } catch (err) { alive = err.code === "EPERM"; }
+      if (!alive) continue; // (gone meanwhile)
+      throw new Error(`can't read the working directory of listening process ${p}, so can't tell whether it serves this worktree`);
+    }
+    if (cwd && (cwd === ROOT || cwd.startsWith(ROOT + path.sep))) {
+      here.push({ pid: p, cmd: execSync(`ps -o command= -p ${p}`, { encoding: "utf8" }).trim() });
     }
   }
   return here;

@@ -202,7 +202,7 @@ export function AboutPendant() {
     const govOn = query.get("governor") !== "0" && !forceHalf;
     const gov = new PendantGovernor(Math.min(window.devicePixelRatio || 1, 2));
     /** The display's own pace, probed while the scene loads (before the pendant costs anything): the governor reads load
-     *  against it, so a device slow from the first frame isn't taken for a slow screen. */
+     *  against it (never under 60 fps), so a device slow from the first frame isn't taken for a slow screen. */
     let probeRaf = 0;
     const probe: number[] = [];
     const startProbe = () => {
@@ -458,6 +458,7 @@ export function AboutPendant() {
       if (raf || off || lost || !scene || !cam || !inView || document.hidden) return;
       last = performance.now();
       jumped = true; // (the loop was stopped: the scroll may have moved meanwhile)
+      gov.resume(); // (a pause isn't a frame: the governor starts its reading afresh)
       raf = requestAnimationFrame(frame);
     };
     const invalidate = () => { dirty = true; run(); };
