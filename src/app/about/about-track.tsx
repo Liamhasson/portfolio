@@ -3,20 +3,39 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { Fragment, useEffect, useRef, type ReactNode } from "react";
 import { NextPagePull } from "@/components/shell/next-page-pull";
-import { ABOUT, type Line } from "@/content/about";
+import { ABOUT, type Line, type Picture } from "@/content/about";
 import { scrollForSlide, sectionHeight, trackLayout, trackProgress, trackX } from "./track";
 import "./about.css";
 
-/** A line in two colours: its highlights in the near-white, the rest in the darker tone (Liam, 2026-10-12). */
-function Words({ line }: { line: Line }) {
+/** A line in two colours: its highlights in the near-white, the rest in the darker tone (Liam, 2026-10-12). `inLink`: set inside the line's link, right after its words (the band loops). */
+function Words({ line, inLink }: { line: Line; inLink?: ReactNode }) {
   // (one run of text: a stacked slide is a flex box, which would make each span its own line)
   return (
     <span>
       {line.map((s, i) => s.href
-        ? <Link key={i} href={s.href} className={`ab-inline${s.hi ? " hi" : ""}`}>{s.t}</Link>
+        ? <Link key={i} href={s.href} className={`ab-inline${s.hi ? " hi" : ""}`}>{s.t}{inLink}</Link>
         : <span key={i} className={s.hi ? "hi" : undefined}>{s.t}</span>)}
+    </span>
+  );
+}
+
+/**
+ * A picture along the track (spec 2026-10-16-about-pictures-design.md §2): a frame, optionally a caption under it. A loop is
+ * a silent video (it plays only while on screen: the script, not here), a still goes through next/image. `decor`: the
+ * words next to it already say what it shows (a link's name stays its words), so the frame is hidden from assistive tech.
+ * `.ab-pic` / `.ab-pic-f` / `.ab-pic-cap` are the hooks the pictures' motion takes hold of.
+ */
+function Pic({ p, className = "", sizes, width, height, decor, anchor }: { p: Picture; className?: string; sizes?: string; width?: number; height?: number; decor?: boolean; anchor?: string }) {
+  return (
+    <span className={`ab-pic ${className}`.trim()} data-pic={p.id} data-pendant={anchor} title={p.title}>
+      <span className="ab-pic-f" aria-hidden={decor ? true : undefined}>
+        {p.loop
+          ? <video muted loop playsInline preload="none" poster={p.poster} src={p.src} aria-label={decor ? undefined : p.alt} />
+          : <Image src={p.src} alt={p.alt} width={width ?? 1200} height={height ?? 1600} sizes={sizes} />}
+      </span>
+      {p.caption && <span className="ab-pic-cap ab-mono">{p.caption}</span>}
     </span>
   );
 }
@@ -108,27 +127,50 @@ export function AboutTrack() {
                   <Image className="ab-portrait" src={ABOUT.portrait.src} alt={ABOUT.portrait.alt} width={ABOUT.portrait.width} height={ABOUT.portrait.height} sizes="(max-width: 1023px) 70vw, 30vw" priority />
                 </figure>
               )}
-              {ABOUT.lines.map((l, i) => <p key={i} className="ab-slide ab-big"><Words line={l} /></p>)}
-              {/* End to end, straight after "That's still how I work…": the story's conclusion (Liam, 2026-10-12) */}
-              <p className="ab-slide ab-big"><Words line={ABOUT.opening.text} /></p>
-              {ABOUT.quotes.map((q) => (
-                <figure key={q.name} className="ab-slide ab-quote">
-                  <blockquote><Words line={q.text} /></blockquote>
-                  <figcaption className="ab-mono">{q.name} · {q.role}</figcaption>
-                </figure>
+              {ABOUT.lines.map((l, i) => i === 1
+                /* the second paragraph: the two band loops inside its link, and the studio beside it, bottom-aligned (Liam, 2026-10-16) */
+                ? (
+                  <div key={i} className="ab-slide ab-row">
+                    <p className="ab-big"><Words line={l} inLink={ABOUT.pictures.bands.map((b) => <Pic key={b.id} p={b} className="ab-chip" decor />)} /></p>
+                    <Pic p={ABOUT.pictures.studio} className="ab-studio" width={1200} height={1600} sizes="(max-width: 1023px) 40vw, 12vw" />
+                  </div>
+                )
+                : <p key={i} className="ab-slide ab-big"><Words line={l} /></p>)}
+              {/* End to end, straight after "That's still how I work…": the story's conclusion (Liam, 2026-10-12), the three case studies' loops under it */}
+              <div className="ab-slide ab-lead">
+                <p className="ab-big"><Words line={ABOUT.opening.text} /></p>
+                <div className="ab-strip" data-pendant="strip">
+                  {ABOUT.pictures.strip.map((s) => (
+                    <Link key={s.id} href={s.href ?? "/"} className="ab-strip-link"><Pic p={s} decor /></Link>
+                  ))}
+                </div>
+              </div>
+              {ABOUT.quotes.map((q, i) => (
+                <Fragment key={q.name}>
+                  {/* between the two quotes, an empty slot the glass pendant passes through (the shader's, not a picture) */}
+                  {i === 1 && <div className="ab-slide ab-glass" data-pendant="glass" aria-hidden="true" />}
+                  <figure className="ab-slide ab-quote">
+                    <blockquote><Words line={q.text} /></blockquote>
+                    <figcaption className="ab-mono">{q.name} · {q.role}</figcaption>
+                  </figure>
+                </Fragment>
               ))}
               {ABOUT.verbs.map((v, i) => (
-                <div key={v.title} className="ab-slide ab-verb">
-                  <div className="ab-mono">What I do · {i + 1} of {ABOUT.verbs.length}</div>
-                  <h2 className="ab-verb-title">{v.title}</h2>
-                  <ul className="ab-skills">
-                    {v.skills.map((s) => (
-                      <li key={s.name}>
-                        <span className="ab-skill">{s.name}</span>
-                        {s.href ? <Link href={s.href} className="ab-proof">{s.proof} ↗</Link> : <span className="ab-proof">{s.proof}</span>}
-                      </li>
-                    ))}
-                  </ul>
+                <div key={v.title} className={`ab-slide ab-verb${i === ABOUT.verbs.length - 1 ? " ab-verbrow" : ""}`}>
+                  <div className="ab-verb-body">
+                    <div className="ab-mono">What I do · {i + 1} of {ABOUT.verbs.length}</div>
+                    <h2 className="ab-verb-title">{v.title}</h2>
+                    <ul className="ab-skills">
+                      {v.skills.map((s) => (
+                        <li key={s.name}>
+                          <span className="ab-skill">{s.name}</span>
+                          {s.href ? <Link href={s.href} className="ab-proof">{s.proof} ↗</Link> : <span className="ab-proof">{s.proof}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  {/* "Build it.": the desk film, wire to final, right of its skills */}
+                  {i === ABOUT.verbs.length - 1 && <Pic p={ABOUT.pictures.desk} className="ab-deskvid" anchor="deskfilm" />}
                 </div>
               ))}
               <p className="ab-slide ab-big"><Words line={ABOUT.closing} /></p>

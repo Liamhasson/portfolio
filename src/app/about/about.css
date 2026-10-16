@@ -12,7 +12,7 @@
 .ab-quote blockquote::before { content: "\201C"; position: absolute; left: -0.6em; color: #f4efe9; opacity: 0.45; }
 .ab-mono { font: 400 clamp(11px, 0.95vw, 14px)/1.4 var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: rgba(244, 239, 233, 0.55); }
 .ab-quote figcaption { margin-top: 2.2vw; }
-.ab-verb { max-width: 60vw; }
+.ab-verb, .ab-verb-body { max-width: 60vw; }
 .ab-verb-title { margin: 1.4vw 0 0; font-weight: 400; font-size: clamp(26px, 3.2vw, 56px); color: #f4efe9; }
 .ab-skills { list-style: none; margin: 2.4vw 0 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.9vw 4vw; }
 .ab-skill { display: block; font-size: clamp(17px, 1.75vw, 30px); color: #f4efe9; }
@@ -59,3 +59,41 @@ a.ab-proof:hover, a.ab-proof:focus-visible { color: #f4efe9; }
 .ab-inline { color: inherit; text-decoration: underline; text-decoration-color: rgba(230, 191, 174, 0.45); text-decoration-thickness: 1px; text-underline-offset: 0.18em; transition: text-decoration-color var(--duration-ui) var(--ease-settle); }
 .ab-inline:hover, .ab-inline:focus-visible { text-decoration-color: rgba(230, 191, 174, 0.95); }
 .ab-inline::after { content: " \2197"; text-decoration: none; display: inline-block; margin-left: 0.15em; font-size: 0.6em; vertical-align: 0.5em; color: rgba(230, 191, 174, 0.8); }
+
+/* the pictures along the track (spec 2026-10-16-about-pictures-design.md §2; the v26 mockup): every one is an .ab-pic, a frame
+   (.ab-pic-f) with an optional caption under it. Corners 10px, the desk 12px. */
+.ab-pic { display: inline-block; position: relative; vertical-align: top; }
+.ab-pic-f { display: block; overflow: hidden; background: #151210; }
+.ab-pic-f img, .ab-pic-f video { display: block; width: 100%; height: 100%; object-fit: cover; }
+.ab-pic-cap { display: block; margin-top: 0.55vw; white-space: nowrap; }
+/* word-sized, inside the sentence (the bands, in the playground link) */
+.ab-chip { vertical-align: -0.07em; margin: 0 0.04em; }
+.ab-chip .ab-pic-f { height: 0.8em; width: 1.3em; border-radius: 0.12em; }
+.ab-chip + .ab-chip { margin-left: 0.1em; }
+/* paragraph 2 and the studio, bottom-aligned */
+.ab-row { display: flex; align-items: flex-end; gap: 3.2vw; max-width: none; }
+.ab-row .ab-big, .ab-lead .ab-big { margin: 0; max-width: 52vw; }
+.ab-studio { width: 12vw; flex: 0 0 auto; margin-bottom: 0.25vw; }
+.ab-studio .ab-pic-f { aspect-ratio: 3 / 4; border-radius: 10px; }
+/* End to end, and the three case studies under it */
+.ab-strip { display: flex; gap: 1.6vw; margin-top: 3vw; }
+.ab-strip-link { display: block; color: inherit; text-decoration: none; }
+.ab-strip .ab-pic { width: 9vw; }
+.ab-strip .ab-pic-f { aspect-ratio: 16 / 10; border-radius: 10px; }
+.ab-strip-link:hover .ab-pic-cap, .ab-strip-link:focus-visible .ab-pic-cap { color: #f4efe9; }
+/* between the two quotes, where the glass pendant passes (empty: the shader draws it) */
+.ab-glass { width: 17vw; height: 17vw; }
+/* Build it. and the desk film */
+.ab-verbrow { display: flex; align-items: flex-start; gap: 3.2vw; max-width: none; }
+.ab-deskvid { width: 34vw; flex: 0 0 auto; align-self: center; margin: 0 5vw 0 7vw; }
+.ab-deskvid .ab-pic-f { aspect-ratio: 16 / 10; border-radius: 12px; }
+.ab-deskvid .ab-pic-cap { margin-top: 0.9vw; }
+/* stacked (phones, reduced motion): the pictures simply flow under their text */
+.ab[data-mode="stack"] .ab-row, .ab[data-mode="stack"] .ab-verbrow { flex-direction: column; align-items: flex-start; gap: 6vw; }
+.ab[data-mode="stack"] .ab-row .ab-big, .ab[data-mode="stack"] .ab-lead .ab-big { max-width: none; }
+.ab[data-mode="stack"] .ab-studio { width: min(40vw, 220px); margin: 0; }
+.ab[data-mode="stack"] .ab-strip { gap: 3vw; margin-top: 6vw; }
+.ab[data-mode="stack"] .ab-strip .ab-pic { width: 28vw; }
+.ab[data-mode="stack"] .ab-pic-cap { margin-top: 1.6vw; white-space: normal; }
+.ab[data-mode="stack"] .ab-deskvid { width: min(100%, 520px); margin: 0; align-self: flex-start; }
+.ab[data-mode="stack"] .ab-glass { display: none; }
