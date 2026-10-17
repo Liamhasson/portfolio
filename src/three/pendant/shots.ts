@@ -19,7 +19,8 @@ export type Anchor = "start" | "end" | { pendant: string; fallback?: string | [s
 export interface Shot {
   id: string;
   anchor: Anchor;
-  /** Where on the screen (share of width) the anchor's centre sits when this shot is fully on. */
+  /** Where on the screen (share of width) the anchor's centre sits when this shot is fully on. Stacked (SHOTS_STACK) it is
+   *  read as fy: the anchor centre's height as a share of the screen's height. */
   fx: number;
   /** Where the camera stands, in degrees: az 0 faces face one, el 90 looks straight down. */
   az: number;
@@ -121,6 +122,31 @@ export const SHOTS: readonly Shot[] = fill([
     // asked 0.3 / 1.0 (there it sits on the pill nav and the closing line on every screen) to the one free area big enough
     // for it on all four tested screens, the bottom right: it rises from the corner, cut by the right and bottom edges.
     alt: [{ az: 62, lock: 62, roll: -6, ax: 0.97, ay: 0.85, h: 0.8 }] },
+]);
+
+/**
+ * The stacked About (portrait phones and reduced motion: spec §8, plan Task 11): the same film, six of its shots, framed for a
+ * tall screen at 390 x 844. Travel is the page's vertical scroll through the section, so `fx` reads as fy (the anchor centre's
+ * height as a share of the screen: the shot is fully on when the anchor's middle is there) and every front shot's `ay` sits
+ * in a free band above or below the text column (the column takes the screen's whole width, so the bands are the gaps between
+ * the stacked slides' words). The cursor's lean is off here (no cursor on a phone). The solve fits each one to the screen
+ * as on the track.
+ */
+export const SHOTS_STACK: readonly Shot[] = fill([
+  // 01 Small, beside Liam's photo in the strip of black at its right, spinning in place
+  { id: "opening", anchor: "start", az: 0, el: 8, roll: 0, fov: 30, h: 0.2, ax: 0.85, ay: 0.53, spin: 0.22, layer: "front", dim: 1, aperture: 0.0006 },
+  // 03 Tumble: end over end behind "eight years managing two rock bands", dimmed
+  { id: "tumble", anchor: { pendant: "band" }, fx: 0.5, az: -70, el: 0, roll: 0, fov: 32, h: 0.38, ax: 0.6, ay: 0.52, spin: 0.05, tumble: 0.32, layer: "back", dim: 0.4, aperture: 0.001 },
+  // 05 From above: the four faces like a compass, in the band between the work strip and the first quote
+  { id: "above", anchor: { pendant: "strip", fallback: "e2e" }, fx: 0.3, az: 0, el: 89, roll: 0, fov: 30, h: 0.6, ax: 0.5, ay: 0.6, aim: [0, 0.28, 0], spin: 0.12, tumble: 0, layer: "front", dim: 1, aperture: 0.0012 },
+  // 06 Through the glass: small, between the two quotes (the ball drawn round it once the stack shows the slot)
+  { id: "glass", anchor: { pendant: "glass", fallback: ["quote1", "quote2"] }, fx: 0.5, az: 150, el: 8, roll: 0, fov: 30, h: 0.15, ax: "glass", ay: "glass", aim: [0, 0, 0], spin: 0.16, aperture: 0.0005, glass: 1 },
+  // 08 Whirl: stands up spinning fast in the band above "Check I'm right", slows to a new face
+  { id: "whirl", anchor: { pendant: "check" }, fx: 0.68, az: 20, el: 10, roll: 0, fov: 34, h: 0.21, ax: 0.5, ay: 0.3, aim: [0, 0, 0], spin: 1.3, aperture: 0.0008, glass: 0 },
+  // 10 Hero: rising from the bottom left corner under the last line, cut by the left and bottom edges, a face turned toward the
+  // line. (Smaller than the track's close-up: the fixed resume pill holds the bottom's middle, and the last line rises through
+  // the band below it on the way in, so the corner left of the pill is the one free place; the solve fits it there.)
+  { id: "hero", anchor: "end", az: -62, el: -12, roll: 6, fov: 24, h: 0.32, ax: 0.08, ay: 0.9, aim: [0, 0.02, -0.1], spin: 0, lock: -30, aperture: 0.0016 },
 ]);
 
 /** A shot and its alternates, in the order the solve tries them: the shot as written, then each alternate laid over it. */

@@ -196,7 +196,7 @@ const CHROME = ".sh-name, .sh-nav, .sh-burger, .ab-resume";
  *  measures them: the text's own rects, not the element's block box) or picture / chrome box its on-screen box overlaps by more than
  *  1 px both ways (sub-pixel rounding aside). Empty when it is behind, not drawn, or clear. The box is clipped to the
  *  screen: a part of the pendant past the screen's edge covers nothing anyone can read. Runs in the page. */
-function coveredNow({ TEXT, CHROME }: { TEXT: string; CHROME: string }): string[] {
+function coveredNow({ TEXT, CHROME, STILLS = "" }: { TEXT: string; CHROME: string; STILLS?: string }): string[] {
   const h = window.__pendant;
   if (!h?.ready || h.layer !== "front") return [];
   const c = document.querySelector("canvas.ab-pendant")!.getBoundingClientRect();
@@ -236,6 +236,11 @@ function coveredNow({ TEXT, CHROME }: { TEXT: string; CHROME: string }): string[
       const left = Math.max(r.left, minX), top = Math.max(r.top, minY);
       if (r.right > left && r.bottom > top) boxes.push({ r: { left, top, right: r.right, bottom: r.bottom }, what: `picture ${pic.dataset.pic}` });
     }
+  }
+  // (stacked: pictures that hold still in the column, whole: Liam's photo)
+  if (STILLS) for (const el of document.querySelectorAll<HTMLElement>(STILLS)) {
+    const r = el.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0) boxes.push({ r, what: `.${el.className.split(" ")[0]}` });
   }
   const out: string[] = [];
   for (const { r, what } of boxes) {
@@ -431,4 +436,109 @@ test("a press on the pendant drags; elsewhere links work", async ({ page }) => {
   await page.mouse.click(target!.x, target!.y);
   await page.waitForURL((u) => u.pathname !== "/about", { timeout: 10_000 });
   expect(new URL(page.url()).pathname).toBe(target!.href);
+});
+
+// ---------- Task 11: phones and reduced motion (About stacked) ----------
+
+/** The stacked column's still pictures, avoided like the words (Liam's photo above the first line). */
+const STILLS = ".ab-portrait";
+const stackedOverlaps = (page: Page) => page.evaluate(coveredNow, { TEXT, CHROME, STILLS });
+/** The stack's scroll range: the section's top to where its last screen shows. */
+const stackRange = trackRange;
+
+for (const [w, h] of [[390, 844], [430, 932]] as const) {
+  test.describe(`on a ${w}x${h} phone`, () => {
+    test.use({ viewport: { width: w, height: h }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+    test("stacked: the six phone shots, at most 2x, never in front of a line", async ({ page }) => {
+      test.setTimeout(240_000);
+      const errors = collectErrors(page);
+      await page.goto("/about");
+      await expect(page.locator("section.ab")).toHaveAttribute("data-mode", "stack");
+      await ready(page, 30_000);
+      await page.waitForTimeout(1500); // (the nav's entrance)
+      const hook = await page.evaluate(() => ({ mode: window.__pendant!.mode, ids: window.__pendant!.keys.map((k) => k.id), pr: window.__pendant!.pixelRatio }));
+      expect(hook.mode).toBe("stack");
+      expect(hook.ids).toEqual(["opening", "tumble", "above", "glass", "whirl", "hero"]);
+      expect(hook.pr).toBeLessThanOrEqual(2); // (a 3x phone draws at 2x at most)
+      await expect(page.locator("canvas.ab-pendant")).toBeVisible();
+      const { top, end } = await stackRange(page);
+      const bad: string[] = [];
+      let front = 0;
+      for (let i = 0; i <= 120; i++) {
+        await page.evaluate((y) => window.scrollTo(0, y), top + ((end - top) * i) / 120);
+        await page.waitForTimeout(400);
+        bad.push(...(await stackedOverlaps(page)).map((m) => `step ${i}: ${m}`));
+        if (await page.evaluate(() => window.__pendant!.layer === "front")) front++;
+      }
+      expect(bad).toEqual([]);
+      expect(front).toBeGreaterThan(30); // (and it was in front for a good part of the way: the check had something to check)
+      expect(errors).toEqual([]);
+    });
+  });
+}
+
+test.describe("under reduced motion", () => {
+  test.use({ viewport: { width: 1440, height: 900 }, reducedMotion: "reduce" });
+  test("it stacks; each shot is held still and a change of shot crossfades the canvas", async ({ page }) => {
+    test.setTimeout(120_000);
+    const errors = collectErrors(page);
+    await page.goto("/about");
+    await expect(page.locator("section.ab")).toHaveAttribute("data-mode", "stack");
+    await ready(page, 30_000);
+    await expect(page.locator("canvas.ab-pendant")).toHaveAttribute("data-mode", "still");
+    await page.waitForTimeout(1500);
+    const keys = await page.evaluate(() => window.__pendant!.keys);
+    expect(keys.map((k) => k.id)).toEqual(["opening", "tumble", "above", "glass", "whirl", "hero"]);
+    // held on the opening, nothing moves between frames: the same turn, the same box, no blur, fully shown
+    const watch = (ms: number) => page.evaluate((ms) => new Promise<{ yaw: number; shot: number; op: number; box: number[]; blur: boolean }[]>((done) => {
+      const out: { yaw: number; shot: number; op: number; box: number[]; blur: boolean }[] = [];
+      const t0 = performance.now();
+      const tick = () => {
+        const h = window.__pendant!;
+        out.push({ yaw: h.yaw, shot: h.shot, op: h.opacity, box: [h.box.l, h.box.t, h.box.r, h.box.b], blur: h.blur.on });
+        if (performance.now() - t0 < ms) requestAnimationFrame(tick); else done(out);
+      };
+      requestAnimationFrame(tick);
+    }), ms);
+    const still = await watch(1200);
+    expect(new Set(still.map((f) => f.shot))).toEqual(new Set([0]));
+    expect(Math.max(...still.map((f) => f.yaw)) - Math.min(...still.map((f) => f.yaw))).toBeLessThan(1e-6); // (no spin)
+    expect(new Set(still.map((f) => f.box.map((v) => v.toFixed(2)).join()))).toHaveProperty("size", 1); // (no drift)
+    expect(still.every((f) => f.op === 1 && !f.blur)).toBe(true);
+    // past the halfway point to the tumble's key: out to nothing, the tumble put in place, back in, over about 0.6 s
+    await page.evaluate((y) => window.scrollTo(0, y), keys[0].y + 0.6 * (keys[1].y - keys[0].y));
+    const fade = await watch(1500);
+    const at = fade.findIndex((f) => f.shot === 1);
+    expect(at).toBeGreaterThan(0);
+    expect(Math.min(...fade.map((f) => f.op))).toBeLessThan(0.05);
+    expect(fade.slice(0, at).every((f) => f.shot === 0)).toBe(true);
+    expect(fade.slice(at).every((f) => f.shot === 1)).toBe(true); // (one change, no flicker back)
+    expect(fade.at(-1)!.op).toBe(1);
+    // the opacity only falls before the change and only rises after it: a crossfade, not a flash
+    for (let i = 1; i < at; i++) expect(fade[i].op).toBeLessThanOrEqual(fade[i - 1].op + 1e-9);
+    for (let i = at + 1; i < fade.length; i++) expect(fade[i].op).toBeGreaterThanOrEqual(fade[i - 1].op - 1e-9);
+    // and each held shot is still: no turn between frames on either side of the change
+    const yaws = (fs: typeof fade) => Math.max(...fs.map((f) => f.yaw)) - Math.min(...fs.map((f) => f.yaw));
+    expect(yaws(fade.slice(0, at))).toBeLessThan(1e-6);
+    expect(yaws(fade.slice(at))).toBeLessThan(1e-6);
+    expect(fade.every((f) => !f.blur)).toBe(true);
+    expect(errors).toEqual([]);
+  });
+  test("held still, it is never in front of a line as the words scroll past it", async ({ page }) => {
+    test.setTimeout(180_000);
+    await page.goto("/about");
+    await ready(page, 30_000);
+    await page.waitForTimeout(1500);
+    const { top, end } = await stackRange(page);
+    const bad: string[] = [];
+    let front = 0;
+    for (let i = 0; i <= 80; i++) {
+      await page.evaluate((y) => window.scrollTo(0, y), top + ((end - top) * i) / 80);
+      await page.waitForTimeout(400);
+      bad.push(...(await stackedOverlaps(page)).map((m) => `step ${i}: ${m}`));
+      if (await page.evaluate(() => window.__pendant!.layer === "front")) front++;
+    }
+    expect(bad).toEqual([]);
+    expect(front).toBeGreaterThan(15);
+  });
 });

@@ -16,6 +16,14 @@ describe("hits", () => {
     const texts: TextRect[] = [{ l: 500, t: 400, w: 300, h: 40 }];
     expect(hits(box(500, 600), texts, 0)).toBe(0);
   });
+  it("stacked (axis y): a text rides the page's vertical scroll, its screen top t - s, its left where it is", () => {
+    const texts: TextRect[] = [{ l: 20, t: 2000, w: 350, h: 40, axis: "y" }];
+    const b = box(100, 200, 300, 500); // (screen px)
+    expect(hits(b, texts, 0)).toBe(0);
+    expect(hits(b, texts, 1650)).toBe(1); // text now at screen y 350–390
+    expect(hits(b, texts, 1500)).toBe(0); // at screen y 500–540: touching the box's bottom
+    expect(hits(box(380, 400, 300, 500), texts, 1650)).toBe(0); // (not shifted sideways)
+  });
   it("treats touching edges as not overlapping", () => {
     const texts: TextRect[] = [{ l: 600, t: 150, w: 100, h: 40 }];
     expect(hits(box(500, 600), texts, 0)).toBe(0); // box.r === text left

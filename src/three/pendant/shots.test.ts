@@ -1,6 +1,6 @@
 // src/three/pendant/shots.test.ts
 import { describe, expect, it, test } from "vitest";
-import { SHOTS, shotAt, solveKeys, variants, type Anchor, type Shot } from "./shots";
+import { SHOTS, SHOTS_STACK, shotAt, solveKeys, variants, type Anchor, type Shot } from "./shots";
 
 const VW = 1440;
 const TRAVEL = 9000;
@@ -36,6 +36,41 @@ describe("the pendant's shots (spec 2026-10-16 §3)", () => {
     expect(by("worm").aim[1]).toBeCloseTo(-0.08, 9); // the prototype's 0.42 from the feet
     expect(by("opening").aim).toEqual([0, 0, 0]);
     expect(by("opening").lock).toBeNull();
+  });
+});
+
+describe("the stacked shots (spec §8, plan Task 11)", () => {
+  test("SHOTS_STACK keeps the six phone shots in order", () => {
+    expect(SHOTS_STACK.map((s) => s.id)).toEqual(["opening", "tumble", "above", "glass", "whirl", "hero"]);
+  });
+
+  test("each phone shot keeps its desktop character: the tumble behind and dimmed, the glass through the ball, the hero's face locked", () => {
+    const by = (id: string) => SHOTS_STACK.find((s) => s.id === id)!;
+    expect(by("tumble").layer).toBe("back");
+    expect(by("tumble").dim).toBe(0.4);
+    expect(by("tumble").tumble).toBeGreaterThan(0);
+    expect(by("above").tumble).toBe(0);
+    expect(by("above").el).toBe(89);
+    expect(by("glass").glass).toBe(1);
+    expect([by("glass").ax, by("glass").ay]).toEqual(["glass", "glass"]);
+    expect(by("whirl").glass).toBe(0);
+    expect(by("whirl").spin).toBe(1.3);
+    expect(by("hero").lock).not.toBeNull(); // (it settles a face to the camera instead of spinning)
+    expect(by("hero").spin).toBe(0);
+    expect(by("opening").anchor).toBe("start");
+    expect(by("hero").anchor).toBe("end");
+  });
+
+  test("fx reads as fy: keys solve on the vertical scroll (key = anchor centre - fy x screen height)", () => {
+    const VH = 844, H_TRAVEL = 6070;
+    const ys = { band: 1657, strip: 2872, quote1: 3429, quote2: 4020, check: 5201 };
+    const keys = solveKeys(SHOTS_STACK, centres(ys), VH, H_TRAVEL);
+    expect(keys[0]).toBe(0);
+    expect(keys[1]).toBeCloseTo(1657 - 0.5 * VH, 9);
+    expect(keys[2]).toBeCloseTo(2872 - 0.3 * VH, 9);
+    expect(keys[3]).toBeCloseTo((3429 + 4020) / 2 - 0.5 * VH, 9); // (no slot in the stack: the quotes' midpoint)
+    expect(keys[4]).toBeCloseTo(5201 - 0.68 * VH, 9);
+    expect(keys[5]).toBe(H_TRAVEL);
   });
 });
 

@@ -8,6 +8,8 @@
  * track only moves sideways). At travel `s` (px of the track gone by) a text's screen left is `l - s`. Boxes are screen px.
  * `fixed` boxes are what holds still on screen while the track moves (the site's wordmark and pill nav, About's resume pill
  * and progress bar): screen px, never shifted by `s`, and treated exactly like text (the pendant is never in front over one).
+ * Stacked (phones, reduced motion: plan Task 11) the travel is the page's own vertical scroll through the section: a text
+ * marked `axis: "y"` has its `l` in screen px and its `t` in the section's px, and at travel `s` its screen top is `t - s`.
  */
 import type { Box } from "./camera";
 import type { Layer } from "./shots";
@@ -19,6 +21,8 @@ export interface TextRect {
    *  about/picture-motion.ts): at travel `s`, the screen point (px) left of and above which none of it shows, or null when
    *  none of it shows at all. Without it the whole box always counts. */
   shown?: (s: number) => { x: number; y: number } | null;
+  /** Which way it rides with the travel: "x" (the default) the sideways track, "y" the stacked page scrolling up. */
+  axis?: "x" | "y";
 }
 /** One look ahead along the scroll: the layer the shots want at travel `s`, and the pendant's projected bounds there. */
 export interface Sample { s: number; wanted: Layer; box: Box }
@@ -31,8 +35,9 @@ export interface Sample { s: number; wanted: Layer; box: Box }
 export function hits(box: Box, texts: readonly TextRect[], s: number, fixed: readonly Box[] = []): number {
   let n = 0;
   for (const x of texts) {
-    let l = x.l - s, t = x.t;
-    const r = l + x.w, b = x.t + x.h;
+    const dx = x.axis === "y" ? 0 : s, dy = x.axis === "y" ? s : 0;
+    let l = x.l - dx, t = x.t - dy;
+    const r = l + x.w, b = t + x.h;
     if (x.shown) {
       const c = x.shown(s);
       if (c === null) continue;

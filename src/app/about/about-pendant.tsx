@@ -8,7 +8,7 @@ import { clipBox, hits, padBox, type TextRect } from "@/three/pendant/layout";
 import { REST, stepMotion, type MotionState } from "@/three/pendant/motion";
 import { PendantGovernor } from "@/three/pendant/governor";
 import type { GlassSlot, PendantScene } from "@/three/pendant/scene";
-import { SHOTS, shotAt, solveKeys, type Layer, type Shot } from "@/three/pendant/shots";
+import { SHOTS, SHOTS_STACK, shotAt, solveKeys, type Layer, type Shot } from "@/three/pendant/shots";
 import type { Outline } from "@/three/pendant/solve";
 import type { Spot } from "@/three/pendant/layout";
 import { leanFor } from "./glass-lean";
@@ -46,6 +46,11 @@ export interface PendantHook {
   bokehHalf: boolean;
   /** The screen's frame interval the governor reads load against (ms), null until known. */
   baseMs: number | null;
+  /** "track": the sideways track (SHOTS); "stack": portrait phones and reduced motion, the page scrolling down (SHOTS_STACK). */
+  mode: "track" | "stack";
+  /** Reduced motion: the shot held (its index), and the canvas's opacity (a change of shot crossfades it). */
+  shot: number;
+  opacity: number;
 }
 
 declare global {
@@ -96,6 +101,13 @@ const GUARD_HOLD = 0.2;
 /** How fast a solved-behind shot dims to solve.ts FORCED_DIM and comes back (what is left of the gap after a second): the
  *  layer flips while the pendant is clear of the words, so the dim eases in behind them instead of popping. */
 const FORCED_EASE = 0.0001;
+/** Stacked, the canvas fades in over this long once drawn (s), as the track's CSS fades it in. Under reduced motion a change
+ *  of shot crossfades it: out over half of CROSSFADE, the new shot held, back in over the other half. */
+const APPEAR = 0.6;
+const CROSSFADE = 0.6;
+/** Stacked, the pictures that hold still in the column count too: Liam's photo above the first line (on the track it is
+ *  cropped away before the pendant reaches it, so only the stack avoids it). */
+const STACK_PIC = ".ab-portrait";
 
 const clamp01 = (v: number) => Math.min(Math.max(v, 0), 1);
 
@@ -153,6 +165,9 @@ function afterPaint(): Promise<void> {
  * follows the sideways track with a soft lag, never stops moving, and can be grabbed and turned. Anything that goes wrong
  * (no WebGL2, a file that won't load, a shader three changed, a lost GPU) leaves About exactly as it was, with nothing in
  * the console. A lost context hides the canvas; a restored one reloads the scene on a fresh canvas.
+ * Stacked (portrait phones and reduced motion, plan Task 11) the canvas is fixed to the screen and films SHOTS_STACK on the
+ * page's own scroll through the section; the cursor's lean rests, and only a mouse grabs it. Under reduced motion each shot
+ * is held still (no spin, drift, blur or outro move) and a change of shot crossfades the canvas.
  */
 export function AboutPendant() {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -171,13 +186,13 @@ export function AboutPendant() {
     const reducedQ = window.matchMedia("(prefers-reduced-motion: reduce)");
     let reduced = reducedQ.matches;
     canvas.dataset.mode = reduced ? "still" : "live";
-    const onReduced = () => { reduced = reducedQ.matches; canvas.dataset.mode = reduced ? "still" : "live"; jumped = true; };
+    const onReduced = () => { reduced = reducedQ.matches; canvas.dataset.mode = reduced ? "still" : "live"; jumped = true; invalidate(); };
     reducedQ.addEventListener?.("change", onReduced);
 
     const hook: PendantHook = {
       ready: false, keys: [], s: 0, layer: "front", box: { l: 0, t: 0, r: 0, b: 0 }, glass: null, solve: { moved: [], behind: [] },
       yaw: 0, dragging: false, blur: { smear: 0, on: false, jump: false }, gpuMs: null, pixelRatio: 1,
-      bokehHalf: false, baseMs: null,
+      bokehHalf: false, baseMs: null, mode: "track", shot: 0, opacity: 0,
     };
     window.__pendant = hook;
 
@@ -221,14 +236,18 @@ export function AboutPendant() {
       if (good.length >= 10) gov.setBase(good[good.length >> 1]); // (the median: a long task or two while loading doesn't count)
     };
     const L = {
-      vw: 1, vh: 1, dpr: 1, pr: 1, half: false, sized: false, mode: "track", top: 0, H: 0, travel: 0, line1: 0.5,
-      /** The glass slot's centre (track px). */
+      vw: 1, vh: 1, dpr: 1, pr: 1, half: false, sized: false, mode: "track" as "track" | "stack", top: 0, H: 0, travel: 0, line1: 0.5,
+      /** The track: the glass slot's centre (track px). */
       glassMid: null as number | null,
+      /** The stack: the glass point (x a share of the width, y in the section's px) and whether it is the slot (the ball is
+       *  drawn only round a slot; without one the glass shot sits between the quotes, their centres' midpoint). */
+      glassStack: null as { x: number; y: number; slot: boolean } | null,
       /** Its radius, as a share of the screen's height. */
       glassR: 0,
       keys: [] as number[],
       texts: [] as TextRect[],
-      /** The site's chrome (viewport px, fixed to the viewport) and About's own (the pinned frame's px). */
+      /** The site's chrome (viewport px, fixed to the viewport) and About's own (the pinned frame's px; stacked, the
+       *  viewport's: the resume is fixed there). */
       site: [] as Box[],
       own: [] as Box[],
       /** This screen's solve: the shots as solved, their rest spots, the layer as a function of travel (null until solved). */
@@ -236,16 +255,57 @@ export function AboutPendant() {
       spots: [] as Spot[],
       layer: null as ((s: number) => Layer) | null,
     };
+    /** The shots for the layout: the track's, or the stack's. */
+    const baseShots = () => (L.mode === "stack" ? SHOTS_STACK : SHOTS);
+    /** The glass point on screen (shares of the viewport) at travel `s`: on the track the slot rides sideways at mid-height;
+     *  stacked it rides up with the page. */
+    const glassAt = (s: number): { x: number; y: number } => {
+      if (L.mode === "stack") return L.glassStack ? { x: L.glassStack.x, y: (L.glassStack.y - s) / L.vh } : { x: 0.5, y: 0.5 };
+      return { x: L.glassMid === null ? 0.5 : (L.glassMid - s) / L.vw, y: 0.5 };
+    };
+    /** Whether there is a slot to draw the ball round. */
+    const hasSlot = () => L.glassR > 0 && (L.mode === "stack" ? L.glassStack?.slot === true : L.glassMid !== null);
     let dirty = true;
     const anchor = (name: string) => tr?.querySelector<HTMLElement>(`[data-pendant="${name}"]`) ?? null;
     // a slide's left edge along the track (offsets ignore the track's transform and the arrival animation)
     const left = (el: HTMLElement) => (el.offsetParent === tr ? el.offsetLeft : el.offsetLeft - (tr?.offsetLeft ?? 0));
     const centre = (name: string) => { const el = anchor(name); return el ? left(el) + el.offsetWidth / 2 : null; };
+    /** Stacked: how far a slide's rise-in (about.css: translateY while it arrives) has it from its place right now (px). */
+    const rising = (el: Element) => {
+      const slide = el.closest<HTMLElement>(".ab-slide");
+      if (!slide) return 0;
+      const t = getComputedStyle(slide).transform;
+      if (!t || t === "none") return 0;
+      try { return new DOMMatrixReadOnly(t).m42; } catch { return 0; }
+    };
+    /** Stacked: an element's box in the section's px (y) and the screen's (x), as it stands once its slide has risen in. */
+    const inSection = (r: Box, el: Element, secTop: number): Box => {
+      const dy = rising(el);
+      return { l: r.l, r: r.r, t: r.t - dy - secTop, b: r.b - dy - secTop };
+    };
+    const rectBox = (r: DOMRect): Box => ({ l: r.left, t: r.top, r: r.right, b: r.bottom });
     const measure = () => {
       dirty = false;
       if (!sec || !tr || !clip || !pin) return;
-      L.mode = sec.dataset.mode ?? "track";
-      const vw = pin.clientWidth || window.innerWidth, vh = pin.clientHeight || window.innerHeight;
+      const mode = sec.dataset.mode === "stack" ? "stack" : "track";
+      if (mode !== L.mode) {
+        // another film: its shots, its keys, a fresh solve at once, the follow restarting where the page is
+        L.mode = mode;
+        L.shots = baseShots();
+        L.spots = [];
+        L.layer = null;
+        first = true;
+        jumped = true;
+        held = -1;
+        motion = REST;
+        appear = 0;
+        setOpacity(null);
+      }
+      hook.mode = mode;
+      const stack = mode === "stack";
+      // (stacked, the canvas is fixed to the viewport: its own size is the screen's)
+      const vw = (stack ? canvas.clientWidth : pin.clientWidth) || window.innerWidth;
+      const vh = (stack ? canvas.clientHeight : pin.clientHeight) || window.innerHeight;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       gov.setMax(dpr);
       const pr = govOn ? gov.pixelRatio : dpr;
@@ -255,6 +315,24 @@ export function AboutPendant() {
       if (scene && half !== L.half) { scene.setBokehScale(half ? 0.5 : 1); L.half = half; }
       L.top = sec.offsetTop;
       L.H = sec.offsetHeight;
+      if (stack) measureStack(vw, vh);
+      else measureTrack(vw, vh);
+      // (the section is a screen plus the travel, so travel px and scroll px are one to one; stacked, travel is the scroll)
+      hook.keys = L.shots.map((s, i) => ({ id: s.id, y: L.top + L.keys[i] }));
+      const seen = (el: HTMLElement) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 ? r : null; };
+      // the chrome: stacked, all of it is fixed to the viewport (the canvas's own px)
+      const org = (stack ? canvas : pin).getBoundingClientRect();
+      const box = (r: DOMRect, top: number): Box => ({ l: r.left - org.left, t: r.top - top, r: r.right - org.left, b: r.bottom - top });
+      L.site = [...document.querySelectorAll<HTMLElement>(CHROME_SITE)].map(seen).filter((r) => r !== null).map((r) => box(r, 0));
+      L.own = [...pin.querySelectorAll<HTMLElement>(CHROME_PIN)].map(seen).filter((r) => r !== null).map((r) => box(r, org.top));
+      // the solve: at once the first time, then after a quiet spell (a window being dragged wider measures every frame)
+      window.clearTimeout(solveT);
+      if (L.layer === null) solveNow();
+      else solveT = window.setTimeout(() => { try { solveNow(); } catch { fail(); } }, SOLVE_QUIET);
+    };
+    /** The sideways track: its travel, the anchors along it, the words and pictures in track px. */
+    const measureTrack = (vw: number, vh: number) => {
+      if (!sec || !tr || !clip || !pin) return;
       const viewW = clip.clientWidth || vw;
       L.travel = Math.max(tr.scrollWidth - viewW, 0);
       const c1 = centre("line1");
@@ -267,9 +345,7 @@ export function AboutPendant() {
         L.glassMid = null;
         L.glassR = 0;
       }
-      L.keys = solveKeys(SHOTS, (a) => (typeof a === "object" ? centre(a.pendant) : null), viewW, L.travel);
-      // (the section is a screen plus the travel, so travel px and scroll px are one to one)
-      hook.keys = SHOTS.map((s, i) => ({ id: s.id, y: L.top + L.keys[i] }));
+      L.keys = solveKeys(L.shots, (a) => (typeof a === "object" ? centre(a.pendant) : null), viewW, L.travel);
       // The words and the chrome, as boxes. Rects relative to the track are proof against the track's own transform; the
       // arrival animation (the first slides slide in for 1.1 s) and the nav's entrance move them too, so while either runs
       // these boxes are provisional and everything is measured and solved again the moment they have finished.
@@ -288,23 +364,54 @@ export function AboutPendant() {
         return [...frame, ...cap];
       });
       L.texts = [...words, ...pics];
-      const box = (r: DOMRect, top: number): Box => ({ l: r.left - pinR.left, t: r.top - top, r: r.right - pinR.left, b: r.bottom - top });
-      const seen = (el: HTMLElement) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 ? r : null; };
-      L.site = [...document.querySelectorAll<HTMLElement>(CHROME_SITE)].map(seen).filter((r) => r !== null).map((r) => box(r, 0));
-      L.own = [...pin.querySelectorAll<HTMLElement>(CHROME_PIN)].map(seen).filter((r) => r !== null).map((r) => box(r, pinR.top));
-      // the solve: at once the first time, then after a quiet spell (a window being dragged wider measures every frame)
-      window.clearTimeout(solveT);
-      if (L.layer === null) solveNow();
-      else solveT = window.setTimeout(() => { try { solveNow(); } catch { fail(); } }, SOLVE_QUIET);
+    };
+    /** The stack: travel is the page's scroll through the section (to where its last screen shows), the anchors' middles and
+     *  the words in the section's px (y) riding up with it, and every picture whole where it stands (nothing is cut there). */
+    const measureStack = (vw: number, vh: number) => {
+      if (!sec || !tr) return;
+      // (the nav's entrance only: a slide's rise-in is taken out of its rects below, so it needs no second measure)
+      settle(false);
+      const secTop = sec.getBoundingClientRect().top;
+      L.travel = Math.max(L.H - vh, 0);
+      const mid = (name: string) => {
+        const el = anchor(name);
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        if (r.width <= 0 && r.height <= 0) return null; // (not laid out: the stack hides the glass slot today)
+        const b = inSection(rectBox(r), el, secTop);
+        return { x: (b.l + b.r) / 2, y: (b.t + b.b) / 2, w: r.width };
+      };
+      const l1 = mid("line1");
+      L.line1 = l1 === null ? 0.5 : l1.x / vw;
+      const slot = mid("glass");
+      if (slot) {
+        L.glassStack = { x: slot.x / vw, y: slot.y, slot: true };
+        L.glassR = (GLASS_SLOT_R * slot.w) / vh;
+      } else {
+        const q1 = mid("quote1"), q2 = mid("quote2");
+        L.glassStack = q1 && q2 ? { x: 0.5, y: (q1.y + q2.y) / 2, slot: false } : null;
+        L.glassR = 0;
+      }
+      L.keys = solveKeys(L.shots, (a) => (typeof a === "object" ? mid(a.pendant)?.y ?? null : null), vh, L.travel);
+      const rect = (b: Box): TextRect => ({ l: b.l, t: b.t, w: b.r - b.l, h: b.b - b.t, axis: "y" });
+      const of = (el: Element) => (b: Box) => rect(inSection(b, el, secTop));
+      const words = [...tr.querySelectorAll<HTMLElement>(TEXT)].flatMap((el) => lineBoxes(el).map(of(el)));
+      const frames = [...tr.querySelectorAll<HTMLElement>(`${PIC_FRAME}, ${STACK_PIC}`)].flatMap((el) => {
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0 ? [of(el)(rectBox(r))] : [];
+      });
+      const caps = [...tr.querySelectorAll<HTMLElement>(PIC_CAP)].flatMap((el) => lineBoxes(el).map(of(el)));
+      L.texts = [...words, ...frames, ...caps];
     };
     let solveT = 0;
-    /** This screen's spots and layers, from the words and chrome as last measured (the pinned frame at the screen's top). */
+    /** This screen's spots and layers, from the words and chrome as last measured (the pinned frame at the screen's top;
+     *  stacked, the page at each point of its scroll). No cursor on a phone: the stack's lean is off, so it isn't kept clear. */
     const solveNow = () => {
-      if (!scene || !sv || !outline || L.mode !== "track") return;
-      const glassMid = L.glassMid, vw = L.vw;
+      if (!scene || !sv || !outline) return;
       const solved = sv.solve({
-        shots: SHOTS, keys: L.keys, travel: L.travel, vw, vh: L.vh, texts: L.texts, fixed: [...L.site, ...L.own], outline, lookMax: LOOK,
-        at: (s) => ({ line1: L.line1, glass: { x: glassMid === null ? 0.5 : (glassMid - s) / vw, y: 0.5 } }),
+        shots: baseShots(), keys: L.keys, travel: L.travel, vw: L.vw, vh: L.vh, texts: L.texts, fixed: [...L.site, ...L.own], outline,
+        lookMax: L.mode === "stack" ? 0 : LOOK,
+        at: (s) => ({ line1: L.line1, glass: glassAt(s) }),
       });
       L.shots = solved.shots;
       L.spots = solved.spots;
@@ -314,9 +421,9 @@ export function AboutPendant() {
     };
     /** Measure and solve again once the arrival animation and the nav's entrance have finished (if either is running). */
     let settling = false;
-    const settle = () => {
+    const settle = (withTrack = true) => {
       if (settling || !tr) return;
-      const els = [tr, ...document.querySelectorAll<HTMLElement>(CHROME_SITE)];
+      const els = [...(withTrack ? [tr] : []), ...document.querySelectorAll<HTMLElement>(CHROME_SITE)];
       const running = els.flatMap((el) => el.getAnimations?.({ subtree: true }) ?? []).filter((a) => {
         const end = a.effect?.getComputedTiming().endTime;
         return a.playState === "running" && typeof end === "number" && Number.isFinite(end);
@@ -336,15 +443,30 @@ export function AboutPendant() {
     /** The motion blur's reset: the pose jumped since the last frame (the loop resumed, a new solve, reduced motion
      *  toggled, the scroll jumped), so the move between the two frames is not smeared. */
     let jumped = true, sTargetPrev = 0;
+    /** Stacked: the fade-in once drawn (0..1). Reduced motion: the shot held (-1 before the first frame) and the crossfade
+     *  (1 shown, down to 0 and back as the held shot changes). */
+    let appear = 0, held = -1, fadeK = 1;
+    /** Stacked, the canvas's opacity is the frame's (the fade-in, the crossfade, the outro: the canvas is fixed to the screen
+     *  there, so it can't scroll off with the pinned frame); null hands it back to about.css (the track). */
+    let opacityNow: string | null = null;
+    const setOpacity = (v: number | null) => {
+      const next = v === null ? null : (Math.round(Math.min(Math.max(v, 0), 1) * 1000) / 1000).toString();
+      if (next === opacityNow) return;
+      opacityNow = next;
+      canvas.style.opacity = next ?? "";
+      canvas.style.transition = next === null ? "" : "none";
+      hook.opacity = next === null ? 1 : Number(next);
+    };
     /** Diagnostics (window.__pendantPerf): the frames whose GPU time is still on its way back. */
     let frameNo = 0;
     const perfFrames = new Map<number, { s: number; shot: string }>();
-    /** The shot whose key is nearest this travel. */
-    const nearestShot = (s: number) => {
+    /** The index of the shot whose key is nearest this travel. */
+    const nearestIndex = (s: number) => {
       let best = 0;
       for (let i = 1; i < L.keys.length; i++) if (Math.abs(L.keys[i] - s) < Math.abs(L.keys[best] - s)) best = i;
-      return L.shots[best]?.id ?? SHOTS[best]?.id ?? "";
+      return best;
     };
+    const nearestShot = (s: number) => L.shots[nearestIndex(s)]?.id ?? "";
     /** The live guard: behind since it last saw the pendant near a line, until it has been clear for GUARD_HOLD. */
     let guardBack = false, clearFor = 0;
 
@@ -365,31 +487,50 @@ export function AboutPendant() {
       const dt = stepped ? fixedStep / 1000 : Math.min(Math.max((now - last) / 1000, 0), DT_MAX);
       last = now;
       time += dt;
-      const vh = window.innerHeight, y = window.scrollY;
-      const sTarget = trackProgress(y, L.top, L.H, vh) * L.travel;
+      const stack = L.mode === "stack";
+      // the travel: the track's progress across its overflow, or (stacked) the page's scroll through the section
+      const vh = stack ? L.vh : window.innerHeight, y = window.scrollY;
+      const sTarget = stack ? Math.min(Math.max(y - L.top, 0), L.travel) : trackProgress(y, L.top, L.H, vh) * L.travel;
       if (first) { sSm = sPrev = sTargetPrev = sTarget; first = false; } // (a page opened mid-track starts where it is, no fly-in)
       if (Math.abs(sTarget - sTargetPrev) > vh) jumped = true; // (a jump, not a scroll: an anchor, a key, a restore)
       sTargetPrev = sTarget;
       sSm += (sTarget - sSm) * (1 - FOLLOW ** dt);
       const vel = (sSm - sPrev) / Math.max(dt, 1e-3);
       sPrev = sSm;
-      // the glass slot rides with the track as the page shows it (not the smoothed travel): it is a place in the page
-      const gx = L.glassMid === null ? 0.5 : (L.glassMid - sTarget) / L.vw;
-      const f = shotAt(sSm, L.keys, L.shots, { line1: L.line1, glass: { x: gx, y: 0.5 } });
+      // Reduced motion: no blend and no follow, the shot nearest the page held still; a change of shot crossfades the canvas,
+      // out to nothing, the new shot put in place unseen, then back in.
+      if (reduced) {
+        const want = nearestIndex(sTarget);
+        // (a locked face is put to the camera at once, unseen, rather than turned to it)
+        const hold = (i: number) => { held = i; jumped = true; const lock = L.shots[i]?.lock ?? null; motion = { ...REST, yaw: lock === null ? 0 : (lock * Math.PI) / 180 }; };
+        if (held < 0) hold(want);
+        if (want !== held) {
+          fadeK = Math.max(fadeK - dt / (CROSSFADE / 2), 0);
+          if (fadeK === 0) hold(want);
+        } else fadeK = Math.min(fadeK + dt / (CROSSFADE / 2), 1);
+      } else { held = -1; fadeK = 1; }
+      const sAt = reduced ? L.keys[held] ?? 0 : sSm;
+      // the glass rides with the page as the page shows it (not the smoothed travel): it is a place in the page. Held, it is
+      // where the held shot has it.
+      const gp = glassAt(reduced ? sAt : sTarget);
+      const f = shotAt(sAt, L.keys, L.shots, { line1: L.line1, glass: gp });
       sv?.applySpot(f, L.spots); // (this screen's rest spots)
-      // the pull to Contact: it falls away into the dark as the section scrolls off
+      // the pull to Contact: it falls away into the dark as the section scrolls off (held still: only the fade)
       const o = clamp01((y - (L.top + L.H - vh)) / vh);
-      f.h *= 1 - OUT_SHRINK * o;
-      f.ay += OUT_SINK * o;
+      if (!reduced) {
+        f.h *= 1 - OUT_SHRINK * o;
+        f.ay += OUT_SINK * o;
+      }
       motion = stepMotion(motion, {
         dt, spin: f.spin, tumble: f.tumble, lock: f.lock, scrollVel: vel, dragging: drag !== null, dragDX, dragDY, reduced,
       });
       dragDX = dragDY = 0;
-      look.x += (-mouse.y * LOOK - look.x) * LOOK_EASE;
-      look.y += (-mouse.x * LOOK - look.y) * LOOK_EASE;
+      // the cursor's lean (stacked there is no cursor to follow: it rests)
+      look.x += ((stack ? 0 : -mouse.y * LOOK) - look.x) * LOOK_EASE;
+      look.y += ((stack ? 0 : -mouse.x * LOOK) - look.y) * LOOK_EASE;
       // the glass ball, when the pendant draws it (it owns it, and the slot is there)
       const ours = glassOwner() === "pendant";
-      const glass: GlassSlot | null = ours && f.glass > GLASS_MIN && L.glassMid !== null && L.glassR > 0 ? { x: gx, y: 0.5, r: L.glassR } : null;
+      const glass: GlassSlot | null = ours && f.glass > GLASS_MIN && hasSlot() ? { x: gp.x, y: gp.y, r: L.glassR } : null;
       // (through a drawn ball the lean is eased down: the ball magnifies it and turns it over, see PendantScene.glassLook)
       leanFor(look, glass !== null, f.glass, sc.glassLook, leaned);
       cm.poseRig(f, motion, time, leaned, L.vw, L.vh, sc.camera, sc.outer, sc.inner, { still: reduced });
@@ -401,22 +542,30 @@ export function AboutPendant() {
       // pendant the eased one, so after a jump they part for a moment) and the chrome where it is (the site's chrome holds to
       // the viewport while the pinned frame moves off in the outro). Near a line it goes behind while still clear, and only
       // comes back once it has been clear for GUARD_HOLD: the solve keeps the motion's whole reach clear, so this only steps
-      // in when something the solve can't see (a jump, a fast scroll's lean, a hand) carries it close.
-      const pinTop = y < L.top ? L.top - y : Math.min(0, L.top + L.H - vh - y);
+      // in when something the solve can't see (a jump, a fast scroll's lean, a hand) carries it close. Held still (reduced
+      // motion), the words scroll past the held shot, and the guard is what takes it behind them as they come.
+      // (stacked, the canvas and all the chrome are fixed to the viewport: nothing to shift)
+      const pinTop = stack ? 0 : y < L.top ? L.top - y : Math.min(0, L.top + L.H - vh - y);
       const fixed = [...L.own, ...L.site.map((b) => ({ l: b.l, r: b.r, t: b.t - pinTop, b: b.b - pinTop }))];
       const near = sv !== null && hits(clipBox(padBox(box, sv.PAD / 2), L.vw, L.vh), L.texts, sTarget, fixed) > 0;
       if (near) { guardBack = true; clearFor = 0; } else if (guardBack && (clearFor += dt) >= GUARD_HOLD) guardBack = false;
-      const layer: Layer = (L.layer ? L.layer(sSm) : f.layer) === "front" && !guardBack ? "front" : "back";
+      const layer: Layer = (L.layer ? L.layer(sAt) : f.layer) === "front" && !guardBack ? "front" : "back";
       // a shot that wanted the front but is behind the words dims to the tumble's brightness, eased in behind them
       const forced = layer === "back" && f.layer === "front" ? 1 : 0;
       forcedK += (forced - forcedK) * (1 - FORCED_EASE ** dt);
       const shotDim = f.dim + (Math.min(f.dim, sv?.FORCED_DIM ?? f.dim) - f.dim) * forcedK;
-      const dim = shotDim * (1 - o);
+      // (on the track the pinned frame carries it off; stacked it fades instead, below)
+      const dim = stack ? shotDim : shotDim * (1 - o);
       const tag = ++frameNo;
-      if (hook.gpuMs) perfFrames.set(tag, { s: sSm, shot: nearestShot(sSm) });
-      sc.draw(f, glass, dim, glass ? glassRim() : null, { dt, reset: jumped, tag });
+      if (hook.gpuMs) perfFrames.set(tag, { s: sAt, shot: nearestShot(sAt) });
+      // (held still, nothing is smeared: every frame starts the blur afresh)
+      sc.draw(f, glass, dim, glass ? glassRim() : null, { dt, reset: jumped || reduced, tag });
       jumped = false;
       drawn = true;
+      if (stack) {
+        appear = Math.min(appear + dt / APPEAR, 1);
+        setOpacity(appear * fadeK * (1 - o));
+      } else setOpacity(null);
       hook.blur = sc.blurState;
       hook.pixelRatio = L.pr;
       hook.bokehHalf = L.half;
@@ -430,7 +579,8 @@ export function AboutPendant() {
         for (const k of perfFrames.keys()) if (k < tag - 64) perfFrames.delete(k); else break;
       }
       if (canvas.dataset.layer !== layer) canvas.dataset.layer = layer;
-      hook.s = sSm;
+      hook.s = sAt;
+      hook.shot = reduced ? held : nearestIndex(sAt);
       hook.layer = layer;
       hook.box = box;
       hook.yaw = motion.yaw;
@@ -450,7 +600,6 @@ export function AboutPendant() {
           return;
         }
       }
-      if (L.mode !== "track") return; // stacked: about.css hides it; a resize back to the track restarts it
       raf = requestAnimationFrame(frame);
       try {
         step(now, scene, cam);
@@ -479,7 +628,9 @@ export function AboutPendant() {
       // the pendant is behind the words. Only a link under a pendant in front of the track gives way to the grab.
       const ctl = e.target instanceof Element ? e.target.closest(CONTROL) : null;
       if (ctl && (canvas.dataset.layer === "back" || !tr?.contains(ctl))) return;
-      if (!scene || !drawn || lost || L.mode !== "track" || !e.isPrimary || e.button !== 0) return;
+      if (!scene || !drawn || lost || !e.isPrimary || e.button !== 0) return;
+      // (stacked on a phone a finger scrolls the page: only a mouse grabs it there, as under reduced motion on a desktop)
+      if (L.mode === "stack" && e.pointerType !== "mouse") return;
       const r = canvas.getBoundingClientRect();
       const x = e.clientX - r.left, y = e.clientY - r.top;
       if (x < 0 || y < 0 || x > r.width || y > r.height) return;
@@ -528,7 +679,12 @@ export function AboutPendant() {
     const onVisible = () => { if (!document.hidden) run(); };
 
     const io = typeof IntersectionObserver === "function" && sec
-      ? new IntersectionObserver(([e]) => { inView = e.isIntersecting; run(); })
+      ? new IntersectionObserver(([e]) => {
+        inView = e.isIntersecting;
+        // (stacked, the canvas is fixed to the screen: past About it must not hold its last frame there)
+        if (!inView && L.mode === "stack") setOpacity(0);
+        run();
+      })
       : null;
     const ro = typeof ResizeObserver === "function" ? new ResizeObserver(invalidate) : null;
     if (sec) { io?.observe(sec); ro?.observe(sec); }
@@ -544,18 +700,9 @@ export function AboutPendant() {
     canvas.addEventListener("webglcontextlost", onLost);
     canvas.addEventListener("webglcontextrestored", onRestored);
 
-    /** Resolves once the section is a track (at once if it is, or if there is no section to judge by). */
-    let modeObs: MutationObserver | null = null;
-    const untilTrack = () => new Promise<void>((done) => {
-      if (!sec || sec.dataset.mode !== "stack") { done(); return; }
-      modeObs = new MutationObserver(() => {
-        if (sec.dataset.mode === "stack") return;
-        modeObs?.disconnect();
-        modeObs = null;
-        done();
-      });
-      modeObs.observe(sec, { attributes: true, attributeFilter: ["data-mode"] });
-    });
+    /** A change of layout (about-track.tsx sets data-mode: the track, or stacked) measures and solves again. */
+    const modeObs = typeof MutationObserver === "function" && sec ? new MutationObserver(invalidate) : null;
+    if (sec) modeObs?.observe(sec, { attributes: true, attributeFilter: ["data-mode"] });
 
     let torn = false;
     const teardown = () => {
@@ -597,8 +744,6 @@ export function AboutPendant() {
     void (async () => {
       try {
         await afterPaint();
-        if (off) return;
-        await untilTrack(); // (stacked, the canvas is hidden until Task 11: three and the files wait for the track)
         if (off) return;
         // (probed after the paint too: making a GL context costs a few ms the text shouldn't wait for)
         if (!hasWebGL2()) throw new Error("no WebGL2");

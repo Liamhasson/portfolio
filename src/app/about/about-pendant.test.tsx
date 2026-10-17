@@ -115,16 +115,37 @@ test("a scene that arrives after About has gone is freed at once", async () => {
   expect(dispose).toHaveBeenCalledTimes(1);
 });
 
-test("stacked, it waits for the track before loading three and the files", async () => {
+test("stacked (phones, reduced motion), it loads too: the phone framing, not a hidden canvas", async () => {
   load.mockReturnValue(new Promise(() => {}));
   const { fontsDone, runIdle } = setup();
-  const { container } = render(<Page mode="stack" />);
+  render(<Page mode="stack" />);
   await fontsDone();
   await runIdle();
-  await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
-  expect(load).not.toHaveBeenCalled();
-  await act(async () => { container.querySelector<HTMLElement>(".ab")!.dataset.mode = "track"; });
   await waitFor(() => expect(load).toHaveBeenCalledTimes(1));
+});
+
+test("stacked, it films the stack's six shots on the page's own scroll", async () => {
+  await liveScene();
+  const { fontsDone, runIdle } = setup();
+  render(<Page mode="stack" />);
+  await fontsDone();
+  await runIdle();
+  await waitFor(() => expect(window.__pendant?.ready).toBe(true));
+  expect(window.__pendant!.mode).toBe("stack");
+  expect(window.__pendant!.keys.map((k) => k.id)).toEqual(["opening", "tumble", "above", "glass", "whirl", "hero"]);
+});
+
+test("a change of layout films the other shots", async () => {
+  await liveScene();
+  const { fontsDone, runIdle } = setup();
+  const { container } = render(<Page />);
+  await fontsDone();
+  await runIdle();
+  await waitFor(() => expect(window.__pendant?.ready).toBe(true));
+  expect(window.__pendant!.keys).toHaveLength(12);
+  await act(async () => { container.querySelector<HTMLElement>(".ab")!.dataset.mode = "stack"; });
+  await waitFor(() => expect(window.__pendant!.keys).toHaveLength(6));
+  expect(window.__pendant!.mode).toBe("stack");
 });
 
 test("unmounting removes the page hook", () => {
