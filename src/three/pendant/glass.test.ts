@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { distanceFor } from "./camera";
 import { EDGE_COLOURS } from "@/three/edge-light/field";
-import { GLASS_FINISH_FRAGMENT, GLASS_FRAGMENT, GLASS_IOR, GLASS_MAG, glassAt, glassFinishMaterial, glassMaterial } from "./glass";
+import { GLASS_FINISH_FRAGMENT, GLASS_FRAGMENT, GLASS_IOR, GLASS_MAG, glassAt, glassCone, glassFinishMaterial, glassMaterial } from "./glass";
 
 const D2R = Math.PI / 180;
 
@@ -119,5 +119,34 @@ describe("the glass finish pass (after the tone mapping)", () => {
     m.dispose();
     glass.dispose();
   });
+});
+
+describe("glassCone: the ball shows at the slot's size wherever the slot is", () => {
+  // the camera's z = -1 plane at fov 30 and 16:10: the slot's centre (as tangents) and its 0.44 x 17vw radius
+  const t = Math.tan((30 * D2R) / 2), r = 2 * t * ((0.44 * 0.17 * 1440) / 900);
+  for (const [x, y] of [[0, 0], [-0.8 * 1.6 * t, 0], [0.8 * 1.6 * t, 0], [0, 0.7 * t], [0.5 * t, -0.5 * t]]) {
+    it(`at (${x.toFixed(3)}, ${y.toFixed(3)}) the outline is centred on the slot and r across both ways, within 3.5%`, () => {
+      const { dir, sine } = glassCone(x, y, r);
+      expect(Math.hypot(...dir)).toBeCloseTo(1, 9);
+      // the grazing rays round the cone, met with z = -1
+      const ax = dir, a = Math.asin(sine);
+      let e1 = [ax[1], -ax[0], 0];
+      if (Math.hypot(...e1) < 1e-9) e1 = [1, 0, 0];
+      e1 = e1.map((v) => v / Math.hypot(...e1));
+      const e2 = [ax[1] * e1[2] - ax[2] * e1[1], ax[2] * e1[0] - ax[0] * e1[2], ax[0] * e1[1] - ax[1] * e1[0]];
+      const off = Math.hypot(x, y), ux = off > 0 ? x / off : 1, uy = off > 0 ? y / off : 0;
+      let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity;
+      for (let i = 0; i < 4000; i++) {
+        const s = (i / 4000) * 2 * Math.PI;
+        const d = [0, 1, 2].map((k) => ax[k] * Math.cos(a) + (e1[k] * Math.cos(s) + e2[k] * Math.sin(s)) * Math.sin(a));
+        const px = -d[0] / d[2] - x, py = -d[1] / d[2] - y;
+        const along = px * ux + py * uy, across = -px * uy + py * ux;
+        a0 = Math.min(a0, along); a1 = Math.max(a1, along); b0 = Math.min(b0, across); b1 = Math.max(b1, across);
+      }
+      expect(Math.abs((a0 + a1) / 2) / r).toBeLessThan(1e-3);
+      expect(Math.abs((b0 + b1) / 2) / r).toBeLessThan(1e-3);
+      for (const half of [(a1 - a0) / 2, (b1 - b0) / 2]) expect(Math.abs(half / r - 1)).toBeLessThan(0.035);
+    });
+  }
 });
 

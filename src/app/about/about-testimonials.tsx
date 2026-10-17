@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { glassOwner, setGlassLight, type GlassOwner } from "@/lib/about-glass";
+import { glassOwner, setGlassLight, type GlassLight, type GlassOwner } from "@/lib/about-glass";
 import type { TestimonialsLight } from "@/three/edge-light/testimonials-light";
 import { pulsePhase, stepArrival, testimonialsQ, type Arrival } from "./testimonials-q";
 import { trackProgress, trackX } from "./track";
@@ -82,6 +82,8 @@ export function AboutTestimonials() {
     let moodQ = "";
     let shown = false;
     const t0 = performance.now();
+    /** What the pendant's ball is told each frame (about-glass.ts setGlassLight). */
+    const toPendant: GlassLight = { q: 0, t: 0, pulse: -1 };
     /** The ball's handoff to the pendant. The pendant claims the glass once its scene is ready, but its canvas then fades in
      *  (about.css: `.ab-pendant` opacity, 0.6 s ease). Until that fade is done the light keeps its own ball at 1 − the
      *  canvas's opacity, read each frame, so the two balls, centred on one slot, cross-fade at whatever pace the canvas
@@ -154,8 +156,10 @@ export function AboutTestimonials() {
       publish({ q, pulse, drawing, ownBall: ball !== null });
       if (!drawing) { setGlassLight(null); show(false); return; }
       const t = reduced ? 0 : (now - t0) / 1000;
-      // (the pendant's ball reads this on its own frame: the same q, the same clock, so its rim shows the edges as drawn here)
-      setGlassLight(q > 0 ? { q, t, pulse } : null);
+      // (the pendant's ball reads this on its own frame: the same q, the same clock, so its rim shows the edges as drawn here;
+      // one object, rewritten each frame: the store copies it)
+      toPendant.q = q; toPendant.t = t; toPendant.pulse = pulse;
+      setGlassLight(q > 0 ? toPendant : null);
       try {
         // (its own box: fixed at inset 0, it leaves out a classic scrollbar, as the quotes' and the pendant's client sizes do)
         light.resize(canvas.clientWidth || window.innerWidth, canvas.clientHeight || window.innerHeight, window.devicePixelRatio || 1);

@@ -12,12 +12,15 @@
 
 export type GlassOwner = "pendant" | "testimonials";
 /** The testimonials' light as the ball needs it: `q` its strength 0..1, `t` the light's own clock (s; the colour field turns
- *  on it, so both shaders agree), `pulse` the arrival wave's phase (−1 none, else 0..1). */
+ *  on it, so both shaders agree). `pulse`, the arrival wave's phase (−1 none, else 0..1), is carried for later: the ball
+ *  doesn't draw it. */
 export type GlassLight = { q: number; t: number; pulse: number };
 
 /** Live claims, oldest first: the newest decides. */
 const claims: { owner: GlassOwner }[] = [];
-let light: GlassLight | null = null;
+/** The store's own copy (written in place each frame: no allocation), and whether there is a light. */
+const light: GlassLight = { q: 0, t: 0, pulse: -1 };
+let lit = false;
 
 /** Takes the ball. Returns the release (its own claim only: calling it twice, or after a newer claim, is harmless). */
 export function claimGlass(owner: GlassOwner): () => void {
@@ -34,17 +37,20 @@ export function glassOwner(): GlassOwner {
   return claims.length ? claims[claims.length - 1].owner : "testimonials";
 }
 
-/** The light this frame, or null when it is off (q 0, not drawing, or gone). Copied in. */
+/** The light this frame, or null when it is off (q 0, not drawing, or gone). Its fields are copied into the store's own
+ *  object, so the caller may reuse its own. */
 export function setGlassLight(l: GlassLight | null): void {
-  light = l ? { q: l.q, t: l.t, pulse: l.pulse } : null;
+  lit = l !== null;
+  if (l) { light.q = l.q; light.t = l.t; light.pulse = l.pulse; }
 }
 
-export function glassLight(): GlassLight | null {
-  return light;
+/** The light as last set (the store's object, read-only: it is rewritten by the next set), or null. */
+export function glassLight(): Readonly<GlassLight> | null {
+  return lit ? light : null;
 }
 
 /** Tests only: every claim dropped and the light cleared (the store is global, so a test must not leak a claim into the next). */
 export function resetGlassForTests(): void {
   claims.length = 0;
-  light = null;
+  lit = false;
 }

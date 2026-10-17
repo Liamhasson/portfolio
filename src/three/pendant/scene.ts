@@ -36,7 +36,7 @@ import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { FXAAPass } from "three/addons/postprocessing/FXAAPass.js";
 import { distanceFor } from "./camera";
-import { GLASS_MAG, glassAt, glassFinishMaterial, glassMaterial, LENS_DENSITY, LENS_SPAN } from "./glass";
+import { GLASS_MAG, glassAt, glassCone, glassFinishMaterial, glassMaterial, LENS_DENSITY, LENS_SPAN } from "./glass";
 import { ScaledBokehPass } from "./bokeh";
 import { MotionBlurPass, SHUTTER } from "./motion-blur";
 import { buildEdges, patchBokeh, patchOutput, patchShadingR170 } from "./passes";
@@ -47,7 +47,6 @@ import type { Frame } from "./shots";
 export const PENDANT_VERSION = "2026-10-16.4";
 
 const BASE = "/about/pendant/";
-const D = Math.PI / 180;
 /** The depth-of-field blur's ceiling (a share of the screen). */
 const MAX_BLUR = 0.012;
 /** Below this the shot isn't through the glass: the ball shows the empty room, and the lens view isn't drawn. */
@@ -547,10 +546,17 @@ export class PendantScene {
     const cam = this.camera;
     const u = this.glass.uniforms;
     const gd = dist * glassAt(glass.r, f.fov);
-    this.tmp.set(glass.x * 2 - 1, 1 - glass.y * 2, 0.5).unproject(cam).sub(cam.position).normalize();
+    // the slot on the camera's z = -1 plane (its centre, and a point r above it): the cone that shows it at 0.44 x the slot
+    // wherever it is on the screen (glass.ts glassCone), the ball gd along its axis
+    const nx = glass.x * 2 - 1, ny = 1 - glass.y * 2;
+    const p0 = this.tmp.set(nx, ny, 0.5).applyMatrix4(cam.projectionMatrixInverse);
+    const x0 = -p0.x / p0.z, y0 = -p0.y / p0.z;
+    const p1 = this.tmp.set(nx, ny + 2 * glass.r, 0.5).applyMatrix4(cam.projectionMatrixInverse);
+    const cone = glassCone(x0, y0, Math.hypot(-p1.x / p1.z - x0, -p1.y / p1.z - y0));
+    this.tmp.set(...cone.dir).transformDirection(cam.matrixWorld);
     this.centre.copy(cam.position).addScaledVector(this.tmp, gd);
     u.centre.value.copy(this.centre);
-    u.radius.value = glass.r * 2 * gd * Math.tan((f.fov * D) / 2);
+    u.radius.value = gd * cone.sine;
     u.camPos.value.copy(cam.position);
     u.camWorld.value.copy(cam.matrixWorld);
     u.projInv.value.copy(cam.projectionMatrixInverse);

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { breath, EDGE_COLOURS, EDGE_GLSL, warpTime } from "./field";
+import { ballCone, breath, EDGE_COLOURS, EDGE_GLSL, warpTime } from "./field";
 
 describe("the edge light's shared core", () => {
   test("warpTime(0) is 0.4 sin(1.3): the uneven time starts off the beat", () => {
@@ -52,3 +52,39 @@ describe("the edge light's shared core", () => {
     expect(count("(")).toBe(count(")"));
   });
 });
+
+/** The outline a cone (axis `phi` off the view's axis toward +x, half-angle `alpha`) draws on the screen z = 1, traced ray
+ *  by ray: its extent along x (toward the axis) and along y (across). */
+function outlineOf(phi: number, alpha: number) {
+  const ax = [Math.sin(phi), 0, Math.cos(phi)], e1 = [Math.cos(phi), 0, -Math.sin(phi)], e2 = [0, 1, 0];
+  let x0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (let i = 0; i < 20000; i++) {
+    const t = (i / 20000) * 2 * Math.PI, c = Math.cos(alpha), s = Math.sin(alpha);
+    const d = [0, 1, 2].map((k) => ax[k] * c + (e1[k] * Math.cos(t) + e2[k] * Math.sin(t)) * s);
+    const x = d[0] / d[2], y = d[1] / d[2];
+    x0 = Math.min(x0, x); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+  }
+  return { centre: (x0 + x1) / 2, halfW: (x1 - x0) / 2, halfH: y1 };
+}
+
+describe("ballCone: the glass ball's outline wherever the slot is", () => {
+  test("straight ahead it is a circle of radius r", () => {
+    const { phi, alpha } = ballCone(0, 0.06);
+    expect(phi).toBeCloseTo(0, 12);
+    expect(Math.tan(alpha)).toBeCloseTo(0.06, 9);
+  });
+
+  for (const rho0 of [0.15, 0.35, 0.45]) {
+    test(`at ${rho0} off the axis the outline is centred there, its half-axes multiplying to r², each within 5% of r`, () => {
+      const r = 0.064;
+      const { phi, alpha } = ballCone(rho0, r);
+      const o = outlineOf(phi, alpha);
+      expect(o.centre).toBeCloseTo(rho0, 6);
+      expect(o.halfW * o.halfH).toBeCloseTo(r * r, 7);
+      expect(Math.abs(o.halfW / r - 1)).toBeLessThan(0.05);
+      expect(Math.abs(o.halfH / r - 1)).toBeLessThan(0.05);
+      expect(o.halfW).toBeGreaterThan(o.halfH); // (stretched toward the axis)
+    });
+  }
+});
+

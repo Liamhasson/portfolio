@@ -28,7 +28,7 @@
  */
 import { Matrix4, ShaderMaterial, Vector2, Vector3 } from "three";
 import type { Texture } from "three";
-import { EDGE_COLOURS, EDGE_GLSL } from "@/three/edge-light/field";
+import { ballCone, EDGE_COLOURS, EDGE_GLSL } from "@/three/edge-light/field";
 
 /** Glass. */
 export const GLASS_IOR = 1.5;
@@ -57,6 +57,21 @@ const D = Math.PI / 180;
 export function glassAt(r: number, fovDeg: number, mag = GLASS_MAG): number {
   const k = (GLASS_IOR / (2 * (GLASS_IOR - 1))) * 2 * r * Math.tan((fovDeg * D) / 2);
   return Math.min(0.95, Math.max(0.05, 1 - k * (1 + 1 / mag)));
+}
+
+/**
+ * Which way the ball lies from the camera, and how large it is, so it shows as the slot's ball wherever the slot is on the
+ * screen: `(x, y)` the slot's centre and `r` its radius on the camera's z = -1 plane (camera space, the shot's lens shift
+ * taken in). Off the screen's middle a sphere shows larger than its angular size (an ellipse, stretched toward the middle):
+ * field.ts ballCone sets the cone so the outline is centred on the slot and about r across both ways, as the light's own
+ * ball (testimonials-light.ts sphereFor) has it. Returns the axis (camera space, unit) and the cone's sine (the ball at
+ * distance d along the axis has radius d x sine).
+ */
+export function glassCone(x: number, y: number, r: number): { dir: [number, number, number]; sine: number } {
+  const off = Math.hypot(x, y);
+  const { phi, alpha } = ballCone(off, r);
+  const ux = off > 1e-9 ? x / off : 1, uy = off > 1e-9 ? y / off : 0;
+  return { dir: [ux * Math.sin(phi), uy * Math.sin(phi), -Math.cos(phi)], sine: Math.sin(alpha) };
 }
 
 /** The lamp, up to the left and in front of the ball (camera space, toward it): the key light's side. Within about 23 degrees
@@ -253,7 +268,9 @@ export const GLASS_FINISH_FRAGMENT = /* glsl */ `
     }
     c.rgb *= mix( dim, 1.0, cover );
     float ra = max( rim.r, max( rim.g, rim.b ) );
-    gl_FragColor = vec4( c.rgb + rim, c.a + ( 1.0 - c.a ) * ra );
+    vec3 rgb = c.rgb + rim;
+    // (premultiplied: no channel above alpha, so a glint landing on a pixel already opaque stays a valid colour)
+    gl_FragColor = vec4( rgb, max( c.a + ( 1.0 - c.a ) * ra, max( rgb.r, max( rgb.g, rgb.b ) ) ) );
   }`;
 
 /** The finish pass's uniforms: its own frame and dim, and (shared, the same objects) the glass pass's sphere and light. */

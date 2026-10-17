@@ -21,6 +21,30 @@ export function breath(tw: number): number {
 }
 
 /**
+ * The glass ball's cone, as seen from an eye looking straight at a screen one unit away (lengths in that unit: tangents): the
+ * sphere whose outline on the screen is centred `rho0` off the view's axis and is `r` across, both balls (the light's own,
+ * testimonials-light.ts sphereFor; the pendant's, pendant/glass.ts glassCone) placing theirs from it so the two outlines
+ * match wherever the slot is. Off the axis a sphere shows as an ellipse, stretched along the line to the axis (about
+ * 1 / cos² of the angle) more than across it (1 / cos): no sphere shows as a circle there, so its two half-axes are made to
+ * multiply to r² (each within a few percent of r across the screen, the one larger as the other is smaller) and the ellipse
+ * is centred on rho0 exactly. Returns the cone's axis, `phi` (radians off the view's axis, toward the point), and its
+ * half-angle `alpha` (the sphere at distance d along the axis has radius d sin alpha).
+ */
+export function ballCone(rho0: number, r: number): { phi: number; alpha: number } {
+  // the outline along the line to the axis runs from atan(rho0 - w) to atan(rho0 + w): w is its half-width there, and its
+  // centre is rho0 (the tangents' mean is the ellipse's centre); across, its half-height is sin a / sqrt(cos² phi - sin² a)
+  let w = r, phi = Math.atan(rho0), alpha = Math.atan(r);
+  for (let i = 0; i < 8; i++) {
+    const a1 = Math.atan(rho0 - w), a2 = Math.atan(rho0 + w);
+    phi = (a1 + a2) / 2;
+    alpha = (a2 - a1) / 2;
+    const across = Math.sin(alpha) / Math.sqrt(Math.cos(phi) ** 2 - Math.sin(alpha) ** 2);
+    w = r * Math.sqrt(w / across); // (the next half-width keeps this shape's ratio, its half-axes' product r²)
+  }
+  return { phi, alpha };
+}
+
+/**
  * Needs the includer's `uniform vec2 R; uniform float T, A, PAD; uniform vec3 C0, C1, C2, C3;`. rimGlint and lampTint take
  * the ball's centre BC (canvas px) as an argument, so a shader without a ball never declares it.
  */

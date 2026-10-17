@@ -436,3 +436,83 @@ test.describe("the pendant's ball catches the light", () => {
     expect(errors).toEqual([]);
   });
 });
+
+// ---------- Task 3, fix round 1: one outline for both balls, wherever the slot is ----------
+
+/** The slot as the page shows it now (screen px). */
+const slotNow = (page: Page) => page.evaluate(() => {
+  const r = document.querySelector("[data-pendant='glass']")!.getBoundingClientRect();
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width };
+});
+
+/** The drawn ball's outline, from pixels: with only `canvas` painted (everything else hidden, the page `ground`), scanned
+ *  along the slot's centre row from the side facing the screen's middle (the far side can sit in the edge light, or off the
+ *  screen) and down its centre column from above (the pendant can pass below the ball). `edge` says which pixels are the
+ *  ball's: the first one met is its outline. Returns the half-width and half-height from the slot's centre (px). */
+async function drawnOutline(page: Page, canvas: string, ground: string, edge: "dark" | "bright", slot: { x: number; y: number; w: number }) {
+  await page.addStyleTag({ content: `html, body { background: ${ground} !important; } body * { visibility: hidden !important; } ${canvas} { visibility: visible !important; }` });
+  await page.waitForTimeout(150);
+  const vp = page.viewportSize()!, R = 0.44 * slot.w, S = Math.ceil(1.4 * R);
+  const toMiddle = slot.x < vp.width / 2 ? 1 : -1; // (+1: the middle is to the right, scan from the right)
+  const clip = { x: Math.max(0, Math.round(slot.x - S)), y: Math.max(0, Math.round(slot.y - S)), width: 0, height: 0 };
+  clip.width = Math.min(vp.width, Math.round(slot.x + S)) - clip.x;
+  clip.height = Math.round(slot.y) + 1 - clip.y;
+  const png = (await page.screenshot({ clip })).toString("base64");
+  return page.evaluate(async ({ png, clip, slot, toMiddle, edge }) => {
+    const img = new Image();
+    img.src = `data:image/png;base64,${png}`;
+    await img.decode();
+    const c = document.createElement("canvas");
+    c.width = img.width; c.height = img.height;
+    const x = c.getContext("2d")!;
+    x.drawImage(img, 0, 0);
+    const d = x.getImageData(0, 0, c.width, c.height).data;
+    // dark: the glass's rim over a white ground (its edge reflects nearly everything); bright: the light's rim glints over black
+    const hit = (px: number, py: number) => {
+      const i = (py * c.width + px) * 4;
+      return edge === "dark" ? Math.min(d[i], d[i + 1], d[i + 2]) < 200 : d[i] > 60;
+    };
+    const row = Math.round(slot.y - clip.y - 0.5), col = Math.round(slot.x - clip.x - 0.5);
+    let side = NaN, top = NaN;
+    if (toMiddle > 0) { for (let px = c.width - 1; px >= 0; px--) if (hit(px, row)) { side = clip.x + px + 0.5 - slot.x; break; } }
+    else { for (let px = 0; px < c.width; px++) if (hit(px, row)) { side = slot.x - (clip.x + px + 0.5); break; } }
+    for (let py = 0; py < c.height; py++) if (hit(col, py)) { top = slot.y - (clip.y + py + 0.5); break; }
+    return { halfW: side, halfH: top };
+  }, { png, clip, slot, toMiddle, edge });
+}
+
+test.describe("both balls keep the slot's size across the screen", () => {
+  for (const at of [0.1, 0.9]) {
+    test(`the pendant's ball, with the slot at ${at} of the width: drawn 0.44 x the slot across and down, within 4%`, async ({ page }) => {
+      await page.goto("/about");
+      await lightLoaded(page);
+      await page.waitForFunction(() => window.__pendant?.ready === true, null, { timeout: 20_000 });
+      await page.mouse.move(1430, 890);
+      await scrollTo(page, "slot");
+      await page.evaluate((at) => window.scrollTo(0, window.scrollY + (0.5 - at) * innerWidth), at);
+      await page.waitForTimeout(1500);
+      expect(await pendantBall(page)).not.toBeNull();
+      const slot = await slotNow(page);
+      const o = await drawnOutline(page, "canvas.ab-pendant", "#fff", "dark", slot);
+      const R = 0.44 * slot.w;
+      expect(Math.abs(o.halfW / R - 1), `half-width ${o.halfW} against ${R}`).toBeLessThan(0.04);
+      expect(Math.abs(o.halfH / R - 1), `half-height ${o.halfH} against ${R}`).toBeLessThan(0.04);
+    });
+
+    test(`the light's own ball (no pendant), with the slot at ${at} of the width: the same outline, within 4%`, async ({ page }) => {
+      await page.route(PENDANT_GLB, (r) => r.abort());
+      await page.goto("/about");
+      await lightLoaded(page);
+      await expect(page.locator("canvas.ab-pendant")).toHaveCount(0, { timeout: 15_000 });
+      await scrollTo(page, "slot");
+      await page.evaluate((at) => window.scrollTo(0, window.scrollY + (0.5 - at) * innerWidth), at);
+      await page.waitForTimeout(600);
+      await expect.poll(async () => (await hook(page)).ownBall).toBe(true);
+      const slot = await slotNow(page);
+      const o = await drawnOutline(page, "canvas.ab-light", "#000", "bright", slot);
+      const R = 0.44 * slot.w;
+      expect(Math.abs(o.halfW / R - 1), `half-width ${o.halfW} against ${R}`).toBeLessThan(0.04);
+      expect(Math.abs(o.halfH / R - 1), `half-height ${o.halfH} against ${R}`).toBeLessThan(0.04);
+    });
+  }
+});

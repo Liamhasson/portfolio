@@ -45,4 +45,16 @@ describe("about-glass: one ball between the testimonials, owned by whoever draws
     l.q = 1;
     expect(glassLight()).toEqual({ q: 0.5, t: 1, pulse: 0.2 });
   });
+
+  it("no allocation per frame: the store keeps one object of its own, rewritten by each set", () => {
+    const l = { q: 0.2, t: 1, pulse: -1 };
+    setGlassLight(l);
+    const first = glassLight();
+    expect(first).not.toBe(l);
+    l.q = 0.9; l.t = 2;
+    setGlassLight(l);
+    expect(glassLight()).toBe(first);
+    expect(glassLight()).toEqual({ q: 0.9, t: 2, pulse: -1 });
+  });
 });
+

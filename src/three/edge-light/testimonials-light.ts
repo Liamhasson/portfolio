@@ -6,7 +6,7 @@
  * It composites without a CSS blend (a blend over a canvas costs about 14 ms a frame: perf lesson 2026-10-11): each pixel
  * is premultiplied colour with alpha max(r, g, b), close to a screen blend over the near-black page.
  */
-import { EDGE_COLOURS, EDGE_GLSL } from "./field";
+import { ballCone, EDGE_COLOURS, EDGE_GLSL } from "./field";
 
 /** The canvas's pixel ratio never goes above this (cost). */
 export const MAX_DPR = 1.5;
@@ -48,18 +48,21 @@ export type LightUniforms = {
 export const eyeOf = (w: number, h: number): [number, number, number] => [w / 2, h / 2, h * 2.2];
 
 /**
- * The sphere behind the screen that shows as a disc of radius `r` centred on `(x, y)` (canvas px, y up) from the eye: on the
- * ray through that point, sitting 1.2 of its radii behind the screen along it (the mockup's depth), sized so its outline's
- * cone meets the screen at `r` (exact for a ball straight ahead, within a few percent towards the screen's sides). The
- * mockup placed a sphere of radius r at the point itself, which shows about 6% smaller than the slot's 0.44.
+ * The sphere behind the screen that shows as the slot's ball, radius `r` centred on `(x, y)` (canvas px, y up), from the eye:
+ * placed on the cone field.ts ballCone gives (the pendant's ball takes its outline from the same cone, so the two match where
+ * they cross-fade), sitting 1.2 of its radii behind the screen along that cone's axis (the mockup's depth). Off the screen's
+ * middle a sphere shows as an ellipse: ballCone centres it on the point and makes its half-axes multiply to r², each within a
+ * few percent of r. (The mockup placed a sphere of radius r at the point itself, which shows about 6% smaller.)
  */
 export function sphereFor(x: number, y: number, r: number, w: number, h: number): { c: [number, number, number]; rho: number } {
-  const e = eyeOf(w, h);
-  const d = [x - e[0], y - e[1], -e[2]], L = Math.hypot(d[0], d[1], d[2]);
-  const s = r / Math.hypot(L, r); // (the outline cone's sine)
-  const rho = (L * s) / (1 - 1.2 * s);
-  const D = L + 1.2 * rho;
-  return { c: [e[0] + (d[0] / L) * D, e[1] + (d[1] / L) * D, e[2] + (d[2] / L) * D], rho };
+  const e = eyeOf(w, h), E = e[2];
+  const dx = x - e[0], dy = y - e[1], off = Math.hypot(dx, dy);
+  const { phi, alpha } = ballCone(off / E, r / E);
+  const ux = off > 1e-9 ? dx / off : 1, uy = off > 1e-9 ? dy / off : 0;
+  const d = [ux * Math.sin(phi), uy * Math.sin(phi), -Math.cos(phi)];
+  const s = Math.sin(alpha);
+  const D = E / Math.cos(phi) / (1 - 1.2 * s); // (the axis meets the screen at E / cos phi; the centre 1.2 radii past it)
+  return { c: [e[0] + d[0] * D, e[1] + d[1] * D, e[2] + d[2] * D], rho: D * s };
 }
 
 /** The pulse's origin in uv (GL: y up, so the bottom edge is y 0); just outside the screen so the wave enters it. */

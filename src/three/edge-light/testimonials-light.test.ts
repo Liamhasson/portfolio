@@ -16,20 +16,33 @@ describe("the light's uniforms", () => {
     expect(lightUniforms(frame(), 2160, 1350, 1440, 900).BR).toBe(0);
   });
 
-  test("the sphere shows as a disc of the slot's radius centred on the slot: on the eye's ray through it, its outline meeting the screen at r", () => {
+  test("the sphere shows as the slot's ball wherever it is: its outline centred on the slot, about r across both ways, 1.2 radii behind the screen", () => {
     const [w, h] = [1440, 900];
-    for (const [x, y, r] of [[720, 450, 107.7], [300, 450, 107.7], [1300, 200, 60]]) {
+    for (const [x, y, r] of [[720, 450, 107.7], [300, 450, 107.7], [144, 450, 107.7], [1300, 200, 60]]) {
       const { c, rho } = sphereFor(x, y, r, w, h);
       const e = eyeOf(w, h);
-      // the centre projects back onto (x, y) on the screen (z 0)
-      const t = e[2] / (e[2] - c[2]);
-      expect(e[0] + (c[0] - e[0]) * t).toBeCloseTo(x, 6);
-      expect(e[1] + (c[1] - e[1]) * t).toBeCloseTo(y, 6);
-      // the outline's cone: tan = r / (the eye's distance to the point), so the disc on the screen has radius r (straight ahead)
-      const D = Math.hypot(c[0] - e[0], c[1] - e[1], c[2] - e[2]), L = Math.hypot(x - e[0], y - e[1], e[2]);
-      expect(rho / Math.sqrt(D * D - rho * rho)).toBeCloseTo(r / L, 9);
-      // 1.2 radii behind the screen along the ray, as the mockup's depth
-      expect(D - L).toBeCloseTo(1.2 * rho, 6);
+      // its outline on the screen (z 0), traced: the rays from the eye that graze the sphere
+      const toC = [c[0] - e[0], c[1] - e[1], c[2] - e[2]], D = Math.hypot(...toC), ax = toC.map((v) => v / D);
+      const a = Math.asin(rho / D), up = [0, 0, 1];
+      const cross = (p: number[], q: number[]) => [p[1] * q[2] - p[2] * q[1], p[2] * q[0] - p[0] * q[2], p[0] * q[1] - p[1] * q[0]];
+      let e1 = cross(ax, up);
+      if (Math.hypot(...e1) < 1e-9) e1 = [1, 0, 0];
+      e1 = e1.map((v) => v / Math.hypot(...e1));
+      const e2 = cross(ax, e1);
+      const u = [x - e[0], y - e[1]], ul = Math.hypot(...u) || 1, ux = u[0] / ul || 1, uy = u[1] / ul;
+      let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity;
+      for (let i = 0; i < 4000; i++) {
+        const t = (i / 4000) * 2 * Math.PI;
+        const d = [0, 1, 2].map((k) => ax[k] * Math.cos(a) + (e1[k] * Math.cos(t) + e2[k] * Math.sin(t)) * Math.sin(a));
+        const s = -e[2] / d[2], px = e[0] + d[0] * s - x, py = e[1] + d[1] * s - y;
+        const along = px * ux + py * uy, across = -px * uy + py * ux;
+        a0 = Math.min(a0, along); a1 = Math.max(a1, along); b0 = Math.min(b0, across); b1 = Math.max(b1, across);
+      }
+      expect((a0 + a1) / 2).toBeCloseTo(0, 3); // (centred on the slot)
+      expect((b0 + b1) / 2).toBeCloseTo(0, 3);
+      for (const half of [(a1 - a0) / 2, (b1 - b0) / 2]) expect(Math.abs(half / r - 1)).toBeLessThan(0.03); // (the slot's 0.44)
+      // 1.2 radii behind the screen along the cone's axis, as the mockup's depth
+      expect(D - -e[2] / ax[2]).toBeCloseTo(1.2 * rho, 6);
     }
   });
 
