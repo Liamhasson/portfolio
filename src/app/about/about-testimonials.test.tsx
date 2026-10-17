@@ -650,3 +650,41 @@ test("no WebGL, stacked: no slot is opened", async () => {
   await waitFor(() => expect(container.querySelector("canvas.ab-light")).toBeNull());
   expect(container.querySelector<HTMLElement>("section.ab")!.dataset.glass).toBeUndefined();
 });
+
+// ---------- Task 5, fix round 1: the lens on Android, whatever the URL bar does ----------
+
+test("the lens's map is built for the large viewport (a fixed 100lvh probe), so a side slice covers its strip in both bar states; the bar rebuilds nothing", async () => {
+  const { toDataURL } = asChromium();
+  const LVH = 860; // (the URL bar hidden: the fixed layer 60 px taller than the client height, the small viewport, says)
+  vi.spyOn(Element.prototype, "clientWidth", "get").mockImplementation(function (this: Element) { return this === document.documentElement ? W : 0; });
+  vi.spyOn(Element.prototype, "clientHeight", "get").mockImplementation(function (this: Element) { return this === document.documentElement ? H : 0; });
+  vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) {
+    return this.parentElement === document.body && this.style.position === "fixed" && this.style.visibility === "hidden" ? LVH : 0;
+  });
+  await mount("stack");
+  await waitFor(() => expect(toDataURL).toHaveBeenCalledTimes(4));
+  const d = parseFloat(document.querySelector<HTMLElement>(".ab-lens")!.style.getPropertyValue("--lens-d"));
+  const fs = filters();
+  // the side slices run the large viewport's height between the strips (rounded outward to whole map px): taller than a
+  // strip on the small viewport, the height a strip has with the bar hidden
+  for (const i of [1, 3]) expect(placed(fs[i].img)[3]).toBeGreaterThanOrEqual(LVH - 2 * d);
+  expect(placed(fs[1].img)[3]).toBeGreaterThan(H - 2 * d);
+  const before = fs.map((f) => [f.img.getAttribute("href"), ...placed(f.img)]);
+  // the URL bar showing and hiding: the window's height changes, the client height and the large viewport don't
+  for (const ih of [H - 56, LVH]) {
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: ih });
+    window.dispatchEvent(new Event("resize"));
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  expect(toDataURL).toHaveBeenCalledTimes(4);
+  expect(fs.map((f) => [f.img.getAttribute("href"), ...placed(f.img)])).toEqual(before);
+});
+
+test("the lens's large-viewport probe goes when the lens does", async () => {
+  asChromium();
+  const view = await mount("stack");
+  const probes = () => [...document.body.children].filter((el) => (el as HTMLElement).style.position === "fixed" && (el as HTMLElement).style.visibility === "hidden");
+  expect(probes()).toHaveLength(1);
+  view.unmount();
+  expect(probes()).toHaveLength(0);
+});

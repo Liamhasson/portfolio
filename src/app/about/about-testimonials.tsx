@@ -42,10 +42,14 @@ const lensServer = () => false;
 /** The lens's strips, in lensStrips' order: each its own filter, its own slice of the map. */
 const LENS_EDGES: readonly LensEdge[] = ["top", "right", "bottom", "left"];
 
-/** The screen as the lens covers it (fixed at inset 0: a classic scrollbar left out). */
-const screenSize = () => ({
+/** The screen as the lens covers it: as wide as the client (fixed strips leave out a classic scrollbar), as tall as the
+ *  tallest the fixed strips can ever be. On Android Chrome the client height is the small viewport and stays put while the
+ *  fixed layer grows with the URL bar hidden, so it is taken against the large viewport (`lvh`: a hidden fixed 100lvh
+ *  probe's height). The map built for that height covers the strips in both bar states, and it doesn't change with the
+ *  bar, so the bar never rebuilds it. */
+const lensScreen = (lvh: number) => ({
   w: document.documentElement.clientWidth || window.innerWidth,
-  h: document.documentElement.clientHeight || window.innerHeight,
+  h: Math.max(document.documentElement.clientHeight || window.innerHeight, lvh),
 });
 
 /** A stacked slide's rise-in (about.css: translateY until it has come into view), px: taken out of its rect, so the stack is
@@ -95,12 +99,13 @@ export function AboutTestimonials() {
 
   // The lens's map: built at half the screen's resolution (rounded up), first once About's text has painted (on the track or
   // stacked: a visit that never reaches the testimonials before the page is idle pays nothing during load), then again
-  // 150 ms after a resize settles that changed the screen's size (a phone's URL bar, which leaves the screen's client size
-  // as it was, rebuilds nothing). Each
-  // strip gets its own slice as a PNG (a filter reading only its strip's pixels is far cheaper than four reading the whole
-  // map), placed where the full map would put it, so the strips meet without a seam. Meanwhile each old slice is stretched
-  // over its strip's new box at once, so no part of a strip is ever left outside its map. Gone with the light (a failure):
-  // no more work.
+  // 150 ms after a resize settles that changed the screen's size (lensScreen: the large viewport's height, so a phone's URL
+  // bar rebuilds nothing). Each strip gets its own slice as a PNG (a filter reading only its strip's pixels is far cheaper
+  // than four reading the whole map), placed in its strip's own space where the full map would put it, so the strips meet
+  // without a seam. Built for the tallest screen, a side slice runs past its strip's foot while the fixed layer is shorter
+  // (the URL bar showing): the filter clips it to the strip, and the bottom strip's slice is the map's foot wherever that
+  // strip sits. Meanwhile, after a real resize, each old slice is stretched over its strip's new box at once, so no part
+  // of a strip is ever left outside its map. Gone with the light (a failure): no more work.
   useEffect(() => {
     if (!lensOn || gone) return;
     const box = lensRef.current, defs = defsRef.current;
@@ -108,6 +113,13 @@ export function AboutTestimonials() {
     const imgs = LENS_EDGES.map((e) => defs.querySelector<SVGFEImageElement>(`#ab-edge-lens-${e} feImage`));
     if (imgs.some((i) => !i)) return;
     const c = document.createElement("canvas");
+    /** The large viewport's height, from a hidden fixed 100lvh probe (100vh where lvh isn't known), as the pendant has it. */
+    const probe = document.createElement("div");
+    probe.setAttribute("aria-hidden", "true");
+    probe.style.cssText = "position:fixed;top:0;left:0;width:0;height:100vh;visibility:hidden;pointer-events:none";
+    probe.style.height = "100lvh";
+    document.body.appendChild(probe);
+    const screenSize = () => lensScreen(probe.offsetHeight);
     let timer = 0, depth = 0, off = false, painted = false;
     /** The screen size the slices were built for, and the one their placement shows now ("WxH"). */
     let built = "", shown = "";
@@ -175,6 +187,7 @@ export function AboutTestimonials() {
       off = true;
       clearTimeout(timer);
       window.removeEventListener("resize", onResize);
+      probe.remove();
       lensReady.current = false;
     };
   }, [lensOn, gone]);

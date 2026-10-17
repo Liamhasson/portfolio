@@ -9,8 +9,9 @@
  *     the pendant's ball works out the same edge colours the light shows and glints in them.
  * And the stack's glass slot (about.css: `data-glass="on"` on the section opens it) is shown by both, each for itself
  * (`showGlassSlot`): it opens while either one says it will draw the ball there, and collapses only when neither does, so
- * one side letting go never collapses the slot under the other's ball.
- * A module-level store: no React, and no DOM beyond the one attribute `showGlassSlot` writes.
+ * one side letting go never collapses the slot under the other's ball. Where the browser doesn't anchor the scroll (iOS
+ * Safari), a slot that opens or closes wholly above the screen scrolls the page by its change, so what's on screen holds.
+ * A module-level store: no React, and no DOM beyond the attribute `showGlassSlot` writes and that one correction.
  */
 
 export type GlassOwner = "pendant" | "testimonials";
@@ -56,17 +57,43 @@ export function glassLight(): Readonly<GlassLight> | null {
 let slotShowers = new WeakMap<object, Set<GlassOwner>>();
 
 /**
- * `who` shows the glass slot (on) or no longer does (off). The section carries `data-glass="on"` while anyone shows it, and
- * none once nobody does; the attribute is written only when it changes, so calling this every frame costs nothing.
+ * The scroll that keeps the screen still as the slot changes height (px; 0 for none): its change, when the slot lies wholly
+ * above the screen at its taller size (`top` its top on screen, before and after the same: nothing above it changes), and
+ * only where the browser doesn't anchor the scroll itself (Chromium and Firefox do: a second correction would jump back).
  */
-export function showGlassSlot(sec: { dataset: DOMStringMap }, who: GlassOwner, on: boolean): void {
+export function slotScrollFix(top: number, before: number, after: number, anchors: boolean): number {
+  const delta = after - before;
+  if (anchors || delta === 0) return 0;
+  return top + Math.max(before, after) <= 0 ? delta : 0;
+}
+
+/** The browser anchors the scroll (CSS `overflow-anchor`); asked once. */
+let anchorsAsked: boolean | null = null;
+const anchors = () => (anchorsAsked ??= typeof CSS !== "undefined" && typeof CSS.supports === "function" && CSS.supports("overflow-anchor", "auto"));
+
+/** The section as showGlassSlot needs it: its data attributes, and (in the page) its glass slot to keep the scroll by. */
+export type GlassSection = { dataset: DOMStringMap; querySelector?: (sel: string) => Element | null };
+
+/**
+ * `who` shows the glass slot (on) or no longer does (off). The section carries `data-glass="on"` while anyone shows it, and
+ * none once nobody does; the attribute is written only when it changes, so calling this every frame costs nothing. A change
+ * of the slot's height wholly above the screen is scrolled away in the same task (slotScrollFix), where nothing else does.
+ */
+export function showGlassSlot(sec: GlassSection, who: GlassOwner, on: boolean): void {
   let showers = slotShowers.get(sec);
   if (on) {
     if (!showers) slotShowers.set(sec, (showers = new Set()));
     showers.add(who);
   } else showers?.delete(who);
-  if (showers && showers.size > 0) { if (sec.dataset.glass !== "on") sec.dataset.glass = "on"; }
-  else if (sec.dataset.glass !== undefined) delete sec.dataset.glass;
+  const open = !!showers && showers.size > 0;
+  if (open === (sec.dataset.glass === "on")) return;
+  const slot = anchors() ? null : sec.querySelector?.("[data-pendant='glass']") ?? null;
+  const before = slot?.getBoundingClientRect();
+  if (open) sec.dataset.glass = "on"; else delete sec.dataset.glass;
+  if (!slot || !before) return;
+  const after = slot.getBoundingClientRect();
+  const dy = slotScrollFix(before.top, before.height, after.height, false);
+  if (dy !== 0) window.scrollBy(0, dy);
 }
 
 /** Tests only: every claim dropped, the light cleared and nobody showing a slot (the store is global, so a test must not
@@ -75,4 +102,5 @@ export function resetGlassForTests(): void {
   claims.length = 0;
   lit = false;
   slotShowers = new WeakMap();
+  anchorsAsked = null;
 }

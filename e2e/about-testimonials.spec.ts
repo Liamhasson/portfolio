@@ -892,6 +892,16 @@ for (const [w, h] of [[390, 844], [430, 932]] as const) {
       expect(ball, "the pendant's ball").not.toBeNull();
       expect(Math.abs(ball!.y - slot.y)).toBeLessThan(2);
       expect((await hook(page)).ownBall).toBe(false);
+      // and the light's canvas shows no ball of its own: the pendant hidden, no rim glints at r ± 3 px round the slot
+      // (the light's own ball glints there brightly: the next test)
+      await expect.poll(async () => (await hook(page)).pulse, { timeout: 5000 }).toBe(1);
+      await page.locator("canvas.ab-pendant").evaluate((c) => { (c as HTMLElement).style.visibility = "hidden"; });
+      await page.waitForTimeout(100);
+      expect((await hook(page)).drawing).toBe(true);
+      const r = 0.44 * slot.w, S = Math.ceil(r + 6);
+      const clip = { x: Math.round(slot.x - S), y: Math.round(slot.y - S), width: 2 * S, height: 2 * S };
+      const rim = await colourIn(page, clip, { r0: r - 3, r1: r + 3 });
+      expect(rim.bright, `bright rim pixels on the light's canvas (of ${rim.n})`).toBeLessThan(5);
       expect(errors).toEqual([]);
     });
 
@@ -925,7 +935,7 @@ for (const [w, h] of [[390, 844], [430, 932]] as const) {
       expect(errors).toEqual([]);
     });
 
-    test("the glass edges show on Chromium at q 1, and the wave comes from the bottom", async ({ page }) => {
+    test("the glass edges show on Chromium at q 1, and hide again above the testimonials", async ({ page }) => {
       test.setTimeout(60_000);
       const errors = collectErrors(page);
       await page.goto("/about");
@@ -986,4 +996,80 @@ test.describe("stacked on a phone, the toolbar", () => {
     const rotated = await read();
     expect(rotated.w).toBe(Math.round(400 * 1.5));
   });
+});
+
+// ---------- Task 5, fix round 1: the glass edges on Android, whatever the URL bar does ----------
+
+/** Android Chrome as far as the lens can tell: the client height is the small viewport (`small` px, the URL bar showing)
+ *  and stays put, while the fixed layer is the real viewport (the bar hidden). Installed before the page's own scripts. */
+const smallClient = (page: Page, small: number) => page.addInitScript((small) => {
+  const d = Object.getOwnPropertyDescriptor(Element.prototype, "clientHeight")!;
+  Object.defineProperty(Element.prototype, "clientHeight", {
+    configurable: true,
+    get(this: Element) { return this === document.documentElement ? small : d.get!.call(this); },
+  });
+}, small);
+
+/** Each strip's box (screen px) and its slice as placed in the strip's own space, and the slices' hrefs. */
+const lensCover = (page: Page) => page.evaluate(() => [...document.querySelectorAll<HTMLElement>(".ab-lens-strip")].map((el) => {
+  const r = el.getBoundingClientRect(), img = document.querySelector(`#ab-edge-lens-${el.dataset.edge} feImage`)!;
+  const [x, y, w, h] = ["x", "y", "width", "height"].map((a) => Number(img.getAttribute(a)));
+  return { edge: el.dataset.edge!, box: { x: r.x, y: r.y, w: r.width, h: r.height }, img: { x, y, w, h }, href: img.getAttribute("href") };
+}));
+
+/** Every strip lies wholly inside its slice (its own space: the slice from (x, y), w by h). */
+function expectCovered(cover: Awaited<ReturnType<typeof lensCover>>, when: string) {
+  for (const s of cover) {
+    expect(s.img.x, `${when}: ${s.edge} slice's left`).toBeLessThanOrEqual(0);
+    expect(s.img.y, `${when}: ${s.edge} slice's top`).toBeLessThanOrEqual(0);
+    expect(s.img.x + s.img.w, `${when}: ${s.edge} slice's right against the strip's ${s.box.w} px`).toBeGreaterThanOrEqual(s.box.w);
+    expect(s.img.y + s.img.h, `${when}: ${s.edge} slice's foot against the strip's ${s.box.h} px`).toBeGreaterThanOrEqual(s.box.h);
+  }
+}
+
+test.describe("stacked on an Android phone (390 x 844, the URL bar 56 px)", () => {
+  test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+  test("the side strips' maps cover them whole with the bar hidden and shown; the bottom strip sits on the light's foot; nothing is rebuilt", async ({ page }) => {
+    test.setTimeout(60_000);
+    const errors = collectErrors(page);
+    await smallClient(page, 844 - 56);
+    await page.goto("/about");
+    await lightLoaded(page);
+    expect(await page.evaluate(() => document.documentElement.clientHeight)).toBe(788);
+    await stackTo(page, "slot");
+    await expect.poll(async () => (await hook(page)).q).toBeGreaterThan(0.999);
+    await expect(page.locator(".ab-lens-strip[data-edge='left']")).toBeVisible();
+    const hidden = await lensCover(page);
+    // the bar hidden: the sides run the full 844 px between the top and bottom strips, and every slice covers its strip
+    const d = hidden.find((s) => s.edge === "top")!.box.h;
+    expect(hidden.find((s) => s.edge === "left")!.box.h).toBe(844 - 2 * d);
+    expectCovered(hidden, "the bar hidden");
+    // the bottom strip on the light canvas's foot (both stand on the large viewport)
+    const lightFoot = await page.locator("canvas.ab-light").evaluate((c) => c.getBoundingClientRect().bottom);
+    const bottom = hidden.find((s) => s.edge === "bottom")!.box;
+    expect(bottom.y + bottom.h).toBe(lightFoot);
+    // the bar showing: the window reports 56 px less, and says so (the large viewport and the client height unchanged)
+    await page.evaluate(() => {
+      Object.defineProperty(window, "innerHeight", { configurable: true, get: () => 844 - 56 });
+      window.dispatchEvent(new Event("resize"));
+    });
+    await page.waitForTimeout(500); // (past the rebuild's 150 ms)
+    const shown = await lensCover(page);
+    expectCovered(shown, "the bar shown");
+    expect(shown.map((s) => s.href), "nothing rebuilt").toEqual(hidden.map((s) => s.href));
+    expect(shown.map((s) => s.img)).toEqual(hidden.map((s) => s.img));
+    expect(errors).toEqual([]);
+  });
+});
+
+test("on the track, a client height shorter than the fixed layer (an Android tablet's URL bar hidden): the side slices still cover their strips", async ({ page }) => {
+  await smallClient(page, 900 - 56);
+  await page.goto("/about");
+  await lightLoaded(page);
+  await scrollTo(page, "slot");
+  await expect.poll(async () => (await hook(page)).q).toBeGreaterThan(0.999);
+  await expect(page.locator(".ab-lens-strip[data-edge='left']")).toBeVisible();
+  const cover = await lensCover(page);
+  expect(cover.find((s) => s.edge === "left")!.box.h).toBe(720);
+  expectCovered(cover, "the track");
 });
