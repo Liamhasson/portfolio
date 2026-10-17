@@ -36,7 +36,7 @@ import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { FXAAPass } from "three/addons/postprocessing/FXAAPass.js";
 import { distanceFor } from "./camera";
-import { GLASS_MAG, glassAt, glassCone, glassFinishMaterial, glassMaterial, LENS_DENSITY, LENS_SPAN } from "./glass";
+import { GLASS_MAG, glassAt, glassCone, glassFinishMaterial, glassMaterial, LENS_DENSITY, LENS_SPAN, type GlassCone } from "./glass";
 import { ScaledBokehPass } from "./bokeh";
 import { MotionBlurPass, SHUTTER } from "./motion-blur";
 import { buildEdges, patchBokeh, patchOutput, patchShadingR170 } from "./passes";
@@ -139,6 +139,8 @@ export class PendantScene {
   private readonly ndc = new Vector2();
   private readonly fwd = new Vector3();
   private readonly centre = new Vector3();
+  /** The ball's cone, rewritten each frame the glass is placed (placeGlass). */
+  private readonly cone: GlassCone = { dir: [0, 0, -1], sine: 0 };
   private readonly zoom = new Matrix4();
 
   private constructor(
@@ -552,8 +554,8 @@ export class PendantScene {
     const p0 = this.tmp.set(nx, ny, 0.5).applyMatrix4(cam.projectionMatrixInverse);
     const x0 = -p0.x / p0.z, y0 = -p0.y / p0.z;
     const p1 = this.tmp.set(nx, ny + 2 * glass.r, 0.5).applyMatrix4(cam.projectionMatrixInverse);
-    const cone = glassCone(x0, y0, Math.hypot(-p1.x / p1.z - x0, -p1.y / p1.z - y0));
-    this.tmp.set(...cone.dir).transformDirection(cam.matrixWorld);
+    const cone = glassCone(x0, y0, Math.hypot(-p1.x / p1.z - x0, -p1.y / p1.z - y0), this.cone);
+    this.tmp.set(cone.dir[0], cone.dir[1], cone.dir[2]).transformDirection(cam.matrixWorld);
     this.centre.copy(cam.position).addScaledVector(this.tmp, gd);
     u.centre.value.copy(this.centre);
     u.radius.value = gd * cone.sine;

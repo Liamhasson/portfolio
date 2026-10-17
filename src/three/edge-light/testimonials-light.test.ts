@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { bufferSize, eyeOf, LIGHT_FS, lightUniforms, MAX_DPR, PULSE_ORIGIN, sphereFor, TestimonialsLight, type LightFrame } from "./testimonials-light";
+import { bufferSize, emptyUniforms, eyeOf, LIGHT_FS, lightUniforms, MAX_DPR, PULSE_ORIGIN, sphereFor, TestimonialsLight, type LightFrame } from "./testimonials-light";
 
 const frame = (o: Partial<LightFrame> = {}): LightFrame => ({ q: 1, t: 0, pulse: -1, pulseFrom: "right", ball: null, ...o });
 
@@ -87,5 +87,32 @@ describe("the shader", () => {
   test("no WebGL: create returns null", () => {
     const canvas = { getContext: () => null } as unknown as HTMLCanvasElement;
     expect(TestimonialsLight.create(canvas)).toBeNull();
+  });
+});
+
+describe("no allocation per frame", () => {
+  test("sphereFor writes into `out` when given and returns it: the same sphere as a fresh call", () => {
+    const out = { c: [9, 9, 9] as [number, number, number], rho: 9 };
+    const c = out.c;
+    for (const [x, y, r] of [[720, 450, 107.7], [144, 450, 107.7], [1300, 200, 60]]) {
+      expect(sphereFor(x, y, r, 1440, 900, out)).toBe(out);
+      expect(out.c).toBe(c);
+      expect(out).toEqual(sphereFor(x, y, r, 1440, 900));
+    }
+  });
+
+  test("lightUniforms writes into `out` when given (its arrays kept): the same uniforms as a fresh call, a frame without the ball clearing it", () => {
+    const out = emptyUniforms();
+    const arrays = [out.R, out.PO, out.BC, out.BP];
+    const frames = [
+      frame({ ball: { x: 300, y: 200, r: 80, a: 0.5 }, pulse: 0.3, pulseFrom: "bottom" }),
+      frame({ q: 0.4, t: 2 }),
+      frame({ ball: { x: 1200, y: 700, r: 60 } }),
+    ];
+    for (const f of frames) {
+      expect(lightUniforms(f, 2160, 1350, 1440, 900, out)).toBe(out);
+      [out.R, out.PO, out.BC, out.BP].forEach((a, i) => expect(a).toBe(arrays[i]));
+      expect(out).toEqual(lightUniforms(f, 2160, 1350, 1440, 900));
+    }
   });
 });

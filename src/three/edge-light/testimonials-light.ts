@@ -6,7 +6,11 @@
  * It composites without a CSS blend (a blend over a canvas costs about 14 ms a frame: perf lesson 2026-10-11): each pixel
  * is premultiplied colour with alpha max(r, g, b), close to a screen blend over the near-black page.
  */
-import { ballCone, EDGE_COLOURS, EDGE_GLSL } from "./field";
+import { ballCone, EDGE_COLOURS, EDGE_GLSL, type Cone } from "./field";
+
+/** ballCone's and sphereFor's answers inside lightUniforms, written in place (they run every frame the light draws a ball). */
+const coneTmp: Cone = { phi: 0, alpha: 0 };
+const sphereTmp: Sphere = { c: [0, 0, 0], rho: 0 };
 
 /** The canvas's pixel ratio never goes above this (cost). */
 export const MAX_DPR = 1.5;
@@ -47,22 +51,29 @@ export type LightUniforms = {
 /** The shader's eye: centred over the screen, 2.2 screen heights in front of it (the mockup's camera). */
 export const eyeOf = (w: number, h: number): [number, number, number] => [w / 2, h / 2, h * 2.2];
 
+/** A sphere behind the screen (canvas px): its centre and radius. */
+export type Sphere = { c: [number, number, number]; rho: number };
+
 /**
  * The sphere behind the screen that shows as the slot's ball, radius `r` centred on `(x, y)` (canvas px, y up), from the eye:
  * placed on the cone field.ts ballCone gives (the pendant's ball takes its outline from the same cone, so the two match where
  * they cross-fade), sitting 1.2 of its radii behind the screen along that cone's axis (the mockup's depth). Off the screen's
  * middle a sphere shows as an ellipse: ballCone centres it on the point and makes its half-axes multiply to r², each within a
- * few percent of r. (The mockup placed a sphere of radius r at the point itself, which shows about 6% smaller.)
+ * few percent of r. (The mockup placed a sphere of radius r at the point itself, which shows about 6% smaller.) Written into
+ * `out` when given (the light passes its own each frame: no allocation).
  */
-export function sphereFor(x: number, y: number, r: number, w: number, h: number): { c: [number, number, number]; rho: number } {
-  const e = eyeOf(w, h), E = e[2];
-  const dx = x - e[0], dy = y - e[1], off = Math.hypot(dx, dy);
-  const { phi, alpha } = ballCone(off / E, r / E);
+export function sphereFor(x: number, y: number, r: number, w: number, h: number, out: Sphere = { c: [0, 0, 0], rho: 0 }): Sphere {
+  const ex = w / 2, ey = h / 2, E = h * 2.2; // (eyeOf, inline: no array per frame)
+  const dx = x - ex, dy = y - ey, off = Math.hypot(dx, dy);
+  const { phi, alpha } = ballCone(off / E, r / E, coneTmp);
   const ux = off > 1e-9 ? dx / off : 1, uy = off > 1e-9 ? dy / off : 0;
-  const d = [ux * Math.sin(phi), uy * Math.sin(phi), -Math.cos(phi)];
   const s = Math.sin(alpha);
   const D = E / Math.cos(phi) / (1 - 1.2 * s); // (the axis meets the screen at E / cos phi; the centre 1.2 radii past it)
-  return { c: [e[0] + d[0] * D, e[1] + d[1] * D, e[2] + d[2] * D], rho: D * s };
+  out.c[0] = ex + ux * Math.sin(phi) * D;
+  out.c[1] = ey + uy * Math.sin(phi) * D;
+  out.c[2] = E - Math.cos(phi) * D;
+  out.rho = D * s;
+  return out;
 }
 
 /** The pulse's origin in uv (GL: y up, so the bottom edge is y 0); just outside the screen so the wave enters it. */
@@ -70,26 +81,32 @@ export const PULSE_ORIGIN = { right: [1.001, 0.5], bottom: [0.5, -0.001] } as co
 
 /**
  * A frame's uniforms on a canvas of `w` x `h` device px showing a `cssW` x `cssH` screen. Everything the shader reads is in
- * canvas px with y up (gl_FragCoord), so the ball's centre is flipped and scaled here.
+ * canvas px with y up (gl_FragCoord), so the ball's centre is flipped and scaled here. Written into `out` when given (the
+ * light keeps one and rewrites it each frame: no allocation).
  */
-export function lightUniforms(f: LightFrame, w: number, h: number, cssW: number, cssH: number): LightUniforms {
+export function lightUniforms(f: LightFrame, w: number, h: number, cssW: number, cssH: number, out: LightUniforms = emptyUniforms()): LightUniforms {
   const k = cssW > 0 ? w / cssW : 1;
   const ky = cssH > 0 ? h / cssH : 1;
   const po = PULSE_ORIGIN[f.pulseFrom];
-  const bc: [number, number] = f.ball ? [f.ball.x * k, h - f.ball.y * ky] : [0, 0];
-  const sphere = f.ball && f.ball.r > 0 ? sphereFor(bc[0], bc[1], f.ball.r * k, w, h) : null;
-  return {
-    R: [w, h],
-    T: f.t,
-    A: Math.min(1, Math.max(0, f.q)),
-    P: f.pulse < 0 ? -1 : Math.min(1, f.pulse),
-    PAD: Math.min(50, Math.min(cssW, cssH) * 0.1) * k,
-    PO: [po[0], po[1]],
-    BC: bc,
-    BP: sphere ? sphere.c : [0, 0, 0],
-    BR: sphere ? sphere.rho : 0,
-    BA: f.ball ? Math.min(1, Math.max(0, f.ball.a ?? 1)) : 0,
-  };
+  const b = f.ball;
+  const bx = b ? b.x * k : 0, by = b ? h - b.y * ky : 0;
+  const sphere = b && b.r > 0 ? sphereFor(bx, by, b.r * k, w, h, sphereTmp) : null;
+  out.R[0] = w; out.R[1] = h;
+  out.T = f.t;
+  out.A = Math.min(1, Math.max(0, f.q));
+  out.P = f.pulse < 0 ? -1 : Math.min(1, f.pulse);
+  out.PAD = Math.min(50, Math.min(cssW, cssH) * 0.1) * k;
+  out.PO[0] = po[0]; out.PO[1] = po[1];
+  out.BC[0] = bx; out.BC[1] = by;
+  out.BP[0] = sphere ? sphere.c[0] : 0; out.BP[1] = sphere ? sphere.c[1] : 0; out.BP[2] = sphere ? sphere.c[2] : 0;
+  out.BR = sphere ? sphere.rho : 0;
+  out.BA = b ? Math.min(1, Math.max(0, b.a ?? 1)) : 0;
+  return out;
+}
+
+/** A fresh set of uniforms for lightUniforms to write into. */
+export function emptyUniforms(): LightUniforms {
+  return { R: [0, 0], T: 0, A: 0, P: -1, PAD: 0, PO: [0, 0], BC: [0, 0], BP: [0, 0, 0], BR: 0, BA: 0 };
 }
 
 /** The drawing buffer for a screen: the CSS size times the pixel ratio, capped at MAX_DPR, at least 1 px. */
@@ -149,9 +166,21 @@ const hex = (h: string): [number, number, number] => [1, 3, 5].map((i) => parseI
 
 type Loc = WebGLUniformLocation | null;
 
+/** EXT_disjoint_timer_query (WebGL1's GPU timer), as far as the light uses it. */
+type TimerExt = {
+  TIME_ELAPSED_EXT: number; GPU_DISJOINT_EXT: number; QUERY_RESULT_EXT: number; QUERY_RESULT_AVAILABLE_EXT: number;
+  createQueryEXT(): WebGLQuery | null; deleteQueryEXT(q: WebGLQuery): void;
+  beginQueryEXT(target: number, q: WebGLQuery): void; endQueryEXT(target: number): void;
+  getQueryObjectEXT(q: WebGLQuery, pname: number): number | boolean;
+};
+
 export class TestimonialsLight {
   private cssW = 1;
   private cssH = 1;
+  /** This frame's uniforms, rewritten in place (lightUniforms' `out`): nothing allocated per frame. */
+  private readonly v = emptyUniforms();
+  /** Diagnostics (enableGpuTiming): the queries in flight, each with its frame's tag, and the times read back. */
+  private timer: { ext: TimerExt; pending: { q: WebGLQuery; tag: number }[]; done: { ms: number; tag: number }[] } | null = null;
   private constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly gl: WebGLRenderingContext,
@@ -217,10 +246,11 @@ export class TestimonialsLight {
     this.gl.viewport(0, 0, w, h);
   }
 
-  draw(f: LightFrame): void {
+  /** Draws a frame. `tag` labels its GPU time while timing is on (enableGpuTiming; the perf script). */
+  draw(f: LightFrame, tag = 0): void {
     const { gl, u } = this;
     if (gl.isContextLost()) return;
-    const v = lightUniforms(f, this.canvas.width, this.canvas.height, this.cssW, this.cssH);
+    const v = lightUniforms(f, this.canvas.width, this.canvas.height, this.cssW, this.cssH, this.v);
     gl.uniform2f(u.R, v.R[0], v.R[1]);
     gl.uniform1f(u.T, v.T);
     gl.uniform1f(u.A, v.A);
@@ -231,7 +261,50 @@ export class TestimonialsLight {
     gl.uniform3f(u.BP, v.BP[0], v.BP[1], v.BP[2]);
     gl.uniform1f(u.BR, v.BR);
     gl.uniform1f(u.BA, v.BA);
+    const timed = this.beginTimer(tag);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+    if (timed) this.timer!.ext.endQueryEXT(this.timer!.ext.TIME_ELAPSED_EXT);
+  }
+
+  /** Diagnostics: times each draw on the GPU from now on (the light has its own context, so its own query). False if the
+   *  GPU can't (no EXT_disjoint_timer_query). */
+  enableGpuTiming(): boolean {
+    if (this.timer) return true;
+    if (this.gl.isContextLost()) return false;
+    const ext = this.gl.getExtension("EXT_disjoint_timer_query") as TimerExt | null;
+    if (!ext) return false;
+    this.timer = { ext, pending: [], done: [] };
+    return true;
+  }
+
+  /** The GPU times (ms) read back since the last call, each with its frame's tag. */
+  takeGpuTimes(): { ms: number; tag: number }[] {
+    if (!this.timer) return [];
+    const out = this.timer.done;
+    this.timer.done = [];
+    return out;
+  }
+
+  /** Reads back the finished queries and starts this draw's; true if one was started. */
+  private beginTimer(tag: number): boolean {
+    const t = this.timer;
+    if (!t) return false;
+    const { ext } = t;
+    const disjoint = this.gl.getParameter(ext.GPU_DISJOINT_EXT) as boolean;
+    while (t.pending.length) {
+      const { q, tag: qt } = t.pending[0];
+      if (!ext.getQueryObjectEXT(q, ext.QUERY_RESULT_AVAILABLE_EXT)) break;
+      const ns = ext.getQueryObjectEXT(q, ext.QUERY_RESULT_EXT) as number;
+      if (!disjoint) t.done.push({ ms: ns / 1e6, tag: qt });
+      ext.deleteQueryEXT(q);
+      t.pending.shift();
+    }
+    if (t.pending.length > 8) return false; // (the GPU is far behind: skip timing this draw)
+    const q = ext.createQueryEXT();
+    if (!q) return false;
+    ext.beginQueryEXT(ext.TIME_ELAPSED_EXT, q);
+    t.pending.push({ q, tag });
+    return true;
   }
 
   /** Frees the GPU objects and the context at once (a page holds only so many). Its forced loss fires a context-lost event:

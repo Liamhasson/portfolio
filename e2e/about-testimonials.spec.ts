@@ -1,7 +1,7 @@
 // e2e/about-testimonials.spec.ts: the testimonials' light on About's desktop track (plan 2026-10-17-about-testimonials-light,
 // Task 2), and stacked on phones (Task 5). Run with `npx playwright test -c playwright.about.config.ts` (a GPU-backed Chromium at 1440 x 900).
 import { expect, test, type Page } from "@playwright/test";
-import { lensBand, lensMap } from "../src/app/about/edge-lens";
+import { lensBand, lensDepth, lensMap, lensStrips } from "../src/app/about/edge-lens";
 import { testimonialsQ } from "../src/app/about/testimonials-q";
 
 /** The pendant's model, blocked (its URL carries a ?v= cache token, so a plain glob wouldn't match). */
@@ -63,10 +63,12 @@ async function changedPixels(a: Buffer, b: Buffer, page: Page) {
   }, { a: a.toString("base64"), b: b.toString("base64") });
 }
 
-/** Two PNG screenshots of one clip: the count of pixels that differ by more than 2 levels, and how many of those lie off
- *  the busiest row and the busiest column (a line of rounding differences counts as none). */
-async function diffLines(a: Buffer, b: Buffer, page: Page) {
-  return page.evaluate(async ({ a, b }) => {
+/** Two PNG screenshots of one clip, compared in the page (a pixel differs when a channel is more than 2 levels apart): the
+ *  count that differ; the busiest row and column (clip px, −1 where nothing differs) with their counts, the most any pixel
+ *  on them differs (levels) and how many differ off them; and on the lines given (`at`, clip px: the strips' origins) the
+ *  most any pixel differs. */
+async function diffLines(a: Buffer, b: Buffer, page: Page, at: { row: number; col: number }) {
+  return page.evaluate(async ({ a, b, at }) => {
     const read = async (src: string) => {
       const img = new Image();
       img.src = `data:image/png;base64,${src}`;
@@ -78,17 +80,27 @@ async function diffLines(a: Buffer, b: Buffer, page: Page) {
       return { d: x.getImageData(0, 0, c.width, c.height).data, w: c.width };
     };
     const A = await read(a), B = await read(b);
-    const rows = new Map<number, number>(), cols = new Map<number, number>(), px: [number, number][] = [];
+    const delta = new Uint8Array(A.d.length / 4);
+    const rows = new Map<number, number>(), cols = new Map<number, number>();
+    let n = 0, maxOnOrigin = 0;
     for (let i = 0; i < A.d.length; i += 4) {
-      if (Math.max(Math.abs(A.d[i] - B.d[i]), Math.abs(A.d[i + 1] - B.d[i + 1]), Math.abs(A.d[i + 2] - B.d[i + 2])) <= 2) continue;
       const p = i / 4, x = p % A.w, y = Math.floor(p / A.w);
-      px.push([x, y]);
+      const dl = (delta[p] = Math.max(Math.abs(A.d[i] - B.d[i]), Math.abs(A.d[i + 1] - B.d[i + 1]), Math.abs(A.d[i + 2] - B.d[i + 2])));
+      if (y === at.row || x === at.col) maxOnOrigin = Math.max(maxOnOrigin, dl);
+      if (dl <= 2) continue;
+      n++;
       rows.set(y, (rows.get(y) ?? 0) + 1); cols.set(x, (cols.get(x) ?? 0) + 1);
     }
-    const busiest = (m: Map<number, number>) => [...m.entries()].reduce((best, e) => (e[1] > best[1] ? e : best), [-1, 0])[0];
-    const row = busiest(rows), col = busiest(cols);
-    return { n: px.length, offLine: px.filter(([x, y]) => y !== row && x !== col).length };
-  }, { a: a.toString("base64"), b: b.toString("base64") });
+    const busiest = (m: Map<number, number>) => [...m.entries()].reduce((best, e) => (e[1] > best[1] ? e : best), [-1, 0]);
+    const [row, rowN] = busiest(rows), [col, colN] = busiest(cols);
+    let maxOnLine = 0, offLine = 0;
+    for (let p = 0; p < delta.length; p++) {
+      const x = p % A.w, y = Math.floor(p / A.w);
+      if (y === row || x === col) maxOnLine = Math.max(maxOnLine, delta[p]);
+      else if (delta[p] > 2) offLine++;
+    }
+    return { n, row, rowN, col, colN, maxOnLine, offLine, maxOnOrigin };
+  }, { a: a.toString("base64"), b: b.toString("base64"), at });
 }
 
 /** Mean colour, and the count of bright pixels (r + g + b > 150), in a clip; `ring`: only pixels between two radii from its centre. */
@@ -498,52 +510,92 @@ async function drawnOutline(page: Page, canvas: string, ground: string, edge: "d
     const x = c.getContext("2d")!;
     x.drawImage(img, 0, 0);
     const d = x.getImageData(0, 0, c.width, c.height).data;
-    // dark: the glass's rim over a white ground (its edge reflects nearly everything); bright: the light's rim glints over black
+    // dark: the glass's rim over a white ground (its edge reflects nearly everything). bright: the light's ball over black,
+    // found as a step up from the pixel scanned before it (more than 24 levels in any channel): the rim's first pixel is dim
+    // (red about 60, green and blue moving with the glints), and the edge light's falloff can lift the ground near a screen
+    // edge, but only gradually.
+    const lum = (px: number, py: number) => { const i = (py * c.width + px) * 4; return Math.max(d[i], d[i + 1], d[i + 2]); };
+    let prev = -1;
     const hit = (px: number, py: number) => {
-      const i = (py * c.width + px) * 4;
-      return edge === "dark" ? Math.min(d[i], d[i + 1], d[i + 2]) < 200 : d[i] > 60;
+      if (edge === "dark") { const i = (py * c.width + px) * 4; return Math.min(d[i], d[i + 1], d[i + 2]) < 200; }
+      const v = lum(px, py), step = prev >= 0 && v - prev > 24;
+      prev = v;
+      return step;
     };
     const row = Math.round(slot.y - clip.y - 0.5), col = Math.round(slot.x - clip.x - 0.5);
     let side = NaN, top = NaN;
     if (toMiddle > 0) { for (let px = c.width - 1; px >= 0; px--) if (hit(px, row)) { side = clip.x + px + 0.5 - slot.x; break; } }
     else { for (let px = 0; px < c.width; px++) if (hit(px, row)) { side = slot.x - (clip.x + px + 0.5); break; } }
+    prev = -1;
     for (let py = 0; py < c.height; py++) if (hit(col, py)) { top = slot.y - (clip.y + py + 0.5); break; }
     return { halfW: side, halfH: top };
   }, { png, clip, slot, toMiddle, edge });
 }
 
+/** The pendant's ball with the slot at `at` of the screen's width: the slot and the drawn outline. */
+async function pendantOutlineAt(page: Page, at: number) {
+  await page.goto("/about");
+  await lightLoaded(page);
+  await page.waitForFunction(() => window.__pendant?.ready === true, null, { timeout: 20_000 });
+  await page.mouse.move(1430, 890);
+  await scrollTo(page, "slot");
+  await page.evaluate((at) => window.scrollTo(0, window.scrollY + (0.5 - at) * innerWidth), at);
+  await page.waitForTimeout(1500);
+  expect(await pendantBall(page)).not.toBeNull();
+  const slot = await slotNow(page);
+  return { slot, o: await drawnOutline(page, "canvas.ab-pendant", "#fff", "dark", slot) };
+}
+
+/** The light's own ball (the pendant's model blocked) with the slot at `at` of the screen's width: the slot and the drawn
+ *  outline. */
+async function lightOutlineAt(page: Page, at: number) {
+  await page.route(PENDANT_GLB, (r) => r.abort());
+  await page.goto("/about");
+  await lightLoaded(page);
+  await expect(page.locator("canvas.ab-pendant")).toHaveCount(0, { timeout: 15_000 });
+  await scrollTo(page, "slot");
+  await page.evaluate((at) => window.scrollTo(0, window.scrollY + (0.5 - at) * innerWidth), at);
+  await page.waitForTimeout(600);
+  await expect.poll(async () => (await hook(page)).ownBall).toBe(true);
+  const slot = await slotNow(page);
+  return { slot, o: await drawnOutline(page, "canvas.ab-light", "#000", "bright", slot) };
+}
+
 test.describe("both balls keep the slot's size across the screen", () => {
   for (const at of [0.1, 0.9]) {
     test(`the pendant's ball, with the slot at ${at} of the width: drawn 0.44 x the slot across and down, within 4%`, async ({ page }) => {
-      await page.goto("/about");
-      await lightLoaded(page);
-      await page.waitForFunction(() => window.__pendant?.ready === true, null, { timeout: 20_000 });
-      await page.mouse.move(1430, 890);
-      await scrollTo(page, "slot");
-      await page.evaluate((at) => window.scrollTo(0, window.scrollY + (0.5 - at) * innerWidth), at);
-      await page.waitForTimeout(1500);
-      expect(await pendantBall(page)).not.toBeNull();
-      const slot = await slotNow(page);
-      const o = await drawnOutline(page, "canvas.ab-pendant", "#fff", "dark", slot);
+      const { slot, o } = await pendantOutlineAt(page, at);
       const R = 0.44 * slot.w;
       expect(Math.abs(o.halfW / R - 1), `half-width ${o.halfW} against ${R}`).toBeLessThan(0.04);
       expect(Math.abs(o.halfH / R - 1), `half-height ${o.halfH} against ${R}`).toBeLessThan(0.04);
     });
 
     test(`the light's own ball (no pendant), with the slot at ${at} of the width: the same outline, within 4%`, async ({ page }) => {
-      await page.route(PENDANT_GLB, (r) => r.abort());
-      await page.goto("/about");
-      await lightLoaded(page);
-      await expect(page.locator("canvas.ab-pendant")).toHaveCount(0, { timeout: 15_000 });
-      await scrollTo(page, "slot");
-      await page.evaluate((at) => window.scrollTo(0, window.scrollY + (0.5 - at) * innerWidth), at);
-      await page.waitForTimeout(600);
-      await expect.poll(async () => (await hook(page)).ownBall).toBe(true);
-      const slot = await slotNow(page);
-      const o = await drawnOutline(page, "canvas.ab-light", "#000", "bright", slot);
+      const { slot, o } = await lightOutlineAt(page, at);
       const R = 0.44 * slot.w;
       expect(Math.abs(o.halfW / R - 1), `half-width ${o.halfW} against ${R}`).toBeLessThan(0.04);
       expect(Math.abs(o.halfH / R - 1), `half-height ${o.halfH} against ${R}`).toBeLessThan(0.04);
+    });
+  }
+
+  // (each within 4% of the nominal size could still leave the two up to 8 px apart, which would show as two outlines while
+  // they cross-fade: so the two, measured at the same slot position, against each other)
+  for (const at of [0.1, 0.5, 0.9]) {
+    test(`with the slot at ${at} of the width, the pendant's ball and the light's own draw the same outline, within 3 px`, async ({ page, context }) => {
+      const bare = await context.newPage();
+      try {
+        const p = await pendantOutlineAt(page, at);
+        const l = await lightOutlineAt(bare, at);
+        // (the same place: the two pages scrolled alike)
+        expect(Math.abs(p.slot.x - l.slot.x), `slot ${p.slot.x} against ${l.slot.x}`).toBeLessThan(0.5);
+        expect(Math.abs(p.slot.y - l.slot.y)).toBeLessThan(0.5);
+        expect(p.slot.w).toBeCloseTo(l.slot.w, 1);
+        const msg = `pendant ${p.o.halfW} x ${p.o.halfH}, light ${l.o.halfW} x ${l.o.halfH} (nominal ${0.44 * p.slot.w})`;
+        expect(Math.abs(p.o.halfW - l.o.halfW), msg).toBeLessThanOrEqual(3);
+        expect(Math.abs(p.o.halfH - l.o.halfH), msg).toBeLessThanOrEqual(3);
+      } finally {
+        await bare.close();
+      }
     });
   }
 });
@@ -704,15 +756,27 @@ test.describe("the glass edges", () => {
       const bare = await page.screenshot({ clip: corners[0] });
       expect(await changedPixels(strips[0], bare, page)).toBeGreaterThan(200);
       // Even sizes: identical. Odd: the bottom and right strips start on odd pixels, so their slices sit a pixel off their own
-      // origin (at the same place on the screen) and the samples along that one row or column of map pixels can round the
-      // other way: a few levels, in the grain, all on one line. So the check at an odd size: off the busiest row and the
-      // busiest column, at most 10 pixels differ. (A slice misplaced by one map pixel, or scaled by the 0.5003 an odd screen
-      // gives a rounded half-size map, differs in some 600 to 700 pixels per corner, all over its band.)
+      // origin (at the same place on the screen), and the filter samples the map a hair differently: where the bent text's
+      // edge sits on a rounding boundary, one row or column of pixels comes out a few levels apart (measured 10-17: up to 9
+      // levels, along one row 69 px into the bottom strip, or a few pixels down one column; never on a strip's origin). So
+      // at an odd size: the seams themselves (the right strip's first column, the bottom strip's first row, from lensStrips)
+      // match to 2 levels; whatever differs is one line, at most a few levels and a few dozen pixels; off it, at most two.
+      // (A slice misplaced by one map pixel, or scaled by the 0.5003 an odd screen gives a rounded half-size map, differs in
+      // hundreds of pixels per corner, all over its band and on its origin, by tens of levels: the negative control in the
+      // Task 6 report.)
+      const strips4 = lensStrips(W, H, lensDepth(lensBand(W, H)));
+      const originX = strips4[1].x, originY = strips4[2].y; // (the right strip's left edge, the bottom strip's top)
       const even = W % 2 === 0 && H % 2 === 0;
       for (let i = 0; i < corners.length; i++) {
-        const d = await diffLines(strips[i], whole[i], page);
-        if (even) expect(d.n, `corner ${i} (${corners[i].x}, ${corners[i].y})`).toBe(0);
-        else expect(d.offLine, `corner ${i} (${corners[i].x}, ${corners[i].y}): ${d.n} differ, ${d.offLine} off the busiest row and column`).toBeLessThanOrEqual(10);
+        const at = { row: originY - corners[i].y, col: originX - corners[i].x }; // (clip px; outside the clip for a corner without it)
+        const d = await diffLines(strips[i], whole[i], page, at);
+        const where = `corner ${i} (${corners[i].x}, ${corners[i].y}): ${d.n} differ, busiest row ${d.row} (${d.rowN}), column ${d.col} (${d.colN}), ` +
+          `up to ${d.maxOnLine} levels on them, ${d.offLine} off them; up to ${d.maxOnOrigin} levels on the strip origins (row ${at.row}, column ${at.col})`;
+        if (even) { expect(d.n, where).toBe(0); continue; }
+        expect(d.maxOnOrigin, where).toBeLessThanOrEqual(2);
+        expect(d.maxOnLine, where).toBeLessThanOrEqual(12);
+        expect(Math.max(d.rowN, d.colN), where).toBeLessThanOrEqual(60);
+        expect(d.offLine, where).toBeLessThanOrEqual(2);
       }
     });
   }

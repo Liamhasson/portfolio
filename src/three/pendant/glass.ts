@@ -28,7 +28,7 @@
  */
 import { Matrix4, ShaderMaterial, Vector2, Vector3 } from "three";
 import type { Texture } from "three";
-import { ballCone, EDGE_COLOURS, EDGE_GLSL } from "@/three/edge-light/field";
+import { ballCone, EDGE_COLOURS, EDGE_GLSL, type Cone } from "@/three/edge-light/field";
 
 /** Glass. */
 export const GLASS_IOR = 1.5;
@@ -59,19 +59,26 @@ export function glassAt(r: number, fovDeg: number, mag = GLASS_MAG): number {
   return Math.min(0.95, Math.max(0.05, 1 - k * (1 + 1 / mag)));
 }
 
+/** The ball's cone from the camera: its axis (camera space, unit) and its sine. */
+export type GlassCone = { dir: [number, number, number]; sine: number };
+/** ballCone's answer, written in place (glassCone runs every frame the ball is drawn). */
+const coneTmp: Cone = { phi: 0, alpha: 0 };
+
 /**
  * Which way the ball lies from the camera, and how large it is, so it shows as the slot's ball wherever the slot is on the
  * screen: `(x, y)` the slot's centre and `r` its radius on the camera's z = -1 plane (camera space, the shot's lens shift
  * taken in). Off the screen's middle a sphere shows larger than its angular size (an ellipse, stretched toward the middle):
  * field.ts ballCone sets the cone so the outline is centred on the slot and about r across both ways, as the light's own
  * ball (testimonials-light.ts sphereFor) has it. Returns the axis (camera space, unit) and the cone's sine (the ball at
- * distance d along the axis has radius d x sine).
+ * distance d along the axis has radius d x sine), written into `out` when given (no allocation per frame).
  */
-export function glassCone(x: number, y: number, r: number): { dir: [number, number, number]; sine: number } {
+export function glassCone(x: number, y: number, r: number, out: GlassCone = { dir: [0, 0, -1], sine: 0 }): GlassCone {
   const off = Math.hypot(x, y);
-  const { phi, alpha } = ballCone(off, r);
+  const { phi, alpha } = ballCone(off, r, coneTmp);
   const ux = off > 1e-9 ? x / off : 1, uy = off > 1e-9 ? y / off : 0;
-  return { dir: [ux * Math.sin(phi), uy * Math.sin(phi), -Math.cos(phi)], sine: Math.sin(alpha) };
+  out.dir[0] = ux * Math.sin(phi); out.dir[1] = uy * Math.sin(phi); out.dir[2] = -Math.cos(phi);
+  out.sine = Math.sin(alpha);
+  return out;
 }
 
 /** The lamp, up to the left and in front of the ball (camera space, toward it): the key light's side. Within about 23 degrees

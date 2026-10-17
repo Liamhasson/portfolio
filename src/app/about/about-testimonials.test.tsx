@@ -7,12 +7,14 @@ const real = vi.hoisted(() => ({ on: false }));
 const draw = vi.fn();
 const resize = vi.fn();
 const dispose = vi.fn();
+const enableGpuTiming = vi.fn(() => false);
+const takeGpuTimes = vi.fn((): { ms: number; tag: number }[] => []);
 vi.mock("@/three/edge-light/testimonials-light", async (orig) => {
   const mod = await orig<typeof import("@/three/edge-light/testimonials-light")>();
   return {
     ...mod,
     TestimonialsLight: {
-      create: (c: HTMLCanvasElement) => (real.on ? mod.TestimonialsLight.create(c) : { draw, resize, dispose }),
+      create: (c: HTMLCanvasElement) => (real.on ? mod.TestimonialsLight.create(c) : { draw, resize, dispose, enableGpuTiming, takeGpuTimes }),
     },
   };
 });
@@ -100,6 +102,7 @@ async function mount(mode: "track" | "stack" = "track") {
 beforeEach(() => {
   real.on = false;
   draw.mockReset(); resize.mockReset(); dispose.mockReset();
+  enableGpuTiming.mockReset().mockReturnValue(false); takeGpuTimes.mockReset().mockReturnValue([]);
   at = { q1: 2400, slot: 2800, q2: 3200 }; // (far right: q 0, the slot off screen)
   axis = "x";
 });
@@ -687,4 +690,40 @@ test("the lens's large-viewport probe goes when the lens does", async () => {
   expect(probes()).toHaveLength(1);
   view.unmount();
   expect(probes()).toHaveLength(0);
+});
+
+test("the GPU timer (scripts/about/pendant-perf.cjs) only with ?pendant-debug and window.__pendantPerf: each time goes to the frame it timed", async () => {
+  const w = window as Window & { __pendantPerf?: boolean };
+  w.__pendantPerf = true;
+  try {
+    // without ?pendant-debug: no timer, nothing in the hook, the draw's call as ever
+    let view = await mount();
+    expect(enableGpuTiming).not.toHaveBeenCalled();
+    at = { q1: 200, slot: 500, q2: 800 };
+    window.dispatchEvent(new Event("scroll"));
+    await runFrame(1000);
+    expect(window.__testimonials!.gpuMs).toBeUndefined();
+    expect(draw.mock.lastCall).toHaveLength(1);
+    view.unmount();
+    resetGlassForTests();
+    vi.restoreAllMocks();
+    // with it: the light's own query, each frame tagged; a time read back lands on the frame it timed
+    window.history.replaceState(null, "", "/about?pendant-debug");
+    enableGpuTiming.mockReturnValue(true);
+    at = { q1: 2400, slot: 2800, q2: 3200 };
+    view = await mount();
+    expect(enableGpuTiming).toHaveBeenCalledTimes(1);
+    at = { q1: 200, slot: 500, q2: 800 };
+    window.dispatchEvent(new Event("scroll"));
+    await runFrame(1000);
+    const tag = draw.mock.lastCall![1] as number;
+    expect(tag).toBeGreaterThan(0);
+    takeGpuTimes.mockReturnValueOnce([{ ms: 0.8, tag }]);
+    await runFrame(1100);
+    expect(window.__testimonials!.gpuMs).toEqual([{ ms: 0.8, q: expect.closeTo(1, 9), ownBall: true, lens: false }]);
+    view.unmount();
+  } finally {
+    delete w.__pendantPerf;
+    window.history.replaceState(null, "", "/");
+  }
 });

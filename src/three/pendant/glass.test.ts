@@ -150,3 +150,13 @@ describe("glassCone: the ball shows at the slot's size wherever the slot is", ()
   }
 });
 
+
+it("glassCone writes into `out` when given and returns it: the same cone as a fresh call (no allocation per frame)", () => {
+  const out = { dir: [9, 9, 9] as [number, number, number], sine: 9 };
+  const dir = out.dir;
+  for (const [x, y, r] of [[0, 0, 0.05], [0.3, -0.1, 0.06], [-0.4, 0.2, 0.04]]) {
+    expect(glassCone(x, y, r, out)).toBe(out);
+    expect(out.dir).toBe(dir);
+    expect(out).toEqual(glassCone(x, y, r));
+  }
+});

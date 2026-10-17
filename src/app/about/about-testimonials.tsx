@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { glassOwner, setGlassLight, showGlassSlot, type GlassLight, type GlassOwner } from "@/lib/about-glass";
-import type { TestimonialsLight } from "@/three/edge-light/testimonials-light";
+import type { LightBall, LightFrame, TestimonialsLight } from "@/three/edge-light/testimonials-light";
 import { lensBand, lensDepth, lensMap, lensScale, lensStrips, lensSupported, type LensEdge } from "./edge-lens";
 import { pulsePhase, stepArrival, testimonialsQ, type Arrival } from "./testimonials-q";
 import { trackProgress, trackX } from "./track";
@@ -22,6 +22,10 @@ export interface TestimonialsHook {
   /** The glass edges (edge-lens.ts): the displacement's scale as set on the filter while the lens shows, 0 while it's hidden
    *  (and always where there's no lens: not Chromium). */
   lens: number;
+  /** Diagnostics, only with ?pendant-debug and `window.__pendantPerf` set before load (scripts/about/pendant-perf.cjs): each
+   *  drawn frame's GPU time (ms) on the light's own context, with the frame's q, whether it drew its own ball and whether the
+   *  lens showed. Absent otherwise, and where the GPU can't time (no EXT_disjoint_timer_query). */
+  gpuMs?: { ms: number; q: number; ownBall: boolean; lens: boolean }[];
 }
 
 declare global {
@@ -214,6 +218,14 @@ export function AboutTestimonials() {
     let reduced = reducedQ.matches;
 
     let off = false, loading = false, raf = 0;
+    /** Diagnostics (TestimonialsHook.gpuMs): read once, only with ?pendant-debug, as the pendant does. */
+    const debug = new URLSearchParams(window.location.search).has("pendant-debug");
+    let gpuMs: NonNullable<TestimonialsHook["gpuMs"]> | null = null;
+    const perfFrames = new Map<number, { q: number; ownBall: boolean; lens: boolean }>();
+    let frameNo = 0;
+    /** The frame and the ball handed to the light, rewritten each frame (no allocation per frame). */
+    const lightBall: LightBall = { x: 0, y: 0, r: 0, a: 1 };
+    const frame: LightFrame = { q: 0, t: 0, pulse: -1, pulseFrom: "right", ball: null };
     let light: TestimonialsLight | null = null;
     let arrival: Arrival = { at: null, on: false, armed: true };
     let moodQ = "";
@@ -255,7 +267,7 @@ export function AboutTestimonials() {
       shown = on;
       if (on) canvas.dataset.on = ""; else delete canvas.dataset.on;
     };
-    const publish = (h: TestimonialsHook) => { window.__testimonials = Object.freeze(h); };
+    const publish = (h: TestimonialsHook) => { window.__testimonials = Object.freeze(gpuMs ? { ...h, gpuMs } : h); };
     /** The stack's glass slot is open while the light is there to draw the ball (its own while nobody claims it). */
     const slotShown = (on: boolean) => showGlassSlot(sec, "testimonials", on);
     /** Stacked, the screen as the light covers it: its canvas's own box (fixed, 100lvh: the large viewport), read once and
@@ -343,7 +355,8 @@ export function AboutTestimonials() {
       const pulse = reduced ? -1 : pulsePhase(arrival, now);
       const a = m && drawing && m.near ? ballOpacity() : 0;
       ballA = a;
-      const ball = m && a > 0 ? { x: m.slot.x, y: m.slot.y, r: 0.44 * m.slot.w, a } : null;
+      let ball: LightBall | null = null;
+      if (m && a > 0) { lightBall.x = m.slot.x; lightBall.y = m.slot.y; lightBall.r = 0.44 * m.slot.w; lightBall.a = a; ball = lightBall; }
       const t = reduced ? 0 : (now - t0) / 1000;
       const lens = lensFrame(drawing ? q : 0, t);
       publish({ q, pulse, drawing, ownBall: ball !== null, lens });
@@ -357,7 +370,18 @@ export function AboutTestimonials() {
         // stacked, the box as last measured, the toolbar left out)
         const box = m.stack ? screenBox() : { w: canvas.clientWidth || window.innerWidth, h: canvas.clientHeight || window.innerHeight };
         light.resize(box.w, box.h, window.devicePixelRatio || 1);
-        light.draw({ q, t, pulse, pulseFrom: m.stack ? "bottom" : "right", ball });
+        frame.q = q; frame.t = t; frame.pulse = pulse; frame.pulseFrom = m.stack ? "bottom" : "right"; frame.ball = ball;
+        const tag = ++frameNo;
+        if (gpuMs) perfFrames.set(tag, { q, ownBall: ball !== null, lens: lens > 0 });
+        if (gpuMs) light.draw(frame, tag); else light.draw(frame);
+        if (gpuMs) {
+          // (a query reads back a few frames late: each time goes to the frame it timed)
+          for (const g of light.takeGpuTimes()) {
+            const at = perfFrames.get(g.tag);
+            if (at && gpuMs.length < 100_000) gpuMs.push({ ms: g.ms, ...at });
+          }
+          for (const k of perfFrames.keys()) if (k < tag - 64) perfFrames.delete(k); else break;
+        }
       } catch {
         fail();
         return;
@@ -435,6 +459,7 @@ export function AboutTestimonials() {
           if (!made) { fail(); return; }
           if (off) { made.dispose(); return; }
           light = made;
+          if (debug && window.__pendantPerf) gpuMs = made.enableGpuTiming() ? [] : null;
           slotShown(true);
           publish({ q: 0, pulse: -1, drawing: false, ownBall: false, lens: 0 });
           wake();

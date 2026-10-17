@@ -20,6 +20,9 @@ export function breath(tw: number): number {
   return 0.55 * Math.sin(tw * 0.6) + 0.3 * Math.sin(tw * 1.37 + 2) + 0.15 * Math.sin(tw * 2.9 + 0.5);
 }
 
+/** A cone from the eye: its axis `phi` radians off the view's axis, its half-angle `alpha`. */
+export type Cone = { phi: number; alpha: number };
+
 /**
  * The glass ball's cone, as seen from an eye looking straight at a screen one unit away (lengths in that unit: tangents): the
  * sphere whose outline on the screen is centred `rho0` off the view's axis and is `r` across, both balls (the light's own,
@@ -28,9 +31,10 @@ export function breath(tw: number): number {
  * 1 / cos² of the angle) more than across it (1 / cos): no sphere shows as a circle there, so its two half-axes are made to
  * multiply to r² (each within a few percent of r across the screen, the one larger as the other is smaller) and the ellipse
  * is centred on rho0 exactly. Returns the cone's axis, `phi` (radians off the view's axis, toward the point), and its
- * half-angle `alpha` (the sphere at distance d along the axis has radius d sin alpha).
+ * half-angle `alpha` (the sphere at distance d along the axis has radius d sin alpha). `out`: written in place and returned
+ * (a caller drawing every frame passes its own, so nothing is allocated).
  */
-export function ballCone(rho0: number, r: number): { phi: number; alpha: number } {
+export function ballCone(rho0: number, r: number, out: Cone = { phi: 0, alpha: 0 }): Cone {
   // the outline along the line to the axis runs from atan(rho0 - w) to atan(rho0 + w): w is its half-width there, and its
   // centre is rho0 (the tangents' mean is the ellipse's centre); across, its half-height is sin a / sqrt(cos² phi - sin² a)
   let w = r, phi = Math.atan(rho0), alpha = Math.atan(r);
@@ -41,7 +45,9 @@ export function ballCone(rho0: number, r: number): { phi: number; alpha: number 
     const across = Math.sin(alpha) / Math.sqrt(Math.cos(phi) ** 2 - Math.sin(alpha) ** 2);
     w = r * Math.sqrt(w / across); // (the next half-width keeps this shape's ratio, its half-axes' product r²)
   }
-  return { phi, alpha };
+  out.phi = phi;
+  out.alpha = alpha;
+  return out;
 }
 
 /**

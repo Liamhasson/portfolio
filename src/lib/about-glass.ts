@@ -5,8 +5,9 @@
  * ray-traced ball). Whichever is built first, one ball is drawn:
  *   - the pendant claims the glass once its scene is ready, and releases it on unmount or a lost context;
  *   - the testimonials draw their ball only while `glassOwner() === "testimonials"` (nobody has claimed it), and every frame
- *     they draw tell the pendant the light's state (`setGlassLight`: its strength q, its own clock t, the arrival pulse), so
- *     the pendant's ball works out the same edge colours the light shows and glints in them.
+ *     they draw tell the pendant the light's state (`setGlassLight`: its strength q and its own clock t), so the pendant's
+ *     ball works out the same edge colours the light shows and glints in them. (The arrival pulse rides along in the same
+ *     object but the ball doesn't draw it.)
  * And the stack's glass slot (about.css: `data-glass="on"` on the section opens it) is shown by both, each for itself
  * (`showGlassSlot`): it opens while either one says it will draw the ball there, and collapses only when neither does, so
  * one side letting go never collapses the slot under the other's ball. Where the browser doesn't anchor the scroll (iOS

@@ -88,3 +88,11 @@ describe("ballCone: the glass ball's outline wherever the slot is", () => {
   }
 });
 
+
+test("ballCone writes into `out` when given and returns it: the same cone as a fresh call (no allocation per frame)", () => {
+  const out = { phi: 9, alpha: 9 };
+  for (const [rho, r] of [[0, 0.06], [0.4, 0.05], [-0.3, 0.08]]) {
+    expect(ballCone(rho, r, out)).toBe(out);
+    expect(out).toEqual(ballCone(rho, r));
+  }
+});
