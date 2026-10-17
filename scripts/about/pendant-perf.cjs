@@ -27,7 +27,7 @@
 // blocked, so the light draws its own ball (its costliest frame). The scroll rows leave out the frames while the work
 // section's clips still play at the window's start (they hold this Chromium's rAF at 30 Hz with or without the testimonials)
 // and report those apart. Budgets: the light's median GPU time <= 2 ms; the rAF
-// interval's median <= 17.5 ms with the lens on. Both modes run headed by default (HEADED=0 for headless): a headless
+// interval's median <= 17.5 ms with the lens on. Both modes run headless (HEADED=1 by hand for a visible window; a headless
 // Chromium paces rAF at 60 Hz whatever the screen, so it can't show a 120 Hz screen's dropped frames. ROUNDS: lens on/off
 // pairs (2); SCROLL_S (12) and DWELL_S (5) per round; SETTLE_MS (3000) held at the window's start before each pass; CSS:
 // a style added to the page, for experiments. More experiments: DPR_JS (the pixel ratio the page's scripts are told, the
@@ -37,8 +37,10 @@
 // MODE=loops (task-clips-brief.md): About's silent loops. Dwells at the work strip (its three loops) and at the band chips
 // (two), with each source set in SRCS and each count in PLAYING playing at once, and reports the rAF interval (median, p95,
 // the shares over 12.5, 16.7, 25 and 33 ms) and each video's presented fps and dropped frames. See loops() below for SRCS
-// (old: the shared /work and /playground files; new: /about/loops/; exp:<suffix>: EXP_DIR files), PLAYING and RVFC. Headed.
-//   MODE=loops CHANNEL=chrome DPR=1 node scripts/about/pendant-perf.cjs
+// (old: the shared /work and /playground files; new: /about/loops/; exp:<suffix>: EXP_DIR files), PLAYING and RVFC.
+// Headless, like every mode: it shows each video's presented fps and dropped frames, but not the 30 Hz cap that two or more
+// 30 fps videos put on a real Chrome window (headless Chromium paces rAF at 60 Hz and does not apply it: task-clips-report.md).
+//   MODE=loops DPR=2 node scripts/about/pendant-perf.cjs
 const fs = require("node:fs");
 const path = require("node:path");
 const http = require("node:http");
@@ -61,7 +63,8 @@ const DWELL_S = Number(process.env.DWELL_S) || 5;
 const ROUNDS = Number(process.env.ROUNDS) || 2;
 /** ms held at the window's start before each pass (SETTLE_MS): the pendant's follow settles after the jump back. */
 const SETTLE_MS = Number(process.env.SETTLE_MS) || 3000;
-const HEADED = process.env.HEADED ? process.env.HEADED === "1" : TESTIMONIALS || LOOPS;
+// Never a visible window on Liam's laptop (Liam, 2026-10-17: "stop it for good"): headless unless HEADED=1 is set by hand.
+const HEADED = process.env.HEADED === "1";
 const DWELL = ["opening", "whirl", "glass", "tumble", "hero"];
 const GOVERNOR = process.env.GOVERNOR === "1";
 
@@ -478,7 +481,11 @@ async function loops(page, gpu, contaminated) {
     const vid = (id) => document.querySelector(`.ab-pic[data-pic="${id}"] video`);
     const all = [...document.querySelectorAll(".ab-track video")];
     for (const v of all) v.pause();
-    for (const [id, src] of Object.entries(srcs)) if (src && vid(id).getAttribute("src") !== src) vid(id).setAttribute("src", src);
+    for (const v of all) v.dataset.perfSrc ??= v.getAttribute("src"); // (the build's own src: "page" goes back to it)
+    for (const [id, src] of Object.entries(srcs)) {
+      const want = src ?? vid(id).dataset.perfSrc;
+      if (vid(id).getAttribute("src") !== want) vid(id).setAttribute("src", want);
+    }
     const mid = window.innerWidth / 2;
     const near = [...ids].sort((a, b) => {
       const d = (id) => { const r = vid(id).getBoundingClientRect(); return Math.abs((r.left + r.right) / 2 - mid); };
