@@ -759,3 +759,97 @@ test("the GPU timer (scripts/about/pendant-perf.cjs) only with ?pendant-debug an
     window.history.replaceState(null, "", "/");
   }
 });
+
+// ---------- final fix: a lost context comes back, the spent mark, reduced motion's still frames, the mood's layer ----------
+
+test("a lost context hides the light and waits; restored, a fresh canvas mounts and the light draws again", async () => {
+  const { container } = await mount();
+  at = { q1: 600, slot: 900, q2: 1300 }; // (q 1)
+  window.dispatchEvent(new Event("scroll"));
+  await runFrame(1000);
+  const first = container.querySelector("canvas.ab-light") as HTMLCanvasElement;
+  expect(first).toHaveAttribute("data-on");
+  expect(glassLight()).not.toBeNull();
+  const lost = new Event("webglcontextlost", { cancelable: true });
+  act(() => { first.dispatchEvent(lost); });
+  expect(lost.defaultPrevented).toBe(true); // (so the browser may restore it)
+  expect(container.querySelector("canvas.ab-light")).toBe(first); // (kept: not given up)
+  expect(first).not.toHaveAttribute("data-on");
+  expect(dispose).not.toHaveBeenCalled();
+  expect(glassLight()).toBeNull();
+  expect(window.__testimonials).toMatchObject({ drawing: false, ownBall: false });
+  await runFrame(1100);
+  expect(rafs).toHaveLength(0); // (stopped)
+  draw.mockClear();
+  act(() => { first.dispatchEvent(new Event("webglcontextrestored")); });
+  await waitFor(() => expect(container.querySelector("canvas.ab-light")).not.toBe(first));
+  // the fresh canvas loads the light after the next idle moment, then draws
+  await waitFor(() => expect(g.requestIdleCallback).toHaveBeenCalledTimes(2));
+  const idleCb = vi.mocked(g.requestIdleCallback as (cb: () => void) => number).mock.calls[1][0];
+  await act(async () => { idleCb(); });
+  await waitFor(() => expect(rafs.length).toBeGreaterThan(0));
+  await runFrame(1200);
+  expect(draw).toHaveBeenCalled();
+  expect(container.querySelector("canvas.ab-light")).toHaveAttribute("data-on");
+});
+
+test("a canvas whose light was freed carries the spent mark on itself (Fast Refresh then mounts a fresh one)", async () => {
+  const { container, unmount } = await mount();
+  const canvas = container.querySelector("canvas.ab-light") as HTMLCanvasElement;
+  expect(canvas.dataset.spent).toBeUndefined();
+  unmount();
+  expect(dispose).toHaveBeenCalledTimes(1);
+  expect(canvas.dataset.spent).toBe("1");
+});
+
+test("under reduced motion the light draws only when something it shows changed", async () => {
+  await mount();
+  reducedNow = true;
+  act(() => onReducedChange?.());
+  at = { q1: 600, slot: 900, q2: 1300 };
+  window.dispatchEvent(new Event("scroll"));
+  await runFrame(1000);
+  expect(draw).toHaveBeenCalledTimes(1);
+  for (const now of [1100, 1200, 1300]) await runFrame(now); // (the same q, ball and size: the frame on screen stays)
+  expect(draw).toHaveBeenCalledTimes(1);
+  expect(rafs).toHaveLength(1); // (still watching)
+  at = { q1: 620, slot: 920, q2: 1320 }; // (the ball moved)
+  await runFrame(1400);
+  expect(draw).toHaveBeenCalledTimes(2);
+  at = { q1: 900, slot: 1200, q2: 1600 }; // (q changed: Yoav at 0.9 of the width)
+  await runFrame(1500);
+  expect(draw).toHaveBeenCalledTimes(3);
+  // a handoff under way draws every frame (the ball's opacity follows the pendant's canvas)
+  const pc = document.createElement("canvas");
+  pc.className = "ab-pendant";
+  pc.style.opacity = "0.4";
+  document.querySelector(".ab-pin")!.appendChild(pc);
+  at = { q1: 600, slot: 900, q2: 1300 };
+  await runFrame(1600);
+  claimGlass("pendant");
+  const n = draw.mock.calls.length;
+  await runFrame(1700);
+  await runFrame(1800);
+  expect(draw.mock.calls.length).toBe(n + 2);
+  // motion back on: every frame again
+  reducedNow = false;
+  act(() => onReducedChange?.());
+  pc.style.opacity = "1";
+  await runFrame(1900);
+  await runFrame(2000);
+  await runFrame(2100);
+  expect(draw.mock.calls.length).toBe(n + 5);
+});
+
+test("the mood takes its own layer (data-lit: will-change) only while q > 0", async () => {
+  const { container } = await mount();
+  const mood = container.querySelector(".ab-mood") as HTMLElement;
+  expect(mood).not.toHaveAttribute("data-lit");
+  at = { q1: 600, slot: 900, q2: 1300 };
+  window.dispatchEvent(new Event("scroll"));
+  await runFrame(1000);
+  expect(mood).toHaveAttribute("data-lit");
+  at = { q1: -2400, slot: -2000, q2: -1600 };
+  await runFrame(1100);
+  expect(mood).not.toHaveAttribute("data-lit");
+});

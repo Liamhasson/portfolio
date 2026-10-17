@@ -616,7 +616,10 @@ export function AboutPendant() {
       // page has it (clear glass, nothing to line up).
       const ours = glassOwner() === "pendant";
       const ballAt = reduced && f.glass <= GLASS_MIN ? glassAt(sTarget) : gp;
-      const glass: GlassSlot | null = ours && hasSlot() && slotOnScreen(ballAt) ? { x: ballAt.x, y: ballAt.y, r: L.glassR } : null;
+      // (held still over the words, stacked under reduced motion while the held shot is through the glass: the quotes scroll
+      // over it, so it counts for the guard below and dims with the pendant as it goes behind them)
+      const heldBall = stack && reduced && f.glass > GLASS_MIN;
+      const glass: GlassSlot | null = ours && hasSlot() && slotOnScreen(ballAt) ? { x: ballAt.x, y: ballAt.y, r: L.glassR, dimmed: heldBall } : null;
       // (through a drawn ball the lean is eased down: the ball magnifies it and turns it over, see PendantScene.glassLook)
       leanFor(look, glass !== null, f.glass, sc.glassLook, leaned);
       cm.poseRig(f, motion, time, leaned, L.vw, L.vh, sc.camera, sc.outer, sc.inner, { still: reduced });
@@ -639,7 +642,7 @@ export function AboutPendant() {
       // the shot has it and the quotes scroll past it. Otherwise it rides its slot in the page, in the gap between the quotes,
       // never over a line, and it is not the pendant: left out, or its full disc joined to the pendant's box (padded) would
       // reach the quotes' lines round the slot and send the pendant behind them all the way through the glass)
-      const ball = stack && reduced && glass && f.glass > GLASS_MIN ? { r: glass.r * L.vh, x: glass.x * L.vw, y: glass.y * L.vh } : null;
+      const ball = heldBall && glass ? { r: glass.r * L.vh, x: glass.x * L.vw, y: glass.y * L.vh } : null;
       const guarded = ball
         ? { l: Math.min(box.l, ball.x - ball.r), r: Math.max(box.r, ball.x + ball.r), t: Math.min(box.t, ball.y - ball.r), b: Math.max(box.b, ball.y + ball.r) }
         : box;

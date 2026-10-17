@@ -274,6 +274,7 @@ test("the ball is drawn full size wherever the slot is on screen, far from the g
   expect(f.glass).toBe(0);
   expect(glass.x).toBeCloseTo((600 + 245 / 2) / innerWidth, 6);
   expect(glass.r).toBeCloseTo((0.44 * 245) / innerHeight, 6); // (full size: not scaled by the shot's glass)
+  expect(glass.dimmed).toBe(false); // (riding its slot on the track: it keeps its look whatever the pendant's dim)
   expect(window.__pendant!.glass!.r).toBeCloseTo(glass.r, 9);
   expect(light).toEqual({ q: 0.4, t: 7, pulse: 1 });
   setGlassLight(null);

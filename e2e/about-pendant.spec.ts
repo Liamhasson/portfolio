@@ -860,3 +860,101 @@ test("the pendant's box holds what is drawn: no brass outside it at the worm, wh
     expect(r.outside, `${r.id}: ${r.outside} bright px outside the box, e.g. ${JSON.stringify(r.at)}`).toBeLessThanOrEqual(5);
   }
 });
+
+// ---------- testimonials final fix: the held ball dims as the words scroll over it ----------
+
+/** The glass ball's disc on screen: its brightest pixels (the 99th percentile of r + g + b inside 0.95 of the radius: the
+ *  brass and the rim's glints, a stray spark left out) and the count of text-bright pixels there (r + g + b over 600). */
+async function discLevels(page: Page, g: { x: number; y: number; r: number }) {
+  const vp = page.viewportSize()!;
+  const cx = g.x * vp.width, cy = g.y * vp.height, R = g.r * vp.height;
+  const clip = { x: Math.max(0, Math.round(cx - R)), y: Math.max(0, Math.round(cy - R)), width: Math.round(2 * R), height: Math.round(2 * R) };
+  const png = (await page.screenshot({ clip })).toString("base64");
+  return page.evaluate(async ({ png, ox, oy, R }) => {
+    const img = new Image();
+    img.src = `data:image/png;base64,${png}`;
+    await img.decode();
+    const c = document.createElement("canvas");
+    c.width = img.width; c.height = img.height;
+    const x = c.getContext("2d")!;
+    x.drawImage(img, 0, 0);
+    const d = x.getImageData(0, 0, c.width, c.height).data, k = c.width / (2 * R);
+    const sums: number[] = [];
+    let text = 0;
+    for (let py = 0; py < c.height; py++) {
+      for (let px = 0; px < c.width; px++) {
+        if (Math.hypot((px + 0.5) / k - ox, (py + 0.5) / k - oy) > 0.95 * R) continue;
+        const i = (py * c.width + px) * 4, s = d[i] + d[i + 1] + d[i + 2];
+        sums.push(s);
+        if (s > 600) text++;
+      }
+    }
+    sums.sort((a, b) => a - b);
+    return { p99: sums[Math.floor(0.99 * (sums.length - 1))], text, n: sums.length };
+  }, { png, ox: cx - clip.x, oy: cy - clip.y, R });
+}
+
+test.describe("under reduced motion on a phone, the held glass", () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: "reduce" });
+  test("as the quotes scroll over the held ball it dims with the pendant behind them, and the words read over it", async ({ page }) => {
+    test.setTimeout(90_000);
+    const errors = collectErrors(page);
+    await page.goto("/about");
+    await expect(page.locator("section.ab")).toHaveAttribute("data-mode", "stack");
+    await ready(page, 30_000);
+    await page.waitForTimeout(1500);
+    const keys = await page.evaluate(() => window.__pendant!.keys);
+    const key = keys.find((k) => k.id === "glass")!;
+    await page.evaluate((y) => window.scrollTo(0, y), key.y);
+    await page.waitForTimeout(1500);
+    const held = await page.evaluate(() => ({ shot: window.__pendant!.shot, g: window.__pendant!.glass, layer: window.__pendant!.layer }));
+    expect(held.shot).toBe(keys.indexOf(key));
+    expect(held.g).not.toBeNull();
+    const hideWords = (on: boolean) => page.evaluate((on) => {
+      const id = "only-pendant";
+      document.getElementById(id)?.remove();
+      if (!on) return;
+      const st = document.createElement("style");
+      st.id = id;
+      st.textContent = "body * { visibility: hidden !important; } canvas.ab-pendant { visibility: visible !important; }";
+      document.head.appendChild(st);
+    }, on);
+    // the reference: the ball in its slot between the quotes, at full brightness, the pendant inside (only the canvas painted)
+    await hideWords(true);
+    const ref = await discLevels(page, held.g!);
+    await hideWords(false);
+    expect(ref.p99, "the ball and the brass inside it, bright").toBeGreaterThan(300);
+    // Yoav's last line scrolled down onto the held ball's middle (still nearer the glass key: the shot stays held)
+    const to = await page.evaluate((g) => {
+      const range = document.createRange();
+      const rows: DOMRect[] = [];
+      const walk = document.createTreeWalker(document.querySelector("[data-pendant='quote1'] blockquote")!, NodeFilter.SHOW_TEXT);
+      for (let n = walk.nextNode(); n; n = walk.nextNode()) { range.selectNodeContents(n); rows.push(...[...range.getClientRects()].filter((r) => r.height > 0)); }
+      const last = rows.reduce((a, b) => (b.bottom > a.bottom ? b : a));
+      return window.scrollY - (g.y * innerHeight - (last.top + last.bottom) / 2);
+    }, held.g!);
+    // (the hold lets go only past the middle toward the shot before: shots.ts heldIndex)
+    expect(key.y - to, "a scroll back toward the shot before, short of halfway to it").toBeLessThan(0.5 * (key.y - keys[keys.indexOf(key) - 1].y));
+    await page.evaluate((y) => window.scrollTo(0, y), to);
+    await page.waitForTimeout(1500); // (behind the words, the dim eased in)
+    const over = await page.evaluate(() => ({
+      shot: window.__pendant!.shot, g: window.__pendant!.glass, layer: window.__pendant!.layer,
+      z: getComputedStyle(document.querySelector("canvas.ab-pendant")!).zIndex,
+    }));
+    expect(over.shot, "still held").toBe(held.shot);
+    expect(over.g, "the ball where the held shot has it").toEqual(held.g);
+    expect(over.layer).toBe("back");
+    expect(over.z).toBe("-1"); // (painted under the words)
+    // the ball's own pixels dimmed with the pendant: no brighter than solve.ts FORCED_DIM (0.4) of the reference, plus a
+    // little for the page under the glass
+    await hideWords(true);
+    const dimmed = await discLevels(page, over.g!);
+    await hideWords(false);
+    expect(dimmed.p99, `dimmed ${dimmed.p99} against ${ref.p99}`).toBeLessThanOrEqual(0.4 * ref.p99 + 30);
+    // and the words over it read: bright text in the disc, well above the dimmed ball
+    const shown = await discLevels(page, over.g!);
+    expect(shown.text, "the line's letters over the ball").toBeGreaterThan(100);
+    expect(dimmed.p99).toBeLessThan(450);
+    expect(errors).toEqual([]);
+  });
+});

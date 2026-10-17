@@ -97,9 +97,15 @@ describe("about-glass: one ball between the testimonials, owned by whoever draws
     expect(slotScrollFix(-600, 0, 195, false)).toBe(195);
     // its open foot just at the screen's top: still wholly above
     expect(slotScrollFix(-195, 0, 195, false)).toBe(195);
-    // the open slot would reach onto the screen (or lies below it): the reader sees it open, nothing to keep
-    expect(slotScrollFix(-100, 0, 195, false)).toBe(0);
+    // straddling the screen's top once open: everything on screen is below its top, so scrolled by its whole growth and the
+    // quote being read isn't pushed
+    expect(slotScrollFix(-100, 0, 195, false)).toBe(195);
+    expect(slotScrollFix(-1, 0, 195, false)).toBe(195);
+    // its top on the screen, or below it: the reader sees it open, nothing to keep
+    expect(slotScrollFix(0, 0, 195, false)).toBe(0);
     expect(slotScrollFix(300, 0, 195, false)).toBe(0);
+    // closing while it reaches onto the screen: unchanged, nothing to keep
+    expect(slotScrollFix(-100, 195, 0, false)).toBe(0);
     // closing wholly above: scrolled back by the change
     expect(slotScrollFix(-600, 195, 0, false)).toBe(-195);
     // the browser anchors the scroll itself (Chromium, Firefox): never a second correction

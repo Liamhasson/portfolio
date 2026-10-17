@@ -82,6 +82,9 @@ export interface GlassSlot {
   x: number;
   y: number;
   r: number;
+  /** Held still over the words (stacked under reduced motion, the held shot through the glass: the quotes scroll over it),
+   *  so it dims with the pendant; otherwise it rides its slot and keeps its look whatever the dim. */
+  dimmed?: boolean;
 }
 
 export class PendantScene {
@@ -468,6 +471,7 @@ export class PendantScene {
     this.glassPass.enabled = showGlass;
     if (showGlass) this.placeGlass(glass, f, dist, light);
     this.finish.uniforms.ball.value = showGlass ? 1 : 0;
+    this.finish.uniforms.ballDim.value = showGlass && glass.dimmed ? 1 : 0;
     const lit = showGlass && this.glass.uniforms.A.value > 0;
 
     // depth of field, focused on the aim point

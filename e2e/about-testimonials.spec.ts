@@ -1225,7 +1225,7 @@ test("on the track, a client height shorter than the fixed layer (an Android tab
 
 test.describe("stacked on a phone without scroll anchoring (as iOS Safari)", () => {
   test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
-  test("read into Andrada's quote below the closed slot, the slot opening above doesn't move what's on screen", async ({ page }) => {
+  for (const [into, why] of [[300, "wholly above the screen"], [100, "straddling the screen's top"]] as const) test(`read into Andrada's quote below the closed slot, the slot opening ${why} doesn't move what's on screen`, async ({ page }) => {
     test.setTimeout(60_000);
     const errors = collectErrors(page);
     await page.addInitScript(() => {
@@ -1247,10 +1247,10 @@ test.describe("stacked on a phone without scroll anchoring (as iOS Safari)", () 
     expect(await page.evaluate(() => [CSS.supports("overflow-anchor", "auto"), document.querySelector("section.ab")!.hasAttribute("data-glass")])).toEqual([false, false]);
     expect(await page.locator("[data-pendant='glass']").evaluate((el) => el.getBoundingClientRect().height)).toBe(0);
     // Andrada's quote 300 px into it: where the slot will open (at the quote's old top) lies wholly above the screen
-    await page.evaluate(() => {
+    await page.evaluate((into) => {
       const r = document.querySelector("[data-pendant='quote2']")!.getBoundingClientRect();
-      window.scrollTo(0, r.top + window.scrollY + 300);
-    });
+      window.scrollTo(0, r.top + window.scrollY + into);
+    }, into);
     await page.waitForTimeout(1200); // (its rise-in done)
     const read = () => page.evaluate(() => ({
       y: window.scrollY,
@@ -1259,7 +1259,7 @@ test.describe("stacked on a phone without scroll anchoring (as iOS Safari)", () 
       slot: document.querySelector("[data-pendant='glass']")!.getBoundingClientRect().height,
     }));
     const before = await read();
-    expect(before.top, "the slot's place (the quote's top) wholly above the screen once it opens").toBeLessThan(-250);
+    expect(before.top, "the slot's place (the quote's top) above the screen's top").toBeLessThan(into === 300 ? -250 : -50);
     await page.evaluate(() => (window as unknown as { __idle: () => void }).__idle());
     await expect.poll(async () => (await read()).glass, { timeout: 20_000 }).toBe("on");
     await page.waitForTimeout(300);

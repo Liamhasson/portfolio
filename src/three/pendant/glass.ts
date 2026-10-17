@@ -243,6 +243,7 @@ export const GLASS_FINISH_FRAGMENT = /* glsl */ `
   uniform sampler2D tDiffuse;
   uniform float dim;         // 0..1 brightness, the ball left out
   uniform float ball;        // 1 while the ball is drawn
+  uniform float ballDim;     // 1 while it is held over the words (reduced motion): then it dims with the pendant
   uniform mat4 camWorld;
   uniform mat4 projInv;
   uniform mat4 view;
@@ -273,7 +274,10 @@ export const GLASS_FINISH_FRAGMENT = /* glsl */ `
         rim = clamp( rimGlint( n, rd, normalize( n.xy + 1e-5 ), BC ), 0.0, 1.0 ) * cover;
       }
     }
-    c.rgb *= mix( dim, 1.0, cover );
+    // (the ball is glass in the page, left out of the dim while it rides its slot; held still over the words it dims with
+    // the pendant, rim glints and all, so the lines scrolling over it stay easy to read)
+    c.rgb *= mix( dim, 1.0, cover * ( 1.0 - ballDim ) );
+    rim *= mix( 1.0, dim, ballDim );
     float ra = max( rim.r, max( rim.g, rim.b ) );
     vec3 rgb = c.rgb + rim;
     // (premultiplied: no channel above alpha, so a glint landing on a pixel already opaque stays a valid colour)
@@ -286,13 +290,14 @@ export type GlassFinishUniforms = Pick<GlassUniforms, "camWorld" | "projInv" | "
   tDiffuse: { value: Texture | null };
   dim: { value: number };
   ball: { value: number };
+  ballDim: { value: number };
 };
 
 /** The finish pass's material, sharing the glass pass's uniform objects (so placing the ball places it for both). */
 export function glassFinishMaterial(glass: GlassUniforms): ShaderMaterial & { uniforms: GlassFinishUniforms } {
   const { camWorld, projInv, view, camPos, centre, radius, R, T, A, PAD, C0, C1, C2, C3, BC } = glass;
   const uniforms: GlassFinishUniforms = {
-    tDiffuse: { value: null }, dim: { value: 1 }, ball: { value: 0 },
+    tDiffuse: { value: null }, dim: { value: 1 }, ball: { value: 0 }, ballDim: { value: 0 },
     camWorld, projInv, view, camPos, centre, radius, R, T, A, PAD, C0, C1, C2, C3, BC,
   };
   return new ShaderMaterial({

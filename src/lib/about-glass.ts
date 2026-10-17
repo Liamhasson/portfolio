@@ -58,14 +58,19 @@ export function glassLight(): Readonly<GlassLight> | null {
 let slotShowers = new WeakMap<object, Set<GlassOwner>>();
 
 /**
- * The scroll that keeps the screen still as the slot changes height (px; 0 for none): its change, when the slot lies wholly
- * above the screen at its taller size (`top` its top on screen, before and after the same: nothing above it changes), and
- * only where the browser doesn't anchor the scroll itself (Chromium and Firefox do: a second correction would jump back).
+ * The scroll that keeps the screen still as the slot changes height (px; 0 for none), only where the browser doesn't anchor
+ * the scroll itself (Chromium and Firefox do: a second correction would jump back). `top` is the slot's top on screen
+ * (before and after the same: nothing above it changes).
+ *   - Opening with its top above the screen's top (wholly above, or straddling the top once open): by its whole growth.
+ *     Everything on screen lies below the slot's top then, so all of it would be pushed down by that much; scrolled by it,
+ *     the quote being read holds its place, and the slot opens out of sight above.
+ *   - Closing: by its change when it lay wholly above the screen.
  */
 export function slotScrollFix(top: number, before: number, after: number, anchors: boolean): number {
   const delta = after - before;
   if (anchors || delta === 0) return 0;
-  return top + Math.max(before, after) <= 0 ? delta : 0;
+  if (delta > 0) return top < 0 ? delta : 0;
+  return top + before <= 0 ? delta : 0;
 }
 
 /** The browser anchors the scroll (CSS `overflow-anchor`); asked once. */

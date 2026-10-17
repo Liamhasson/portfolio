@@ -34,9 +34,6 @@ declare global {
   }
 }
 
-/** Canvases whose context the light has given up (dispose loses it): a re-run of the effect on one (Fast Refresh) mounts a
- *  fresh canvas instead, as the pendant does. */
-const spent = new WeakSet<HTMLCanvasElement>();
 
 /** The lens's feature check never changes in a visit: nothing to subscribe to. */
 const noSubscribe = () => () => {};
@@ -216,7 +213,9 @@ export function AboutTestimonials() {
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas) return;
-    if (spent.has(canvas)) {
+    // (a canvas whose context the light has given up, dispose losing it, carries `data-spent`: on the element itself, so a
+    // module reloaded by Fast Refresh still sees it)
+    if (canvas.dataset.spent) {
       // (the effect ran again on a canvas whose context it already let go: Fast Refresh. A fresh one, next render.)
       queueMicrotask(() => setGen((n) => n + 1));
       return;
@@ -244,6 +243,10 @@ export function AboutTestimonials() {
     const lightBall: LightBall = { x: 0, y: 0, r: 0, a: 1 };
     const frame: LightFrame = { q: 0, t: 0, pulse: -1, pulseFrom: "right", ball: null };
     let light: TestimonialsLight | null = null;
+    /** Under reduced motion the light holds still (t 0, no wave): a frame is drawn only when what it shows changed (q, the
+     *  ball's place, size and opacity, the canvas's size, the wave's edge), else the last one stays on screen. As numbers,
+     *  no object per frame; `drawnStill` false forces the next draw (a fresh canvas, motion turned back on). */
+    let drawnStill = false, dQ = 0, dBx = 0, dBy = 0, dBr = 0, dBa = 0, dW = 0, dH = 0, dDpr = 0, dStack = false;
     let arrival: Arrival = { at: null, on: false, armed: true };
     let moodQ = "";
     let shown = false;
@@ -278,6 +281,8 @@ export function AboutTestimonials() {
       if (s === moodQ || !mood) return;
       moodQ = s;
       if (s) mood.style.setProperty("--q", s); else mood.style.removeProperty("--q");
+      // (about.css: its own compositor layer only while it shows)
+      if (s) { if (!("lit" in mood.dataset)) mood.dataset.lit = ""; } else delete mood.dataset.lit;
     };
     const show = (on: boolean) => {
       if (on === shown) return;
@@ -378,7 +383,7 @@ export function AboutTestimonials() {
       const t = reduced ? 0 : (now - t0) / 1000;
       const lens = lensFrame(drawing ? q : 0, t);
       publish({ q, pulse, drawing, ownBall: ball !== null, lens });
-      if (!drawing) { setGlassLight(null); show(false); return; }
+      if (!drawing) { setGlassLight(null); show(false); drawnStill = false; return; } // (shown again: drawn afresh)
       // (the pendant's ball reads this on its own frame: the same q, the same clock, so its rim shows the edges as drawn here;
       // one object, rewritten each frame: the store copies it)
       toPendant.q = q; toPendant.t = t; toPendant.pulse = pulse;
@@ -389,7 +394,14 @@ export function AboutTestimonials() {
         // (as two numbers: no object per frame; the stacked box is made only when it is measured afresh)
         let bw: number, bh: number;
         if (m.stack) { const sb = screenBox(); bw = sb.w; bh = sb.h; } else { bw = canvas.clientWidth || window.innerWidth; bh = canvas.clientHeight || window.innerHeight; }
-        light.resize(bw, bh, window.devicePixelRatio || 1);
+        const dpr = window.devicePixelRatio || 1;
+        if (reduced) {
+          const bx = ball ? ball.x : -1, by = ball ? ball.y : -1, br = ball ? ball.r : 0, ba = ball ? a : 0;
+          const same = drawnStill && q === dQ && bx === dBx && by === dBy && br === dBr && ba === dBa && bw === dW && bh === dH && dpr === dDpr && m.stack === dStack;
+          if (same && handing !== "on") { show(true); raf = requestAnimationFrame(tick); return; } // (nothing new to draw)
+          drawnStill = true; dQ = q; dBx = bx; dBy = by; dBr = br; dBa = ba; dW = bw; dH = bh; dDpr = dpr; dStack = m.stack;
+        } else drawnStill = false;
+        light.resize(bw, bh, dpr);
         frame.q = q; frame.t = t; frame.pulse = pulse; frame.pulseFrom = m.stack ? "bottom" : "right"; frame.ball = ball;
         const tag = ++frameNo;
         if (gpuMs) perfFrames.set(tag, { q, ownBall: ball !== null, lens: lens > 0 });
@@ -413,7 +425,16 @@ export function AboutTestimonials() {
     const wake = () => { if (!raf && !off && light) raf = requestAnimationFrame(tick); };
 
     const onReduced = () => { reduced = reducedQ.matches; wake(); };
-    const onLost = (e: Event) => { e.preventDefault(); fail(); };
+    /** A lost context: the light stops and its canvas hides (the quotes read as before), and it waits for the browser to give
+     *  the GPU back; restored, a fresh canvas mounts (the `gen` key) and the light loads on it, as the pendant does. */
+    const onLost = (e: Event) => {
+      e.preventDefault(); // (lets the browser restore it)
+      if (off) return;
+      teardown(false);
+      publish({ q: 0, pulse: -1, drawing: false, ownBall: false, lens: 0 });
+      canvas.addEventListener("webglcontextrestored", onRestored);
+    };
+    const onRestored = () => { canvas.removeEventListener("webglcontextrestored", onRestored); setGen((n) => n + 1); };
     /** A change of layout (about-track.tsx sets data-mode, on every resize: only a new value counts): the stack's box is
      *  measured afresh. */
     let lastMode = sec.dataset.mode;
@@ -437,7 +458,9 @@ export function AboutTestimonials() {
     canvas.addEventListener("webglcontextlost", onLost);
 
     let torn = false;
-    const teardown = () => {
+    /** `dispose`: free the light (its forced loss: the canvas can't get a context again). Not after a context the browser
+     *  lost: that one may come back (onRestored). */
+    const teardown = (dispose = true) => {
       if (torn) return;
       torn = true;
       off = true;
@@ -453,8 +476,11 @@ export function AboutTestimonials() {
       lensFrame(0, 0);
       setGlassLight(null);
       slotShown(false);
-      if (light) spent.add(canvas);
-      try { light?.dispose(); } catch { /* the GPU is already gone */ }
+      show(false);
+      if (light && dispose) {
+        canvas.dataset.spent = "1";
+        try { light.dispose(); } catch { /* the GPU is already gone */ }
+      }
       light = null;
     };
     /** No WebGL, a shader that won't build, a lost GPU: no canvas, the quotes as they were, nothing in the console. */
@@ -493,6 +519,7 @@ export function AboutTestimonials() {
     ensure();
 
     return () => {
+      canvas.removeEventListener("webglcontextrestored", onRestored);
       teardown();
       if (window.__testimonials) delete window.__testimonials;
     };

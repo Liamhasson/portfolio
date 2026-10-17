@@ -104,7 +104,10 @@ describe("the glass finish pass (after the tone mapping)", () => {
     const names = [...GLASS_FINISH_FRAGMENT.matchAll(/uniform\s+\w+\s+(\w+)\s*;/g)].map((x) => x[1]);
     for (const n of names) expect(Object.keys(m.uniforms)).toContain(n);
     expect(GLASS_FINISH_FRAGMENT).toMatch(/rimGlint\(/);
-    expect(GLASS_FINISH_FRAGMENT).toMatch(/mix\( dim, 1\.0, cover \)/);
+    // (left out of the dim while it rides its slot; dimmed with the pendant, glints too, while held over the words)
+    expect(GLASS_FINISH_FRAGMENT).toMatch(/mix\( dim, 1\.0, cover \* \( 1\.0 - ballDim \) \)/);
+    expect(GLASS_FINISH_FRAGMENT).toMatch(/rim \*= mix\( 1\.0, dim, ballDim \)/);
+    expect(m.uniforms.ballDim.value).toBe(0);
     m.dispose();
     glass.dispose();
   });
