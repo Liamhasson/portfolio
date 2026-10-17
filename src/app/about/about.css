@@ -124,3 +124,12 @@ a.ab-proof:hover, a.ab-proof:focus-visible { color: #f4efe9; }
 .ab[data-mode="track"] .ab-mood { position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: calc(var(--q, 0) * 0.6); background: radial-gradient(120% 90% at 70% 40%, #24120f 0%, #160d0c 50%, #0b0908 100%); will-change: opacity; }
 .ab-light { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 4; pointer-events: none; visibility: hidden; }
 .ab-light[data-on] { visibility: visible; }
+/* the glass edges (about-testimonials.tsx, edge-lens.ts; plan Task 4): as the quotes pass, the screen's far edges turn to
+   glass, a crisp lens band at the rounded edge bending what passes under it, the words magnifying toward the rim, no blur.
+   An SVG displacement on the backdrop, so Chromium only (the element is rendered nowhere else). Fixed at 3 in the pinned
+   frame: its backdrop is the track (1) and the pendant (2 / 0) under it; the light (4) sits above it unbent, and the bar and
+   the resume (also 3, but later in the frame) paint after it, so they stay crisp. It never takes the pointer, and shows only
+   while q > 0.01. */
+.ab-lens { position: fixed; inset: 0; z-index: 3; pointer-events: none; display: none; backdrop-filter: url(#ab-edge-lens); }
+.ab-lens[data-on] { display: block; }
+.ab-lens-defs { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }

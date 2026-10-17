@@ -1,9 +1,10 @@
 // src/app/about/about-testimonials.tsx
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { glassOwner, setGlassLight, type GlassLight, type GlassOwner } from "@/lib/about-glass";
 import type { TestimonialsLight } from "@/three/edge-light/testimonials-light";
+import { lensBand, lensMap, lensScale, lensSupported } from "./edge-lens";
 import { pulsePhase, stepArrival, testimonialsQ, type Arrival } from "./testimonials-q";
 import { trackProgress, trackX } from "./track";
 
@@ -17,6 +18,9 @@ export interface TestimonialsHook {
   drawing: boolean;
   /** The light draws the glass ball itself (nobody else has claimed it, and the slot is near the screen). */
   ownBall: boolean;
+  /** The glass edges (edge-lens.ts): the displacement's scale as set on the filter while the lens shows, 0 while it's hidden
+   *  (and always where there's no lens: not Chromium). */
+  lens: number;
 }
 
 declare global {
@@ -28,6 +32,17 @@ declare global {
 /** Canvases whose context the light has given up (dispose loses it): a re-run of the effect on one (Fast Refresh) mounts a
  *  fresh canvas instead, as the pendant does. */
 const spent = new WeakSet<HTMLCanvasElement>();
+
+/** The lens's feature check never changes in a visit: nothing to subscribe to. */
+const noSubscribe = () => () => {};
+const lensClient = () => typeof navigator !== "undefined" && lensSupported(navigator);
+const lensServer = () => false;
+
+/** The screen as the lens covers it (fixed at inset 0: a classic scrollbar left out). */
+const screenSize = () => ({
+  w: document.documentElement.clientWidth || window.innerWidth,
+  h: document.documentElement.clientHeight || window.innerHeight,
+});
 
 /** About's text first: the fonts, then a quiet moment (as the pendant). */
 function afterPaint(): Promise<void> {
@@ -54,6 +69,58 @@ export function AboutTestimonials() {
   const [gone, setGone] = useState(false);
   /** One canvas per light: after dispose's forced loss a canvas can never be given a context again. */
   const [gen, setGen] = useState(0);
+  /** The glass edges (edge-lens.ts): Chromium only; elsewhere no lens element at all. */
+  const lensOn = useSyncExternalStore(noSubscribe, lensClient, lensServer);
+  const lensRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<SVGFEImageElement>(null);
+  const dispRef = useRef<SVGFEDisplacementMapElement>(null);
+  /** The lens's map is in place: until it is the lens never shows (an empty feImage is transparent, which would shift the
+   *  whole screen by half the scale). */
+  const lensReady = useRef(false);
+
+  // The lens's map: built at half the screen's resolution as a PNG once the lens is there, and again 150 ms after a resize
+  // settles. Meanwhile the old map is stretched over the new screen at once (the feImage sized to it), so no part of the
+  // screen is ever left outside the map.
+  useEffect(() => {
+    if (!lensOn) return;
+    const img = mapRef.current;
+    if (!img) return;
+    const c = document.createElement("canvas");
+    let timer = 0;
+    const fit = () => {
+      const { w, h } = screenSize();
+      img.setAttribute("width", String(w));
+      img.setAttribute("height", String(h));
+      return { w, h };
+    };
+    const build = () => {
+      const { w: W, h: H } = screenSize();
+      const w = Math.max(1, Math.round(W * 0.5)), h = Math.max(1, Math.round(H * 0.5));
+      try {
+        c.width = w; c.height = h;
+        const x = c.getContext("2d");
+        if (!x) return;
+        x.putImageData(new ImageData(lensMap(w, h, lensBand(W, H) * 0.5) as Uint8ClampedArray<ArrayBuffer>, w, h), 0, 0);
+        img.setAttribute("href", c.toDataURL("image/png"));
+      } catch {
+        return; // (no 2D canvas: no map, so no lens)
+      }
+      fit();
+      lensReady.current = true;
+    };
+    const onResize = () => {
+      if (lensReady.current) fit();
+      clearTimeout(timer);
+      timer = window.setTimeout(build, 150);
+    };
+    build();
+    window.addEventListener("resize", onResize);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("resize", onResize);
+      lensReady.current = false;
+    };
+  }, [lensOn]);
 
   useEffect(() => {
     const canvas = ref.current;
@@ -119,6 +186,28 @@ export function AboutTestimonials() {
       if (on) canvas.dataset.on = ""; else delete canvas.dataset.on;
     };
     const publish = (h: TestimonialsHook) => { window.__testimonials = Object.freeze(h); };
+    /** The glass edges, each frame the light runs: shown only while q > 0.01 (and its map is in place), the filter's scale
+     *  touched only when it moves by 0.1 or more. Returns the scale as set while it shows, else 0. */
+    let lensShown = false, lensSet = -1, lensEl: HTMLDivElement | null = null;
+    const lensFrame = (q: number, t: number): number => {
+      const el = lensRef.current, disp = dispRef.current;
+      if (el !== lensEl) { lensEl = el; lensShown = false; lensSet = -1; }
+      if (!el || !disp) return 0;
+      const on = q > 0.01 && lensReady.current;
+      if (on) {
+        const s = lensScale(q, t, reduced);
+        if (lensSet < 0 || Math.abs(s - lensSet) >= 0.1) {
+          const v = s.toFixed(1);
+          disp.setAttribute("scale", v);
+          lensSet = Number(v);
+        }
+      }
+      if (on !== lensShown) {
+        lensShown = on;
+        if (on) el.dataset.on = ""; else delete el.dataset.on;
+      }
+      return on ? lensSet : 0;
+    };
 
     /** Where the quotes and the slot are this frame (screen px), or null off the track. Rects are read relative to the
      *  track (its transform cancels out) and placed at the travel the page's scroll gives (about-track.tsx's own formula),
@@ -153,9 +242,10 @@ export function AboutTestimonials() {
       const a = m && drawing && m.near ? ballOpacity() : 0;
       ballA = a;
       const ball = m && a > 0 ? { x: m.slot.x, y: m.slot.y, r: 0.44 * m.slot.w, a } : null;
-      publish({ q, pulse, drawing, ownBall: ball !== null });
-      if (!drawing) { setGlassLight(null); show(false); return; }
       const t = reduced ? 0 : (now - t0) / 1000;
+      const lens = lensFrame(drawing ? q : 0, t);
+      publish({ q, pulse, drawing, ownBall: ball !== null, lens });
+      if (!drawing) { setGlassLight(null); show(false); return; }
       // (the pendant's ball reads this on its own frame: the same q, the same clock, so its rim shows the edges as drawn here;
       // one object, rewritten each frame: the store copies it)
       toPendant.q = q; toPendant.t = t; toPendant.pulse = pulse;
@@ -199,6 +289,7 @@ export function AboutTestimonials() {
       // (before the dispose: its forced loss fires a context-lost event this canvas must not answer)
       canvas.removeEventListener("webglcontextlost", onLost);
       setMood(0);
+      lensFrame(0, 0);
       setGlassLight(null);
       if (light) spent.add(canvas);
       try { light?.dispose(); } catch { /* the GPU is already gone */ }
@@ -208,7 +299,7 @@ export function AboutTestimonials() {
     const fail = () => {
       if (off) return;
       teardown();
-      publish({ q: 0, pulse: -1, drawing: false, ownBall: false });
+      publish({ q: 0, pulse: -1, drawing: false, ownBall: false, lens: 0 });
       setGone(true);
     };
 
@@ -226,7 +317,7 @@ export function AboutTestimonials() {
           if (!made) { fail(); return; }
           if (off) { made.dispose(); return; }
           light = made;
-          publish({ q: 0, pulse: -1, drawing: false, ownBall: false });
+          publish({ q: 0, pulse: -1, drawing: false, ownBall: false, lens: 0 });
           wake();
         } catch {
           fail();
@@ -244,5 +335,23 @@ export function AboutTestimonials() {
   }, [gen]);
 
   if (gone) return null;
-  return <canvas key={gen} ref={ref} className="ab-light" aria-hidden style={{ pointerEvents: "none" }} />;
+  return (
+    <>
+      {/* the glass edges (Chromium): a fixed layer whose backdrop (the track and the pendant under it, not the light above,
+          nor the bar and the resume after it) is bent by the SVG filter below; shown while q > 0.01 */}
+      {lensOn && (
+        <>
+          <div ref={lensRef} className="ab-lens" aria-hidden />
+          <svg className="ab-lens-defs" width="0" height="0" aria-hidden>
+            {/* (objectBoundingBox x0 y0 w1 h1: the region is the lens's own box; userSpaceOnUse did nothing) */}
+            <filter id="ab-edge-lens" x="0" y="0" width="1" height="1" filterUnits="objectBoundingBox" colorInterpolationFilters="sRGB">
+              <feImage ref={mapRef} result="map" x="0" y="0" preserveAspectRatio="none" />
+              <feDisplacementMap ref={dispRef} in="SourceGraphic" in2="map" xChannelSelector="R" yChannelSelector="G" />
+            </filter>
+          </svg>
+        </>
+      )}
+      <canvas key={gen} ref={ref} className="ab-light" aria-hidden style={{ pointerEvents: "none" }} />
+    </>
+  );
 }

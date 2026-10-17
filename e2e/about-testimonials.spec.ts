@@ -516,3 +516,144 @@ test.describe("both balls keep the slot's size across the screen", () => {
     });
   }
 });
+
+// ---------- Task 4: the glass edges ----------
+
+/** The page under the lens alone, made still: the light, the mood and the pendant hidden (each moves or tints on its own). */
+const stillPage = (page: Page) => page.evaluate(() => {
+  document.querySelectorAll<HTMLElement>("canvas.ab-light, canvas.ab-pendant, .ab-mood").forEach((el) => { el.style.visibility = "hidden"; });
+});
+
+/** Yoav's quote moved so its lines start `left` px from the screen's left edge, straddling the lens band. q stays 1 (with
+ *  the slot centred, Yoav's centre is well left of 65%); Andrada hidden in place. */
+async function quoteAtLeftEdge(page: Page, left: number) {
+  await page.evaluate((left) => {
+    const q1 = document.querySelector<HTMLElement>("[data-pendant='quote1']")!;
+    q1.style.transform = "";
+    const r = q1.querySelector("blockquote")!.getBoundingClientRect();
+    q1.style.transform = `translateX(${left - r.left}px)`;
+    document.querySelector<HTMLElement>("[data-pendant='quote2']")!.style.visibility = "hidden";
+  }, left);
+}
+
+/** q 0 with the screen otherwise unchanged: Andrada (hidden) moved past −5% of the width (q's falling half done), or back. */
+const andradaPast = (page: Page, past: boolean) => page.evaluate((past) => {
+  const q2 = document.querySelector<HTMLElement>("[data-pendant='quote2']")!;
+  q2.style.transform = "";
+  if (!past) return;
+  const r = q2.getBoundingClientRect(), vw = document.querySelector<HTMLElement>(".ab-clip")!.clientWidth;
+  q2.style.transform = `translateX(${-0.2 * vw - (r.left + r.width / 2)}px)`;
+}, past);
+
+/** The text's pixels (r + g + b > 150) in a clip: their count and mean x (clip px). */
+async function inkIn(page: Page, clip: { x: number; y: number; width: number; height: number }) {
+  const png = (await page.screenshot({ clip })).toString("base64");
+  return page.evaluate(async (png) => {
+    const img = new Image();
+    img.src = `data:image/png;base64,${png}`;
+    await img.decode();
+    const c = document.createElement("canvas");
+    c.width = img.width; c.height = img.height;
+    const x = c.getContext("2d")!;
+    x.drawImage(img, 0, 0);
+    const d = x.getImageData(0, 0, c.width, c.height).data;
+    let n = 0, sx = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 150) { n++; sx += (i / 4) % c.width; }
+    return { n, meanX: n ? sx / n : NaN };
+  }, png);
+}
+
+test.describe("the glass edges", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/about");
+    await lightLoaded(page);
+    await page.waitForFunction(() => window.__pendant?.ready === true, null, { timeout: 20_000 });
+    await page.mouse.move(1430, 890);
+  });
+
+  test("the lens: Chromium, fixed over the frame at 3, never taking the pointer, shown only while q > 0.01", async ({ page }) => {
+    const errors = collectErrors(page);
+    const lens = page.locator(".ab-lens");
+    await expect(lens).toHaveCount(1);
+    await expect(lens).toHaveAttribute("aria-hidden", "true");
+    expect(await lens.evaluate((el) => {
+      const s = getComputedStyle(el);
+      return { pe: s.pointerEvents, z: s.zIndex, pos: s.position, bf: s.backdropFilter };
+    })).toEqual({ pe: "none", z: "3", pos: "fixed", bf: 'url("#ab-edge-lens")' });
+    // the filter as the mockup's: the region the lens's own box
+    expect(await page.locator("#ab-edge-lens").evaluate((f) => [f.getAttribute("filterUnits"), f.getAttribute("x"), f.getAttribute("y"), f.getAttribute("width"), f.getAttribute("height")]))
+      .toEqual(["objectBoundingBox", "0", "0", "1", "1"]);
+    await scrollTo(page, "start");
+    await expect(lens).toBeHidden();
+    await scrollTo(page, { q: 0.005 });
+    await expect.poll(async () => (await hook(page)).q).toBeLessThan(0.01);
+    await expect(lens).toBeHidden();
+    await scrollTo(page, { q: 0.5 });
+    await expect(lens).toBeVisible();
+    await expect.poll(async () => (await hook(page)).lens).toBeGreaterThan(0.5 * 52 * 0.8 - 0.1);
+    expect((await hook(page)).lens).toBeLessThan(0.5 * 52 * 1.2 + 0.1);
+    await scrollTo(page, "slot");
+    await expect.poll(async () => (await hook(page)).lens).toBeGreaterThan(52 * 0.8 - 0.1);
+    // the pointer passes through it: what's under the screen's middle is the page, not the lens
+    expect(await page.evaluate(() => document.elementFromPoint(innerWidth / 2, innerHeight / 2)?.closest(".ab-lens") ?? null)).toBeNull();
+    await scrollTo(page, "end");
+    await expect(lens).toBeHidden();
+    expect((await hook(page)).lens).toBe(0);
+    expect(errors).toEqual([]);
+  });
+
+  test("at q 1 the words at the left edge move toward the rim; the middle of the screen and the resume are pixel-identical", async ({ page }) => {
+    await scrollTo(page, "slot");
+    await expect.poll(async () => (await hook(page)).q).toBeGreaterThan(0.999);
+    await stillPage(page);
+    await quoteAtLeftEdge(page, 24);
+    await page.waitForTimeout(200);
+    await expect.poll(async () => (await hook(page)).q).toBeGreaterThan(0.999);
+    await expect(page.locator(".ab-lens")).toBeVisible();
+    const vp = page.viewportSize()!;
+    const qr = await page.locator("[data-pendant='quote1'] blockquote").boundingBox();
+    // the band (56 px at 1440 x 900) and a little past it, over the quote's lines
+    const band = { x: 0, y: Math.round(qr!.y), width: 80, height: Math.round(qr!.height) };
+    const inset = 90; // (past the band and the 26 px pull)
+    const middle = { x: inset, y: inset, width: vp.width - 2 * inset, height: vp.height - 2 * inset };
+    const resume = await page.locator(".ab-resume").boundingBox();
+    const resumeClip = { x: Math.floor(resume!.x) - 4, y: Math.floor(resume!.y) - 4, width: Math.ceil(resume!.width) + 8, height: Math.ceil(resume!.height) + 8 };
+    const bent = await inkIn(page, band);
+    const midBent = await page.screenshot({ clip: middle });
+    const resumeBent = await page.screenshot({ clip: resumeClip });
+    // q 0: the same screen, the lens gone
+    await andradaPast(page, true);
+    await expect.poll(async () => (await hook(page)).q).toBe(0);
+    await expect(page.locator(".ab-lens")).toBeHidden();
+    const flat = await inkIn(page, band);
+    const midFlat = await page.screenshot({ clip: middle });
+    const resumeFlat = await page.screenshot({ clip: resumeClip });
+    expect(flat.n, "the quote's letters straddle the band").toBeGreaterThan(200);
+    // magnified toward the rim: the ink moves left (outward)
+    expect(bent.meanX, `mean ink x: bent ${bent.meanX.toFixed(1)}, flat ${flat.meanX.toFixed(1)}`).toBeLessThan(flat.meanX - 2);
+    expect(await changedPixels(midBent, midFlat, page)).toBe(0);
+    expect(await changedPixels(resumeBent, resumeFlat, page)).toBe(0);
+    // and back at q 1: bent again
+    await andradaPast(page, false);
+    await expect.poll(async () => (await hook(page)).q).toBeGreaterThan(0.999);
+    await expect(page.locator(".ab-lens")).toBeVisible();
+  });
+
+  test("after a resize mid-testimonials the lens's map is the new screen's size", async ({ page }) => {
+    const errors = collectErrors(page);
+    await scrollTo(page, "slot");
+    await expect.poll(async () => (await hook(page)).q).toBeGreaterThan(0.999);
+    const img = page.locator("#ab-edge-lens feImage");
+    expect(await img.evaluate((el) => [el.getAttribute("width"), el.getAttribute("height")])).toEqual(["1440", "900"]);
+    const before = await img.evaluate((el) => el.getAttribute("href"));
+    expect(before).toMatch(/^data:image\/png;base64,/);
+    await page.setViewportSize({ width: 1200, height: 760 });
+    await page.waitForTimeout(500); // (the 150 ms debounce, then the rebuild)
+    expect(await img.evaluate((el) => [el.getAttribute("width"), el.getAttribute("height")])).toEqual(["1200", "760"]);
+    const after = await img.evaluate((el) => el.getAttribute("href"));
+    expect(after).not.toBe(before);
+    // the rebuilt map is half the new screen
+    expect(await page.evaluate(async (src) => { const i = new Image(); i.src = src!; await i.decode(); return [i.width, i.height]; }, after)).toEqual([600, 380]);
+    expect(errors).toEqual([]);
+  });
+});

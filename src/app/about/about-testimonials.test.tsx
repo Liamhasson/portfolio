@@ -309,3 +309,103 @@ test("unmounting stops the loop and frees the light", async () => {
   expect(dispose).toHaveBeenCalledTimes(1);
   expect(rafs).toHaveLength(0);
 });
+
+// ---------- Task 4: the glass edges ----------
+
+/** Chromium, as far as the feature check can tell (jsdom has no userAgentData), with a 2D canvas for the lens's map. */
+function asChromium() {
+  Object.defineProperty(navigator, "userAgentData", { configurable: true, value: { brands: [{ brand: "Chromium", version: "130" }] } });
+  const putImageData = vi.fn();
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation((() => ({ putImageData })) as never);
+  const toDataURL = vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockImplementation(() => "data:image/png;base64,TEST");
+  if (typeof g.ImageData !== "function") {
+    g.ImageData = class { constructor(public data: Uint8ClampedArray, public width: number, public height: number) {} };
+  }
+  return { putImageData, toDataURL };
+}
+afterEach(() => {
+  delete (navigator as unknown as Record<string, unknown>).userAgentData;
+});
+
+test("no lens outside Chromium (no userAgentData): no element, no filter, the hook reads 0", async () => {
+  await mount();
+  at = { q1: 600, slot: 900, q2: 1300 };
+  window.dispatchEvent(new Event("scroll"));
+  await runFrame();
+  expect(document.querySelector(".ab-lens")).toBeNull();
+  expect(document.querySelector("#ab-edge-lens")).toBeNull();
+  expect(window.__testimonials!.lens).toBe(0);
+});
+
+test("Chromium: the lens shows only while q > 0.01, its map the screen's size, its scale 2·26·q breathing; reduced: 26·q", async () => {
+  const { putImageData, toDataURL } = asChromium();
+  await mount();
+  const lens = document.querySelector<HTMLElement>(".ab-lens")!;
+  expect(lens).not.toBeNull();
+  expect(lens).toHaveAttribute("aria-hidden", "true");
+  const img = document.querySelector("#ab-edge-lens feImage")!, disp = document.querySelector("#ab-edge-lens feDisplacementMap")!;
+  // the map: built once on mount, at half the screen's resolution, sized to the screen
+  expect(toDataURL).toHaveBeenCalledTimes(1);
+  const data = putImageData.mock.calls[0][0] as { width: number; height: number };
+  expect([data.width, data.height]).toEqual([W / 2, H / 2]);
+  expect(img.getAttribute("href")).toBe("data:image/png;base64,TEST");
+  expect([img.getAttribute("width"), img.getAttribute("height")]).toEqual([String(W), String(H)]);
+  // q 0 (the slot near, the light drawing): hidden
+  at = { q1: W + 1100, slot: W + SLOT - 10, q2: W + 1500 };
+  window.dispatchEvent(new Event("scroll"));
+  await runFrame(1000);
+  expect(window.__testimonials).toMatchObject({ drawing: true, lens: 0 });
+  expect(lens.dataset.on).toBeUndefined();
+  // q 1: shown, at the full pull, breathing within ±20%
+  at = { q1: 600, slot: 900, q2: 1300 };
+  await runFrame(2000);
+  expect(lens.dataset.on).toBe("");
+  const s = Number(disp.getAttribute("scale"));
+  expect(s).toBeGreaterThanOrEqual(52 * 0.8 - 0.05);
+  expect(s).toBeLessThanOrEqual(52 * 1.2 + 0.05);
+  expect(window.__testimonials!.lens).toBe(s);
+  // the same frame again: the DOM untouched (the scale moves by less than 0.1)
+  const set = vi.spyOn(disp, "setAttribute");
+  await runFrame(2000);
+  expect(set).not.toHaveBeenCalled();
+  // reduced motion: a fixed gentle bend, half the strength
+  reducedNow = true;
+  act(() => onReducedChange?.());
+  await runFrame(5000);
+  expect(disp.getAttribute("scale")).toBe("26.0");
+  // gone past: hidden again
+  at = { q1: -2400, slot: -2000, q2: -1600 };
+  await runFrame(6000);
+  expect(lens.dataset.on).toBeUndefined();
+  expect(window.__testimonials!.lens).toBe(0);
+});
+
+test("a resize stretches the map over the new screen at once and rebuilds it 150 ms after the resize settles", async () => {
+  const { toDataURL } = asChromium();
+  await mount();
+  const img = document.querySelector("#ab-edge-lens feImage")!;
+  expect(toDataURL).toHaveBeenCalledTimes(1);
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1200 });
+  Object.defineProperty(window, "innerHeight", { configurable: true, value: 700 });
+  window.dispatchEvent(new Event("resize"));
+  window.dispatchEvent(new Event("resize"));
+  expect([img.getAttribute("width"), img.getAttribute("height")]).toEqual(["1200", "700"]);
+  expect(toDataURL).toHaveBeenCalledTimes(1);
+  await waitFor(() => expect(toDataURL).toHaveBeenCalledTimes(2), { timeout: 1000 });
+  await new Promise((r) => setTimeout(r, 250));
+  expect(toDataURL).toHaveBeenCalledTimes(2); // (debounced: one rebuild for the two events)
+});
+
+test("unmounting hides the lens and stops listening for resizes", async () => {
+  const { toDataURL } = asChromium();
+  const { unmount } = await mount();
+  at = { q1: 600, slot: 900, q2: 1300 };
+  window.dispatchEvent(new Event("scroll"));
+  await runFrame();
+  expect(document.querySelector<HTMLElement>(".ab-lens")!.dataset.on).toBe("");
+  unmount();
+  expect(document.querySelector(".ab-lens")).toBeNull();
+  window.dispatchEvent(new Event("resize"));
+  await new Promise((r) => setTimeout(r, 250));
+  expect(toDataURL).toHaveBeenCalledTimes(1);
+});
