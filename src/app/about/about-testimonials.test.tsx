@@ -327,52 +327,70 @@ afterEach(() => {
   delete (navigator as unknown as Record<string, unknown>).userAgentData;
 });
 
+/** The strips' filters, top, right, bottom, left: each one's map slice and displacement. */
+const filters = () => (["top", "right", "bottom", "left"] as const).map((e) => {
+  const f = document.querySelector(`#ab-edge-lens-${e}`)!;
+  return { img: f.querySelector("feImage")!, disp: f.querySelector("feDisplacementMap")! };
+});
+const placed = (img: Element) => ["x", "y", "width", "height"].map((a) => Number(img.getAttribute(a)));
+
 test("no lens outside Chromium (no userAgentData): no element, no filter, the hook reads 0", async () => {
   await mount();
   at = { q1: 600, slot: 900, q2: 1300 };
   window.dispatchEvent(new Event("scroll"));
   await runFrame();
   expect(document.querySelector(".ab-lens")).toBeNull();
-  expect(document.querySelector("#ab-edge-lens")).toBeNull();
+  expect(document.querySelector(".ab-lens-defs")).toBeNull();
   expect(window.__testimonials!.lens).toBe(0);
 });
 
-test("Chromium: the lens shows only while q > 0.01, its map the screen's size, its scale 2·26·q breathing; reduced: 26·q", async () => {
+test("Chromium: four strips, each its slice of the map; shown only while q > 0.01, scale 2·26·q easing below full; reduced: 26·q", async () => {
   const { putImageData, toDataURL } = asChromium();
   await mount();
   const lens = document.querySelector<HTMLElement>(".ab-lens")!;
   expect(lens).not.toBeNull();
   expect(lens).toHaveAttribute("aria-hidden", "true");
-  const img = document.querySelector("#ab-edge-lens feImage")!, disp = document.querySelector("#ab-edge-lens feDisplacementMap")!;
-  // the map: built once on mount, at half the screen's resolution, sized to the screen
-  expect(toDataURL).toHaveBeenCalledTimes(1);
-  const data = putImageData.mock.calls[0][0] as { width: number; height: number };
-  expect([data.width, data.height]).toEqual([W / 2, H / 2]);
-  expect(img.getAttribute("href")).toBe("data:image/png;base64,TEST");
-  expect([img.getAttribute("width"), img.getAttribute("height")]).toEqual([String(W), String(H)]);
+  expect([...lens.querySelectorAll<HTMLElement>(".ab-lens-strip")].map((s) => s.dataset.edge)).toEqual(["top", "right", "bottom", "left"]);
+  // 1000 x 800: the band 52 px, the strips 86 px deep (band + pull + margin)
+  expect(lens.style.getPropertyValue("--lens-d")).toBe("86px");
+  const fs = filters();
+  // the map: built once on mount at half the screen's resolution, cut into the strips' four slices (map px)
+  expect(toDataURL).toHaveBeenCalledTimes(4);
+  const full = putImageData.mock.calls[0][0] as { width: number; height: number };
+  expect([full.width, full.height]).toEqual([W / 2, H / 2]);
+  expect(putImageData.mock.calls.map((c) => c.slice(1))).toEqual([
+    [-0, -0, 0, 0, 500, 43],
+    [-457, -43, 457, 43, 43, 314],
+    [-0, -357, 0, 357, 500, 43],
+    [-0, -43, 0, 43, 43, 314],
+  ]);
+  // each slice placed over its strip's own box (screen px, the strip's own space)
+  expect(fs.map((f) => placed(f.img))).toEqual([[0, 0, 1000, 86], [0, 0, 86, 628], [0, 0, 1000, 86], [0, 0, 86, 628]]);
+  for (const f of fs) expect(f.img.getAttribute("href")).toBe("data:image/png;base64,TEST");
   // q 0 (the slot near, the light drawing): hidden
   at = { q1: W + 1100, slot: W + SLOT - 10, q2: W + 1500 };
   window.dispatchEvent(new Event("scroll"));
   await runFrame(1000);
   expect(window.__testimonials).toMatchObject({ drawing: true, lens: 0 });
   expect(lens.dataset.on).toBeUndefined();
-  // q 1: shown, at the full pull, breathing within ±20%
+  // q 1: shown, at most the full pull (52), easing down to 0.8 of it; every strip the same
   at = { q1: 600, slot: 900, q2: 1300 };
   await runFrame(2000);
   expect(lens.dataset.on).toBe("");
-  const s = Number(disp.getAttribute("scale"));
+  const s = Number(fs[0].disp.getAttribute("scale"));
   expect(s).toBeGreaterThanOrEqual(52 * 0.8 - 0.05);
-  expect(s).toBeLessThanOrEqual(52 * 1.2 + 0.05);
+  expect(s).toBeLessThanOrEqual(52);
+  for (const f of fs) expect(f.disp.getAttribute("scale")).toBe(fs[0].disp.getAttribute("scale"));
   expect(window.__testimonials!.lens).toBe(s);
   // the same frame again: the DOM untouched (the scale moves by less than 0.1)
-  const set = vi.spyOn(disp, "setAttribute");
+  const sets = fs.map((f) => vi.spyOn(f.disp, "setAttribute"));
   await runFrame(2000);
-  expect(set).not.toHaveBeenCalled();
+  for (const set of sets) expect(set).not.toHaveBeenCalled();
   // reduced motion: a fixed gentle bend, half the strength
   reducedNow = true;
   act(() => onReducedChange?.());
   await runFrame(5000);
-  expect(disp.getAttribute("scale")).toBe("26.0");
+  for (const f of fs) expect(f.disp.getAttribute("scale")).toBe("26.0");
   // gone past: hidden again
   at = { q1: -2400, slot: -2000, q2: -1600 };
   await runFrame(6000);
@@ -380,20 +398,24 @@ test("Chromium: the lens shows only while q > 0.01, its map the screen's size, i
   expect(window.__testimonials!.lens).toBe(0);
 });
 
-test("a resize stretches the map over the new screen at once and rebuilds it 150 ms after the resize settles", async () => {
+test("a resize stretches each slice over its strip's new box at once and rebuilds the map 150 ms after the resize settles", async () => {
   const { toDataURL } = asChromium();
   await mount();
-  const img = document.querySelector("#ab-edge-lens feImage")!;
-  expect(toDataURL).toHaveBeenCalledTimes(1);
+  const fs = filters();
+  expect(toDataURL).toHaveBeenCalledTimes(4);
   Object.defineProperty(window, "innerWidth", { configurable: true, value: 1200 });
   Object.defineProperty(window, "innerHeight", { configurable: true, value: 700 });
   window.dispatchEvent(new Event("resize"));
   window.dispatchEvent(new Event("resize"));
-  expect([img.getAttribute("width"), img.getAttribute("height")]).toEqual(["1200", "700"]);
-  expect(toDataURL).toHaveBeenCalledTimes(1);
-  await waitFor(() => expect(toDataURL).toHaveBeenCalledTimes(2), { timeout: 1000 });
+  // at once: the old 86 px strips over the new screen
+  expect(fs.map((f) => placed(f.img))).toEqual([[0, 0, 1200, 86], [0, 0, 86, 528], [0, 0, 1200, 86], [0, 0, 86, 528]]);
+  expect(toDataURL).toHaveBeenCalledTimes(4);
+  await waitFor(() => expect(toDataURL).toHaveBeenCalledTimes(8), { timeout: 1000 });
+  // rebuilt: 1200 x 700, the band 45.5 px, the strips 80 px deep
+  expect(document.querySelector<HTMLElement>(".ab-lens")!.style.getPropertyValue("--lens-d")).toBe("80px");
+  expect(fs.map((f) => placed(f.img))).toEqual([[0, 0, 1200, 80], [0, 0, 80, 540], [0, 0, 1200, 80], [0, 0, 80, 540]]);
   await new Promise((r) => setTimeout(r, 250));
-  expect(toDataURL).toHaveBeenCalledTimes(2); // (debounced: one rebuild for the two events)
+  expect(toDataURL).toHaveBeenCalledTimes(8); // (debounced: one rebuild for the two events)
 });
 
 test("unmounting hides the lens and stops listening for resizes", async () => {
@@ -407,5 +429,5 @@ test("unmounting hides the lens and stops listening for resizes", async () => {
   expect(document.querySelector(".ab-lens")).toBeNull();
   window.dispatchEvent(new Event("resize"));
   await new Promise((r) => setTimeout(r, 250));
-  expect(toDataURL).toHaveBeenCalledTimes(1);
+  expect(toDataURL).toHaveBeenCalledTimes(4);
 });

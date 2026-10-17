@@ -571,35 +571,102 @@ test.describe("the glass edges", () => {
     await page.mouse.move(1430, 890);
   });
 
-  test("the lens: Chromium, fixed over the frame at 3, never taking the pointer, shown only while q > 0.01", async ({ page }) => {
+  test("the lens: Chromium, four fixed strips at 3 covering the edges once, never taking the pointer, shown only while q > 0.01", async ({ page }) => {
     const errors = collectErrors(page);
     const lens = page.locator(".ab-lens");
+    const top = page.locator(".ab-lens-strip[data-edge='top']");
     await expect(lens).toHaveCount(1);
     await expect(lens).toHaveAttribute("aria-hidden", "true");
-    expect(await lens.evaluate((el) => {
-      const s = getComputedStyle(el);
-      return { pe: s.pointerEvents, z: s.zIndex, pos: s.position, bf: s.backdropFilter };
-    })).toEqual({ pe: "none", z: "3", pos: "fixed", bf: 'url("#ab-edge-lens")' });
-    // the filter as the mockup's: the region the lens's own box
-    expect(await page.locator("#ab-edge-lens").evaluate((f) => [f.getAttribute("filterUnits"), f.getAttribute("x"), f.getAttribute("y"), f.getAttribute("width"), f.getAttribute("height")]))
-      .toEqual(["objectBoundingBox", "0", "0", "1", "1"]);
+    await scrollTo(page, "slot");
+    await expect(top).toBeVisible();
+    // each strip: fixed, at 3, no pointer, its own filter; 90 px deep at 1440 x 900, top and bottom full width, the sides between
+    expect(await page.locator(".ab-lens-strip").evaluateAll((els) => els.map((el) => {
+      const s = getComputedStyle(el), r = el.getBoundingClientRect();
+      return { edge: (el as HTMLElement).dataset.edge, pe: s.pointerEvents, z: s.zIndex, pos: s.position, bf: s.backdropFilter, box: [r.x, r.y, r.width, r.height] };
+    }))).toEqual([
+      { edge: "top", pe: "none", z: "3", pos: "fixed", bf: 'url("#ab-edge-lens-top")', box: [0, 0, 1440, 90] },
+      { edge: "right", pe: "none", z: "3", pos: "fixed", bf: 'url("#ab-edge-lens-right")', box: [1350, 90, 90, 720] },
+      { edge: "bottom", pe: "none", z: "3", pos: "fixed", bf: 'url("#ab-edge-lens-bottom")', box: [0, 810, 1440, 90] },
+      { edge: "left", pe: "none", z: "3", pos: "fixed", bf: 'url("#ab-edge-lens-left")', box: [0, 90, 90, 720] },
+    ]);
+    // the filters as the mockup's: each region its strip's own box
+    expect(await page.locator(".ab-lens-defs filter").evaluateAll((fs) => fs.map((f) => ["filterUnits", "x", "y", "width", "height"].map((a) => f.getAttribute(a)))))
+      .toEqual(Array(4).fill(["objectBoundingBox", "0", "0", "1", "1"]));
     await scrollTo(page, "start");
-    await expect(lens).toBeHidden();
+    await expect(top).toBeHidden();
     await scrollTo(page, { q: 0.005 });
     await expect.poll(async () => (await hook(page)).q).toBeLessThan(0.01);
-    await expect(lens).toBeHidden();
+    await expect(top).toBeHidden();
     await scrollTo(page, { q: 0.5 });
-    await expect(lens).toBeVisible();
+    await expect(top).toBeVisible();
     await expect.poll(async () => (await hook(page)).lens).toBeGreaterThan(0.5 * 52 * 0.8 - 0.1);
-    expect((await hook(page)).lens).toBeLessThan(0.5 * 52 * 1.2 + 0.1);
+    expect((await hook(page)).lens).toBeLessThanOrEqual(0.5 * 52 + 0.1);
     await scrollTo(page, "slot");
     await expect.poll(async () => (await hook(page)).lens).toBeGreaterThan(52 * 0.8 - 0.1);
-    // the pointer passes through it: what's under the screen's middle is the page, not the lens
-    expect(await page.evaluate(() => document.elementFromPoint(innerWidth / 2, innerHeight / 2)?.closest(".ab-lens") ?? null)).toBeNull();
+    expect((await hook(page)).lens).toBeLessThanOrEqual(52);
+    // the pointer passes through them: what's under a strip is the page, not the lens
+    expect(await page.evaluate(() => [[innerWidth / 2, innerHeight / 2], [20, innerHeight / 2], [innerWidth / 2, 20], [innerWidth - 20, innerHeight - 20]]
+      .map(([x, y]) => document.elementFromPoint(x, y)?.closest(".ab-lens") ?? null))).toEqual([null, null, null, null]);
     await scrollTo(page, "end");
-    await expect(lens).toBeHidden();
+    await expect(top).toBeHidden();
     expect((await hook(page)).lens).toBe(0);
     expect(errors).toEqual([]);
+  });
+
+  test("the strips meet without a seam: a corner as one full-screen lens with the same map would bend it", async ({ page }) => {
+    await scrollTo(page, "slot");
+    await expect.poll(async () => (await hook(page)).q).toBeGreaterThan(0.999);
+    await stillPage(page);
+    // Yoav's lines across the top-left corner, over the seam between the top strip and the left one (y 90)
+    await page.evaluate(() => {
+      const q1 = document.querySelector<HTMLElement>("[data-pendant='quote1']")!;
+      const r = q1.querySelector("blockquote")!.getBoundingClientRect();
+      q1.style.transform = `translate(${10 - r.left}px, ${30 - r.top}px)`;
+      document.querySelector<HTMLElement>("[data-pendant='quote2']")!.style.visibility = "hidden";
+    });
+    // the scale held at the full 52 (the breath eases it), on the strips and the reference alike
+    await page.evaluate(() => {
+      document.querySelectorAll(".ab-lens-defs feDisplacementMap").forEach((d) => {
+        const set = d.setAttribute.bind(d);
+        d.setAttribute = (k: string, v: string) => (k === "scale" ? undefined : set(k, v));
+        set("scale", "52");
+      });
+    });
+    await page.waitForTimeout(200);
+    await expect(page.locator(".ab-lens-strip[data-edge='top']")).toBeVisible();
+    const corner = { x: 0, y: 0, width: 260, height: 220 };
+    const strips = await page.screenshot({ clip: corner });
+    // the reference: one full-screen layer, its map the four slices put back together (the middle neutral)
+    await page.evaluate(async () => {
+      const W = document.documentElement.clientWidth, H = document.documentElement.clientHeight;
+      const c = document.createElement("canvas");
+      c.width = Math.round(W / 2); c.height = Math.round(H / 2);
+      const x = c.getContext("2d")!;
+      x.fillStyle = "rgb(128,128,128)";
+      x.fillRect(0, 0, c.width, c.height);
+      for (const el of document.querySelectorAll<HTMLElement>(".ab-lens-strip")) {
+        const r = el.getBoundingClientRect(), img = document.querySelector(`#ab-edge-lens-${el.dataset.edge} feImage`)!;
+        const i = new Image(); i.src = img.getAttribute("href")!; await i.decode();
+        x.drawImage(i, (r.x + Number(img.getAttribute("x"))) / 2, (r.y + Number(img.getAttribute("y"))) / 2);
+      }
+      const NS = "http://www.w3.org/2000/svg", svg = document.createElementNS(NS, "svg");
+      svg.setAttribute("width", "0"); svg.setAttribute("height", "0"); svg.style.position = "absolute";
+      svg.innerHTML = `<filter id="t4-ref" x="0" y="0" width="1" height="1" filterUnits="objectBoundingBox" color-interpolation-filters="sRGB"><feImage href="${c.toDataURL()}" result="map" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="none"/><feDisplacementMap in="SourceGraphic" in2="map" scale="52" xChannelSelector="R" yChannelSelector="G"/></filter>`;
+      const ref = document.createElement("div");
+      ref.style.cssText = "position:fixed;inset:0;z-index:3;pointer-events:none;backdrop-filter:url(#t4-ref)";
+      const lens = document.querySelector(".ab-lens")!;
+      lens.before(svg, ref);
+      (lens as HTMLElement).style.visibility = "hidden";
+      document.querySelectorAll<HTMLElement>(".ab-lens-strip").forEach((s) => { s.style.display = "none"; });
+    });
+    await page.waitForTimeout(300);
+    const whole = await page.screenshot({ clip: corner });
+    // (the corner does bend: the same corner with no lens differs)
+    await page.evaluate(() => { (document.querySelector("#t4-ref")!.parentElement!.nextElementSibling as HTMLElement).style.display = "none"; });
+    await page.waitForTimeout(200);
+    const bare = await page.screenshot({ clip: corner });
+    expect(await changedPixels(strips, bare, page)).toBeGreaterThan(200);
+    expect(await changedPixels(strips, whole, page)).toBe(0);
   });
 
   test("at q 1 the words at the left edge move toward the rim; the middle of the screen and the resume are pixel-identical", async ({ page }) => {
@@ -609,7 +676,7 @@ test.describe("the glass edges", () => {
     await quoteAtLeftEdge(page, 24);
     await page.waitForTimeout(200);
     await expect.poll(async () => (await hook(page)).q).toBeGreaterThan(0.999);
-    await expect(page.locator(".ab-lens")).toBeVisible();
+    await expect(page.locator(".ab-lens-strip[data-edge='left']")).toBeVisible();
     const vp = page.viewportSize()!;
     const qr = await page.locator("[data-pendant='quote1'] blockquote").boundingBox();
     // the band (56 px at 1440 x 900) and a little past it, over the quote's lines
@@ -624,7 +691,7 @@ test.describe("the glass edges", () => {
     // q 0: the same screen, the lens gone
     await andradaPast(page, true);
     await expect.poll(async () => (await hook(page)).q).toBe(0);
-    await expect(page.locator(".ab-lens")).toBeHidden();
+    await expect(page.locator(".ab-lens-strip[data-edge='left']")).toBeHidden();
     const flat = await inkIn(page, band);
     const midFlat = await page.screenshot({ clip: middle });
     const resumeFlat = await page.screenshot({ clip: resumeClip });
@@ -636,24 +703,32 @@ test.describe("the glass edges", () => {
     // and back at q 1: bent again
     await andradaPast(page, false);
     await expect.poll(async () => (await hook(page)).q).toBeGreaterThan(0.999);
-    await expect(page.locator(".ab-lens")).toBeVisible();
+    await expect(page.locator(".ab-lens-strip[data-edge='left']")).toBeVisible();
   });
 
-  test("after a resize mid-testimonials the lens's map is the new screen's size", async ({ page }) => {
+  test("after a resize mid-testimonials the strips and their maps cover the new screen", async ({ page }) => {
     const errors = collectErrors(page);
     await scrollTo(page, "slot");
     await expect.poll(async () => (await hook(page)).q).toBeGreaterThan(0.999);
-    const img = page.locator("#ab-edge-lens feImage");
-    expect(await img.evaluate((el) => [el.getAttribute("width"), el.getAttribute("height")])).toEqual(["1440", "900"]);
-    const before = await img.evaluate((el) => el.getAttribute("href"));
-    expect(before).toMatch(/^data:image\/png;base64,/);
+    /** Each strip's box and its slice as placed (screen px), and the slice's own pixel size. */
+    const strips = () => page.evaluate(async () => Promise.all([...document.querySelectorAll<HTMLElement>(".ab-lens-strip")].map(async (el) => {
+      const r = el.getBoundingClientRect(), img = document.querySelector(`#ab-edge-lens-${el.dataset.edge} feImage`)!;
+      const i = new Image(); i.src = img.getAttribute("href")!; await i.decode();
+      return { edge: el.dataset.edge, box: [r.x, r.y, r.width, r.height], img: ["x", "y", "width", "height"].map((a) => Number(img.getAttribute(a))), px: [i.width, i.height], href: img.getAttribute("href") };
+    })));
+    const before = await strips();
+    expect(before.map((s) => s.box)).toEqual([[0, 0, 1440, 90], [1350, 90, 90, 720], [0, 810, 1440, 90], [0, 90, 90, 720]]);
     await page.setViewportSize({ width: 1200, height: 760 });
     await page.waitForTimeout(500); // (the 150 ms debounce, then the rebuild)
-    expect(await img.evaluate((el) => [el.getAttribute("width"), el.getAttribute("height")])).toEqual(["1200", "760"]);
-    const after = await img.evaluate((el) => el.getAttribute("href"));
-    expect(after).not.toBe(before);
-    // the rebuilt map is half the new screen
-    expect(await page.evaluate(async (src) => { const i = new Image(); i.src = src!; await i.decode(); return [i.width, i.height]; }, after)).toEqual([600, 380]);
+    const after = await strips();
+    // 1200 x 760: the band 49.4 px, the strips 84 px deep, the corners still covered once
+    expect(after.map((s) => s.box)).toEqual([[0, 0, 1200, 84], [1116, 84, 84, 592], [0, 676, 1200, 84], [0, 84, 84, 592]]);
+    for (const s of after) {
+      // each slice over its strip's whole box, at half its resolution, rebuilt
+      expect(s.img, s.edge).toEqual([0, 0, s.box[2], s.box[3]]);
+      expect(s.px, s.edge).toEqual([s.box[2] / 2, s.box[3] / 2]);
+      expect(s.href).not.toBe(before.find((b) => b.edge === s.edge)!.href);
+    }
     expect(errors).toEqual([]);
   });
 });

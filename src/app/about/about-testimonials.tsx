@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { glassOwner, setGlassLight, type GlassLight, type GlassOwner } from "@/lib/about-glass";
 import type { TestimonialsLight } from "@/three/edge-light/testimonials-light";
-import { lensBand, lensMap, lensScale, lensSupported } from "./edge-lens";
+import { lensBand, lensDepth, lensMap, lensScale, lensStrips, lensSupported, type LensEdge } from "./edge-lens";
 import { pulsePhase, stepArrival, testimonialsQ, type Arrival } from "./testimonials-q";
 import { trackProgress, trackX } from "./track";
 
@@ -37,6 +37,9 @@ const spent = new WeakSet<HTMLCanvasElement>();
 const noSubscribe = () => () => {};
 const lensClient = () => typeof navigator !== "undefined" && lensSupported(navigator);
 const lensServer = () => false;
+
+/** The lens's strips, in lensStrips' order: each its own filter, its own slice of the map. */
+const LENS_EDGES: readonly LensEdge[] = ["top", "right", "bottom", "left"];
 
 /** The screen as the lens covers it (fixed at inset 0: a classic scrollbar left out). */
 const screenSize = () => ({
@@ -71,41 +74,58 @@ export function AboutTestimonials() {
   const [gen, setGen] = useState(0);
   /** The glass edges (edge-lens.ts): Chromium only; elsewhere no lens element at all. */
   const lensOn = useSyncExternalStore(noSubscribe, lensClient, lensServer);
+  /** The strips' container (display: contents while shown, so the strips sit straight in the pinned frame) and the filters. */
   const lensRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<SVGFEImageElement>(null);
-  const dispRef = useRef<SVGFEDisplacementMapElement>(null);
+  const defsRef = useRef<SVGSVGElement>(null);
   /** The lens's map is in place: until it is the lens never shows (an empty feImage is transparent, which would shift the
-   *  whole screen by half the scale). */
+   *  whole strip by half the scale). */
   const lensReady = useRef(false);
 
-  // The lens's map: built at half the screen's resolution as a PNG once the lens is there, and again 150 ms after a resize
-  // settles. Meanwhile the old map is stretched over the new screen at once (the feImage sized to it), so no part of the
-  // screen is ever left outside the map.
+  // The lens's map: built at half the screen's resolution once the lens is there, and again 150 ms after a resize settles.
+  // Each strip gets its own slice as a PNG (a filter reading only its strip's pixels is far cheaper than four reading the
+  // whole map), placed where the full map would put it, so the strips meet without a seam. Meanwhile each old slice is
+  // stretched over its strip's new box at once, so no part of a strip is ever left outside its map.
   useEffect(() => {
     if (!lensOn) return;
-    const img = mapRef.current;
-    if (!img) return;
+    const box = lensRef.current, defs = defsRef.current;
+    if (!box || !defs) return;
+    const imgs = LENS_EDGES.map((e) => defs.querySelector<SVGFEImageElement>(`#ab-edge-lens-${e} feImage`));
+    if (imgs.some((i) => !i)) return;
     const c = document.createElement("canvas");
-    let timer = 0;
+    let timer = 0, depth = 0;
+    const place = (img: SVGFEImageElement, x: number, y: number, w: number, h: number) => {
+      img.setAttribute("x", String(x)); img.setAttribute("y", String(y));
+      img.setAttribute("width", String(w)); img.setAttribute("height", String(h));
+    };
     const fit = () => {
-      const { w, h } = screenSize();
-      img.setAttribute("width", String(w));
-      img.setAttribute("height", String(h));
-      return { w, h };
+      const { w: W, h: H } = screenSize();
+      lensStrips(W, H, depth).forEach((s, i) => place(imgs[i]!, 0, 0, s.w, s.h));
     };
     const build = () => {
       const { w: W, h: H } = screenSize();
-      const w = Math.max(1, Math.round(W * 0.5)), h = Math.max(1, Math.round(H * 0.5));
+      const w = Math.max(1, Math.round(W * 0.5)), h = Math.max(1, Math.round(H * 0.5)), kx = w / W, ky = h / H;
+      const band = lensBand(W, H), D = lensDepth(band);
+      const urls: string[] = [];
+      const at: [number, number, number, number][] = [];
       try {
-        c.width = w; c.height = h;
         const x = c.getContext("2d");
         if (!x) return;
-        x.putImageData(new ImageData(lensMap(w, h, lensBand(W, H) * 0.5) as Uint8ClampedArray<ArrayBuffer>, w, h), 0, 0);
-        img.setAttribute("href", c.toDataURL("image/png"));
+        const full = new ImageData(lensMap(w, h, band * 0.5) as Uint8ClampedArray<ArrayBuffer>, w, h);
+        for (const s of lensStrips(W, H, D)) {
+          // (the slice: the map's pixels under the strip, rounded outward; placed in the strip's own space)
+          const sx = Math.floor(s.x * kx), sy = Math.floor(s.y * ky);
+          const sw = Math.max(1, Math.min(w, Math.ceil((s.x + s.w) * kx)) - sx), sh = Math.max(1, Math.min(h, Math.ceil((s.y + s.h) * ky)) - sy);
+          c.width = sw; c.height = sh;
+          x.putImageData(full, -sx, -sy, sx, sy, sw, sh);
+          urls.push(c.toDataURL("image/png"));
+          at.push([sx / kx - s.x, sy / ky - s.y, sw / kx, sh / ky]);
+        }
       } catch {
         return; // (no 2D canvas: no map, so no lens)
       }
-      fit();
+      depth = D;
+      box.style.setProperty("--lens-d", `${D}px`);
+      imgs.forEach((img, i) => { img!.setAttribute("href", urls[i]); place(img!, ...at[i]); });
       lensReady.current = true;
     };
     const onResize = () => {
@@ -189,16 +209,20 @@ export function AboutTestimonials() {
     /** The glass edges, each frame the light runs: shown only while q > 0.01 (and its map is in place), the filter's scale
      *  touched only when it moves by 0.1 or more. Returns the scale as set while it shows, else 0. */
     let lensShown = false, lensSet = -1, lensEl: HTMLDivElement | null = null;
+    let disps: SVGFEDisplacementMapElement[] = [];
     const lensFrame = (q: number, t: number): number => {
-      const el = lensRef.current, disp = dispRef.current;
-      if (el !== lensEl) { lensEl = el; lensShown = false; lensSet = -1; }
-      if (!el || !disp) return 0;
+      const el = lensRef.current;
+      if (el !== lensEl) {
+        lensEl = el; lensShown = false; lensSet = -1;
+        disps = Array.from(defsRef.current?.querySelectorAll<SVGFEDisplacementMapElement>("feDisplacementMap") ?? []);
+      }
+      if (!el || disps.length === 0) return 0;
       const on = q > 0.01 && lensReady.current;
       if (on) {
         const s = lensScale(q, t, reduced);
         if (lensSet < 0 || Math.abs(s - lensSet) >= 0.1) {
           const v = s.toFixed(1);
-          disp.setAttribute("scale", v);
+          for (const d of disps) d.setAttribute("scale", v);
           lensSet = Number(v);
         }
       }
@@ -337,17 +361,23 @@ export function AboutTestimonials() {
   if (gone) return null;
   return (
     <>
-      {/* the glass edges (Chromium): a fixed layer whose backdrop (the track and the pendant under it, not the light above,
-          nor the bar and the resume after it) is bent by the SVG filter below; shown while q > 0.01 */}
+      {/* the glass edges (Chromium): four fixed strips at the screen's edges whose backdrop (the track and the pendant under
+          them, not the light above, nor the bar and the resume after them) is bent by the SVG filters below; shown while
+          q > 0.01 */}
       {lensOn && (
         <>
-          <div ref={lensRef} className="ab-lens" aria-hidden />
-          <svg className="ab-lens-defs" width="0" height="0" aria-hidden>
-            {/* (objectBoundingBox x0 y0 w1 h1: the region is the lens's own box; userSpaceOnUse did nothing) */}
-            <filter id="ab-edge-lens" x="0" y="0" width="1" height="1" filterUnits="objectBoundingBox" colorInterpolationFilters="sRGB">
-              <feImage ref={mapRef} result="map" x="0" y="0" preserveAspectRatio="none" />
-              <feDisplacementMap ref={dispRef} in="SourceGraphic" in2="map" xChannelSelector="R" yChannelSelector="G" />
-            </filter>
+          <div ref={lensRef} className="ab-lens" aria-hidden>
+            {LENS_EDGES.map((e) => <div key={e} className="ab-lens-strip" data-edge={e} />)}
+          </div>
+          {/* (outside the toggled container: a filter in a display: none subtree stops rendering) */}
+          <svg ref={defsRef} className="ab-lens-defs" width="0" height="0" aria-hidden>
+            {/* (objectBoundingBox x0 y0 w1 h1: each filter's region is its strip's own box; userSpaceOnUse did nothing) */}
+            {LENS_EDGES.map((e) => (
+              <filter key={e} id={`ab-edge-lens-${e}`} x="0" y="0" width="1" height="1" filterUnits="objectBoundingBox" colorInterpolationFilters="sRGB">
+                <feImage result="map" x="0" y="0" preserveAspectRatio="none" />
+                <feDisplacementMap in="SourceGraphic" in2="map" xChannelSelector="R" yChannelSelector="G" />
+              </filter>
+            ))}
           </svg>
         </>
       )}

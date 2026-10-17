@@ -126,10 +126,17 @@ a.ab-proof:hover, a.ab-proof:focus-visible { color: #f4efe9; }
 .ab-light[data-on] { visibility: visible; }
 /* the glass edges (about-testimonials.tsx, edge-lens.ts; plan Task 4): as the quotes pass, the screen's far edges turn to
    glass, a crisp lens band at the rounded edge bending what passes under it, the words magnifying toward the rim, no blur.
-   An SVG displacement on the backdrop, so Chromium only (the element is rendered nowhere else). Fixed at 3 in the pinned
-   frame: its backdrop is the track (1) and the pendant (2 / 0) under it; the light (4) sits above it unbent, and the bar and
-   the resume (also 3, but later in the frame) paint after it, so they stay crisp. It never takes the pointer, and shows only
-   while q > 0.01. */
-.ab-lens { position: fixed; inset: 0; z-index: 3; pointer-events: none; display: none; backdrop-filter: url(#ab-edge-lens); }
-.ab-lens[data-on] { display: block; }
+   An SVG displacement on the backdrop, so Chromium only (the elements are rendered nowhere else). Four fixed strips, each
+   --lens-d deep (the band, its pull and a margin: edge-lens.ts lensDepth), top and bottom full width and left and right
+   between them, so every corner is covered once (a full-screen backdrop filter cost about 10 ms a frame). At 3 in the
+   pinned frame: their backdrop is the track (1) and the pendant (2 / 0) under them; the light (4) sits above them unbent,
+   and the bar and the resume (also 3, but later in the frame) paint after them, so they stay crisp. They never take the
+   pointer, and show only while q > 0.01 (the container: display contents, no box of its own). */
+.ab-lens { display: none; }
+.ab-lens[data-on] { display: contents; }
+.ab-lens-strip { position: fixed; z-index: 3; pointer-events: none; --d: var(--lens-d, 90px); }
+.ab-lens-strip[data-edge="top"] { top: 0; left: 0; right: 0; height: var(--d); backdrop-filter: url(#ab-edge-lens-top); }
+.ab-lens-strip[data-edge="bottom"] { bottom: 0; left: 0; right: 0; height: var(--d); backdrop-filter: url(#ab-edge-lens-bottom); }
+.ab-lens-strip[data-edge="left"] { top: var(--d); bottom: var(--d); left: 0; width: var(--d); backdrop-filter: url(#ab-edge-lens-left); }
+.ab-lens-strip[data-edge="right"] { top: var(--d); bottom: var(--d); right: 0; width: var(--d); backdrop-filter: url(#ab-edge-lens-right); }
 .ab-lens-defs { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }
