@@ -33,6 +33,12 @@
 // a style added to the page, for experiments. More experiments: DPR_JS (the pixel ratio the page's scripts are told, the
 // screen's staying DPR: the canvases follow it, CSS and the lens don't), NO_CLIPS=1 (the work clips never play: their
 // posters), CHANNEL (an installed browser, e.g. chrome: nothing is downloaded) and ARGS (more Chromium flags).
+//
+// MODE=loops (task-clips-brief.md): About's silent loops. Dwells at the work strip (its three loops) and at the band chips
+// (two), with each source set in SRCS and each count in PLAYING playing at once, and reports the rAF interval (median, p95,
+// the shares over 12.5, 16.7, 25 and 33 ms) and each video's presented fps and dropped frames. See loops() below for SRCS
+// (old: the shared /work and /playground files; new: /about/loops/; exp:<suffix>: EXP_DIR files), PLAYING and RVFC. Headed.
+//   MODE=loops CHANNEL=chrome DPR=1 node scripts/about/pendant-perf.cjs
 const fs = require("node:fs");
 const path = require("node:path");
 const http = require("node:http");
@@ -47,14 +53,15 @@ const DPR = Number(process.env.DPR) || 2;
 const W = Number(process.env.W) || 1440;
 const H = Number(process.env.H) || 900;
 const MODE = process.env.MODE || "pendant";
-if (!["pendant", "both", "light"].includes(MODE)) throw new Error(`MODE must be pendant, both or light (got ${MODE})`);
-const TESTIMONIALS = MODE !== "pendant";
+if (!["pendant", "both", "light", "loops"].includes(MODE)) throw new Error(`MODE must be pendant, both, light or loops (got ${MODE})`);
+const TESTIMONIALS = MODE === "both" || MODE === "light";
+const LOOPS = MODE === "loops";
 const SCROLL_S = Number(process.env.SCROLL_S) || (TESTIMONIALS ? 12 : 30);
 const DWELL_S = Number(process.env.DWELL_S) || 5;
 const ROUNDS = Number(process.env.ROUNDS) || 2;
 /** ms held at the window's start before each pass (SETTLE_MS): the pendant's follow settles after the jump back. */
 const SETTLE_MS = Number(process.env.SETTLE_MS) || 3000;
-const HEADED = process.env.HEADED ? process.env.HEADED === "1" : TESTIMONIALS;
+const HEADED = process.env.HEADED ? process.env.HEADED === "1" : TESTIMONIALS || LOOPS;
 const DWELL = ["opening", "whirl", "glass", "tumble", "hero"];
 const GOVERNOR = process.env.GOVERNOR === "1";
 
@@ -411,6 +418,159 @@ async function testimonials(page, gpu, contaminated) {
     fs.writeFileSync(process.env.OUT, JSON.stringify({ MODE, W, H, DPR, HEADED, contaminated, gpu, sizes, win, rows, rounds }, null, 1));
   }
 }
+/** MODE=loops: the cost of About's silent loops (task-clips-brief.md). Two places are dwelt at: the work strip centred (its
+ *  three loops: cyvore, eventread, nordic-logic) and the band chips centred (marni-came, sanskrit). At each, every source set
+ *  in SRCS is tried with each count in PLAYING playing at once (the ones nearest the screen's middle; the rest paused,
+ *  holding their frame or their poster), and the rAF interval is measured over DWELL_S, with the frames each playing video
+ *  presented (requestVideoFrameCallback's presentedFrames, read once at each end of the dwell) and the frames it dropped
+ *  (getVideoPlaybackQuality). The script takes the loops over for the dwell (loops.ts is left running, but nothing moves, so
+ *  it has nothing to change).
+ *  SRCS (comma list, default old,new): page (the build's own srcs), old (the shared /work and /playground files), new (the
+ *  About copies in /about/loops/), exp:<suffix> (experiments: EXP_DIR/<name><suffix>.mp4, served at /__loops-exp/).
+ *  PLAYING (default 0,1,2,all). RVFC=1: each playing video also keeps a no-op requestVideoFrameCallback loop going.
+ *  ROUNDS (2) repeats the whole matrix; SETTLE_MS (2000 here) is held after each change before measuring. */
+async function loops(page, gpu, contaminated) {
+  await page.waitForFunction(() => window.__pendant?.ready || !document.querySelector("canvas.ab-pendant"), null, { timeout: 120_000 });
+  await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
+  if (process.env.CSS) await page.addStyleTag({ content: process.env.CSS });
+  await page.mouse.move(W - 10, H - 10);
+  const srcSets = (process.env.SRCS || "old,new").split(",").filter(Boolean);
+  const counts = (process.env.PLAYING || "0,1,2,all").split(",").filter(Boolean);
+  const settle = Number(process.env.SETTLE_MS) || 2000;
+  const rvfc = process.env.RVFC === "1";
+  const OLD = {
+    "marni-came": "/playground/after-heartbreaks-loop.mp4", sanskrit: "/playground/my-small-world-loop.mp4",
+    cyvore: "/work/cyvore.mp4", eventread: "/work/eventread.mp4", "nordic-logic": "/work/nordic-logic-live.mp4",
+  };
+  const NAME = { "marni-came": "after-heartbreaks-loop", sanskrit: "my-small-world-loop", cyvore: "cyvore", eventread: "eventread", "nordic-logic": "nordic-logic-live" };
+  const srcFor = (set, id) => {
+    if (set === "page") return null;
+    if (set === "old") return OLD[id];
+    if (set === "new") return `/about/loops/${NAME[id]}.mp4`;
+    if (set.startsWith("exp:")) return `/__loops-exp/${NAME[id]}${set.slice(4)}.mp4`;
+    throw new Error(`unknown source set ${set}`);
+  };
+  if (srcSets.some((x) => x.startsWith("exp:"))) {
+    const dir = process.env.EXP_DIR;
+    if (!dir) throw new Error("SRCS has exp: sets but EXP_DIR is not set");
+    await page.route(/\/__loops-exp\//, (r) => r.fulfill({ path: path.join(dir, path.basename(new URL(r.request().url()).pathname)), contentType: "video/mp4" }));
+  }
+  const places = await page.evaluate(() => {
+    const sec = document.querySelector("section.ab"), tr = sec?.querySelector(".ab-track"), clip = tr?.parentElement;
+    if (!sec || !tr || !clip || sec.dataset.mode !== "track") return null;
+    const trR = tr.getBoundingClientRect(), clipL = clip.getBoundingClientRect().left, vw = clip.clientWidth;
+    const top = sec.getBoundingClientRect().top + window.scrollY;
+    const centre = (els) => {
+      const rs = els.map((e) => e.getBoundingClientRect());
+      const l = Math.min(...rs.map((r) => r.left)), r = Math.max(...rs.map((r) => r.right));
+      return top + clipL + ((l + r) / 2 - trR.left) - vw / 2;
+    };
+    const ids = (sel) => [...document.querySelectorAll(sel)].map((e) => e.closest(".ab-pic").dataset.pic);
+    return {
+      strip: { y: centre([document.querySelector(".ab-strip")]), ids: ids(".ab-strip .ab-pic video") },
+      bands: { y: centre([...document.querySelectorAll(".ab-chip")]), ids: ids(".ab-chip video") },
+    };
+  });
+  if (!places) throw new Error("About isn't on its sideways track at this size: no strip to measure");
+
+  /** Sets the sources, pauses all, plays the n nearest the middle; resolves with the ids playing once each has data. */
+  const arrange = (set, n, ids) => page.evaluate(async ({ srcs, n, ids, rvfc }) => {
+    const vid = (id) => document.querySelector(`.ab-pic[data-pic="${id}"] video`);
+    const all = [...document.querySelectorAll(".ab-track video")];
+    for (const v of all) v.pause();
+    for (const [id, src] of Object.entries(srcs)) if (src && vid(id).getAttribute("src") !== src) vid(id).setAttribute("src", src);
+    const mid = window.innerWidth / 2;
+    const near = [...ids].sort((a, b) => {
+      const d = (id) => { const r = vid(id).getBoundingClientRect(); return Math.abs((r.left + r.right) / 2 - mid); };
+      return d(a) - d(b);
+    }).slice(0, n === "all" ? ids.length : Number(n));
+    window.__loopRvfc = (window.__loopRvfc ?? 0) + 1; // (stops any earlier no-op loops)
+    const gen = window.__loopRvfc;
+    for (const id of near) {
+      const v = vid(id);
+      try { await v.play(); } catch { /* reported below */ }
+      if (rvfc && v.requestVideoFrameCallback) { const f = () => { if (window.__loopRvfc === gen) v.requestVideoFrameCallback(f); }; v.requestVideoFrameCallback(f); }
+    }
+    const end = performance.now() + 8000;
+    while (performance.now() < end && !near.every((id) => vid(id).readyState >= 3 && !vid(id).paused)) await new Promise((r) => setTimeout(r, 100));
+    return near.map((id) => ({ id, playing: !vid(id).paused, ready: vid(id).readyState, src: vid(id).currentSrc.replace(location.origin, ""), size: `${vid(id).videoWidth}x${vid(id).videoHeight}` }));
+  }, { srcs: Object.fromEntries(Object.keys(OLD).map((id) => [id, srcFor(set, id)])), n, ids, rvfc });
+  /** The rAF intervals over ms, with each video's presented and dropped frames over the same span. */
+  const measure = (ms) => page.evaluate(async (ms) => {
+    const vids = [...document.querySelectorAll(".ab-track video")].filter((v) => !v.paused);
+    const presented = (v) => new Promise((done) => {
+      if (!v.requestVideoFrameCallback) return done(null);
+      const t = setTimeout(() => done(null), 500);
+      v.requestVideoFrameCallback((_, m) => { clearTimeout(t); done({ n: m.presentedFrames, t: m.expectedDisplayTime }); });
+    });
+    const quality = (v) => v.getVideoPlaybackQuality?.() ?? { totalVideoFrames: NaN, droppedVideoFrames: NaN };
+    const p0 = await Promise.all(vids.map(presented)), q0 = vids.map(quality);
+    const gaps = await new Promise((done) => {
+      const out = [];
+      let t0 = null, last = 0;
+      const tick = (now) => {
+        if (t0 === null) t0 = last = now;
+        else { out.push(now - last); last = now; }
+        if (now - t0 < ms) requestAnimationFrame(tick);
+        else done(out);
+      };
+      requestAnimationFrame(tick);
+    });
+    const p1 = await Promise.all(vids.map(presented)), q1 = vids.map(quality);
+    const videos = vids.map((v, i) => ({
+      id: v.closest(".ab-pic").dataset.pic,
+      fps: p0[i] && p1[i] ? (p1[i].n - p0[i].n) / ((p1[i].t - p0[i].t) / 1000) : NaN,
+      dropped: q1[i].droppedVideoFrames - q0[i].droppedVideoFrames,
+      decoded: q1[i].totalVideoFrames - q0[i].totalVideoFrames,
+    }));
+    return { gaps, videos };
+  }, ms);
+
+  const rows = [];
+  for (let round = 0; round < ROUNDS; round++) {
+    for (const [place, { y, ids }] of Object.entries(places)) {
+      await page.evaluate((y) => window.scrollTo(0, y), y);
+      await page.waitForTimeout(1500); // (the pendant's follow and the pictures' rise settle)
+      for (const set of srcSets) {
+        for (const n of counts) {
+          if (n !== "all" && Number(n) > ids.length) continue;
+          const playing = await arrange(set, n, ids);
+          await page.waitForTimeout(settle);
+          const m = await measure(DWELL_S * 1000);
+          rows.push({ round, place, set, n, playing, ...m });
+        }
+      }
+    }
+  }
+  const label = contaminated ? " [CONTAMINATED: Blender running]" : "";
+  console.log(`\nloops (MODE=loops), ${W}x${H} at DPR ${DPR}, ${HEADED ? "headed" : "headless"}, ${process.env.CHANNEL || "playwright chromium"}${rvfc ? ", RVFC no-op loops on" : ""} (${gpu})${label}`);
+  console.log(`  strip at scroll ${Math.round(places.strip.y)} (${places.strip.ids.join(", ")}); bands at ${Math.round(places.bands.y)} (${places.bands.ids.join(", ")}); dwell ${DWELL_S} s, ${ROUNDS} round(s)`);
+  const sample = rows.filter((r) => r.round === 0 && r.n === "all");
+  for (const r of sample) console.log(`  ${r.place} ${r.set}: ${r.playing.map((p) => `${p.id} ${p.src} ${p.size}${p.playing ? "" : " NOT PLAYING"}`).join("; ")}`);
+  console.log("\n  place   srcs            playing  frames  rAF med     p95  >12.5ms  >16.7ms    >25ms    >33ms   video fps (each)            dropped");
+  const out = {};
+  for (const place of Object.keys(places)) {
+    for (const set of srcSets) {
+      for (const n of counts) {
+        const rs = rows.filter((r) => r.place === place && r.set === set && r.n === n);
+        if (!rs.length) continue;
+        const gaps = rs.flatMap((r) => r.gaps), st = rafStats(gaps);
+        const over33 = gaps.filter((g) => g > 33.4).length / (gaps.length || 1);
+        const byId = {};
+        for (const r of rs) for (const v of r.videos) (byId[v.id] ??= []).push(v);
+        const fps = Object.entries(byId).map(([id, vs]) => `${id.slice(0, 5)} ${fmt(vs.reduce((a, v) => a + v.fps, 0) / vs.length)}`).join(" ");
+        const dropped = Object.values(byId).flat().reduce((a, v) => a + (v.dropped || 0), 0);
+        const notPlaying = rs.flatMap((r) => r.playing.filter((p) => !p.playing).map((p) => p.id));
+        out[`${place}|${set}|${n}`] = { ...st, over33, fps: byId, notPlaying, perRound: rs.map((r) => pct(r.gaps, 50)) };
+        console.log(`  ${place.padEnd(7)} ${set.padEnd(15)} ${String(n).padStart(7)}  ${String(st.n).padStart(6)}  ${fmt(st.median).padStart(6)}  ${fmt(st.p95).padStart(6)}  ${share(st.over12).padStart(7)}  ${share(st.over16).padStart(7)}  ${share(st.over25).padStart(7)}  ${share(over33).padStart(7)}   ${fps.padEnd(28)} ${dropped}${notPlaying.length ? `  NOT PLAYING: ${notPlaying.join(",")}` : ""}  (round medians ${rs.map((r) => fmt(pct(r.gaps, 50))).join("/")})`);
+      }
+    }
+  }
+  if (process.env.OUT) {
+    fs.mkdirSync(path.dirname(process.env.OUT), { recursive: true });
+    fs.writeFileSync(process.env.OUT, JSON.stringify({ MODE, W, H, DPR, HEADED, channel: process.env.CHANNEL ?? null, rvfc, contaminated, gpu, places, out, rows }, null, 1));
+  }
+}
 (async () => {
   const b = blender();
   const contaminated = b.length > 0;
@@ -458,6 +618,7 @@ async function testimonials(page, gpu, contaminated) {
       return d ? gl.getParameter(d.UNMASKED_RENDERER_WEBGL) : "unknown";
     });
     if (TESTIMONIALS) await testimonials(page, gpu, contaminated);
+    else if (LOOPS) await loops(page, gpu, contaminated);
     else await pendant(page, gpu, contaminated);
   } finally {
     await browser.close();
