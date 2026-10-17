@@ -92,7 +92,8 @@ export function showGlassSlot(sec: GlassSection, who: GlassOwner, on: boolean): 
   if (open) sec.dataset.glass = "on"; else delete sec.dataset.glass;
   if (!slot || !before) return;
   const after = slot.getBoundingClientRect();
-  const dy = slotScrollFix(before.top, before.height, after.height, false);
+  // (the slot's top where it is laid out: closed it is display: none, its rect all zeros, so after opening, before closing)
+  const dy = slotScrollFix(open ? after.top : before.top, before.height, after.height, false);
   if (dy !== 0) window.scrollBy(0, dy);
 }
 

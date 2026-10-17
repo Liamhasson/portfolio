@@ -114,7 +114,8 @@ describe("about-glass: one ball between the testimonials, owned by whoever draws
     const scrollBy = vi.spyOn(window, "scrollBy").mockImplementation(() => {});
     const make = () => {
       const sec = { dataset: {} as DOMStringMap, querySelector: () => slot as unknown as Element };
-      const slot = { getBoundingClientRect: () => ({ top: -600, height: sec.dataset.glass === "on" ? 195 : 0 }) };
+      // (closed, the slot is display: none: a rect of zeros; open, wholly above the screen)
+      const slot = { getBoundingClientRect: () => (sec.dataset.glass === "on" ? { top: -600, height: 195 } : { top: 0, height: 0 }) };
       return sec;
     };
     try {
@@ -125,10 +126,15 @@ describe("about-glass: one ball between the testimonials, owned by whoever draws
       expect(scrollBy).toHaveBeenCalledWith(0, 195);
       showGlassSlot(sec, "pendant", true); // (no change of the attribute: nothing more)
       expect(scrollBy).toHaveBeenCalledTimes(1);
+      // closing, wholly above: scrolled back by its height
+      showGlassSlot(sec, "pendant", false);
+      showGlassSlot(sec, "testimonials", false);
+      expect(scrollBy).toHaveBeenLastCalledWith(0, -195);
+      expect(scrollBy).toHaveBeenCalledTimes(2);
       g.CSS = { supports: (p: string, v: string) => p === "overflow-anchor" && v === "auto" }; // (Chromium)
       resetGlassForTests();
       showGlassSlot(make(), "testimonials", true);
-      expect(scrollBy).toHaveBeenCalledTimes(1);
+      expect(scrollBy).toHaveBeenCalledTimes(2);
     } finally {
       g.CSS = css;
       scrollBy.mockRestore();

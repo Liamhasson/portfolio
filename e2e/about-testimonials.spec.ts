@@ -1073,3 +1073,53 @@ test("on the track, a client height shorter than the fixed layer (an Android tab
   expect(cover.find((s) => s.edge === "left")!.box.h).toBe(720);
   expectCovered(cover, "the track");
 });
+
+// ---------- Task 5, fix round 2: the page holds its place when the slot opens above it ----------
+
+test.describe("stacked on a phone without scroll anchoring (as iOS Safari)", () => {
+  test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+  test("read into Andrada's quote below the closed slot, the slot opening above doesn't move what's on screen", async ({ page }) => {
+    test.setTimeout(60_000);
+    const errors = collectErrors(page);
+    await page.addInitScript(() => {
+      // no anchoring: the page says so (CSS.supports) and does none (overflow-anchor: none), as iOS Safari
+      const supports = CSS.supports.bind(CSS);
+      CSS.supports = ((...a: [string, string?]) => (a[0] === "overflow-anchor" ? false : (supports as (...x: unknown[]) => boolean)(...a))) as typeof CSS.supports;
+      document.addEventListener("DOMContentLoaded", () => {
+        document.documentElement.style.overflowAnchor = "none";
+        document.body.style.overflowAnchor = "none";
+      });
+      // the light and the pendant load after an idle moment: held until the test lets them, so the slot opens on cue
+      const held: (() => void)[] = [];
+      window.requestIdleCallback = ((cb: IdleRequestCallback) => { held.push(() => cb({ didTimeout: false, timeRemaining: () => 0 })); return held.length; }) as typeof window.requestIdleCallback;
+      (window as unknown as { __idle: () => void }).__idle = () => held.splice(0).forEach((f) => f());
+    });
+    await page.goto("/about");
+    await expect(page.locator("section.ab")).toHaveAttribute("data-mode", "stack");
+    await page.waitForTimeout(500);
+    expect(await page.evaluate(() => [CSS.supports("overflow-anchor", "auto"), document.querySelector("section.ab")!.hasAttribute("data-glass")])).toEqual([false, false]);
+    expect(await page.locator("[data-pendant='glass']").evaluate((el) => el.getBoundingClientRect().height)).toBe(0);
+    // Andrada's quote 300 px into it: where the slot will open (at the quote's old top) lies wholly above the screen
+    await page.evaluate(() => {
+      const r = document.querySelector("[data-pendant='quote2']")!.getBoundingClientRect();
+      window.scrollTo(0, r.top + window.scrollY + 300);
+    });
+    await page.waitForTimeout(1200); // (its rise-in done)
+    const read = () => page.evaluate(() => ({
+      y: window.scrollY,
+      top: document.querySelector("[data-pendant='quote2']")!.getBoundingClientRect().top,
+      glass: document.querySelector("section.ab")!.getAttribute("data-glass"),
+      slot: document.querySelector("[data-pendant='glass']")!.getBoundingClientRect().height,
+    }));
+    const before = await read();
+    expect(before.top, "the slot's place (the quote's top) wholly above the screen once it opens").toBeLessThan(-250);
+    await page.evaluate(() => (window as unknown as { __idle: () => void }).__idle());
+    await expect.poll(async () => (await read()).glass, { timeout: 20_000 }).toBe("on");
+    await page.waitForTimeout(300);
+    const after = await read();
+    expect(after.slot).toBeGreaterThan(150); // (open: 50vw)
+    expect(after.y - before.y, "the page scrolled by the slot's height").toBeCloseTo(after.slot, 0);
+    expect(Math.abs(after.top - before.top), "Andrada's quote held its place on screen").toBeLessThan(3);
+    expect(errors).toEqual([]);
+  });
+});
