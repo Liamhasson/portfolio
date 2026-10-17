@@ -25,8 +25,10 @@ type Pictures = {
 };
 const PICTURES: Pictures = {
   // word-sized loops, inline right after "two rock bands", part of the link to /playground; the title shows on hover.
-  // (The loops here play About's own right-sized copies in /about/loops/: the bands 320 x 180, the strip 480 x 300, limited-range
-  // yuv420p. The shared /playground and /work files are 1280 wide; two of those playing at once dropped the page to 30 fps.)
+  // (The loops here play About's own copies in /about/loops/: the bands 320 x 180, the strip 480 x 300, limited-range yuv420p,
+  // each at 120 fps with its frames repeated. Once two or more videos play, Chrome holds the whole page to the fastest one's
+  // frame rate until the next scroll or touch: two 30 fps loops held it at 30 fps. The shared 1280-wide /playground and /work
+  // files stay as they are for their other users.)
   bands: [
     { id: "marni-came", src: "/about/loops/after-heartbreaks-loop.mp4", poster: "/playground/after-heartbreaks-film.jpg", alt: "Marni Came on stage", title: "Marni Came", loop: true },
     { id: "sanskrit", src: "/about/loops/my-small-world-loop.mp4", poster: "/playground/my-small-world.jpg", alt: "Sanskrit, my band before Marni Came", title: "Sanskrit", loop: true },

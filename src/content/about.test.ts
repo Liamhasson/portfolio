@@ -4,6 +4,37 @@ import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { ABOUT, CONTACT, plain } from "./about";
 
+/** An MP4's video track: its coded frame size and its frames per second (the media timescale over the sample duration,
+ *  which must be the same for every sample). Reads the boxes moov > trak > mdia > (mdhd, hdlr, minf > stbl > (stsd, stts)). */
+function mp4Video(file: string) {
+  const b = readFileSync(file);
+  const boxes = (from: number, to: number) => {
+    const out: { type: string; start: number; end: number }[] = [];
+    for (let at = from; at + 8 <= to;) {
+      let size = b.readUInt32BE(at), head = 8;
+      if (size === 1) { size = Number(b.readBigUInt64BE(at + 8)); head = 16; } else if (size === 0) size = to - at;
+      out.push({ type: b.toString("latin1", at + 4, at + 8), start: at + head, end: at + size });
+      at += size;
+    }
+    return out;
+  };
+  const child = (box: { start: number; end: number }, type: string) => boxes(box.start, box.end).find((x) => x.type === type)!;
+  const moov = boxes(0, b.length).find((x) => x.type === "moov")!;
+  for (const trak of boxes(moov.start, moov.end).filter((x) => x.type === "trak")) {
+    const mdia = child(trak, "mdia");
+    if (b.toString("latin1", child(mdia, "hdlr").start + 8, child(mdia, "hdlr").start + 12) !== "vide") continue;
+    const mdhd = child(mdia, "mdhd"), v1 = b[mdhd.start] === 1;
+    const timescale = b.readUInt32BE(mdhd.start + (v1 ? 20 : 12));
+    const stbl = child(child(mdia, "minf"), "stbl"), stts = child(stbl, "stts"), entry = child(stbl, "stsd").start + 8;
+    const n = b.readUInt32BE(stts.start + 4);
+    const deltas = new Set<number>();
+    for (let i = 0; i < n; i++) deltas.add(b.readUInt32BE(stts.start + 8 + i * 8 + 4));
+    // (the visual sample entry's width and height: after its 8-byte header, 6 reserved, the data reference, and 16 more)
+    return { width: b.readUInt16BE(entry + 32), height: b.readUInt16BE(entry + 34), fps: deltas.size === 1 ? timescale / [...deltas][0] : NaN };
+  }
+  throw new Error(`${file}: no video track`);
+}
+
 const approved = readFileSync(join(process.cwd(), "docs/copy/about.md"), "utf8")
   .split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#"));
 
@@ -68,6 +99,12 @@ describe("About and Contact content (spec 2026-10-12-about-contact-design.md)", 
     // (two 1280-wide /work or /playground files playing at once dropped the page to 30 fps; the posters stay the shared ones)
     for (const p of [...ABOUT.pictures.bands, ...ABOUT.pictures.strip]) expect(p.src).toMatch(/^\/about\/loops\/[a-z-]+\.mp4$/);
     expect(ABOUT.pictures.strip.map((p) => p.poster)).toEqual(["/work/cyvore.jpg", "/work/eventread.jpg", "/work/nordic-logic-live.jpg"]);
+  });
+  test("those loops run at 120 fps (each frame repeated), at their right size: two or more playing at 30 fps cap the whole page at 30 fps in Chrome", () => {
+    // (Chrome's compositor holds the page to the fastest playing video's rate once two or more videos play and nothing is
+    // being scrolled or touched; a 120 fps loop keeps that at a ProMotion screen's 120 Hz: task-clips-report.md)
+    for (const p of ABOUT.pictures.strip) expect(mp4Video(join(process.cwd(), "public", p.src)), p.id).toEqual({ width: 480, height: 300, fps: 120 });
+    for (const p of ABOUT.pictures.bands) expect(mp4Video(join(process.cwd(), "public", p.src)), p.id).toEqual({ width: 320, height: 180, fps: 120 });
   });
   test("Pulse is not in About's pictures", () => {
     for (const p of pictures()) {
