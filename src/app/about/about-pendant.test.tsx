@@ -233,3 +233,19 @@ test("a lost context gives the glass back to the testimonials", async () => {
   unmount();
   expect(glassOwner()).toBe("testimonials");
 });
+
+test("the stack's glass slot takes its room only while the pendant holds the ball and draws", async () => {
+  await liveScene();
+  const { fontsDone, runIdle } = setup();
+  const { container, unmount } = render(<Page mode="stack" />);
+  const sec = container.querySelector<HTMLElement>(".ab")!;
+  expect(sec.dataset.glass).toBeUndefined(); // (nothing drawn yet: no slot)
+  await fontsDone();
+  await runIdle();
+  await waitFor(() => expect(window.__pendant?.ready).toBe(true));
+  expect(sec.dataset.glass).toBe("on");
+  act(() => { container.querySelector(".ab-pendant")!.dispatchEvent(new Event("webglcontextlost", { cancelable: true })); });
+  expect(sec.dataset.glass).toBeUndefined(); // (the GPU gone: the slot collapses)
+  unmount();
+});
+

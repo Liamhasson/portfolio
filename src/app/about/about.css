@@ -107,6 +107,8 @@ a.ab-proof:hover, a.ab-proof:focus-visible { color: #f4efe9; }
 .ab[data-mode="stack"] .ab-strip .ab-pic { width: 28vw; }
 .ab[data-mode="stack"] .ab-pic-cap { margin-top: 1.6vw; white-space: normal; }
 .ab[data-mode="stack"] .ab-deskvid { width: min(100%, 520px); margin: 0; align-self: flex-start; }
-/* the glass ball's slot between the stacked quotes (Liam, 2026-10-17): the pendant draws the ball in it, 0.44 of its width */
-.ab[data-mode="stack"] .ab-glass { width: 50vw; height: 50vw; min-height: 0; align-self: center; }
+/* the glass ball's slot between the stacked quotes (Liam, 2026-10-17): the pendant draws the ball in it, 0.44 of its width.
+   It takes its room only while the pendant holds the ball and draws (about-pendant.tsx sets data-glass): no empty square. */
+.ab[data-mode="stack"] .ab-glass { display: none; }
+.ab[data-mode="stack"][data-glass="on"] .ab-glass { display: flex; width: 50vw; height: 50vw; min-height: 0; align-self: center; }
 .ab[data-mode="stack"] .ab-verb-body { max-width: none; }   /* (the 60vw cap is the track's; the slide itself is already uncapped) */

@@ -107,6 +107,9 @@ const FORCED_EASE = 0.0001;
 /** Stacked, the canvas fades in over this long once drawn (s), as the track's CSS fades it in. Under reduced motion a change
  *  of shot crossfades it: out over half of CROSSFADE, the new shot held, back in over the other half. */
 const APPEAR = 0.6;
+/** Stacked, the opening waits unseen while its outline is on the site's chrome (at the page's top the gap above the first
+ *  line is still under the resume pill), then fades in over this long (s) as it rises clear; and back out the same way. */
+const CLEAR_FADE = 0.3;
 const CROSSFADE = 0.6;
 /** Stacked, the pictures that hold still in the column count too: Liam's photo above the first line (on the track it is
  *  cropped away before the pendant reaches it, so only the stack avoids it). */
@@ -114,6 +117,7 @@ const STACK_PIC = ".ab-portrait";
 /** The pull to Contact under About (about-track.tsx `.ab-end`): stacked, the canvas has faded out before its first line
  *  comes up the screen. */
 const PULL = ".ab-end";
+const PULL_FADE = 0.85;
 
 const clamp01 = (v: number) => Math.min(Math.max(v, 0), 1);
 
@@ -212,7 +216,13 @@ export function AboutPendant() {
     /** The glass ball is one ball: the pendant claims it once its scene is ready (the testimonials then don't draw theirs),
      *  and gives it back on unmount or a lost context (about-glass.ts). */
     let releaseGlass: (() => void) | null = null;
-    const giveGlassBack = () => { releaseGlass?.(); releaseGlass = null; };
+    /** The glass slot between the stacked quotes takes its room only while the pendant holds the ball and draws
+     *  (about.css: `data-glass` on the section); without the pendant the stack has no empty square. */
+    const glassShown = (on: boolean) => {
+      if (!sec) return;
+      if (on) { if (sec.dataset.glass !== "on") sec.dataset.glass = "on"; } else delete sec.dataset.glass;
+    };
+    const giveGlassBack = () => { releaseGlass?.(); releaseGlass = null; glassShown(false); };
 
     // ---------- layout: the track measured (on load, resize, fonts, and whenever the track or section changes size) ----------
     /** The quality follows the frame time, both ways: the sharpness down to 1.5x, then the depth of field at half resolution
@@ -333,6 +343,7 @@ export function AboutPendant() {
         held = -1;
         motion = REST;
         appear = 0;
+        clearK = 0;
         setOpacity(null);
       }
       hook.mode = mode;
@@ -498,7 +509,7 @@ export function AboutPendant() {
     let jumped = true, sTargetPrev = 0;
     /** Stacked: the fade-in once drawn (0..1). Reduced motion: the shot held (-1 before the first frame) and the crossfade
      *  (1 shown, down to 0 and back as the held shot changes). */
-    let appear = 0, held = -1, fadeK = 1;
+    let appear = 0, held = -1, fadeK = 1, clearK = 0;
     /** Stacked, the canvas's opacity is the frame's (the fade-in, the crossfade, the outro: the canvas is fixed to the screen
      *  there, so it can't scroll off with the pinned frame); null hands it back to about.css (the track). */
     let opacityNow: string | null = null;
@@ -627,9 +638,17 @@ export function AboutPendant() {
         // and the pull's first line coming up into view
         const shownH = window.innerHeight, foot = L.top + L.H - shownH;
         const gap = L.pullTop === null ? 0.1 * shownH : L.pullTop - (L.top + L.H);
-        const away = clamp01((y - foot) / Math.max(gap, 1));
+        // (done over the first PULL_FADE of that gap: fully out a little before the line, never a sub-pixel after it)
+        const away = clamp01((y - foot) / Math.max(gap * PULL_FADE, 1));
         appear = Math.min(appear + dt / APPEAR, 1);
-        setOpacity(appear * fadeK * (1 - away));
+        // the opening, while its outline is on the chrome (the resume pill at the page's top): unseen, not dimmed behind it
+        const opening = reduced ? held === 0 : f.index === 0 && f.t < 0.5;
+        // (and, while it is still coming in, until the layers have it in front: there it is clear of the chrome by the motion's
+        // whole reach, so it arrives at full brightness rather than dimmed behind; once in, behind the words dims as ever)
+        const onChrome = opening && hits(clipBox(padBox(box, (sv?.PAD ?? 8) / 2), L.vw, L.vh), [], 0, fixed) > 0;
+        const unseen = onChrome || (opening && layer === "back" && clearK < 1);
+        clearK = unseen ? Math.max(clearK - dt / CLEAR_FADE, 0) : Math.min(clearK + dt / CLEAR_FADE, 1);
+        setOpacity(appear * clearK * fadeK * (1 - away));
       } else setOpacity(null);
       hook.blur = sc.blurState;
       hook.pixelRatio = L.pr;
@@ -652,6 +671,7 @@ export function AboutPendant() {
       hook.dragging = drag !== null;
       hook.glass = glass && { x: glass.x, y: glass.y, r: glass.r * f.glass }; // (the scene grows the ball with f.glass)
       if (!hook.ready) { hook.ready = true; canvas.dataset.ready = ""; }
+      glassShown(releaseGlass !== null);
     };
 
     const frame = (now: number) => {

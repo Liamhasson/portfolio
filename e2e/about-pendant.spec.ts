@@ -488,6 +488,16 @@ for (const [w, h] of [[390, 844], [430, 932]] as const) {
       expect(hook.pr).toBeLessThanOrEqual(2); // (a 3x phone draws at 2x at most)
       expect(hook.fxaa).toBe(true); // (and so is smoothed: under the screen's own ratio there is no multisampling)
       await expect(page.locator("canvas.ab-pendant")).toBeVisible();
+      // at the page's top the opening's gap is still under the resume pill: unseen there, never a dim sliver behind it
+      const atLoad = await page.evaluate(() => {
+        const h = window.__pendant!;
+        const op = Number(getComputedStyle(document.querySelector("canvas.ab-pendant")!).opacity);
+        const on = [...document.querySelectorAll<HTMLElement>(".sh-name, .sh-nav, .sh-burger, .ab-resume")].map((e) => e.getBoundingClientRect())
+          .filter((r) => r.width > 0 && h.box.l < r.right && h.box.r > r.left && Math.max(h.box.t, 0) < r.bottom && Math.min(h.box.b, innerHeight) > r.top);
+        return { s: h.s, op, onChrome: on.length };
+      });
+      expect(atLoad.s).toBe(0);
+      expect(atLoad.op === 0 || atLoad.onChrome === 0).toBe(true);
       const { top, end, foot } = await stackRange(page);
       const bad: string[] = [];
       let front = 0;
@@ -505,7 +515,26 @@ for (const [w, h] of [[390, 844], [430, 932]] as const) {
       }
       expect(bad).toEqual([]);
       expect(front).toBeGreaterThan(30); // (and it was in front for a good part of the way: the check had something to check)
-      // at the section's foot (the pull's first line on screen) the canvas has faded right out
+      // where the pull's first line comes up into view the canvas has already faded right out (About still on screen, so
+      // this is the outro's own fade, not the pause off screen)
+      const pullIn = await page.evaluate(() => {
+        const range = document.createRange();
+        const walk = document.createTreeWalker(document.querySelector(".ab-end")!, NodeFilter.SHOW_TEXT);
+        for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+          if (!n.textContent?.trim()) continue;
+          range.selectNodeContents(n);
+          return range.getClientRects()[0].top + scrollY - innerHeight;
+        }
+        return null;
+      });
+      expect(pullIn).not.toBeNull();
+      await page.evaluate((y) => window.scrollTo(0, y), pullIn!);
+      await page.waitForTimeout(600);
+      expect(await page.evaluate(() => document.querySelector(".ab")!.getBoundingClientRect().bottom > 0)).toBe(true);
+      expect((await stackPaint(page)).opacity).toBe(0);
+      // and at the section's foot
+      await page.evaluate((y) => window.scrollTo(0, y), foot);
+      await page.waitForTimeout(400);
       expect((await stackPaint(page)).opacity).toBe(0);
       expect(errors).toEqual([]);
     });
@@ -547,6 +576,20 @@ test.describe("on a phone, the glass", () => {
     expect(px.brass).toBeGreaterThan(0.08); // (the pendant, magnified, inside)
     expect(px.grey).toBeLessThan(0.05);
     expect(errors).toEqual([]);
+  });
+});
+
+test.describe("on a phone, without the pendant", () => {
+  test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+  test("no empty glass slot between the quotes", async ({ page }) => {
+    test.setTimeout(60_000);
+    let aborted = 0;
+    await page.route("**/about/pendant/**", (r) => { aborted++; return r.abort(); });
+    await page.goto("/about");
+    await expect.poll(() => aborted, { timeout: 15_000 }).toBeGreaterThan(0);
+    await expect(page.locator("canvas.ab-pendant")).toHaveCount(0, { timeout: 15_000 });
+    expect(await page.locator("[data-pendant='glass']").evaluate((el) => el.getBoundingClientRect().height)).toBe(0);
+    await expect(page.locator("section.ab")).not.toHaveAttribute("data-glass", "on");
   });
 });
 
