@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { glassOwner, setGlassLight, showGlassSlot, type GlassLight, type GlassOwner } from "@/lib/about-glass";
 import type { LightBall, LightFrame, TestimonialsLight } from "@/three/edge-light/testimonials-light";
-import { lensBand, lensDepth, lensMap, lensScale, lensStrips, lensSupported, type LensEdge } from "./edge-lens";
+import { lensBand, lensDepth, lensMap, lensScale, lensStrips, lensSupported, type LensEdge, type LensLayout } from "./edge-lens";
 import { pulsePhase, stepArrival, testimonialsQ, type Arrival } from "./testimonials-q";
 import { trackProgress, trackX } from "./track";
 import { resizeKind } from "./viewport";
@@ -110,12 +110,18 @@ export function AboutTestimonials() {
   // (the URL bar showing): the filter clips it to the strip, and the bottom strip's slice is the map's foot wherever that
   // strip sits. Meanwhile, after a real resize, each old slice is stretched over its strip's new box at once, so no part
   // of a strip is ever left outside its map. Gone with the light (a failure): no more work.
+  // On the desktop track only the left and right strips show, each the full height (edge-lens.ts LensLayout "sides": about.css
+  // hides the top and bottom ones there); stacked, all four. A change of layout (the section's data-mode) rebuilds the
+  // slices at once, before the next frame paints, so a strip is never shown with a slice built for the other layout.
   useEffect(() => {
     if (!lensOn || gone) return;
     const box = lensRef.current, defs = defsRef.current;
     if (!box || !defs) return;
     const imgs = LENS_EDGES.map((e) => defs.querySelector<SVGFEImageElement>(`#ab-edge-lens-${e} feImage`));
     if (imgs.some((i) => !i)) return;
+    const imgOf = (e: LensEdge) => imgs[LENS_EDGES.indexOf(e)]!;
+    const sec = box.closest<HTMLElement>(".ab");
+    const layout = (): LensLayout => (sec?.dataset.mode === "track" ? "sides" : "four");
     const c = document.createElement("canvas");
     /** The large viewport's height, from a hidden fixed 100lvh probe (100vh where lvh isn't known), as the pendant has it. */
     const probe = document.createElement("div");
@@ -125,11 +131,11 @@ export function AboutTestimonials() {
     document.body.appendChild(probe);
     const screenSize = () => lensScreen(probe.offsetHeight);
     let timer = 0, depth = 0, off = false, painted = false;
-    /** The screen size the slices were built for, and the one their placement shows now ("WxH"). */
+    /** The screen size and layout the slices were built for, and the ones their placement shows now ("WxH:layout"). */
     let built = "", shown = "";
-    /** The exact placements of the last build, to put back when a resize returns to the built size. */
-    let exact: [number, number, number, number][] = [];
-    const sizeKey = (W: number, H: number) => `${W}x${H}`;
+    /** The exact placements of the last build (by strip), to put back when a resize returns to the built size. */
+    let exact: [LensEdge, number, number, number, number][] = [];
+    const sizeKey = (W: number, H: number) => `${W}x${H}:${layout()}`;
     const place = (img: SVGFEImageElement, x: number, y: number, w: number, h: number) => {
       img.setAttribute("x", String(x)); img.setAttribute("y", String(y));
       img.setAttribute("width", String(w)); img.setAttribute("height", String(h));
@@ -139,8 +145,8 @@ export function AboutTestimonials() {
       const { w: W, h: H } = screenSize(), key = sizeKey(W, H);
       if (key === shown) return;
       shown = key;
-      if (key === built) { imgs.forEach((img, i) => place(img!, ...exact[i])); return; }
-      lensStrips(W, H, depth).forEach((s, i) => place(imgs[i]!, 0, 0, s.w, s.h));
+      if (key === built) { exact.forEach(([e, ...at]) => place(imgOf(e), ...at)); return; }
+      lensStrips(W, H, depth, layout()).forEach((s) => place(imgOf(s.edge), 0, 0, s.w, s.h));
     };
     const build = () => {
       if (off) return;
@@ -151,19 +157,19 @@ export function AboutTestimonials() {
       const w = Math.max(1, Math.ceil(W / 2)), h = Math.max(1, Math.ceil(H / 2));
       const band = lensBand(W, H), D = lensDepth(band);
       const urls: string[] = [];
-      const at: [number, number, number, number][] = [];
+      const at: [LensEdge, number, number, number, number][] = [];
       try {
         const x = c.getContext("2d");
         if (!x) return;
         const full = new ImageData(lensMap(w, h, band * 0.5) as Uint8ClampedArray<ArrayBuffer>, w, h);
-        for (const s of lensStrips(W, H, D)) {
+        for (const s of lensStrips(W, H, D, layout())) {
           // (the slice: the map's pixels under the strip, rounded outward; placed in the strip's own space)
           const sx = Math.floor(s.x / 2), sy = Math.floor(s.y / 2);
           const sw = Math.max(1, Math.min(w, Math.ceil((s.x + s.w) / 2)) - sx), sh = Math.max(1, Math.min(h, Math.ceil((s.y + s.h) / 2)) - sy);
           c.width = sw; c.height = sh;
           x.putImageData(full, -sx, -sy, sx, sy, sw, sh);
           urls.push(c.toDataURL("image/png"));
-          at.push([2 * sx - s.x, 2 * sy - s.y, 2 * sw, 2 * sh]);
+          at.push([s.edge, 2 * sx - s.x, 2 * sy - s.y, 2 * sw, 2 * sh]);
         }
       } catch {
         return; // (no 2D canvas: no map, so no lens)
@@ -171,7 +177,8 @@ export function AboutTestimonials() {
       depth = D;
       // (clamped as lensStrips clamps it: on a very short screen the CSS strips and the slices agree)
       box.style.setProperty("--lens-d", `${Math.min(D, W / 2, H / 2)}px`);
-      imgs.forEach((img, i) => { img!.setAttribute("href", urls[i]); place(img!, ...at[i]); });
+      // (the strips of this layout only: the others are hidden, and get theirs when the layout turns to them)
+      at.forEach(([e, ...p], i) => { imgOf(e).setAttribute("href", urls[i]); place(imgOf(e), ...p); });
       exact = at;
       built = shown = key;
       lensReady.current = true;
@@ -185,11 +192,21 @@ export function AboutTestimonials() {
       clearTimeout(timer);
       timer = window.setTimeout(() => (built ? build() : ensure()), 150);
     };
+    /** A change of layout: the slices for the new one now (built once already: the first build waits for the paint). */
+    let lastLayout = layout();
+    const onMode = () => {
+      if (layout() === lastLayout) return;
+      lastLayout = layout();
+      if (built) build();
+    };
+    const modeObs = sec && typeof MutationObserver === "function" ? new MutationObserver(onMode) : null;
+    if (sec) modeObs?.observe(sec, { attributes: true, attributeFilter: ["data-mode"] });
     void afterPaint().then(() => { painted = true; ensure(); });
     window.addEventListener("resize", onResize);
     return () => {
       off = true;
       clearTimeout(timer);
+      modeObs?.disconnect();
       window.removeEventListener("resize", onResize);
       probe.remove();
       lensReady.current = false;
@@ -306,7 +323,9 @@ export function AboutTestimonials() {
 
     /** Where the quotes and the slot are this frame (screen px): `size` the axis q is scrubbed along (the screen's width on
      *  the track, the large viewport's height stacked), `c0` Yoav's centre along it. Null in any other layout. */
-    const measure = () => {
+    /** This frame's places, rewritten in place each frame (no object per frame; read within the frame only). */
+    const placed = { size: 0, c0: 0, stack: false, q: 0, slot: { x: 0, y: 0, w: 0 }, near: false };
+    const measure = (): typeof placed | null => {
       if (sec.dataset.mode === "stack") return measureStack();
       if (sec.dataset.mode !== "track") return null;
       return measureTrack();
@@ -321,25 +340,24 @@ export function AboutTestimonials() {
       const centre = (r: DOMRect) => left + (r.left - trR.left) + r.width / 2;
       const s = slot.getBoundingClientRect();
       const c0 = centre(q1.getBoundingClientRect()), c1 = centre(q2.getBoundingClientRect()), sx = centre(s);
-      return {
-        size: vw, c0, stack: false,
-        q: vw > 0 ? testimonialsQ(c0, c1, vw) : 0,
-        slot: { x: sx, y: s.top + s.height / 2, w: s.width },
-        near: s.width > 0 && sx > -s.width && sx < vw + s.width,
-      };
+      placed.size = vw; placed.c0 = c0; placed.stack = false;
+      placed.q = vw > 0 ? testimonialsQ(c0, c1, vw) : 0;
+      placed.slot.x = sx; placed.slot.y = s.top + s.height / 2; placed.slot.w = s.width;
+      placed.near = s.width > 0 && sx > -s.width && sx < vw + s.width;
+      return placed;
     };
     /** Stacked: the page scrolls the column itself, so each rect is where it is on screen (its rise-in taken out); the
      *  canvas is fixed at the screen's top, so screen px are the canvas's. */
     const measureStack = () => {
       const vh = screenBox().h;
-      const middle = (el: HTMLElement) => { const r = el.getBoundingClientRect(); return { r, y: r.top - rising(el) + r.height / 2 }; };
-      const a = middle(q1), b = middle(q2), s = middle(slot);
-      return {
-        size: vh, c0: a.y, stack: true,
-        q: vh > 0 ? testimonialsQ(a.y, b.y, vh) : 0,
-        slot: { x: s.r.left + s.r.width / 2, y: s.y, w: s.r.width },
-        near: s.r.width > 0 && s.y > -s.r.width && s.y < vh + s.r.width,
-      };
+      const middle = (el: HTMLElement, r: DOMRect) => r.top - rising(el) + r.height / 2;
+      const sr = slot.getBoundingClientRect();
+      const a = middle(q1, q1.getBoundingClientRect()), b = middle(q2, q2.getBoundingClientRect()), sy = middle(slot, sr);
+      placed.size = vh; placed.c0 = a; placed.stack = true;
+      placed.q = vh > 0 ? testimonialsQ(a, b, vh) : 0;
+      placed.slot.x = sr.left + sr.width / 2; placed.slot.y = sy; placed.slot.w = sr.width;
+      placed.near = sr.width > 0 && sy > -sr.width && sy < vh + sr.width;
+      return placed;
     };
 
     const tick = (now: number) => {

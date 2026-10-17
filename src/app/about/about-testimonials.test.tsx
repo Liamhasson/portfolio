@@ -353,7 +353,7 @@ test("no lens outside Chromium (no userAgentData): no element, no filter, the ho
   expect(window.__testimonials!.lens).toBe(0);
 });
 
-test("Chromium: four strips, each its slice of the map; shown only while q > 0.01, scale 2·26·q easing below full; reduced: 26·q", async () => {
+test("Chromium, on the track: the side strips only, each the full height with its slice of the map; shown only while q > 0.01, scale 2·26·q easing below full; reduced: 26·q", async () => {
   const { putImageData, toDataURL } = asChromium();
   await mount();
   const lens = document.querySelector<HTMLElement>(".ab-lens")!;
@@ -363,19 +363,19 @@ test("Chromium: four strips, each its slice of the map; shown only while q > 0.0
   // 1000 x 800: the band 52 px, the strips 86 px deep (band + pull + margin)
   expect(lens.style.getPropertyValue("--lens-d")).toBe("86px");
   const fs = filters();
-  // the map: built once on mount at half the screen's resolution, cut into the strips' four slices (map px)
-  expect(toDataURL).toHaveBeenCalledTimes(4);
+  // the map: built once on mount at half the screen's resolution, cut into the side strips' two slices (map px), the right
+  // then the left, each the map's full height (the top and bottom strips are hidden on the track: about.css)
+  expect(toDataURL).toHaveBeenCalledTimes(2);
   const full = putImageData.mock.calls[0][0] as { width: number; height: number };
   expect([full.width, full.height]).toEqual([W / 2, H / 2]);
   expect(putImageData.mock.calls.map((c) => c.slice(1))).toEqual([
-    [-0, -0, 0, 0, 500, 43],
-    [-457, -43, 457, 43, 43, 314],
-    [-0, -357, 0, 357, 500, 43],
-    [-0, -43, 0, 43, 43, 314],
+    [-457, -0, 457, 0, 43, 400],
+    [-0, -0, 0, 0, 43, 400],
   ]);
-  // each slice placed over its strip's own box (screen px, the strip's own space)
-  expect(fs.map((f) => placed(f.img))).toEqual([[0, 0, 1000, 86], [0, 0, 86, 628], [0, 0, 1000, 86], [0, 0, 86, 628]]);
-  for (const f of fs) expect(f.img.getAttribute("href")).toBe("data:image/png;base64,TEST");
+  // each slice placed over its strip's own box (screen px, the strip's own space); the top and bottom ones get none
+  expect([fs[1], fs[3]].map((f) => placed(f.img))).toEqual([[0, 0, 86, 800], [0, 0, 86, 800]]);
+  for (const f of [fs[1], fs[3]]) expect(f.img.getAttribute("href")).toBe("data:image/png;base64,TEST");
+  for (const f of [fs[0], fs[2]]) expect(f.img.getAttribute("href")).toBeNull();
   // q 0 (the slot near, the light drawing): hidden
   at = { q1: W + 1100, slot: W + SLOT - 10, q2: W + 1500 };
   window.dispatchEvent(new Event("scroll"));
@@ -410,21 +410,21 @@ test("Chromium: four strips, each its slice of the map; shown only while q > 0.0
 test("a resize stretches each slice over its strip's new box at once and rebuilds the map 150 ms after the resize settles", async () => {
   const { toDataURL } = asChromium();
   await mount();
-  const fs = filters();
-  expect(toDataURL).toHaveBeenCalledTimes(4);
+  const fs = filters(), sides = [fs[1], fs[3]];
+  expect(toDataURL).toHaveBeenCalledTimes(2);
   Object.defineProperty(window, "innerWidth", { configurable: true, value: 1200 });
   Object.defineProperty(window, "innerHeight", { configurable: true, value: 700 });
   window.dispatchEvent(new Event("resize"));
   window.dispatchEvent(new Event("resize"));
-  // at once: the old 86 px strips over the new screen
-  expect(fs.map((f) => placed(f.img))).toEqual([[0, 0, 1200, 86], [0, 0, 86, 528], [0, 0, 1200, 86], [0, 0, 86, 528]]);
-  expect(toDataURL).toHaveBeenCalledTimes(4);
-  await waitFor(() => expect(toDataURL).toHaveBeenCalledTimes(8), { timeout: 1000 });
+  // at once: the old 86 px side strips over the new screen's full height
+  expect(sides.map((f) => placed(f.img))).toEqual([[0, 0, 86, 700], [0, 0, 86, 700]]);
+  expect(toDataURL).toHaveBeenCalledTimes(2);
+  await waitFor(() => expect(toDataURL).toHaveBeenCalledTimes(4), { timeout: 1000 });
   // rebuilt: 1200 x 700, the band 45.5 px, the strips 80 px deep
   expect(document.querySelector<HTMLElement>(".ab-lens")!.style.getPropertyValue("--lens-d")).toBe("80px");
-  expect(fs.map((f) => placed(f.img))).toEqual([[0, 0, 1200, 80], [0, 0, 80, 540], [0, 0, 1200, 80], [0, 0, 80, 540]]);
+  expect(sides.map((f) => placed(f.img))).toEqual([[0, 0, 80, 700], [0, 0, 80, 700]]);
   await new Promise((r) => setTimeout(r, 250));
-  expect(toDataURL).toHaveBeenCalledTimes(8); // (debounced: one rebuild for the two events)
+  expect(toDataURL).toHaveBeenCalledTimes(4); // (debounced: one rebuild for the two events)
 });
 
 test("unmounting hides the lens and stops listening for resizes", async () => {
@@ -438,7 +438,7 @@ test("unmounting hides the lens and stops listening for resizes", async () => {
   expect(document.querySelector(".ab-lens")).toBeNull();
   window.dispatchEvent(new Event("resize"));
   await new Promise((r) => setTimeout(r, 250));
-  expect(toDataURL).toHaveBeenCalledTimes(4);
+  expect(toDataURL).toHaveBeenCalledTimes(2);
 });
 
 // ---------- Task 4, fix round 2: the map waits; no work after a failure or an unchanged resize ----------
@@ -465,7 +465,7 @@ test("no map is built before About has painted; once painted it comes, stacked a
 test("after the light fails, the lens is gone and a resize builds nothing", async () => {
   const { toDataURL } = asChromium();
   await mount();
-  expect(toDataURL).toHaveBeenCalledTimes(4);
+  expect(toDataURL).toHaveBeenCalledTimes(2);
   draw.mockImplementation(() => { throw new Error("context lost"); });
   at = { q1: 600, slot: 900, q2: 1300 };
   window.dispatchEvent(new Event("scroll"));
@@ -475,7 +475,7 @@ test("after the light fails, the lens is gone and a resize builds nothing", asyn
   Object.defineProperty(window, "innerWidth", { configurable: true, value: 1200 });
   window.dispatchEvent(new Event("resize"));
   await new Promise((r) => setTimeout(r, 250));
-  expect(toDataURL).toHaveBeenCalledTimes(4);
+  expect(toDataURL).toHaveBeenCalledTimes(2);
 });
 
 test("a resize that leaves the screen's size as it was rebuilds nothing and touches no placement", async () => {
@@ -485,29 +485,61 @@ test("a resize that leaves the screen's size as it was rebuilds nothing and touc
   const sets = fs.map((f) => vi.spyOn(f.img, "setAttribute"));
   window.dispatchEvent(new Event("resize")); // (the same 1000 x 800)
   await new Promise((r) => setTimeout(r, 250));
-  expect(toDataURL).toHaveBeenCalledTimes(4);
+  expect(toDataURL).toHaveBeenCalledTimes(2);
   for (const set of sets) expect(set).not.toHaveBeenCalled();
   // away and straight back before the rebuild: stretched, then the exact placements put back, still no rebuild
   Object.defineProperty(window, "innerHeight", { configurable: true, value: 700 });
   window.dispatchEvent(new Event("resize"));
-  expect(placed(fs[1].img)).toEqual([0, 0, 86, 528]);
+  expect(placed(fs[1].img)).toEqual([0, 0, 86, 700]);
   Object.defineProperty(window, "innerHeight", { configurable: true, value: H });
   window.dispatchEvent(new Event("resize"));
-  expect(fs.map((f) => placed(f.img))).toEqual([[0, 0, 1000, 86], [0, 0, 86, 628], [0, 0, 1000, 86], [0, 0, 86, 628]]);
+  expect([fs[1], fs[3]].map((f) => placed(f.img))).toEqual([[0, 0, 86, 800], [0, 0, 86, 800]]);
   await new Promise((r) => setTimeout(r, 250));
-  expect(toDataURL).toHaveBeenCalledTimes(4);
+  expect(toDataURL).toHaveBeenCalledTimes(2);
 });
 
-test("on a very short screen the strips' depth is clamped to half of it, as lensStrips clamps it", async () => {
+test("on a very short screen the strips' depth is clamped to half of it, as lensStrips clamps it (stacked: four strips)", async () => {
   asChromium();
   const { runIdle } = setup();
   Object.defineProperty(window, "innerHeight", { configurable: true, value: 70 }); // (band 4.55 px: 39 px strips, more than half)
-  render(<Page />);
+  render(<Page mode="stack" />);
   await runIdle();
   await waitFor(() => expect(document.querySelector<HTMLElement>(".ab-lens")!.style.getPropertyValue("--lens-d")).toBe("35px"));
   // (the top and bottom strips meet: the side strips have no height left, their slices the 1 map px minimum)
   expect(placed(filters()[0].img)[3]).toBe(36); // (35 px, its slice rounded outward to whole map px: 18)
   expect(placed(filters()[1].img)[3]).toBeLessThanOrEqual(2);
+});
+
+test("stacked: all four strips, each its slice of the map (the sides between the top and the bottom)", async () => {
+  const { putImageData, toDataURL } = asChromium();
+  await mount("stack");
+  await waitFor(() => expect(toDataURL).toHaveBeenCalledTimes(4));
+  expect(putImageData.mock.calls.map((c) => c.slice(1))).toEqual([
+    [-0, -0, 0, 0, 500, 43],
+    [-457, -43, 457, 43, 43, 314],
+    [-0, -357, 0, 357, 500, 43],
+    [-0, -43, 0, 43, 43, 314],
+  ]);
+  const fs = filters();
+  expect(fs.map((f) => placed(f.img))).toEqual([[0, 0, 1000, 86], [0, 0, 86, 628], [0, 0, 1000, 86], [0, 0, 86, 628]]);
+  for (const f of fs) expect(f.img.getAttribute("href")).toBe("data:image/png;base64,TEST");
+});
+
+test("a change of layout rebuilds the slices for it at once: the track's two, the stack's four, and back", async () => {
+  const { toDataURL } = asChromium();
+  await mount();
+  const sec = document.querySelector<HTMLElement>("section.ab")!, fs = filters();
+  expect(toDataURL).toHaveBeenCalledTimes(2);
+  // (the attribute's observer runs as a microtask: before the next frame, no resize needed)
+  await act(async () => { sec.dataset.mode = "stack"; await Promise.resolve(); });
+  expect(toDataURL).toHaveBeenCalledTimes(6);
+  expect(fs.map((f) => placed(f.img))).toEqual([[0, 0, 1000, 86], [0, 0, 86, 628], [0, 0, 1000, 86], [0, 0, 86, 628]]);
+  await act(async () => { sec.dataset.mode = "track"; await Promise.resolve(); });
+  expect(toDataURL).toHaveBeenCalledTimes(8);
+  expect([fs[1], fs[3]].map((f) => placed(f.img))).toEqual([[0, 0, 86, 800], [0, 0, 86, 800]]);
+  // the same layout again (about-track.tsx rewrites data-mode on every resize): nothing rebuilt
+  await act(async () => { sec.dataset.mode = "track"; await Promise.resolve(); });
+  expect(toDataURL).toHaveBeenCalledTimes(8);
 });
 
 // ---------- Task 5: the stack (portrait phones, reduced motion) ----------

@@ -500,7 +500,7 @@ async function drawnOutline(page: Page, canvas: string, ground: string, edge: "d
   const clip = { x: Math.max(0, Math.round(slot.x - S)), y: Math.max(0, Math.round(slot.y - S)), width: 0, height: 0 };
   clip.width = Math.min(vp.width, Math.round(slot.x + S)) - clip.x;
   clip.height = Math.round(slot.y) + 1 - clip.y;
-  const png = (await page.screenshot({ clip })).toString("base64");
+  const png = (await page.screenshot({ clip, scale: "css" })).toString("base64"); // (one pixel per CSS px, whatever the screen)
   return page.evaluate(async ({ png, clip, slot, toMiddle, edge }) => {
     const img = new Image();
     img.src = `data:image/png;base64,${png}`;
@@ -651,6 +651,57 @@ async function inkIn(page: Page, clip: { x: number; y: number; width: number; he
   }, png);
 }
 
+/** The lens's scale held at the full 52 (the breath eases it), on the strips and any reference alike. */
+const holdScale = (page: Page) => page.evaluate(() => {
+  document.querySelectorAll(".ab-lens-defs feDisplacementMap").forEach((d) => {
+    const set = d.setAttribute.bind(d);
+    d.setAttribute = (k: string, v: string) => (k === "scale" ? undefined : set(k, v));
+    set("scale", "52");
+  });
+}).then(() => page.waitForTimeout(200));
+
+/** The reference: one full-screen fixed layer whose map is lensMap's own, at the size the page builds it (half the screen,
+ *  rounded up, at exactly twice its size): no slices in it, so a slice put in the wrong place can't hide in both. The
+ *  page's strips are hidden. */
+async function addReferenceLens(page: Page, W: number, H: number) {
+  const w = Math.ceil(W / 2), h = Math.ceil(H / 2);
+  const rgba = Buffer.from(lensMap(w, h, lensBand(W, H) * 0.5).buffer).toString("base64");
+  await page.evaluate(({ rgba, w, h }) => {
+    const bin = atob(rgba), data = new Uint8ClampedArray(bin.length);
+    for (let i = 0; i < bin.length; i++) data[i] = bin.charCodeAt(i);
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    c.getContext("2d")!.putImageData(new ImageData(data, w, h), 0, 0);
+    const NS = "http://www.w3.org/2000/svg", svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("width", "0"); svg.setAttribute("height", "0"); svg.style.position = "absolute";
+    svg.innerHTML = `<filter id="t4-ref" x="0" y="0" width="1" height="1" filterUnits="objectBoundingBox" color-interpolation-filters="sRGB"><feImage href="${c.toDataURL()}" result="map" x="0" y="0" width="${2 * w}" height="${2 * h}" preserveAspectRatio="none"/><feDisplacementMap in="SourceGraphic" in2="map" scale="52" xChannelSelector="R" yChannelSelector="G"/></filter>`;
+    const ref = document.createElement("div");
+    ref.id = "t4-ref-layer";
+    ref.style.cssText = "position:fixed;inset:0;z-index:3;pointer-events:none;backdrop-filter:url(#t4-ref)";
+    const lens = document.querySelector(".ab-lens")!;
+    lens.before(svg, ref);
+    document.querySelectorAll<HTMLElement>(".ab-lens-strip").forEach((s) => { s.style.display = "none"; });
+  }, { rgba, w, h });
+}
+
+/**
+ * Strips against the reference at an odd size. The right and bottom strips start on odd pixels, so their slices sit a pixel
+ * off their own origin (at the same place on the screen), and the filter samples the map a hair differently: where the bent
+ * text's edge sits on a rounding boundary, one row or column of pixels comes out a few levels apart (measured 10-17: up to 9
+ * levels, along one row 69 px into the bottom strip, or a few pixels down one column; never on a strip's origin). So: the
+ * strips' origins match to 2 levels; whatever differs is one line, at most a few levels and a few dozen pixels; off it, at
+ * most two. (A slice misplaced by one map pixel differs in hundreds of pixels per corner, all over its band and on its
+ * origin. Negative control, run once (Task 6): the right strip's slice moved by +1 map px gives about 2000 differing pixels
+ * in its corner, about 1900 of them off the busiest line, and 7 levels on the origin column, at both sizes; every check
+ * here fails on it.)
+ */
+function expectOddSeam(d: Awaited<ReturnType<typeof diffLines>>, where: string) {
+  expect(d.maxOnOrigin, where).toBeLessThanOrEqual(2);
+  expect(d.maxOnLine, where).toBeLessThanOrEqual(12);
+  expect(Math.max(d.rowN, d.colN), where).toBeLessThanOrEqual(60);
+  expect(d.offLine, where).toBeLessThanOrEqual(2);
+}
+
 test.describe("the glass edges", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/about");
@@ -659,23 +710,24 @@ test.describe("the glass edges", () => {
     await page.mouse.move(1430, 890);
   });
 
-  test("the lens: Chromium, four fixed strips at 3 covering the edges once, never taking the pointer, shown only while q > 0.01", async ({ page }) => {
+  test("the lens: Chromium, on the track the two side strips at 3, each the full height, never taking the pointer, shown only while q > 0.01", async ({ page }) => {
     const errors = collectErrors(page);
     const lens = page.locator(".ab-lens");
-    const top = page.locator(".ab-lens-strip[data-edge='top']");
+    const top = page.locator(".ab-lens-strip[data-edge='right']"); // (the track's strips show and hide together)
     await expect(lens).toHaveCount(1);
     await expect(lens).toHaveAttribute("aria-hidden", "true");
     await scrollTo(page, "slot");
     await expect(top).toBeVisible();
-    // each strip: fixed, at 3, no pointer, its own filter; 90 px deep at 1440 x 900, top and bottom full width, the sides between
-    expect(await page.locator(".ab-lens-strip").evaluateAll((els) => els.map((el) => {
+    // the track's top and bottom strips never show (Liam, 2026-10-17: the sides only, 120 Hz beside the pendant)
+    await expect(page.locator(".ab-lens-strip[data-edge='top']")).toBeHidden();
+    await expect(page.locator(".ab-lens-strip[data-edge='bottom']")).toBeHidden();
+    // each side strip: fixed, at 3, no pointer, its own filter; 90 px wide at 1440 x 900, the screen's full height
+    expect(await page.locator(".ab-lens-strip").evaluateAll((els) => els.filter((el) => getComputedStyle(el).display !== "none").map((el) => {
       const s = getComputedStyle(el), r = el.getBoundingClientRect();
       return { edge: (el as HTMLElement).dataset.edge, pe: s.pointerEvents, z: s.zIndex, pos: s.position, bf: s.backdropFilter, box: [r.x, r.y, r.width, r.height] };
     }))).toEqual([
-      { edge: "top", pe: "none", z: "3", pos: "fixed", bf: 'url("#ab-edge-lens-top")', box: [0, 0, 1440, 90] },
-      { edge: "right", pe: "none", z: "3", pos: "fixed", bf: 'url("#ab-edge-lens-right")', box: [1350, 90, 90, 720] },
-      { edge: "bottom", pe: "none", z: "3", pos: "fixed", bf: 'url("#ab-edge-lens-bottom")', box: [0, 810, 1440, 90] },
-      { edge: "left", pe: "none", z: "3", pos: "fixed", bf: 'url("#ab-edge-lens-left")', box: [0, 90, 90, 720] },
+      { edge: "right", pe: "none", z: "3", pos: "fixed", bf: 'url("#ab-edge-lens-right")', box: [1350, 0, 90, 900] },
+      { edge: "left", pe: "none", z: "3", pos: "fixed", bf: 'url("#ab-edge-lens-left")', box: [0, 0, 90, 900] },
     ]);
     // the filters as the mockup's: each region its strip's own box
     expect(await page.locator(".ab-lens-defs filter").evaluateAll((fs) => fs.map((f) => ["filterUnits", "x", "y", "width", "height"].map((a) => f.getAttribute(a)))))
@@ -702,7 +754,7 @@ test.describe("the glass edges", () => {
   });
 
   for (const [W, H] of [[1440, 900], [1441, 901]] as const) {
-    test(`${W} x ${H}: the strips meet without a seam: every corner as one full-screen lens with the map from lensMap would bend it`, async ({ page }) => {
+    test(`${W} x ${H}, the track: the side strips bend their columns as one full-screen lens with the map from lensMap would; the top and bottom bands between them stay as they are`, async ({ page }) => {
       if (W !== 1440 || H !== 900) {
         await page.setViewportSize({ width: W, height: H });
         await page.waitForTimeout(500); // (the strips rebuilt for the new size)
@@ -710,79 +762,49 @@ test.describe("the glass edges", () => {
       await scrollTo(page, "slot");
       await expect.poll(async () => (await hook(page)).q).toBeGreaterThan(0.999);
       await stillPage(page);
-      // Yoav's lines across the top-left corner, over the seam between the top strip and the left one (y 90)
+      // Yoav's lines across the top-left corner: through the left strip's top end and on past it (x 90) into the top band
       await page.evaluate(() => {
         const q1 = document.querySelector<HTMLElement>("[data-pendant='quote1']")!;
         const r = q1.querySelector("blockquote")!.getBoundingClientRect();
         q1.style.transform = `translate(${10 - r.left}px, ${30 - r.top}px)`;
         document.querySelector<HTMLElement>("[data-pendant='quote2']")!.style.visibility = "hidden";
       });
-      // the scale held at the full 52 (the breath eases it), on the strips and the reference alike
-      await page.evaluate(() => {
-        document.querySelectorAll(".ab-lens-defs feDisplacementMap").forEach((d) => {
-          const set = d.setAttribute.bind(d);
-          d.setAttribute = (k: string, v: string) => (k === "scale" ? undefined : set(k, v));
-          set("scale", "52");
-        });
-      });
-      await page.waitForTimeout(200);
-      await expect(page.locator(".ab-lens-strip[data-edge='top']")).toBeVisible();
+      await holdScale(page);
+      await expect(page.locator(".ab-lens-strip[data-edge='left']")).toBeVisible();
       expect(await page.evaluate(() => [document.documentElement.clientWidth, document.documentElement.clientHeight])).toEqual([W, H]);
-      const S = { width: 260, height: 220 };
-      const corners = [{ x: 0, y: 0 }, { x: W - S.width, y: 0 }, { x: 0, y: H - S.height }, { x: W - S.width, y: H - S.height }].map((c) => ({ ...c, ...S }));
-      const strips = [];
-      for (const c of corners) strips.push(await page.screenshot({ clip: c }));
-      // the reference: one full-screen layer whose map is lensMap's own, at the size the page builds it (half the screen,
-      // rounded up, at exactly twice its size): no slices in it, so a slice put in the wrong place can't hide in both
-      const w = Math.ceil(W / 2), h = Math.ceil(H / 2);
-      const rgba = Buffer.from(lensMap(w, h, lensBand(W, H) * 0.5).buffer).toString("base64");
-      await page.evaluate(({ rgba, w, h }) => {
-        const bin = atob(rgba), data = new Uint8ClampedArray(bin.length);
-        for (let i = 0; i < bin.length; i++) data[i] = bin.charCodeAt(i);
-        const c = document.createElement("canvas");
-        c.width = w; c.height = h;
-        c.getContext("2d")!.putImageData(new ImageData(data, w, h), 0, 0);
-        const NS = "http://www.w3.org/2000/svg", svg = document.createElementNS(NS, "svg");
-        svg.setAttribute("width", "0"); svg.setAttribute("height", "0"); svg.style.position = "absolute";
-        svg.innerHTML = `<filter id="t4-ref" x="0" y="0" width="1" height="1" filterUnits="objectBoundingBox" color-interpolation-filters="sRGB"><feImage href="${c.toDataURL()}" result="map" x="0" y="0" width="${2 * w}" height="${2 * h}" preserveAspectRatio="none"/><feDisplacementMap in="SourceGraphic" in2="map" scale="52" xChannelSelector="R" yChannelSelector="G"/></filter>`;
-        const ref = document.createElement("div");
-        ref.id = "t4-ref-layer";
-        ref.style.cssText = "position:fixed;inset:0;z-index:3;pointer-events:none;backdrop-filter:url(#t4-ref)";
-        const lens = document.querySelector(".ab-lens")!;
-        lens.before(svg, ref);
-        document.querySelectorAll<HTMLElement>(".ab-lens-strip").forEach((s) => { s.style.display = "none"; });
-      }, { rgba, w, h });
-      await page.waitForTimeout(300);
-      const whole = [];
-      for (const c of corners) whole.push(await page.screenshot({ clip: c }));
-      // (the corner does bend: the same top-left corner with no lens differs)
-      await page.evaluate(() => { document.getElementById("t4-ref-layer")!.style.display = "none"; });
+      const d = lensDepth(lensBand(W, H));
+      // each corner in two parts: its side strip's columns (the strip's end), and the band beside them
+      const SH = 220, SW = 260;
+      const parts = [{ x: 0, y: 0 }, { x: W - SW, y: 0 }, { x: 0, y: H - SH }, { x: W - SW, y: H - SH }].map((c) => {
+        const left = c.x === 0;
+        return {
+          side: { x: left ? 0 : W - d, y: c.y, width: d, height: SH },
+          band: { x: left ? d : W - SW, y: c.y, width: SW - d, height: SH },
+          originCol: left ? -1 : 0, // (the right strip starts at its clip's first column; the left one at the screen's edge)
+        };
+      });
+      const shoot = async () => { const out = []; for (const p of parts) out.push({ side: await page.screenshot({ clip: p.side }), band: await page.screenshot({ clip: p.band }) }); return out; };
+      const strips = await shoot();
+      await page.evaluate(() => { document.querySelectorAll<HTMLElement>(".ab-lens-strip").forEach((s) => { s.style.display = "none"; }); });
       await page.waitForTimeout(200);
-      const bare = await page.screenshot({ clip: corners[0] });
-      expect(await changedPixels(strips[0], bare, page)).toBeGreaterThan(200);
-      // Even sizes: identical. Odd: the bottom and right strips start on odd pixels, so their slices sit a pixel off their own
-      // origin (at the same place on the screen), and the filter samples the map a hair differently: where the bent text's
-      // edge sits on a rounding boundary, one row or column of pixels comes out a few levels apart (measured 10-17: up to 9
-      // levels, along one row 69 px into the bottom strip, or a few pixels down one column; never on a strip's origin). So
-      // at an odd size: the seams themselves (the right strip's first column, the bottom strip's first row, from lensStrips)
-      // match to 2 levels; whatever differs is one line, at most a few levels and a few dozen pixels; off it, at most two.
-      // (A slice misplaced by one map pixel, or scaled by the 0.5003 an odd screen gives a rounded half-size map, differs in
-      // hundreds of pixels per corner, all over its band and on its origin. Negative control, run once (Task 6): the right
-      // strip's slice moved by +1 map px gives about 2000 differing pixels in its corner, about 1900 of them off the busiest
-      // line, and 7 levels on the origin column, at both sizes; every check below fails on it.)
-      const strips4 = lensStrips(W, H, lensDepth(lensBand(W, H)));
-      const originX = strips4[1].x, originY = strips4[2].y; // (the right strip's left edge, the bottom strip's top)
-      const even = W % 2 === 0 && H % 2 === 0;
-      for (let i = 0; i < corners.length; i++) {
-        const at = { row: originY - corners[i].y, col: originX - corners[i].x }; // (clip px; outside the clip for a corner without it)
-        const d = await diffLines(strips[i], whole[i], page, at);
-        const where = `corner ${i} (${corners[i].x}, ${corners[i].y}): ${d.n} differ, busiest row ${d.row} (${d.rowN}), column ${d.col} (${d.colN}), ` +
-          `up to ${d.maxOnLine} levels on them, ${d.offLine} off them; up to ${d.maxOnOrigin} levels on the strip origins (row ${at.row}, column ${at.col})`;
-        if (even) { expect(d.n, where).toBe(0); continue; }
-        expect(d.maxOnOrigin, where).toBeLessThanOrEqual(2);
-        expect(d.maxOnLine, where).toBeLessThanOrEqual(12);
-        expect(Math.max(d.rowN, d.colN), where).toBeLessThanOrEqual(60);
-        expect(d.offLine, where).toBeLessThanOrEqual(2);
+      const bare = await shoot();
+      await addReferenceLens(page, W, H);
+      await page.waitForTimeout(300);
+      const whole = await shoot();
+      // (the corner does bend: the left strip's end with no lens differs)
+      expect(await changedPixels(strips[0].side, bare[0].side, page)).toBeGreaterThan(200);
+      // and the reference does bend the band beside it, where the track's lens now leaves it be
+      expect(await changedPixels(whole[0].band, bare[0].band, page)).toBeGreaterThan(200);
+      for (let i = 0; i < parts.length; i++) {
+        // the bands beside the strips: exactly the page, unbent
+        expect(await changedPixels(strips[i].band, bare[i].band, page), `corner ${i}'s band`).toBe(0);
+        // the side strips' columns: as the full-screen lens (even sizes: identical; odd: as the four strips had it, below)
+        const at = { row: -1, col: parts[i].originCol };
+        const dl = await diffLines(strips[i].side, whole[i].side, page, at);
+        const where = `corner ${i}'s side strip: ${dl.n} differ, busiest row ${dl.row} (${dl.rowN}), column ${dl.col} (${dl.colN}), ` +
+          `up to ${dl.maxOnLine} levels on them, ${dl.offLine} off them; up to ${dl.maxOnOrigin} levels on the strip's origin`;
+        if (W % 2 === 0 && H % 2 === 0) { expect(dl.n, where).toBe(0); continue; }
+        expectOddSeam(dl, where);
       }
     });
   }
@@ -824,23 +846,23 @@ test.describe("the glass edges", () => {
     await expect(page.locator(".ab-lens-strip[data-edge='left']")).toBeVisible();
   });
 
-  test("after a resize mid-testimonials the strips and their maps cover the new screen", async ({ page }) => {
+  test("after a resize mid-testimonials the side strips and their maps cover the new screen", async ({ page }) => {
     const errors = collectErrors(page);
     await scrollTo(page, "slot");
     await expect.poll(async () => (await hook(page)).q).toBeGreaterThan(0.999);
     /** Each strip's box and its slice as placed (screen px), and the slice's own pixel size. */
-    const strips = () => page.evaluate(async () => Promise.all([...document.querySelectorAll<HTMLElement>(".ab-lens-strip")].map(async (el) => {
+    const strips = () => page.evaluate(async () => Promise.all([...document.querySelectorAll<HTMLElement>(".ab-lens-strip")].filter((el) => getComputedStyle(el).display !== "none").map(async (el) => {
       const r = el.getBoundingClientRect(), img = document.querySelector(`#ab-edge-lens-${el.dataset.edge} feImage`)!;
       const i = new Image(); i.src = img.getAttribute("href")!; await i.decode();
       return { edge: el.dataset.edge, box: [r.x, r.y, r.width, r.height], img: ["x", "y", "width", "height"].map((a) => Number(img.getAttribute(a))), px: [i.width, i.height], href: img.getAttribute("href") };
     })));
     const before = await strips();
-    expect(before.map((s) => s.box)).toEqual([[0, 0, 1440, 90], [1350, 90, 90, 720], [0, 810, 1440, 90], [0, 90, 90, 720]]);
+    expect(before.map((s) => [s.edge, ...s.box])).toEqual([["right", 1350, 0, 90, 900], ["left", 0, 0, 90, 900]]);
     await page.setViewportSize({ width: 1200, height: 760 });
     await page.waitForTimeout(500); // (the 150 ms debounce, then the rebuild)
     const after = await strips();
-    // 1200 x 760: the band 49.4 px, the strips 84 px deep, the corners still covered once
-    expect(after.map((s) => s.box)).toEqual([[0, 0, 1200, 84], [1116, 84, 84, 592], [0, 676, 1200, 84], [0, 84, 84, 592]]);
+    // 1200 x 760: the band 49.4 px, the side strips 84 px wide, the full height
+    expect(after.map((s) => [s.edge, ...s.box])).toEqual([["right", 1116, 0, 84, 760], ["left", 0, 0, 84, 760]]);
     for (const s of after) {
       // each slice over its strip's whole box, at half its resolution, rebuilt
       expect(s.img, s.edge).toEqual([0, 0, s.box[2], s.box[3]]);
@@ -1068,6 +1090,60 @@ test.describe("stacked on a phone, the toolbar", () => {
   });
 });
 
+// ---------- Task 6, fix round 2: the stack keeps all four strips, and they meet without a seam ----------
+
+for (const [W, H] of [[390, 844], [391, 845]] as const) {
+  test.describe(`stacked on a ${W} x ${H} phone, the four strips`, () => {
+    // (one device pixel per CSS px, so the comparison sees the strips' own pixels and their odd-size rounding)
+    test.use({ viewport: { width: W, height: H }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+    test("meet without a seam: every corner as one full-screen lens with the map from lensMap would bend it", async ({ page }) => {
+      test.setTimeout(60_000);
+      await page.goto("/about");
+      await lightLoaded(page);
+      await expect(page.locator("section.ab")).toHaveAttribute("data-mode", "stack");
+      await stackTo(page, "slot");
+      await expect.poll(async () => (await hook(page)).q).toBeGreaterThan(0.999);
+      await page.waitForTimeout(800); // (the slides' rise-in done)
+      await stillPage(page);
+      // Yoav's lines across the top-left corner, over the seam between the top strip and the left one (q stays 1: his
+      // centre well above 65% of the height, Andrada's below the middle, hidden in place)
+      await page.evaluate(() => {
+        const q1 = document.querySelector<HTMLElement>("[data-pendant='quote1']")!;
+        q1.style.transform = "";
+        const r = q1.querySelector("blockquote")!.getBoundingClientRect();
+        q1.style.transform = `translate(${10 - r.left}px, ${30 - r.top}px)`;
+        q1.style.transition = "none";
+        document.querySelector<HTMLElement>("[data-pendant='quote2']")!.style.visibility = "hidden";
+      });
+      await holdScale(page);
+      for (const e of ["top", "right", "bottom", "left"]) await expect(page.locator(`.ab-lens-strip[data-edge='${e}']`)).toBeVisible();
+      expect(await page.evaluate(() => [document.documentElement.clientWidth, document.documentElement.clientHeight])).toEqual([W, H]);
+      const S = { width: 180, height: 200 };
+      const corners = [{ x: 0, y: 0 }, { x: W - S.width, y: 0 }, { x: 0, y: H - S.height }, { x: W - S.width, y: H - S.height }].map((c) => ({ ...c, ...S }));
+      const strips = [];
+      for (const c of corners) strips.push(await page.screenshot({ clip: c }));
+      await addReferenceLens(page, W, H);
+      await page.waitForTimeout(300);
+      const whole = [];
+      for (const c of corners) whole.push(await page.screenshot({ clip: c }));
+      await page.evaluate(() => { document.getElementById("t4-ref-layer")!.style.display = "none"; });
+      await page.waitForTimeout(200);
+      const bare = await page.screenshot({ clip: corners[0] });
+      expect(await changedPixels(strips[0], bare, page)).toBeGreaterThan(100); // (the corner does bend)
+      const four = lensStrips(W, H, lensDepth(lensBand(W, H)));
+      const originX = four[1].x, originY = four[2].y; // (the right strip's left edge, the bottom strip's top)
+      for (let i = 0; i < corners.length; i++) {
+        const at = { row: originY - corners[i].y, col: originX - corners[i].x };
+        const d = await diffLines(strips[i], whole[i], page, at);
+        const where = `corner ${i} (${corners[i].x}, ${corners[i].y}): ${d.n} differ, busiest row ${d.row} (${d.rowN}), column ${d.col} (${d.colN}), ` +
+          `up to ${d.maxOnLine} levels on them, ${d.offLine} off them; up to ${d.maxOnOrigin} levels on the strip origins (row ${at.row}, column ${at.col})`;
+        if (W % 2 === 0 && H % 2 === 0) { expect(d.n, where).toBe(0); continue; }
+        expectOddSeam(d, where);
+      }
+    });
+  });
+}
+
 // ---------- Task 5, fix round 1: the glass edges on Android, whatever the URL bar does ----------
 
 /** Android Chrome as far as the lens can tell: the client height is the small viewport (`small` px, the URL bar showing)
@@ -1139,8 +1215,9 @@ test("on the track, a client height shorter than the fixed layer (an Android tab
   await scrollTo(page, "slot");
   await expect.poll(async () => (await hook(page)).q).toBeGreaterThan(0.999);
   await expect(page.locator(".ab-lens-strip[data-edge='left']")).toBeVisible();
-  const cover = await lensCover(page);
-  expect(cover.find((s) => s.edge === "left")!.box.h).toBe(720);
+  const cover = (await lensCover(page)).filter((s) => s.box.h > 0); // (the track: the sides only)
+  expect(cover.map((s) => s.edge)).toEqual(["right", "left"]);
+  expect(cover.find((s) => s.edge === "left")!.box.h).toBe(900); // (the fixed layer's full height, past the 844 px client)
   expectCovered(cover, "the track");
 });
 
@@ -1191,5 +1268,96 @@ test.describe("stacked on a phone without scroll anchoring (as iOS Safari)", () 
     expect(after.y - before.y, "the page scrolled by the slot's height").toBeCloseTo(after.slot, 0);
     expect(Math.abs(after.top - before.top), "Andrada's quote held its place on screen").toBeLessThan(3);
     expect(errors).toEqual([]);
+  });
+});
+
+// ---------- Task 6, Step 2: Safari (WebKit). Run by the config's webkit project only (the @webkit tag; the chromium project
+// leaves these out, as the webkit project leaves out everything else: the lens, its seams, the anchoring stub and the GPU
+// timers are Chromium's). Playwright's WebKit runs WebGL and WebGL2 headless, so the light and the pendant both draw. ----------
+
+test.describe("Safari (WebKit) @webkit", () => {
+  test("no lens; at q 1 the light warms the far edges and the pendant's ball sits in the slot at its size; no console errors", async ({ page }) => {
+    const errors = collectErrors(page);
+    await page.goto("/about");
+    await lightLoaded(page);
+    await page.waitForFunction(() => window.__pendant?.ready === true, null, { timeout: 30_000 });
+    // no lens at all: no strips, no filters (lensSupported: no userAgentData), the hook's scale 0
+    await expect(page.locator(".ab-lens")).toHaveCount(0);
+    await expect(page.locator(".ab-lens-defs")).toHaveCount(0);
+    await page.mouse.move(1430, 890);
+    await scrollTo(page, "slot");
+    await expect.poll(async () => (await hook(page)).q).toBeGreaterThan(0.999);
+    await expect.poll(async () => (await hook(page)).pulse, { timeout: 5000 }).toBe(1);
+    expect(await hook(page)).toMatchObject({ drawing: true, lens: 0, ownBall: false });
+    // the light: warm at the left and right edges, dark without it
+    for (const x of [0, 1432]) {
+      const clip = { x, y: 600, width: 8, height: 140 };
+      const lit = await colourIn(page, clip);
+      await setLight(page, false);
+      const dark = await colourIn(page, clip);
+      await setLight(page, true);
+      expect(dark.r).toBeLessThan(40);
+      expect(lit.r).toBeGreaterThan(dark.r + 30);
+      expect(lit.r).toBeGreaterThanOrEqual(lit.g);
+      expect(lit.r).toBeGreaterThanOrEqual(lit.b);
+    }
+    // the ball: the pendant's, centred on the slot, drawn 0.44 x the slot across and down (within 4%, from its pixels)
+    await page.waitForTimeout(1500);
+    const ball = await pendantBall(page);
+    expect(ball, "the pendant's ball").not.toBeNull();
+    const slot = await slotNow(page);
+    expect(Math.abs(ball!.x - slot.x)).toBeLessThan(2);
+    expect(Math.abs(ball!.y - slot.y)).toBeLessThan(2);
+    expect(errors).toEqual([]);
+    const o = await drawnOutline(page, "canvas.ab-pendant", "#fff", "dark", slot);
+    const R = 0.44 * slot.w;
+    expect(Math.abs(o.halfW / R - 1), `half-width ${o.halfW} against ${R}`).toBeLessThan(0.04);
+    expect(Math.abs(o.halfH / R - 1), `half-height ${o.halfH} against ${R}`).toBeLessThan(0.04);
+  });
+
+  test("without the pendant the light draws its own ball in the slot; no lens, no console errors", async ({ page }) => {
+    const errors = collectErrors(page, /Failed to load resource|pendant\.glb/); // (the aborted file's own network line)
+    await page.route(PENDANT_GLB, (r) => r.abort());
+    await page.goto("/about");
+    await lightLoaded(page);
+    await expect(page.locator("canvas.ab-pendant")).toHaveCount(0, { timeout: 15_000 });
+    await expect(page.locator(".ab-lens")).toHaveCount(0);
+    await page.mouse.move(1430, 890);
+    const slot = await scrollTo(page, "slot");
+    await expect.poll(async () => (await hook(page)).ownBall).toBe(true);
+    await page.waitForTimeout(300);
+    const r = 0.44 * slot.w, S = Math.ceil(r + 6);
+    const clip = { x: Math.round(slot.x - S), y: Math.round(slot.y - S), width: 2 * S, height: 2 * S };
+    const lit = await colourIn(page, clip, { r0: r - 3, r1: r + 3 });
+    await setLight(page, false);
+    const bare = await colourIn(page, clip, { r0: r - 3, r1: r + 3 });
+    await setLight(page, true);
+    expect(lit.bright).toBeGreaterThan(lit.n * 0.15);
+    expect(bare.bright).toBeLessThan(5);
+    expect(errors).toEqual([]);
+  });
+
+  test.describe("stacked on a 390 x 844 phone", () => {
+    test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+    test("no lens; the light draws, the slot opens and holds a ball, the quotes read; no console errors", async ({ page }) => {
+      test.setTimeout(60_000);
+      const errors = collectErrors(page);
+      await page.goto("/about");
+      await lightLoaded(page);
+      await expect(page.locator("section.ab")).toHaveAttribute("data-mode", "stack");
+      await expect(page.locator(".ab-lens")).toHaveCount(0);
+      await stackTo(page, "slot");
+      await expect.poll(async () => (await hook(page)).q).toBeGreaterThan(0.999);
+      expect(await hook(page)).toMatchObject({ drawing: true, lens: 0 });
+      await expect(page.locator("section.ab")).toHaveAttribute("data-glass", "on");
+      const slot = await slotNow(page);
+      expect(slot.w).toBeGreaterThan(0.4 * 390); // (open: 50vw)
+      // a ball in it: the pendant's (once ready) or, until then, the light's own
+      await expect.poll(async () => (await pendantBall(page)) !== null || (await hook(page)).ownBall, { timeout: 30_000 }).toBe(true);
+      // the quotes are there to read, the light's canvas fixed over the screen and taking no pointer
+      for (const q of ["quote1", "quote2"]) await expect(page.locator(`[data-pendant='${q}'] blockquote`)).toBeVisible();
+      expect(await page.locator("canvas.ab-light").evaluate((c) => [getComputedStyle(c).position, getComputedStyle(c).pointerEvents])).toEqual(["fixed", "none"]);
+      expect(errors).toEqual([]);
+    });
   });
 });

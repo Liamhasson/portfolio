@@ -352,7 +352,7 @@ async function testimonials(page, gpu, contaminated) {
   await setLens(true);
   const sizes = await page.evaluate(() => {
     const c = document.querySelector("canvas.ab-light");
-    const imgs = [...document.querySelectorAll(".ab-lens-defs feImage")].map((i) => `${i.getAttribute("width")}x${i.getAttribute("height")}`);
+    const imgs = [...document.querySelectorAll(".ab-lens-defs feImage")].filter((i) => i.getAttribute("href")).map((i) => `${i.closest("filter").id.replace("ab-edge-lens-", "")} ${i.getAttribute("width")}x${i.getAttribute("height")}`);
     return { light: c ? `${c.width}x${c.height}` : "none", lensSlices: imgs.join(" "), dpr: window.devicePixelRatio };
   });
 

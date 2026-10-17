@@ -77,12 +77,25 @@ export function lensDepth(band: number): number {
 export type LensEdge = "top" | "right" | "bottom" | "left";
 export type LensStrip = { edge: LensEdge; x: number; y: number; w: number; h: number };
 
+/** Which strips the lens is drawn in: all four (stacked, on phones: the column scrolls through the top and bottom bands), or
+ *  the left and right only (the desktop track: the words travel sideways through the side bands, while the top and bottom
+ *  bands hold only the page's ground; Liam, 2026-10-17: two strips keep 120 Hz beside the pendant, four don't). */
+export type LensLayout = "four" | "sides";
+
 /**
- * The four strips the lens is drawn in (a full-screen backdrop filter costs about 10 ms a frame; the edges alone, a
- * fraction): top and bottom the screen's full width, left and right between them, so every corner is covered exactly once.
+ * The strips the lens is drawn in (a full-screen backdrop filter costs about 10 ms a frame; the edges alone, a fraction).
+ * "four": top and bottom the screen's full width, left and right between them, so every corner is covered exactly once.
+ * "sides": the right and the left strips only, each the screen's full height (nothing above or below them to meet), in
+ * that order.
  */
-export function lensStrips(W: number, H: number, D: number): LensStrip[] {
+export function lensStrips(W: number, H: number, D: number, layout: LensLayout = "four"): LensStrip[] {
   const d = Math.min(D, W / 2, H / 2), mid = Math.max(0, H - 2 * d);
+  if (layout === "sides") {
+    return [
+      { edge: "right", x: W - d, y: 0, w: d, h: H },
+      { edge: "left", x: 0, y: 0, w: d, h: H },
+    ];
+  }
   return [
     { edge: "top", x: 0, y: 0, w: W, h: d },
     { edge: "right", x: W - d, y: d, w: d, h: mid },

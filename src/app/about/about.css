@@ -147,6 +147,10 @@ a.ab-proof:hover, a.ab-proof:focus-visible { color: #f4efe9; }
 .ab-lens-strip[data-edge="bottom"] { bottom: 0; left: 0; right: 0; height: var(--d); backdrop-filter: url(#ab-edge-lens-bottom); }
 .ab-lens-strip[data-edge="left"] { top: var(--d); bottom: var(--d); left: 0; width: var(--d); backdrop-filter: url(#ab-edge-lens-left); }
 .ab-lens-strip[data-edge="right"] { top: var(--d); bottom: var(--d); right: 0; width: var(--d); backdrop-filter: url(#ab-edge-lens-right); }
+/* on the desktop track, the left and right strips only, each the full height (edge-lens.ts "sides": the words travel through
+   the side bands; two strips keep 120 Hz beside the pendant, four don't. Liam, 2026-10-17) */
+.ab[data-mode="track"] .ab-lens-strip[data-edge="top"], .ab[data-mode="track"] .ab-lens-strip[data-edge="bottom"] { display: none; }
+.ab[data-mode="track"] .ab-lens-strip[data-edge="left"], .ab[data-mode="track"] .ab-lens-strip[data-edge="right"] { top: 0; bottom: 0; }
 /* stacked, the strips stand on the large viewport, as the light's canvas does (100lvh from the top): the bottom strip on the
    light's bottom band, the sides between, so the URL bar or toolbar moves neither (showing, it covers the foot of both, as
    it covers the canvas's) */

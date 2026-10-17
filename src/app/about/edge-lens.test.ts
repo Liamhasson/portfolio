@@ -90,7 +90,7 @@ describe("the rim bends without folding", () => {
   }
 });
 
-describe("the four strips", () => {
+describe("the strips", () => {
   for (const [W, H] of [[1440, 900], [1200, 760], [1024, 600], [2560, 1440], [1441, 901]] as const) {
     test(`${W} x ${H}: every point near an edge is in exactly one strip, none in the middle, deep enough for the pull and the corner`, () => {
       const band = lensBand(W, H), D = lensDepth(band), strips = lensStrips(W, H, D);
@@ -106,6 +106,24 @@ describe("the four strips", () => {
       }
     });
   }
+  for (const [W, H] of [[1440, 900], [1441, 901], [1024, 600]] as const) {
+    test(`${W} x ${H}, the track's sides only: the right and the left strips, each the full height; every point by a side edge in exactly one, none elsewhere`, () => {
+      const D = lensDepth(lensBand(W, H)), strips = lensStrips(W, H, D, "sides");
+      expect(strips.map((s) => s.edge)).toEqual(["right", "left"]);
+      for (const s of strips) { expect(s.y).toBe(0); expect(s.h).toBe(H); expect(s.w).toBe(D); }
+      expect(strips[0].x).toBe(W - D);
+      expect(strips[1].x).toBe(0);
+      for (let y = 0.5; y < H; y += 7) {
+        for (let x = 0.5; x < W; x += 7) {
+          const inside = strips.filter((s) => x >= s.x && x < s.x + s.w && y >= s.y && y < s.y + s.h).length;
+          expect(inside, `(${x}, ${y})`).toBe(x < D || x >= W - D ? 1 : 0);
+        }
+      }
+    });
+  }
+  test("the sides on a screen narrower than two strips: each half the width, as the four clamp", () => {
+    expect(lensStrips(120, 900, 90, "sides")).toEqual([{ edge: "right", x: 60, y: 0, w: 60, h: 900 }, { edge: "left", x: 0, y: 0, w: 60, h: 900 }]);
+  });
   test("1440 x 900: 90 px strips", () => {
     expect(lensDepth(lensBand(1440, 900))).toBe(90);
   });
