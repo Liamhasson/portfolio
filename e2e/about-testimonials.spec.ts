@@ -579,7 +579,12 @@ test.describe("both balls keep the slot's size across the screen", () => {
   }
 
   // (each within 4% of the nominal size could still leave the two up to 8 px apart, which would show as two outlines while
-  // they cross-fade: so the two, measured at the same slot position, against each other)
+  // they cross-fade: so the two, measured at the same slot position, against each other. Measured 10-17: identical at 0.1
+  // and 0.5; at 0.9 the pendant's is about 2 px narrower and 2 px taller (108.3 x 107.5 against 110.3 x 105.5), on every
+  // run. Not jitter: both take their outline from field.ts ballCone, but the pendant's cone is set about its camera's view
+  // axis, which the shot's lens shift moves off the screen's middle, while the light's eye sits over the middle; so at 0.9
+  // the two see the slot a little differently off-axis, and the ellipse each draws (its half-axes multiplying to r²) leans
+  // a little differently. A change here past 3 px is a real change to one ball's placement.)
   for (const at of [0.1, 0.5, 0.9]) {
     test(`with the slot at ${at} of the width, the pendant's ball and the light's own draw the same outline, within 3 px`, async ({ page, context }) => {
       const bare = await context.newPage();
@@ -762,8 +767,9 @@ test.describe("the glass edges", () => {
       // at an odd size: the seams themselves (the right strip's first column, the bottom strip's first row, from lensStrips)
       // match to 2 levels; whatever differs is one line, at most a few levels and a few dozen pixels; off it, at most two.
       // (A slice misplaced by one map pixel, or scaled by the 0.5003 an odd screen gives a rounded half-size map, differs in
-      // hundreds of pixels per corner, all over its band and on its origin, by tens of levels: the negative control in the
-      // Task 6 report.)
+      // hundreds of pixels per corner, all over its band and on its origin. Negative control, run once (Task 6): the right
+      // strip's slice moved by +1 map px gives about 2000 differing pixels in its corner, about 1900 of them off the busiest
+      // line, and 7 levels on the origin column, at both sizes; every check below fails on it.)
       const strips4 = lensStrips(W, H, lensDepth(lensBand(W, H)));
       const originX = strips4[1].x, originY = strips4[2].y; // (the right strip's left edge, the bottom strip's top)
       const even = W % 2 === 0 && H % 2 === 0;

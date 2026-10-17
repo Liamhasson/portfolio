@@ -368,8 +368,10 @@ export function AboutTestimonials() {
       try {
         // (its own box: fixed at inset 0, it leaves out a classic scrollbar, as the quotes' and the pendant's client sizes do;
         // stacked, the box as last measured, the toolbar left out)
-        const box = m.stack ? screenBox() : { w: canvas.clientWidth || window.innerWidth, h: canvas.clientHeight || window.innerHeight };
-        light.resize(box.w, box.h, window.devicePixelRatio || 1);
+        // (as two numbers: no object per frame; the stacked box is made only when it is measured afresh)
+        let bw: number, bh: number;
+        if (m.stack) { const sb = screenBox(); bw = sb.w; bh = sb.h; } else { bw = canvas.clientWidth || window.innerWidth; bh = canvas.clientHeight || window.innerHeight; }
+        light.resize(bw, bh, window.devicePixelRatio || 1);
         frame.q = q; frame.t = t; frame.pulse = pulse; frame.pulseFrom = m.stack ? "bottom" : "right"; frame.ball = ball;
         const tag = ++frameNo;
         if (gpuMs) perfFrames.set(tag, { q, ownBall: ball !== null, lens: lens > 0 });

@@ -109,10 +109,13 @@ export function emptyUniforms(): LightUniforms {
   return { R: [0, 0], T: 0, A: 0, P: -1, PAD: 0, PO: [0, 0], BC: [0, 0], BP: [0, 0, 0], BR: 0, BA: 0 };
 }
 
-/** The drawing buffer for a screen: the CSS size times the pixel ratio, capped at MAX_DPR, at least 1 px. */
-export function bufferSize(cssW: number, cssH: number, dpr: number): { w: number; h: number } {
+/** The drawing buffer for a screen: the CSS size times the pixel ratio, capped at MAX_DPR, at least 1 px. Written into
+ *  `out` when given (the light resizes every frame it draws: no allocation). */
+export function bufferSize(cssW: number, cssH: number, dpr: number, out = { w: 0, h: 0 }): { w: number; h: number } {
   const r = Math.min(Math.max(dpr || 1, 0.5), MAX_DPR);
-  return { w: Math.max(1, Math.round(cssW * r)), h: Math.max(1, Math.round(cssH * r)) };
+  out.w = Math.max(1, Math.round(cssW * r));
+  out.h = Math.max(1, Math.round(cssH * r));
+  return out;
 }
 
 const VS = "attribute vec2 p; void main() { gl_Position = vec4(p, 0., 1.); }";
@@ -179,6 +182,8 @@ export class TestimonialsLight {
   private cssH = 1;
   /** This frame's uniforms, rewritten in place (lightUniforms' `out`): nothing allocated per frame. */
   private readonly v = emptyUniforms();
+  /** The drawing buffer's size, rewritten in place (bufferSize's `out`). */
+  private readonly size = { w: 0, h: 0 };
   /** Diagnostics (enableGpuTiming): the queries in flight, each with its frame's tag, and the times read back. */
   private timer: { ext: TimerExt; pending: { q: WebGLQuery; tag: number }[]; done: { ms: number; tag: number }[] } | null = null;
   private constructor(
@@ -240,7 +245,7 @@ export class TestimonialsLight {
   resize(cssW: number, cssH: number, dpr: number): void {
     this.cssW = Math.max(1, cssW);
     this.cssH = Math.max(1, cssH);
-    const { w, h } = bufferSize(this.cssW, this.cssH, dpr);
+    const { w, h } = bufferSize(this.cssW, this.cssH, dpr, this.size);
     if (this.canvas.width !== w) this.canvas.width = w;
     if (this.canvas.height !== h) this.canvas.height = h;
     this.gl.viewport(0, 0, w, h);

@@ -101,6 +101,13 @@ describe("no allocation per frame", () => {
     }
   });
 
+  test("bufferSize writes into `out` when given and returns it", () => {
+    const out = { w: 0, h: 0 };
+    expect(bufferSize(1440, 900, 2, out)).toBe(out);
+    expect(out).toEqual({ w: 2160, h: 1350 });
+    expect(bufferSize(390, 844, 1, out)).toEqual({ w: 390, h: 844 });
+  });
+
   test("lightUniforms writes into `out` when given (its arrays kept): the same uniforms as a fresh call, a frame without the ball clearing it", () => {
     const out = emptyUniforms();
     const arrays = [out.R, out.PO, out.BC, out.BP];

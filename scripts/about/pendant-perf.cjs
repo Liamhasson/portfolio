@@ -30,7 +30,9 @@
 // interval's median <= 17.5 ms with the lens on. Both modes run headed by default (HEADED=0 for headless): a headless
 // Chromium paces rAF at 60 Hz whatever the screen, so it can't show a 120 Hz screen's dropped frames. ROUNDS: lens on/off
 // pairs (2); SCROLL_S (12) and DWELL_S (5) per round; SETTLE_MS (3000) held at the window's start before each pass; CSS:
-// a style added to the page, for experiments.
+// a style added to the page, for experiments. More experiments: DPR_JS (the pixel ratio the page's scripts are told, the
+// screen's staying DPR: the canvases follow it, CSS and the lens don't), NO_CLIPS=1 (the work clips never play: their
+// posters), CHANNEL (an installed browser, e.g. chrome: nothing is downloaded) and ARGS (more Chromium flags).
 const fs = require("node:fs");
 const path = require("node:path");
 const http = require("node:http");
@@ -277,10 +279,10 @@ async function testimonials(page, gpu, contaminated) {
       document.head.appendChild(el);
     } else if (on && st) st.remove();
   }, on);
-  const lensShown = () => page.evaluate(() => {
-    const el = document.querySelector(".ab-lens-strip[data-edge='top']");
-    return !!el && getComputedStyle(el).display !== "none" && el.getBoundingClientRect().height > 0;
-  });
+  /** The lens strips showing now (their edges, "" for none): a CSS experiment can hide some. */
+  const lensShown = () => page.evaluate(() => [...document.querySelectorAll(".ab-lens-strip")]
+    .filter((el) => getComputedStyle(el).display !== "none" && el.getBoundingClientRect().height > 0)
+    .map((el) => el.dataset.edge).join("+"));
   const takeGpu = () => page.evaluate(() => ({
     pendant: window.__pendant?.gpuMs?.splice(0) ?? [],
     light: window.__testimonials?.gpuMs?.splice(0) ?? [],
@@ -363,6 +365,7 @@ async function testimonials(page, gpu, contaminated) {
     if (r.lens && !r.lensShownAtSlot) console.warn("  WARNING: a lens-on round without the lens showing at the slot (not Chromium, or the map not built)");
     if (!r.lens && r.lensShownAtSlot) console.warn("  WARNING: a lens-off round with the lens showing");
   }
+  console.log(`  lens strips showing at the slot in the lens-on rounds: ${[...new Set(rounds.filter((r) => r.lens).map((r) => r.lensShownAtSlot || "none"))].join(", ")}`);
   const head = "                       frames  rAF med     p95   >8.4ms  >12.5ms  >16.7ms    >25ms   pendant GPU med    p95   light GPU med    p95  (frames, own ball)";
   console.log(`\n${head}`);
   const rows = {};
@@ -431,10 +434,18 @@ async function testimonials(page, gpu, contaminated) {
     await waitFor(`${BASE}/about`, 120_000);
   }
 
-  const browser = await chromium.launch({ headless: !HEADED, args: ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"] });
+  const extra = (process.env.ARGS ?? "").split(/\s+/).filter(Boolean);
+  const browser = await chromium.launch({
+    headless: !HEADED, args: ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist", ...extra],
+    ...(process.env.CHANNEL ? { channel: process.env.CHANNEL } : {}),
+  });
   try {
     const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: DPR });
     await page.addInitScript(() => { window.__pendantPerf = true; });
+    // (experiments: the page told another pixel ratio than the screen's, which the canvases read and CSS doesn't)
+    if (process.env.DPR_JS) await page.addInitScript((r) => Object.defineProperty(window, "devicePixelRatio", { get: () => r, configurable: true }), Number(process.env.DPR_JS));
+    // (experiments: no clip ever plays, so each shows its poster)
+    if (process.env.NO_CLIPS === "1") await page.addInitScript(() => { HTMLMediaElement.prototype.play = function () { return Promise.resolve(); }; });
     page.on("console", (m) => m.type() === "error" && !m.text().includes("404") && console.error(m.text().slice(0, 400)));
     // (the light's own ball: the pendant's model blocked; its URL carries a ?v= token)
     if (MODE === "light") await page.route(/\/pendant\.glb(\?|$)/, (r) => r.abort());
