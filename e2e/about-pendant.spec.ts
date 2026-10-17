@@ -836,10 +836,11 @@ test("the pendant's box holds what is drawn: no brass outside it at the worm, wh
     }, png);
     out.push({ id, ...r });
   }
-  // a real pendant in every box, and almost nothing bright outside: at most 0.1% of what is inside (a stray antialiased or
-  // smeared pixel is not a covered line; a box short by even 2 px along one edge of these shots leaves hundreds outside)
+  // a real pendant in every box, and almost nothing bright outside: at most 5 px (a stray antialiased or smeared pixel is
+  // not a covered line; the old, ungrown box leaked 39 px at the glide and 78 at the hero, so a share of the inside would
+  // have let the hero's leak through)
   for (const r of out) {
     expect(r.inside, r.id).toBeGreaterThan(5000);
-    expect(r.outside, `${r.id}: ${r.outside} bright px outside the box, e.g. ${JSON.stringify(r.at)}`).toBeLessThanOrEqual(0.001 * r.inside);
+    expect(r.outside, `${r.id}: ${r.outside} bright px outside the box, e.g. ${JSON.stringify(r.at)}`).toBeLessThanOrEqual(5);
   }
 });
