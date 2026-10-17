@@ -443,39 +443,139 @@ test("a press on the pendant drags; elsewhere links work", async ({ page }) => {
 /** The stacked column's still pictures, avoided like the words (Liam's photo above the first line). */
 const STILLS = ".ab-portrait";
 const stackedOverlaps = (page: Page) => page.evaluate(coveredNow, { TEXT, CHROME, STILLS });
-/** The stack's scroll range: the section's top to where its last screen shows. */
-const stackRange = trackRange;
+/** The stack's scroll range: the section's top to where its last screen shows, and on through the outro to its foot. */
+const stackRange = (page: Page) => page.evaluate(() => {
+  const sec = document.querySelector<HTMLElement>(".ab")!;
+  return { top: sec.offsetTop, end: sec.offsetTop + sec.offsetHeight - innerHeight, foot: sec.offsetTop + sec.offsetHeight };
+});
+
+/** The canvas as the page really paints it: fixed to the screen, its z-index the layer's (2 in front, -1 behind the stacked
+ *  words), and its opacity; plus, while it shows at all, whatever of the pull to Contact's lines the pendant's box is over. */
+const stackPaint = (page: Page) => page.evaluate(() => {
+  const h = window.__pendant!;
+  const c = document.querySelector<HTMLCanvasElement>("canvas.ab-pendant")!;
+  const cs = getComputedStyle(c);
+  const op = Number(cs.opacity);
+  const pull: string[] = [];
+  if (op > 0.01) {
+    const range = document.createRange();
+    const walk = document.createTreeWalker(document.querySelector(".ab-end")!, NodeFilter.SHOW_TEXT);
+    for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+      if (!n.textContent?.trim()) continue;
+      range.selectNodeContents(n);
+      for (const r of range.getClientRects()) {
+        const ox = Math.min(h.box.r, r.right) - Math.max(h.box.l, r.left), oy = Math.min(h.box.b, r.bottom, innerHeight) - Math.max(h.box.t, r.top);
+        if (r.width > 0 && ox > 1 && oy > 1) pull.push(`opacity ${op.toFixed(2)} over "${n.textContent.trim().slice(0, 20)}"`);
+      }
+    }
+  }
+  return { position: cs.position, zIndex: cs.zIndex, layer: h.layer, opacity: op, pull };
+});
 
 for (const [w, h] of [[390, 844], [430, 932]] as const) {
   test.describe(`on a ${w}x${h} phone`, () => {
     test.use({ viewport: { width: w, height: h }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
-    test("stacked: the six phone shots, at most 2x, never in front of a line", async ({ page }) => {
-      test.setTimeout(240_000);
+    test("stacked: the six phone shots, at most 2x, never in front of a line, and gone before Contact", async ({ page }) => {
+      test.setTimeout(300_000);
       const errors = collectErrors(page);
       await page.goto("/about");
       await expect(page.locator("section.ab")).toHaveAttribute("data-mode", "stack");
       await ready(page, 30_000);
       await page.waitForTimeout(1500); // (the nav's entrance)
-      const hook = await page.evaluate(() => ({ mode: window.__pendant!.mode, ids: window.__pendant!.keys.map((k) => k.id), pr: window.__pendant!.pixelRatio }));
+      const hook = await page.evaluate(() => ({ mode: window.__pendant!.mode, ids: window.__pendant!.keys.map((k) => k.id), pr: window.__pendant!.pixelRatio, fxaa: window.__pendant!.fxaa }));
       expect(hook.mode).toBe("stack");
       expect(hook.ids).toEqual(["opening", "tumble", "above", "glass", "whirl", "hero"]);
       expect(hook.pr).toBeLessThanOrEqual(2); // (a 3x phone draws at 2x at most)
+      expect(hook.fxaa).toBe(true); // (and so is smoothed: under the screen's own ratio there is no multisampling)
       await expect(page.locator("canvas.ab-pendant")).toBeVisible();
-      const { top, end } = await stackRange(page);
+      const { top, end, foot } = await stackRange(page);
       const bad: string[] = [];
       let front = 0;
-      for (let i = 0; i <= 120; i++) {
-        await page.evaluate((y) => window.scrollTo(0, y), top + ((end - top) * i) / 120);
+      // the section, then on through the outro to the section's foot (the pull to Contact coming up)
+      const ys = [...Array.from({ length: 121 }, (_, i) => top + ((end - top) * i) / 120), ...Array.from({ length: 20 }, (_, i) => end + ((foot - end) * (i + 1)) / 20)];
+      for (const [i, y] of ys.entries()) {
+        await page.evaluate((y) => window.scrollTo(0, y), y);
         await page.waitForTimeout(400);
         bad.push(...(await stackedOverlaps(page)).map((m) => `step ${i}: ${m}`));
-        if (await page.evaluate(() => window.__pendant!.layer === "front")) front++;
+        const paint = await stackPaint(page);
+        if (paint.position !== "fixed") bad.push(`step ${i}: the canvas is ${paint.position}, not fixed`);
+        if (paint.zIndex !== (paint.layer === "front" ? "2" : "-1")) bad.push(`step ${i}: layer ${paint.layer} painted at z-index ${paint.zIndex}`);
+        bad.push(...paint.pull.map((m) => `step ${i}: ${m}`));
+        if (paint.layer === "front" && y <= end) front++;
       }
       expect(bad).toEqual([]);
       expect(front).toBeGreaterThan(30); // (and it was in front for a good part of the way: the check had something to check)
+      // at the section's foot (the pull's first line on screen) the canvas has faded right out
+      expect((await stackPaint(page)).opacity).toBe(0);
       expect(errors).toEqual([]);
     });
   });
 }
+
+test.describe("on a phone, the glass", () => {
+  test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+  test("the ball sits in the slot between the stacked quotes, touches neither, the pendant inside it", async ({ page }) => {
+    test.setTimeout(60_000);
+    const errors = collectErrors(page);
+    await page.goto("/about");
+    await ready(page, 30_000);
+    const y = await page.evaluate(() => window.__pendant!.keys.find((k) => k.id === "glass")!.y);
+    await page.evaluate((y) => window.scrollTo(0, y), y);
+    await page.waitForTimeout(2500);
+    const m = await page.evaluate(() => {
+      const g = window.__pendant!.glass!;
+      const rows = (sel: string) => {
+        const range = document.createRange();
+        const out: DOMRect[] = [];
+        const walk = document.createTreeWalker(document.querySelector(sel)!, NodeFilter.SHOW_TEXT);
+        for (let n = walk.nextNode(); n; n = walk.nextNode()) { range.selectNodeContents(n); out.push(...[...range.getClientRects()].filter((r) => r.height > 0)); }
+        return out;
+      };
+      const slot = document.querySelector("[data-pendant='glass']")!.getBoundingClientRect();
+      const cy = g.y * innerHeight, R = g.r * innerHeight;
+      return {
+        g, top: cy - R, bottom: cy + R, R, slotMid: (slot.top + slot.bottom) / 2, slotW: slot.width,
+        q1: Math.max(...rows("[data-pendant='quote1']").map((r) => r.bottom)), q2: Math.min(...rows("[data-pendant='quote2']").map((r) => r.top)),
+      };
+    });
+    expect(m.g).not.toBeNull();
+    expect(Math.abs((m.top + m.bottom) / 2 - m.slotMid)).toBeLessThan(2); // (the slot's, as the page shows it)
+    expect(Math.abs(m.R - 0.44 * m.slotW)).toBeLessThan(2);
+    expect(m.top).toBeGreaterThan(m.q1);
+    expect(m.bottom).toBeLessThan(m.q2);
+    const px = await ballPixels(page, m.g);
+    expect(px.brass).toBeGreaterThan(0.08); // (the pendant, magnified, inside)
+    expect(px.grey).toBeLessThan(0.05);
+    expect(errors).toEqual([]);
+  });
+});
+
+test.describe("on a phone, the toolbar", () => {
+  test.use({ viewport: { width: 390, height: 664 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+  test("its showing (a height-only resize under 150 px) neither resizes the canvas, moves a key nor solves again", async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.goto("/about");
+    await ready(page, 30_000);
+    await page.waitForTimeout(1500);
+    const read = () => page.evaluate(() => {
+      const c = document.querySelector<HTMLCanvasElement>("canvas.ab-pendant")!;
+      return { coarse: matchMedia("(pointer: coarse)").matches, w: c.width, h: c.height, keys: window.__pendant!.keys.map((k) => Math.round(k.y)) };
+    });
+    const before = await read();
+    test.skip(!before.coarse, "this browser doesn't report a coarse pointer");
+    // (Chromium's emulation can't show a toolbar: resizing the viewport changes lvh and svh too, which a real toolbar never
+    // does. So the window reports the shorter height a toolbar leaves, as iOS does, and says so with a resize event.)
+    const solve0 = await page.evaluate(() => { (window as unknown as { __solve0: unknown }).__solve0 = window.__pendant!.solve; return true; });
+    expect(solve0).toBe(true);
+    await page.evaluate(() => {
+      Object.defineProperty(window, "innerHeight", { configurable: true, get: () => 664 - 80 });
+      window.dispatchEvent(new Event("resize"));
+    });
+    await page.waitForTimeout(600); // (past the solve's quiet spell)
+    expect(await read()).toEqual(before);
+    expect(await page.evaluate(() => (window as unknown as { __solve0: unknown }).__solve0 === window.__pendant!.solve)).toBe(true); // (not solved again)
+  });
+});
 
 test.describe("under reduced motion", () => {
   test.use({ viewport: { width: 1440, height: 900 }, reducedMotion: "reduce" });
@@ -486,27 +586,38 @@ test.describe("under reduced motion", () => {
     await expect(page.locator("section.ab")).toHaveAttribute("data-mode", "stack");
     await ready(page, 30_000);
     await expect(page.locator("canvas.ab-pendant")).toHaveAttribute("data-mode", "still");
-    await page.waitForTimeout(1500);
     const keys = await page.evaluate(() => window.__pendant!.keys);
     expect(keys.map((k) => k.id)).toEqual(["opening", "tumble", "above", "glass", "whirl", "hero"]);
-    // held on the opening, nothing moves between frames: the same turn, the same box, no blur, fully shown
+    await page.evaluate((y) => window.scrollTo(0, y), keys[0].y);
+    await page.waitForTimeout(1500);
+    // every frame: the hook, and the canvas's opacity as the page paints it
     const watch = (ms: number) => page.evaluate((ms) => new Promise<{ yaw: number; shot: number; op: number; box: number[]; blur: boolean }[]>((done) => {
       const out: { yaw: number; shot: number; op: number; box: number[]; blur: boolean }[] = [];
+      const c = document.querySelector<HTMLCanvasElement>("canvas.ab-pendant")!;
       const t0 = performance.now();
       const tick = () => {
         const h = window.__pendant!;
-        out.push({ yaw: h.yaw, shot: h.shot, op: h.opacity, box: [h.box.l, h.box.t, h.box.r, h.box.b], blur: h.blur.on });
+        out.push({ yaw: h.yaw, shot: h.shot, op: Number(getComputedStyle(c).opacity), box: [h.box.l, h.box.t, h.box.r, h.box.b], blur: h.blur.on });
         if (performance.now() - t0 < ms) requestAnimationFrame(tick); else done(out);
       };
       requestAnimationFrame(tick);
     }), ms);
+    // held on the opening, nothing moves between frames: the same turn, the same box, no blur, fully shown
     const still = await watch(1200);
     expect(new Set(still.map((f) => f.shot))).toEqual(new Set([0]));
     expect(Math.max(...still.map((f) => f.yaw)) - Math.min(...still.map((f) => f.yaw))).toBeLessThan(1e-6); // (no spin)
     expect(new Set(still.map((f) => f.box.map((v) => v.toFixed(2)).join()))).toHaveProperty("size", 1); // (no drift)
     expect(still.every((f) => f.op === 1 && !f.blur)).toBe(true);
-    // past the halfway point to the tumble's key: out to nothing, the tumble put in place, back in, over about 0.6 s
-    await page.evaluate((y) => window.scrollTo(0, y), keys[0].y + 0.6 * (keys[1].y - keys[0].y));
+    // and it is really drawn there: brass in its box (the page round it is near black)
+    const held = await page.evaluate(() => ({ box: window.__pendant!.box, layer: window.__pendant!.layer }));
+    expect(held.layer).toBe("front");
+    expect(await brightPixels(page, held.box)).toBeGreaterThan(300);
+    // just past the halfway point to the tumble's key: still held (no crossfade back and forth at the middle)
+    await page.evaluate((y) => window.scrollTo(0, y), keys[0].y + 0.53 * (keys[1].y - keys[0].y));
+    const middle = await watch(800);
+    expect(middle.every((f) => f.shot === 0 && f.op === 1)).toBe(true);
+    // well past it: out to nothing, the tumble put in place, back in, over about 0.6 s
+    await page.evaluate((y) => window.scrollTo(0, y), keys[0].y + 0.7 * (keys[1].y - keys[0].y));
     const fade = await watch(1500);
     const at = fade.findIndex((f) => f.shot === 1);
     expect(at).toBeGreaterThan(0);
@@ -515,8 +626,8 @@ test.describe("under reduced motion", () => {
     expect(fade.slice(at).every((f) => f.shot === 1)).toBe(true); // (one change, no flicker back)
     expect(fade.at(-1)!.op).toBe(1);
     // the opacity only falls before the change and only rises after it: a crossfade, not a flash
-    for (let i = 1; i < at; i++) expect(fade[i].op).toBeLessThanOrEqual(fade[i - 1].op + 1e-9);
-    for (let i = at + 1; i < fade.length; i++) expect(fade[i].op).toBeGreaterThanOrEqual(fade[i - 1].op - 1e-9);
+    for (let i = 1; i < at; i++) expect(fade[i].op).toBeLessThanOrEqual(fade[i - 1].op + 1e-6);
+    for (let i = at + 1; i < fade.length; i++) expect(fade[i].op).toBeGreaterThanOrEqual(fade[i - 1].op - 1e-6);
     // and each held shot is still: no turn between frames on either side of the change
     const yaws = (fs: typeof fade) => Math.max(...fs.map((f) => f.yaw)) - Math.min(...fs.map((f) => f.yaw));
     expect(yaws(fade.slice(0, at))).toBeLessThan(1e-6);

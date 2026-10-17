@@ -117,7 +117,7 @@ export interface SolveInput {
   vw: number;
   vh: number;
   /** The live screen spots for the "line1" and "glass" aims at travel `s`. */
-  at: (s: number) => { line1: number; glass: { x: number; y: number } };
+  at: (s: number) => { line1: number; glass: { x: number; y: number }; line1Y?: number };
   /** The lines of text: `l` in track px, `t` in the pinned frame's px. */
   texts: readonly TextRect[];
   /** The chrome that holds still on screen, in the pinned frame's px. */
@@ -217,7 +217,8 @@ export function solve(input: SolveInput): Solved {
       const win = v === 0 ? win0 : win0.map((a) => sample(a.s, trial, spots));
       // (a shot pinned to a live place in the page, the glass ball between the quotes, may only grow smaller: moved, it
       // would no longer be seen through the ball)
-      const pinned = typeof vs[v].ax === "string" && vs[v].ax !== "line1";
+      // (and so may a shot riding with the page: the stacked opening in the gap above the first line)
+      const pinned = (typeof vs[v].ax === "string" && vs[v].ax !== "line1") || typeof vs[v].ay === "string";
       const spot = findSpot(spread(win), texts, fixed, {
         vw, vh, maxX: pinned ? 0 : MAX_X, maxY: pinned ? 0 : MAX_Y, minK: MIN_K, edgeLoss: EDGE_LOSS, minShown: MIN_SHOWN,
       });

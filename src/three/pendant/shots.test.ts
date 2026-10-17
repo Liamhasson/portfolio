@@ -1,6 +1,6 @@
 // src/three/pendant/shots.test.ts
 import { describe, expect, it, test } from "vitest";
-import { SHOTS, SHOTS_STACK, shotAt, solveKeys, variants, type Anchor, type Shot } from "./shots";
+import { heldIndex, HOLD_PAST, SHOTS, SHOTS_STACK, shotAt, solveKeys, variants, type Anchor, type Shot } from "./shots";
 
 const VW = 1440;
 const TRAVEL = 9000;
@@ -57,20 +57,50 @@ describe("the stacked shots (spec §8, plan Task 11)", () => {
     expect(by("whirl").spin).toBe(1.3);
     expect(by("hero").lock).not.toBeNull(); // (it settles a face to the camera instead of spinning)
     expect(by("hero").spin).toBe(0);
-    expect(by("opening").anchor).toBe("start");
+    expect(by("opening").ax).toBe(0.5); // (centred above the text, Liam 2026-10-17)
+    expect(by("opening").ay).toBe("line1"); // (in the gap above the first line, riding with the page)
     expect(by("hero").anchor).toBe("end");
   });
 
   test("fx reads as fy: keys solve on the vertical scroll (key = anchor centre - fy x screen height)", () => {
     const VH = 844, H_TRAVEL = 6070;
-    const ys = { band: 1657, strip: 2872, quote1: 3429, quote2: 4020, check: 5201 };
+    const ys = { line1: 1066, band: 1657, strip: 2872, quote1: 3429, quote2: 4020, check: 5201 };
     const keys = solveKeys(SHOTS_STACK, centres(ys), VH, H_TRAVEL);
-    expect(keys[0]).toBe(0);
+    expect(keys[0]).toBeCloseTo(1066 - 0.67 * VH, 9);
     expect(keys[1]).toBeCloseTo(1657 - 0.5 * VH, 9);
     expect(keys[2]).toBeCloseTo(2872 - 0.3 * VH, 9);
     expect(keys[3]).toBeCloseTo((3429 + 4020) / 2 - 0.5 * VH, 9); // (no slot in the stack: the quotes' midpoint)
     expect(keys[4]).toBeCloseTo(5201 - 0.68 * VH, 9);
     expect(keys[5]).toBe(H_TRAVEL);
+  });
+});
+
+test('the stacked opening\'s ay "line1" is the live gap above the first line (at.line1Y), before and at its key', () => {
+  const keys = [500, 1200, 2600, 3300, 4600, 6070];
+  expect(shotAt(0, keys, SHOTS_STACK, { line1: 0.5, glass: { x: 0.5, y: 0.5 }, line1Y: 0.97 }).ay).toBe(0.97);
+  expect(shotAt(500, keys, SHOTS_STACK, { line1: 0.5, glass: { x: 0.5, y: 0.5 }, line1Y: 0.38 }).ay).toBe(0.38);
+  expect(shotAt(500, keys, SHOTS_STACK, { line1: 0.5, glass: { x: 0.5, y: 0.5 } }).ay).toBe(0.5); // (no gap measured: mid-height)
+});
+
+describe("heldIndex (reduced motion's held shot)", () => {
+  const keys = [0, 1000, 2000, 3000];
+  test("with nothing held it is the nearest key's shot", () => {
+    expect(heldIndex(-1, 0, keys)).toBe(0);
+    expect(heldIndex(-1, 560, keys)).toBe(1);
+    expect(heldIndex(-1, 2900, keys)).toBe(3);
+  });
+  test("it keeps the held shot until the page is HOLD_PAST of the gap past the midpoint", () => {
+    expect(HOLD_PAST).toBeGreaterThanOrEqual(0.1);
+    expect(HOLD_PAST).toBeLessThanOrEqual(0.15);
+    expect(heldIndex(0, 501, keys)).toBe(0); // (just past the middle: still the opening)
+    expect(heldIndex(0, 500 + HOLD_PAST * 1000 - 1, keys)).toBe(0);
+    expect(heldIndex(0, 500 + HOLD_PAST * 1000, keys)).toBe(1);
+    // and back: from the second, the first only once the page is as far past the middle the other way
+    expect(heldIndex(1, 499, keys)).toBe(1);
+    expect(heldIndex(1, 500 - HOLD_PAST * 1000, keys)).toBe(0);
+  });
+  test("a jump past several keys changes at once", () => {
+    expect(heldIndex(0, 2990, keys)).toBe(3);
   });
 });
 

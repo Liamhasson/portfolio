@@ -31,6 +31,7 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { FXAAPass } from "three/addons/postprocessing/FXAAPass.js";
 import { distanceFor } from "./camera";
 import { GLASS_MAG, glassAt, glassMaterial, LENS_DENSITY, LENS_SPAN } from "./glass";
 import { ScaledBokehPass } from "./bokeh";
@@ -122,6 +123,8 @@ export class PendantScene {
   private readonly composer: EffectComposer;
   private readonly bokeh: ScaledBokehPass;
   private readonly dimPass: ShaderPass;
+  /** FXAA, last: on only while the pendant is drawn under the screen's own pixel ratio (setAntialias). */
+  private readonly fxaaPass: FXAAPass;
   private readonly outputPass: OutputPass;
   private readonly renderPass: RenderPass;
   private readonly glassPass: ShaderPass;
@@ -223,6 +226,12 @@ export class PendantScene {
     this.dimPass = new ShaderPass(DimShader);
     this.dimPass.enabled = false;
     this.composer.addPass(this.dimPass);
+    // FXAA at the very end, on the colours the screen shows: a frame drawn under the screen's own pixel ratio (a 3x phone at
+    // 2x, the governor's floor) has no multisampling (hiDpi above) and is stretched up, so its edges would stair-step. FXAA
+    // shifts whole texels (rgb and alpha together: premultiplied stays consistent), so the see-through edges stay clean.
+    this.fxaaPass = new FXAAPass();
+    this.fxaaPass.enabled = false;
+    this.composer.addPass(this.fxaaPass);
   }
 
   /** Loads the model, its maps and the wire copy, and builds the scene. Rejects if anything fails to load (and frees
@@ -388,6 +397,9 @@ export class PendantScene {
       this.dimPass.enabled = dimOn;
       this.composer.render();
     }
+    this.fxaaPass.enabled = true; // (FXAA's program, and the output and dim passes drawing to a target before it)
+    this.composer.render();
+    this.fxaaPass.enabled = false;
     this.bokeh.setScale(0.5); // (the governor's half-resolution bokeh: its program too)
     this.composer.render();
     this.bokeh.setScale(1);
@@ -412,6 +424,12 @@ export class PendantScene {
     this.composer.setSize(this.vw, this.vh);
     this.camera.aspect = this.vw / this.vh;
     this.camera.updateProjectionMatrix();
+  }
+
+  /** FXAA on or off (the mount: on while the pixel ratio drawn is under the screen's own). Never resizes. */
+  setAntialias(on: boolean): void {
+    if (this.gone) return;
+    this.fxaaPass.enabled = on;
   }
 
   /** The depth of field's resolution, as a share of the frame's: 1, or 0.5 (the governor's last step, governor.ts). Never
@@ -603,7 +621,7 @@ export class PendantScene {
     this.gone = true;
     if (this.timer) for (const { q } of this.timer.pending) this.timer.gl.deleteQuery(q);
     this.timer = null;
-    for (const p of [this.renderPass, this.bokeh, this.blur, this.glassPass, this.outputPass, this.dimPass]) p.dispose(); // (a shader pass frees its material)
+    for (const p of [this.renderPass, this.bokeh, this.blur, this.glassPass, this.outputPass, this.dimPass, this.fxaaPass]) p.dispose(); // (a shader pass frees its material)
     this.composer.dispose();
     this.lensTarget.dispose();
     for (const o of this.disposables) o.dispose();

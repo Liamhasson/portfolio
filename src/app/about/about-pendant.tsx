@@ -8,12 +8,13 @@ import { clipBox, hits, padBox, type TextRect } from "@/three/pendant/layout";
 import { REST, stepMotion, type MotionState } from "@/three/pendant/motion";
 import { PendantGovernor } from "@/three/pendant/governor";
 import type { GlassSlot, PendantScene } from "@/three/pendant/scene";
-import { SHOTS, SHOTS_STACK, shotAt, solveKeys, type Layer, type Shot } from "@/three/pendant/shots";
+import { heldIndex, SHOTS, SHOTS_STACK, shotAt, solveKeys, type Layer, type Shot } from "@/three/pendant/shots";
 import type { Outline } from "@/three/pendant/solve";
 import type { Spot } from "@/three/pendant/layout";
 import { leanFor } from "./glass-lean";
 import { pictureShown } from "./pendant-pictures";
 import { trackProgress } from "./track";
+import { resizeKind } from "./viewport";
 
 /** What the page tells the e2e tests and the frame script (scripts/about/pendant-frames.cjs), rewritten every frame. */
 export interface PendantHook {
@@ -51,6 +52,8 @@ export interface PendantHook {
   /** Reduced motion: the shot held (its index), and the canvas's opacity (a change of shot crossfades it). */
   shot: number;
   opacity: number;
+  /** Whether FXAA runs (the pixel ratio drawn is under the screen's own). */
+  fxaa: boolean;
 }
 
 declare global {
@@ -108,6 +111,9 @@ const CROSSFADE = 0.6;
 /** Stacked, the pictures that hold still in the column count too: Liam's photo above the first line (on the track it is
  *  cropped away before the pendant reaches it, so only the stack avoids it). */
 const STACK_PIC = ".ab-portrait";
+/** The pull to Contact under About (about-track.tsx `.ab-end`): stacked, the canvas has faded out before its first line
+ *  comes up the screen. */
+const PULL = ".ab-end";
 
 const clamp01 = (v: number) => Math.min(Math.max(v, 0), 1);
 
@@ -192,7 +198,7 @@ export function AboutPendant() {
     const hook: PendantHook = {
       ready: false, keys: [], s: 0, layer: "front", box: { l: 0, t: 0, r: 0, b: 0 }, glass: null, solve: { moved: [], behind: [] },
       yaw: 0, dragging: false, blur: { smear: 0, on: false, jump: false }, gpuMs: null, pixelRatio: 1,
-      bokehHalf: false, baseMs: null, mode: "track", shot: 0, opacity: 0,
+      bokehHalf: false, baseMs: null, mode: "track", shot: 0, opacity: 0, fxaa: false,
     };
     window.__pendant = hook;
 
@@ -215,6 +221,8 @@ export function AboutPendant() {
     const query = new URLSearchParams(window.location.search);
     const forceHalf = query.get("bokehHalf") === "1";
     const govOn = query.get("governor") !== "0" && !forceHalf;
+    /** Diagnostics: ?fxaa=0 holds FXAA off (its cost is measured against it). */
+    const fxaaOk = query.get("fxaa") !== "0";
     const gov = new PendantGovernor(Math.min(window.devicePixelRatio || 1, 2));
     /** The display's own pace, probed while the scene loads (before the pendant costs anything): the governor reads load
      *  against it (never under 60 fps), so a device slow from the first frame isn't taken for a slow screen. */
@@ -244,6 +252,14 @@ export function AboutPendant() {
       glassStack: null as { x: number; y: number; slot: boolean } | null,
       /** Its radius, as a share of the screen's height. */
       glassR: 0,
+      /** Stacked: the middle of the free band above the first line (section px; the opening's ay "line1"), and the page y at
+       *  which the pull to Contact's first line begins (null without one). */
+      lead: null as number | null,
+      pullTop: null as number | null,
+      /** Stacked: the large viewport's height (100lvh, measured once per real resize: the toolbar never changes it). */
+      lvh: 0,
+      /** FXAA on (the pixel ratio drawn is under the screen's own). */
+      aa: false,
       keys: [] as number[],
       texts: [] as TextRect[],
       /** The site's chrome (viewport px, fixed to the viewport) and About's own (the pinned frame's px; stacked, the
@@ -263,6 +279,24 @@ export function AboutPendant() {
       if (L.mode === "stack") return L.glassStack ? { x: L.glassStack.x, y: (L.glassStack.y - s) / L.vh } : { x: 0.5, y: 0.5 };
       return { x: L.glassMid === null ? 0.5 : (L.glassMid - s) / L.vw, y: 0.5 };
     };
+    /** The live spots for the shots' screen aims at travel `s`. */
+    const atFor = (s: number) => ({
+      line1: L.line1, glass: glassAt(s), line1Y: L.mode === "stack" && L.lead !== null ? (L.lead - s) / L.vh : undefined,
+    });
+    /** FXAA follows the pixel ratio: on while it is under the screen's own (a 3x phone at 2x, the governor's floor). */
+    const syncAA = (sc: PendantScene | null) => {
+      const aa = fxaaOk && L.pr < (window.devicePixelRatio || 1) - 1e-3;
+      if (sc && aa !== L.aa) { sc.setAntialias(aa); L.aa = aa; }
+      hook.fxaa = L.aa;
+    };
+    /** Stacked, the large viewport's height: a hidden 100lvh probe (100vh where lvh isn't known). */
+    const lvhProbe = document.createElement("div");
+    lvhProbe.setAttribute("aria-hidden", "true");
+    lvhProbe.style.cssText = "position:fixed;top:0;left:0;width:0;height:100vh;visibility:hidden;pointer-events:none";
+    lvhProbe.style.height = "100lvh";
+    /** A height-only resize under viewport.ts TOOLBAR_MAX on a touch screen (the toolbar): measure the boxes, nothing else. */
+    const coarseQ = window.matchMedia("(pointer: coarse)");
+    let lastWin = { w: window.innerWidth, h: window.innerHeight }, boxesOnly = false;
     /** Whether there is a slot to draw the ball round. */
     const hasSlot = () => L.glassR > 0 && (L.mode === "stack" ? L.glassStack?.slot === true : L.glassMid !== null);
     let dirty = true;
@@ -303,14 +337,22 @@ export function AboutPendant() {
       }
       hook.mode = mode;
       const stack = mode === "stack";
-      // (stacked, the canvas is fixed to the viewport: its own size is the screen's)
+      // the toolbar (stacked, on a touch screen): the boxes again, no new size and no new solve
+      const light = stack && boxesOnly && L.layer !== null && L.sized;
+      boxesOnly = false;
+      if (stack && !light) {
+        if (!lvhProbe.isConnected) document.body.appendChild(lvhProbe);
+        L.lvh = lvhProbe.offsetHeight || window.innerHeight;
+      }
+      // (stacked, the canvas is fixed to the screen at the large viewport's height: the toolbar never resizes it)
       const vw = (stack ? canvas.clientWidth : pin.clientWidth) || window.innerWidth;
-      const vh = (stack ? canvas.clientHeight : pin.clientHeight) || window.innerHeight;
+      const vh = stack ? L.lvh : pin.clientHeight || window.innerHeight;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       gov.setMax(dpr);
       const pr = govOn ? gov.pixelRatio : dpr;
       if (scene && (!L.sized || vw !== L.vw || vh !== L.vh || pr !== L.pr)) { scene.resize(vw, vh, pr); L.sized = true; }
       L.vw = vw; L.vh = vh; L.dpr = dpr; L.pr = pr;
+      syncAA(scene);
       const half = forceHalf || (govOn && gov.bokehHalf);
       if (scene && half !== L.half) { scene.setBokehScale(half ? 0.5 : 1); L.half = half; }
       L.top = sec.offsetTop;
@@ -326,6 +368,7 @@ export function AboutPendant() {
       L.site = [...document.querySelectorAll<HTMLElement>(CHROME_SITE)].map(seen).filter((r) => r !== null).map((r) => box(r, 0));
       L.own = [...pin.querySelectorAll<HTMLElement>(CHROME_PIN)].map(seen).filter((r) => r !== null).map((r) => box(r, org.top));
       // the solve: at once the first time, then after a quiet spell (a window being dragged wider measures every frame)
+      if (light) return;
       window.clearTimeout(solveT);
       if (L.layer === null) solveNow();
       else solveT = window.setTimeout(() => { try { solveNow(); } catch { fail(); } }, SOLVE_QUIET);
@@ -383,6 +426,16 @@ export function AboutPendant() {
       };
       const l1 = mid("line1");
       L.line1 = l1 === null ? 0.5 : l1.x / vw;
+      // the band above the first line: from the photo's foot (when it stands above) to the line's first row of words
+      const l1El = anchor("line1"), photo = tr.querySelector<HTMLElement>(STACK_PIC);
+      const row = l1El ? lineBoxes(l1El)[0] : undefined;
+      const rowTop = row && l1El ? inSection(row, l1El, secTop).t : null;
+      const photoR = photo?.getBoundingClientRect();
+      const foot = photo && photoR && photoR.height > 0 ? inSection(rectBox(photoR), photo, secTop).b : null;
+      L.lead = rowTop === null ? null : foot !== null && foot < rowTop ? (foot + rowTop) / 2 : rowTop - 0.2 * vh;
+      const pull = document.querySelector<HTMLElement>(PULL);
+      const pullRow = pull ? lineBoxes(pull)[0] : undefined;
+      L.pullTop = pullRow ? pullRow.t + window.scrollY : null;
       const slot = mid("glass");
       if (slot) {
         L.glassStack = { x: slot.x / vw, y: slot.y, slot: true };
@@ -411,7 +464,7 @@ export function AboutPendant() {
       const solved = sv.solve({
         shots: baseShots(), keys: L.keys, travel: L.travel, vw: L.vw, vh: L.vh, texts: L.texts, fixed: [...L.site, ...L.own], outline,
         lookMax: L.mode === "stack" ? 0 : LOOK,
-        at: (s) => ({ line1: L.line1, glass: glassAt(s) }),
+        at: atFor,
       });
       L.shots = solved.shots;
       L.spots = solved.spots;
@@ -476,6 +529,7 @@ export function AboutPendant() {
       if (!L.sized) return;
       if (next.pr !== L.pr) { L.pr = next.pr; sc.resize(L.vw, L.vh, next.pr); }
       if (next.bokehHalf !== L.half) { L.half = next.bokehHalf; sc.setBokehScale(next.bokehHalf ? 0.5 : 1); }
+      syncAA(sc);
     };
 
     const step = (now: number, sc: PendantScene, cm: NonNullable<typeof cam>) => {
@@ -500,7 +554,8 @@ export function AboutPendant() {
       // Reduced motion: no blend and no follow, the shot nearest the page held still; a change of shot crossfades the canvas,
       // out to nothing, the new shot put in place unseen, then back in.
       if (reduced) {
-        const want = nearestIndex(sTarget);
+        // (the held shot changes only once the page is well past the middle: viewing near it never flickers)
+        const want = heldIndex(held, sTarget, L.keys);
         // (a locked face is put to the camera at once, unseen, rather than turned to it)
         const hold = (i: number) => { held = i; jumped = true; const lock = L.shots[i]?.lock ?? null; motion = { ...REST, yaw: lock === null ? 0 : (lock * Math.PI) / 180 }; };
         if (held < 0) hold(want);
@@ -513,7 +568,7 @@ export function AboutPendant() {
       // the glass rides with the page as the page shows it (not the smoothed travel): it is a place in the page. Held, it is
       // where the held shot has it.
       const gp = glassAt(reduced ? sAt : sTarget);
-      const f = shotAt(sAt, L.keys, L.shots, { line1: L.line1, glass: gp });
+      const f = shotAt(sAt, L.keys, L.shots, { ...atFor(sAt), glass: gp });
       sv?.applySpot(f, L.spots); // (this screen's rest spots)
       // the pull to Contact: it falls away into the dark as the section scrolls off (held still: only the fade)
       const o = clamp01((y - (L.top + L.H - vh)) / vh);
@@ -547,7 +602,12 @@ export function AboutPendant() {
       // (stacked, the canvas and all the chrome are fixed to the viewport: nothing to shift)
       const pinTop = stack ? 0 : y < L.top ? L.top - y : Math.min(0, L.top + L.H - vh - y);
       const fixed = [...L.own, ...L.site.map((b) => ({ l: b.l, r: b.r, t: b.t - pinTop, b: b.b - pinTop }))];
-      const near = sv !== null && hits(clipBox(padBox(box, sv.PAD / 2), L.vw, L.vh), L.texts, sTarget, fixed) > 0;
+      // (stacked, the ball counts too: held still under reduced motion, the quotes scroll past it)
+      const ball = stack && glass ? { r: glass.r * f.glass * L.vh, x: glass.x * L.vw, y: glass.y * L.vh } : null;
+      const guarded = ball
+        ? { l: Math.min(box.l, ball.x - ball.r), r: Math.max(box.r, ball.x + ball.r), t: Math.min(box.t, ball.y - ball.r), b: Math.max(box.b, ball.y + ball.r) }
+        : box;
+      const near = sv !== null && hits(clipBox(padBox(guarded, sv.PAD / 2), L.vw, L.vh), L.texts, sTarget, fixed) > 0;
       if (near) { guardBack = true; clearFor = 0; } else if (guardBack && (clearFor += dt) >= GUARD_HOLD) guardBack = false;
       const layer: Layer = (L.layer ? L.layer(sAt) : f.layer) === "front" && !guardBack ? "front" : "back";
       // a shot that wanted the front but is behind the words dims to the tumble's brightness, eased in behind them
@@ -563,8 +623,13 @@ export function AboutPendant() {
       jumped = false;
       drawn = true;
       if (stack) {
+        // the pull to Contact: gone between the section's foot reaching the screen's (as the page shows it, toolbar and all)
+        // and the pull's first line coming up into view
+        const shownH = window.innerHeight, foot = L.top + L.H - shownH;
+        const gap = L.pullTop === null ? 0.1 * shownH : L.pullTop - (L.top + L.H);
+        const away = clamp01((y - foot) / Math.max(gap, 1));
         appear = Math.min(appear + dt / APPEAR, 1);
-        setOpacity(appear * fadeK * (1 - o));
+        setOpacity(appear * fadeK * (1 - away));
       } else setOpacity(null);
       hook.blur = sc.blurState;
       hook.pixelRatio = L.pr;
@@ -689,7 +754,13 @@ export function AboutPendant() {
     const ro = typeof ResizeObserver === "function" ? new ResizeObserver(invalidate) : null;
     if (sec) { io?.observe(sec); ro?.observe(sec); }
     if (tr) ro?.observe(tr);
-    window.addEventListener("resize", invalidate);
+    const onResize = () => {
+      const now = { w: window.innerWidth, h: window.innerHeight };
+      if (L.mode === "stack" && resizeKind(lastWin, now, coarseQ.matches) === "toolbar") boxesOnly = true;
+      else { lastWin = now; boxesOnly = false; }
+      invalidate();
+    };
+    window.addEventListener("resize", onResize);
     window.addEventListener("pointerdown", onDown);
     window.addEventListener("pointermove", onMove, { passive: true });
     window.addEventListener("pointerup", onUp);
@@ -718,7 +789,8 @@ export function AboutPendant() {
       io?.disconnect();
       ro?.disconnect();
       reducedQ.removeEventListener?.("change", onReduced);
-      window.removeEventListener("resize", invalidate);
+      window.removeEventListener("resize", onResize);
+      lvhProbe.remove();
       window.removeEventListener("pointerdown", onDown);
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);

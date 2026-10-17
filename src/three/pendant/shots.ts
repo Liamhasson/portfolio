@@ -11,7 +11,9 @@ export type Layer = "front" | "back";
 export type Aim = readonly [number, number, number];
 /** A screen x: a share of the width, or the first line's centre / the glass slot's centre, resolved live. */
 export type ScreenX = number | "line1" | "glass";
-export type ScreenY = number | "glass";
+/** A screen y: a share of the height, the glass slot's centre, or (stacked) the middle of the free band above the first
+ *  line, resolved live (it rides up with the page). */
+export type ScreenY = number | "glass" | "line1";
 /** What the shot hangs on: the top or the end of the track, or an element tagged data-pendant (with what to use if the
  *  page doesn't have it: one other anchor, or the midpoint of two). */
 export type Anchor = "start" | "end" | { pendant: string; fallback?: string | [string, string] };
@@ -133,8 +135,9 @@ export const SHOTS: readonly Shot[] = fill([
  * as on the track.
  */
 export const SHOTS_STACK: readonly Shot[] = fill([
-  // 01 Small, beside Liam's photo in the strip of black at its right, spinning in place
-  { id: "opening", anchor: "start", az: 0, el: 8, roll: 0, fov: 30, h: 0.2, ax: 0.85, ay: 0.53, spin: 0.22, layer: "front", dim: 1, aperture: 0.0006 },
+  // 01 Small, centred above the text, spinning in place in the gap between Liam's photo and the first line (Liam, 2026-10-17:
+  // as on the track). It rides up with the page in that gap (ay "line1") until the first line reaches fy, then lets go.
+  { id: "opening", anchor: { pendant: "line1" }, fx: 0.67, az: 0, el: 8, roll: 0, fov: 30, h: 0.2, ax: 0.5, ay: "line1", spin: 0.22, layer: "front", dim: 1, aperture: 0.0006 },
   // 03 Tumble: end over end behind "eight years managing two rock bands", dimmed
   { id: "tumble", anchor: { pendant: "band" }, fx: 0.5, az: -70, el: 0, roll: 0, fov: 32, h: 0.38, ax: 0.6, ay: 0.52, spin: 0.05, tumble: 0.32, layer: "back", dim: 0.4, aperture: 0.001 },
   // 05 From above: the four faces like a compass, in the band between the work strip and the first quote
@@ -152,6 +155,21 @@ export const SHOTS_STACK: readonly Shot[] = fill([
 /** A shot and its alternates, in the order the solve tries them: the shot as written, then each alternate laid over it. */
 export function variants(shot: Shot): Shot[] {
   return [shot, ...(shot.alt ?? []).map((c) => ({ ...shot, ...c }))];
+}
+
+/** Reduced motion holds the shot nearest the page; it changes only once the page is this share of the gap between the two
+ *  keys past their midpoint, so a page resting near the middle doesn't crossfade back and forth. */
+export const HOLD_PAST = 0.12;
+
+/** The shot reduced motion holds at travel `s`, given the one it holds now (-1 for none): the nearest key's, unless that is
+ *  another shot and the page isn't yet HOLD_PAST of the gap past the midpoint between the two keys. */
+export function heldIndex(held: number, s: number, keys: readonly number[], past = HOLD_PAST): number {
+  let best = 0;
+  for (let i = 1; i < keys.length; i++) if (Math.abs(keys[i] - s) < Math.abs(keys[best] - s)) best = i;
+  if (held < 0 || held >= keys.length || best === held) return best;
+  const a = keys[held], b = keys[best], d = b - a;
+  if (d === 0) return best;
+  return (s - (a + b) / 2) / d >= past ? best : held;
 }
 
 const clamp = (v: number, a: number, b: number) => Math.min(Math.max(v, a), b);
@@ -204,7 +222,9 @@ export function solveKeys(shots: readonly Shot[], centreX: (a: Anchor) => number
  * reads evenly). `layer` and `lock` can't blend, so they switch at the halfway point. `at` supplies the live screen spots
  * for the "line1" and "glass" aims. Before the first key it is the first shot; past the last it is the last.
  */
-export function shotAt(s: number, keys: readonly number[], shots: readonly Shot[], at: { line1: number; glass: { x: number; y: number } }): Frame {
+export function shotAt(
+  s: number, keys: readonly number[], shots: readonly Shot[], at: { line1: number; glass: { x: number; y: number }; line1Y?: number },
+): Frame {
   const last = shots.length - 1;
   let i = 0;
   while (i < last && s > keys[i + 1]) i++;
@@ -213,7 +233,7 @@ export function shotAt(s: number, keys: readonly number[], shots: readonly Shot[
   const span = i >= last ? 0 : keys[i + 1] - keys[i];
   const t = i >= last ? 1 : smoothstep(span > 0 ? clamp((s - keys[i]) / span, 0, 1) : 1);
   const x = (v: ScreenX) => (v === "line1" ? at.line1 : v === "glass" ? at.glass.x : v);
-  const y = (v: ScreenY) => (v === "glass" ? at.glass.y : v);
+  const y = (v: ScreenY) => (v === "glass" ? at.glass.y : v === "line1" ? at.line1Y ?? 0.5 : v);
   const pick = <T,>(a: T, b: T) => (t < 0.5 ? a : b);
   return {
     index: i,
