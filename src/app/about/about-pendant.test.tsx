@@ -6,7 +6,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 vi.mock("@/three/pendant/scene", () => ({ PendantScene: { load: vi.fn() } }));
 
 import { PendantScene } from "@/three/pendant/scene";
-import { glassOwner, resetGlassForTests } from "@/lib/about-glass";
+import { claimGlass, glassOwner, resetGlassForTests, setGlassLight } from "@/lib/about-glass";
 import { AboutPendant } from "./about-pendant";
 
 const load = vi.mocked(PendantScene.load);
@@ -249,6 +249,57 @@ test("the stack's glass slot takes its room only while the pendant holds the bal
   unmount();
 });
 
+
+/** The track with the glass slot at `left` px along it (245 px wide: 17vw at 1440), the screen 1024 wide (jsdom's window). */
+function slotAt(container: HTMLElement, left: number) {
+  const tr = container.querySelector<HTMLElement>(".ab-track")!;
+  const slot = document.createElement("div");
+  slot.dataset.pendant = "glass";
+  tr.appendChild(slot);
+  vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockImplementation(function (this: HTMLElement) { return this === slot ? 245 : 0; });
+  vi.spyOn(HTMLElement.prototype, "offsetLeft", "get").mockImplementation(function (this: HTMLElement) { return this === slot ? left : 0; });
+}
+
+test("the ball is drawn full size wherever the slot is on screen, far from the glass shot, with the light passed in", async () => {
+  const scene = await liveScene();
+  const { fontsDone, runIdle } = setup();
+  const { container } = render(<Page />);
+  slotAt(container, 600); // (on screen at the opening: the shot is nowhere near the glass)
+  setGlassLight({ q: 0.4, t: 7, pulse: 1 });
+  await fontsDone();
+  await runIdle();
+  await waitFor(() => expect(window.__pendant?.ready).toBe(true));
+  await waitFor(() => expect(window.__pendant!.glass).not.toBeNull());
+  const [f, glass, , light] = scene.draw.mock.lastCall!;
+  expect(f.glass).toBe(0);
+  expect(glass.x).toBeCloseTo((600 + 245 / 2) / innerWidth, 6);
+  expect(glass.r).toBeCloseTo((0.44 * 245) / innerHeight, 6); // (full size: not scaled by the shot's glass)
+  expect(window.__pendant!.glass!.r).toBeCloseTo(glass.r, 9);
+  expect(light).toEqual({ q: 0.4, t: 7, pulse: 1 });
+  setGlassLight(null);
+  await waitFor(() => expect(scene.draw.mock.lastCall![3]).toBeNull());
+});
+
+test("no ball while the slot is more than a slot's width off screen, or while the testimonials own the glass", async () => {
+  const scene = await liveScene();
+  const { fontsDone, runIdle } = setup();
+  const { container } = render(<Page />);
+  slotAt(container, innerWidth + 250); // (its centre 372 px past the right edge: more than its 245 px width)
+  await fontsDone();
+  await runIdle();
+  await waitFor(() => expect(window.__pendant?.ready).toBe(true));
+  await waitFor(() => expect(scene.draw.mock.calls.length).toBeGreaterThan(2));
+  expect(scene.draw.mock.lastCall![1]).toBeNull();
+  expect(window.__pendant!.glass).toBeNull();
+  vi.mocked(Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetLeft")!.get!).mockImplementation(function (this: HTMLElement) {
+    return this.dataset.pendant === "glass" ? 600 : 0;
+  });
+  window.dispatchEvent(new Event("resize"));
+  await waitFor(() => expect(window.__pendant!.glass).not.toBeNull());
+  claimGlass("testimonials"); // (a newer claim: the testimonials draw it)
+  await waitFor(() => expect(window.__pendant!.glass).toBeNull());
+  expect(scene.draw.mock.lastCall![1]).toBeNull();
+});
 
 test("the debug hooks are ignored without ?pendant-debug: no GPU timer from window.__pendantPerf", async () => {
   const scene = await liveScene();

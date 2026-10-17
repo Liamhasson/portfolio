@@ -791,23 +791,32 @@ test("the pendant's box holds what is drawn: no brass outside it at the worm, wh
     await page.evaluate((y) => window.scrollTo(0, y), y);
     await page.waitForTimeout(2500);
     // only the canvas painted (the page's words and pictures hidden; the ground stays near black), and the box recorded on
-    // every frame while the screenshot is taken (the pendant never stops moving): the mask is their union plus 4 px
+    // every frame while the screenshot is taken (the pendant never stops moving): the mask is their union plus 4 px. The
+    // glass ball, drawn on the same canvas wherever its slot is on screen, is not the pendant: its disc (as recorded, plus
+    // 4 px) is left out of the count.
     await page.evaluate(() => {
       const st = document.createElement("style");
       st.id = "only-pendant";
       st.textContent = "body * { visibility: hidden !important; } canvas.ab-pendant { visibility: visible !important; }";
       document.head.appendChild(st);
-      const w = window as unknown as { __boxes: { l: number; t: number; r: number; b: number }[]; __stop: boolean };
+      const w = window as unknown as { __boxes: { l: number; t: number; r: number; b: number }[]; __balls: { x: number; y: number; r: number }[]; __stop: boolean };
       w.__boxes = [];
+      w.__balls = [];
       w.__stop = false;
-      const tick = () => { w.__boxes.push({ ...window.__pendant!.box }); if (!w.__stop) requestAnimationFrame(tick); };
+      const tick = () => {
+        const h = window.__pendant!;
+        w.__boxes.push({ ...h.box });
+        if (h.glass) w.__balls.push({ x: h.glass.x * innerWidth, y: h.glass.y * innerHeight, r: h.glass.r * innerHeight });
+        if (!w.__stop) requestAnimationFrame(tick);
+      };
       requestAnimationFrame(tick);
     });
     await page.waitForTimeout(100);
     const png = (await page.screenshot()).toString("base64");
     const r = await page.evaluate(async (src) => {
-      const w = window as unknown as { __boxes: { l: number; t: number; r: number; b: number }[]; __stop: boolean };
+      const w = window as unknown as { __boxes: { l: number; t: number; r: number; b: number }[]; __balls: { x: number; y: number; r: number }[]; __stop: boolean };
       w.__stop = true;
+      const balls = w.__balls;
       document.getElementById("only-pendant")!.remove();
       const bs = w.__boxes;
       const m = { l: Math.min(...bs.map((b) => b.l)) - 4, t: Math.min(...bs.map((b) => b.t)) - 4, r: Math.max(...bs.map((b) => b.r)) + 4, b: Math.max(...bs.map((b) => b.b)) + 4 };
@@ -828,6 +837,7 @@ test("the pendant's box holds what is drawn: no brass outside it at the worm, wh
           const i = (py * c.width + px) * 4;
           if (d[i] + d[i + 1] + d[i + 2] <= 150) continue; // (bright: brass; the ground is near black)
           const X = (px + 0.5) / k, Y = (py + 0.5) / k;
+          if (balls.some((g) => Math.hypot(X - g.x, Y - g.y) <= g.r + 4)) continue; // (the glass, not the pendant)
           if (X >= m.l && X <= m.r && Y >= m.t && Y <= m.b) inside++;
           else { outside++; if (at.length < 5) at.push([Math.round(X), Math.round(Y)]); }
         }

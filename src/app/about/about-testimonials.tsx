@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { glassOwner } from "@/lib/about-glass";
+import { glassOwner, setGlassLight, type GlassOwner } from "@/lib/about-glass";
 import type { TestimonialsLight } from "@/three/edge-light/testimonials-light";
 import { pulsePhase, stepArrival, testimonialsQ, type Arrival } from "./testimonials-q";
 import { trackProgress, trackX } from "./track";
@@ -44,7 +44,9 @@ function afterPaint(): Promise<void> {
  * black behind the words warms (`.ab-mood`, about-track.tsx: its `--q` set here), and one wave crosses the screen as the
  * light arrives. While nobody else draws the glass ball between the quotes (glassOwner(): the pendant claims it once its
  * scene is ready), the light draws its own. It loads after the text has painted, runs only while q > 0 or the slot is
- * within one slot width of the screen, and anything wrong (no WebGL, a lost context) leaves the quotes as they were.
+ * within one slot width of the screen, and anything wrong (no WebGL, a lost context) leaves the quotes as they were. Every
+ * frame it draws with q > 0 it tells the pendant the light's state (about-glass.ts `setGlassLight`), so the pendant's own
+ * ball glints in the same edge colours; null whenever the light is off.
  * Track mode only for now: the stack comes in Task 5.
  */
 export function AboutTestimonials() {
@@ -86,6 +88,9 @@ export function AboutTestimonials() {
      *  shows. `ballA`: the opacity drawn last frame; `handing`: a handoff under way ("on") or finished ("done"). */
     let ballA = 0;
     let handing: "on" | "done" | null = null;
+    /** The owner seen last frame: any change (a release, a claim, both while the slot was far and no frame asked) starts the
+     *  handoff afresh, so a stale "done" from an earlier claim can't hide the ball the next time. */
+    let lastOwner: GlassOwner = glassOwner();
     const ballOpacity = () => {
       if (glassOwner() === "testimonials") { handing = null; return 1; }
       if (handing === null) {
@@ -135,6 +140,8 @@ export function AboutTestimonials() {
     const tick = (now: number) => {
       raf = 0;
       if (off || !light) return;
+      const owner = glassOwner();
+      if (owner !== lastOwner) { lastOwner = owner; handing = null; }
       const m = measure();
       const q = m ? m.q : 0;
       if (m) arrival = stepArrival(arrival, q, m.c0, m.vw, now, reduced);
@@ -145,11 +152,14 @@ export function AboutTestimonials() {
       ballA = a;
       const ball = m && a > 0 ? { x: m.slot.x, y: m.slot.y, r: 0.44 * m.slot.w, a } : null;
       publish({ q, pulse, drawing, ownBall: ball !== null });
-      if (!drawing) { show(false); return; }
+      if (!drawing) { setGlassLight(null); show(false); return; }
+      const t = reduced ? 0 : (now - t0) / 1000;
+      // (the pendant's ball reads this on its own frame: the same q, the same clock, so its rim shows the edges as drawn here)
+      setGlassLight(q > 0 ? { q, t, pulse } : null);
       try {
         // (its own box: fixed at inset 0, it leaves out a classic scrollbar, as the quotes' and the pendant's client sizes do)
         light.resize(canvas.clientWidth || window.innerWidth, canvas.clientHeight || window.innerHeight, window.devicePixelRatio || 1);
-        light.draw({ q, t: reduced ? 0 : (now - t0) / 1000, pulse, pulseFrom: "right", ball });
+        light.draw({ q, t, pulse, pulseFrom: "right", ball });
       } catch {
         fail();
         return;
@@ -185,6 +195,7 @@ export function AboutTestimonials() {
       // (before the dispose: its forced loss fires a context-lost event this canvas must not answer)
       canvas.removeEventListener("webglcontextlost", onLost);
       setMood(0);
+      setGlassLight(null);
       if (light) spent.add(canvas);
       try { light?.dispose(); } catch { /* the GPU is already gone */ }
       light = null;

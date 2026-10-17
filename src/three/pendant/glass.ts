@@ -3,7 +3,8 @@
  * The testimonials' glass ball as the pendant draws it (pendant spec §3 shot 06, §6 "The glass"; its look is the pictures
  * spec's §4.2): mostly clear glass, a dark room with a faint sheen from above, the lamp up to the left (a crisp spark on the
  * front, a soft oval one seen through the glass off the back), no colour and no milk inside, and the pendant behind it seen
- * magnified, bent and upside down. Its rim catches the testimonials' edge colour through a rim light.
+ * magnified, bent and upside down. Its rim glints in the colour of the screen edge it faces, as the testimonials' light
+ * draws that edge (edge-light/field.ts: the one colour field both shaders share), and the lamp's glints take a little of it.
  *
  * How: a full-screen pass after the depth of field, ray-tracing a true sphere per pixel (reflection with Schlick's Fresnel,
  * refraction in and out at index 1.5, one internal bounce). The ray leaving the back of the ball is followed to the plane
@@ -18,10 +19,16 @@
  * (black where nothing is behind: the canvas is see-through) or the page's. A true sphere is cheap to trace exactly, and
  * the exact trace is what turns the pendant over and magnifies it.
  *
- * Pure: the shader as text and the placement maths. The scene owns the pass.
+ * The edge light's colour comes in two places, as in the mockup's ball (about-pictures-v26): the lamp's glints take a little of
+ * it here, on the glass's own reflections (not the pendant seen through it); the rim glints are added by the finish pass
+ * (GLASS_FINISH_FRAGMENT), after the tone mapping, on the colours the screen shows, because they are the light's colours as the
+ * light's canvas draws them (display values, added): through the tone mapping they would come out pale and washed.
+ *
+ * Pure: the shaders as text and the placement maths. The scene owns the passes.
  */
-import { Color, Matrix4, ShaderMaterial, Vector3 } from "three";
+import { Matrix4, ShaderMaterial, Vector2, Vector3 } from "three";
 import type { Texture } from "three";
+import { EDGE_COLOURS, EDGE_GLSL } from "@/three/edge-light/field";
 
 /** Glass. */
 export const GLASS_IOR = 1.5;
@@ -72,9 +79,32 @@ export interface GlassUniforms {
   planePoint: { value: Vector3 };
   planeNormal: { value: Vector3 };
   lamp: { value: Vector3 };
-  rimDir: { value: Vector3 };
-  rimColor: { value: Color };
+  /** How much of the pendant shows through the ball, 0..1: the shot's `glass` (0: the clear, empty room). */
+  see: { value: number };
+  /** The edge light (field.ts EDGE_GLSL), as the testimonials' canvas has it: the canvas's size (px), the light's clock and
+   *  strength (0: no light, the ball as Task 9 drew it), the band's padding (px), the four colours (sRGB 0..1, as the light's
+   *  shader takes them), and the ball's centre on the canvas (px, y up, as gl_FragCoord). */
+  R: { value: Vector2 };
+  T: { value: number };
+  A: { value: number };
+  PAD: { value: number };
+  C0: { value: Vector3 };
+  C1: { value: Vector3 };
+  C2: { value: Vector3 };
+  C3: { value: Vector3 };
+  BC: { value: Vector2 };
 }
+
+/** The edge light's inputs (field.ts EDGE_GLSL reads them; it declares none itself): one per line. */
+const EDGE_UNIFORMS = /* glsl */ `uniform vec2 R;
+  uniform float T;
+  uniform float A;
+  uniform float PAD;
+  uniform vec3 C0;
+  uniform vec3 C1;
+  uniform vec3 C2;
+  uniform vec3 C3;
+  uniform vec2 BC;`;
 
 export const GLASS_VERTEX = /* glsl */ `
   varying vec2 vUv;
@@ -97,9 +127,10 @@ export const GLASS_FRAGMENT = /* glsl */ `
   uniform vec3 planePoint;   // the plane through the pendant, square to the camera
   uniform vec3 planeNormal;
   uniform vec3 lamp;         // camera space, toward the lamp
-  uniform vec3 rimDir;       // camera space, toward the rim light (behind the ball)
-  uniform vec3 rimColor;     // its colour x intensity (black when the testimonials give none)
+  uniform float see;         // how much of the pendant shows through (the shot's glass; 0: the empty room)
+  ${EDGE_UNIFORMS}
   varying vec2 vUv;
+  ${EDGE_GLSL}
 
   const float IOR = ${GLASS_IOR.toFixed(2)};
   const float F0 = 0.04;     // ((n - 1) / (n + 1))^2 at n = 1.5
@@ -115,11 +146,6 @@ export const GLASS_FRAGMENT = /* glsl */ `
     float wide = smoothstep( 0.9925, 0.9992, cosA );                  // about 7 degrees, soft
     c += vec3( 1.0, 0.96, 0.9 ) * mix( 60.0 * crisp, 4.0 * wide, soft );
     return c;
-  }
-
-  // The rim light, as a reflection: it sits behind the ball, so only grazing reflections near the rim reach it.
-  vec3 rim( vec3 d ) {
-    return rimColor * pow( max( dot( d, rimDir ), 0.0 ), 36.0 );
   }
 
   vec3 toCam( vec3 w ) { return normalize( mat3( view ) * w ); }
@@ -169,9 +195,12 @@ export const GLASS_FRAGMENT = /* glsl */ `
     vec3 t3 = refract( i2, -normalize( p3 - centre ), IOR );
 
     float through = ( 1.0 - f1 ) * ( 1.0 - f2 );
-    vec4 seen = behind( p2, t2 ) * through;                           // the pendant, upside down (premultiplied)
-    vec3 glints = f1 * ( room( toCam( r1 ), 0.0 ) + rim( toCam( r1 ) ) );
+    // the pendant, upside down (premultiplied), as much as the shot is through the glass: else the empty room
+    vec4 seen = see > 0.0 ? behind( p2, t2 ) * through * see : vec4( 0.0 );
+    vec3 glints = f1 * room( toCam( r1 ), 0.0 );
     glints += ( 1.0 - f1 ) * f2 * ( 1.0 - f2 ) * room( toCam( t3 ), 1.0 ) * step( 1e-4, dot( t3, t3 ) );
+    // the lamp's glints take a little of the edge's colour (field.ts lampTint; 1 with no light)
+    glints *= lampTint( glints, normalize( toCam( n1 ).xy + 1e-5 ), BC );
     // The page behind shows through what the pendant leaves, dimmed by what the two surfaces reflect away (most of it at the
     // rim: the dark ring of a glass ball). The canvas is premultiplied over the page, so that is an alpha of 1 - through x
     // (1 - the pendant's). A glint is light over the page: as opaque as it is bright (the output pass un-premultiplies).
@@ -180,6 +209,75 @@ export const GLASS_FRAGMENT = /* glsl */ `
     vec4 ball = vec4( seen.rgb + glints, a + ( 1.0 - a ) * ga );
     gl_FragColor = mix( frame, ball, cover );
   }`;
+
+/**
+ * The finish, after the tone mapping (the scene's last pass before FXAA): the testimonials' rim glints added on the ball, in
+ * the colour of the screen edge each point of the rim faces (field.ts rimGlint, display values, as the light's canvas adds
+ * them), and the dim (behind the words) on everything but the ball: the ball is glass in the page, not the pendant, so it
+ * keeps its look whatever the pendant's shot. Premultiplied: a glint is light over the page, as opaque as it is bright (the
+ * light's canvas composites the same way). It traces the same sphere as the glass pass, from the same uniforms.
+ */
+export const GLASS_FINISH_FRAGMENT = /* glsl */ `
+  uniform sampler2D tDiffuse;
+  uniform float dim;         // 0..1 brightness, the ball left out
+  uniform float ball;        // 1 while the ball is drawn
+  uniform mat4 camWorld;
+  uniform mat4 projInv;
+  uniform mat4 view;
+  uniform vec3 camPos;
+  uniform vec3 centre;
+  uniform float radius;
+  ${EDGE_UNIFORMS}
+  varying vec2 vUv;
+  ${EDGE_GLSL}
+
+  void main() {
+    vec4 c = texture2D( tDiffuse, vUv );
+    float cover = 0.0;
+    vec3 rim = vec3( 0.0 );
+    if ( ball > 0.5 ) {
+      vec4 v = projInv * vec4( vUv * 2.0 - 1.0, 1.0, 1.0 );
+      vec3 d = normalize( mat3( camWorld ) * ( v.xyz / v.w ) );
+      vec3 oc = camPos - centre;
+      float b = dot( oc, d );
+      float miss2 = dot( oc, oc ) - b * b;
+      float near = sqrt( max( miss2, 0.0 ) );
+      cover = clamp( ( radius - near ) / max( fwidth( near ), 1e-6 ) + 0.5, 0.0, 1.0 );   // (the glass pass's silhouette)
+      if ( cover > 0.0 && A > 0.0 ) {
+        float h = sqrt( max( radius * radius - miss2, 0.0 ) );
+        // camera space (x right, y up, toward the eye), as the light's ray-traced ball has its normal and ray
+        vec3 n = normalize( mat3( view ) * normalize( camPos + d * ( -b - h ) - centre ) );
+        vec3 rd = normalize( mat3( view ) * d );
+        rim = clamp( rimGlint( n, rd, normalize( n.xy + 1e-5 ), BC ), 0.0, 1.0 ) * cover;
+      }
+    }
+    c.rgb *= mix( dim, 1.0, cover );
+    float ra = max( rim.r, max( rim.g, rim.b ) );
+    gl_FragColor = vec4( c.rgb + rim, c.a + ( 1.0 - c.a ) * ra );
+  }`;
+
+/** The finish pass's uniforms: its own frame and dim, and (shared, the same objects) the glass pass's sphere and light. */
+export type GlassFinishUniforms = Pick<GlassUniforms, "camWorld" | "projInv" | "view" | "camPos" | "centre" | "radius" | "R" | "T" | "A" | "PAD" | "C0" | "C1" | "C2" | "C3" | "BC"> & {
+  [name: string]: { value: unknown };
+  tDiffuse: { value: Texture | null };
+  dim: { value: number };
+  ball: { value: number };
+};
+
+/** The finish pass's material, sharing the glass pass's uniform objects (so placing the ball places it for both). */
+export function glassFinishMaterial(glass: GlassUniforms): ShaderMaterial & { uniforms: GlassFinishUniforms } {
+  const { camWorld, projInv, view, camPos, centre, radius, R, T, A, PAD, C0, C1, C2, C3, BC } = glass;
+  const uniforms: GlassFinishUniforms = {
+    tDiffuse: { value: null }, dim: { value: 1 }, ball: { value: 0 },
+    camWorld, projInv, view, camPos, centre, radius, R, T, A, PAD, C0, C1, C2, C3, BC,
+  };
+  return new ShaderMaterial({
+    name: "PendantGlassFinish", uniforms, vertexShader: GLASS_VERTEX, fragmentShader: GLASS_FINISH_FRAGMENT, depthTest: false, depthWrite: false,
+  }) as ShaderMaterial & { uniforms: GlassFinishUniforms };
+}
+
+/** sRGB 0..1 from "#rrggbb", as the light's shader takes its colours (no colour management: the field cubes them itself). */
+const rgb = (h: string) => new Vector3(...[1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255));
 
 /** The glass pass's material: a full-screen quad over the frame the depth of field left. */
 export function glassMaterial(): ShaderMaterial & { uniforms: GlassUniforms } {
@@ -197,8 +295,16 @@ export function glassMaterial(): ShaderMaterial & { uniforms: GlassUniforms } {
     planePoint: { value: new Vector3() },
     planeNormal: { value: new Vector3(0, 0, -1) },
     lamp: { value: LAMP.clone() },
-    rimDir: { value: new Vector3(0, 0, -1) },
-    rimColor: { value: new Color(0, 0, 0) },
+    see: { value: 0 },
+    R: { value: new Vector2(1, 1) },
+    T: { value: 0 },
+    A: { value: 0 },
+    PAD: { value: 0 },
+    C0: { value: rgb(EDGE_COLOURS[0]) },
+    C1: { value: rgb(EDGE_COLOURS[1]) },
+    C2: { value: rgb(EDGE_COLOURS[2]) },
+    C3: { value: rgb(EDGE_COLOURS[3]) },
+    BC: { value: new Vector2() },
   };
   return new ShaderMaterial({
     name: "PendantGlass", uniforms, vertexShader: GLASS_VERTEX, fragmentShader: GLASS_FRAGMENT, depthTest: false, depthWrite: false,

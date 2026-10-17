@@ -17,7 +17,7 @@ vi.mock("@/three/edge-light/testimonials-light", async (orig) => {
   };
 });
 
-import { claimGlass, resetGlassForTests } from "@/lib/about-glass";
+import { claimGlass, glassLight, resetGlassForTests, setGlassLight } from "@/lib/about-glass";
 import { AboutTestimonials } from "./about-testimonials";
 
 const g = globalThis as unknown as Record<string, unknown>;
@@ -219,6 +219,56 @@ test("a pendant that claimed the glass before the light drew a ball: no ball fad
   await runFrame(1000);
   expect(draw.mock.lastCall![0].ball).toBeNull();
   expect(window.__testimonials!.ownBall).toBe(false);
+});
+
+test("a release and a fresh claim while the slot is away start the handoff afresh: no ball fades in from nowhere", async () => {
+  await mount();
+  const pc = pendantCanvas(0);
+  at = { q1: 100, slot: 500, q2: 900 };
+  window.dispatchEvent(new Event("scroll"));
+  await runFrame(1000);
+  const release = claimGlass("pendant");
+  pc.style.opacity = "0.5";
+  await runFrame(1100); // (a handoff under way)
+  expect(draw.mock.lastCall![0].ball.a).toBeCloseTo(0.5, 9);
+  at = { q1: 1000, slot: 1400, q2: 1800 }; // (the slot more than a width off the right; q still above 0: frames run)
+  await runFrame(1200);
+  expect(draw.mock.lastCall![0].ball).toBeNull();
+  release(); // (the pendant's context lost, then back on a fresh canvas that claims again, fading in from 0)
+  pc.remove();
+  await runFrame(1300);
+  pendantCanvas(0);
+  claimGlass("pendant");
+  await runFrame(1400);
+  at = { q1: 100, slot: 500, q2: 900 }; // (back in the middle: the pendant's ball, no light's ball out of nowhere)
+  await runFrame(1500);
+  expect(draw.mock.lastCall![0].ball).toBeNull();
+  expect(window.__testimonials!.ownBall).toBe(false);
+});
+
+test("tells the pendant the light every frame it draws (q, its own clock, the pulse), null at q 0 and when it goes", async () => {
+  const { unmount } = await mount();
+  setGlassLight({ q: 1, t: 1, pulse: 1 }); // (a stale value: the first frame at q 0 must clear it)
+  at = { q1: W + 1100, slot: W + SLOT - 10, q2: W + 1500 }; // (drawing for the slot, q 0)
+  window.dispatchEvent(new Event("scroll"));
+  await runFrame(1000);
+  expect(window.__testimonials).toMatchObject({ q: 0, drawing: true });
+  expect(glassLight()).toBeNull();
+  at = { q1: 600, slot: 900, q2: 1300 }; // (q 1)
+  await runFrame(1500);
+  const l = glassLight()!;
+  expect(l.q).toBeCloseTo(1, 9);
+  expect(l.t).toBe(draw.mock.lastCall![0].t);
+  expect(l.pulse).toBe(draw.mock.lastCall![0].pulse);
+  at = { q1: -2400, slot: -2000, q2: -1600 }; // (all gone past the left: idle)
+  await runFrame(1600);
+  expect(glassLight()).toBeNull();
+  at = { q1: 600, slot: 900, q2: 1300 };
+  window.dispatchEvent(new Event("scroll"));
+  await runFrame(1700);
+  expect(glassLight()).not.toBeNull();
+  unmount();
+  expect(glassLight()).toBeNull();
 });
 
 test("the light is sized from its own box (a classic scrollbar left out), not the window", async () => {

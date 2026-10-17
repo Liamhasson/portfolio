@@ -1,7 +1,8 @@
 // src/three/pendant/glass.test.ts
 import { describe, expect, it } from "vitest";
 import { distanceFor } from "./camera";
-import { GLASS_FRAGMENT, GLASS_IOR, GLASS_MAG, glassAt, glassMaterial } from "./glass";
+import { EDGE_COLOURS } from "@/three/edge-light/field";
+import { GLASS_FINISH_FRAGMENT, GLASS_FRAGMENT, GLASS_IOR, GLASS_MAG, glassAt, glassFinishMaterial, glassMaterial } from "./glass";
 
 const D2R = Math.PI / 180;
 
@@ -77,4 +78,46 @@ describe("the glass pass's material", () => {
     for (const n of names) expect(Object.keys(m.uniforms)).toContain(n);
     m.dispose();
   });
+
+  it("catches the testimonials' light through the shared field: the lamp's glints tinted here, no rim light left", () => {
+    expect(GLASS_FRAGMENT).toContain("vec3 rimGlint(");   // (EDGE_GLSL included)
+    expect(GLASS_FRAGMENT).toMatch(/glints \*= lampTint\(/);
+    expect(GLASS_FRAGMENT).not.toMatch(/rimColor|rimDir/);
+    for (const u of ["R", "T", "A", "PAD", "C0", "C1", "C2", "C3", "BC", "see"]) expect(GLASS_FRAGMENT).toMatch(new RegExp(`uniform \\w+ ${u};`));
+  });
+
+  it("its colours are the light's, sRGB 0..1 as the light's shader takes them, and the light starts off (A 0)", () => {
+    const m = glassMaterial();
+    EDGE_COLOURS.forEach((h, i) => {
+      const v = m.uniforms[`C${i}`].value as { x: number; y: number; z: number };
+      expect([v.x, v.y, v.z]).toEqual([1, 3, 5].map((k) => parseInt(h.slice(k, k + 2), 16) / 255));
+    });
+    expect(m.uniforms.A.value).toBe(0);
+    m.dispose();
+  });
 });
+
+describe("the glass finish pass (after the tone mapping)", () => {
+  it("adds the rim glints, leaves the ball out of the dim, and has a uniform for every uniform it reads", () => {
+    const glass = glassMaterial();
+    const m = glassFinishMaterial(glass.uniforms);
+    const names = [...GLASS_FINISH_FRAGMENT.matchAll(/uniform\s+\w+\s+(\w+)\s*;/g)].map((x) => x[1]);
+    for (const n of names) expect(Object.keys(m.uniforms)).toContain(n);
+    expect(GLASS_FINISH_FRAGMENT).toMatch(/rimGlint\(/);
+    expect(GLASS_FINISH_FRAGMENT).toMatch(/mix\( dim, 1\.0, cover \)/);
+    m.dispose();
+    glass.dispose();
+  });
+
+  it("shares the glass pass's sphere and light (the same objects), but has its own frame", () => {
+    const glass = glassMaterial();
+    const m = glassFinishMaterial(glass.uniforms);
+    for (const n of ["centre", "radius", "camWorld", "projInv", "view", "camPos", "R", "T", "A", "BC", "C0"]) expect(m.uniforms[n]).toBe(glass.uniforms[n]);
+    expect(m.uniforms.tDiffuse).not.toBe(glass.uniforms.tDiffuse);
+    glass.uniforms.A.value = 0.7;
+    expect(m.uniforms.A.value).toBe(0.7);
+    m.dispose();
+    glass.dispose();
+  });
+});
+

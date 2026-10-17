@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { claimGlass, glassOwner, glassRim } from "@/lib/about-glass";
+import { claimGlass, glassLight, glassOwner } from "@/lib/about-glass";
 import type { Box, Look } from "@/three/pendant/camera";
 import { clipBox, hits, padBox, type TextRect } from "@/three/pendant/layout";
 import { REST, stepMotion, type MotionState } from "@/three/pendant/motion";
@@ -27,7 +27,9 @@ export interface PendantHook {
   layer: Layer;
   /** The pendant's projected bounds on screen (px from the pinned frame's top-left). */
   box: Box;
-  /** The glass ball as drawn (centre as a share of the viewport, radius as a share of its height), or null. */
+  /** The glass ball as drawn (centre as a share of the viewport, radius as a share of its height), or null. Drawn full size
+   *  whenever the pendant owns it and the slot is within one slot width of the screen; it is not the pendant, so `box`
+   *  leaves it out. */
   glass: GlassSlot | null;
   /** This screen's solve (Task 8): the front shots whose rest changed (the alternate used, 0 = as written; the move as shares
    *  of the width / height and the scale) and those resting behind the words. */
@@ -74,9 +76,11 @@ const DT_MAX = 0.05;
 const LOOK = 0.035;
 const LOOK_EASE = 0.1;
 /** The glass between the quotes: the pictures' empty 17vw slot (about-track.tsx `.ab-glass`, data-pendant="glass"), the
- *  ball's radius this share of the slot's width (spec §3: 0.44 x slot, so it never reaches either quote); drawn while the
- *  shot is at least GLASS_MIN "through the glass". (The slot is rendered whenever there are two quotes, the only case the
- *  old quote-gap sizing covered, so that fallback is gone.) */
+ *  ball's radius this share of the slot's width (spec §3: 0.44 x slot, so it never reaches either quote); drawn full size
+ *  whenever the slot is within one slot width of the screen, so it travels with the track as clear glass and catches the
+ *  testimonials' light; the pendant shows through it as far as the shot is through the glass (GLASS_MIN: the shot counts
+ *  as through the glass, for the lean and the stacked guard). (The slot is rendered whenever there are two quotes, the only
+ *  case the old quote-gap sizing covered, so that fallback is gone.) */
 const GLASS_SLOT_R = 0.44;
 const GLASS_MIN = 0.02;
 /** What is painted above the canvas and must keep its press (links, buttons, fields). */
@@ -316,6 +320,13 @@ export function AboutPendant() {
     let lastWin = { w: window.innerWidth, h: window.innerHeight }, boxesOnly = false;
     /** Whether there is a slot to draw the ball round. */
     const hasSlot = () => L.glassR > 0 && (L.mode === "stack" ? L.glassStack?.slot === true : L.glassMid !== null);
+    /** Whether the slot centred at `p` (shares of the viewport) is within one slot width of the screen: along the track
+     *  sideways, stacked up and down (as the testimonials' light decides it runs). */
+    const slotOnScreen = (p: { x: number; y: number }) => {
+      const w = (L.glassR * L.vh) / GLASS_SLOT_R;
+      const c = L.mode === "stack" ? p.y * L.vh : p.x * L.vw, size = L.mode === "stack" ? L.vh : L.vw;
+      return c > -w && c < size + w;
+    };
     let dirty = true;
     const anchor = (name: string) => tr?.querySelector<HTMLElement>(`[data-pendant="${name}"]`) ?? null;
     // a slide's left edge along the track (offsets ignore the track's transform and the arrival animation)
@@ -601,9 +612,13 @@ export function AboutPendant() {
       // the cursor's lean (stacked there is no cursor to follow: it rests)
       look.x += ((stack ? 0 : -mouse.y * LOOK) - look.x) * LOOK_EASE;
       look.y += ((stack ? 0 : -mouse.x * LOOK) - look.y) * LOOK_EASE;
-      // the glass ball, when the pendant draws it (it owns it, and the slot is there)
+      // the glass ball, when the pendant draws it (it owns it, and the slot is within one slot width of the screen), full
+      // size. It is a place in the page: it rides with the page as the page shows it. Held still (reduced motion), it is
+      // where the held shot has it while that shot is through the glass (the pendant inside must line up), else where the
+      // page has it (clear glass, nothing to line up).
       const ours = glassOwner() === "pendant";
-      const glass: GlassSlot | null = ours && f.glass > GLASS_MIN && hasSlot() ? { x: gp.x, y: gp.y, r: L.glassR } : null;
+      const ballAt = reduced && f.glass <= GLASS_MIN ? glassAt(sTarget) : gp;
+      const glass: GlassSlot | null = ours && hasSlot() && slotOnScreen(ballAt) ? { x: ballAt.x, y: ballAt.y, r: L.glassR } : null;
       // (through a drawn ball the lean is eased down: the ball magnifies it and turns it over, see PendantScene.glassLook)
       leanFor(look, glass !== null, f.glass, sc.glassLook, leaned);
       cm.poseRig(f, motion, time, leaned, L.vw, L.vh, sc.camera, sc.outer, sc.inner, { still: reduced });
@@ -622,8 +637,11 @@ export function AboutPendant() {
       // (stacked, the canvas and all the chrome are fixed to the viewport: nothing to shift)
       const pinTop = stack ? 0 : y < L.top ? L.top - y : Math.min(0, L.top + L.H - vh - y);
       const fixed = [...L.own, ...L.site.map((b) => ({ l: b.l, r: b.r, t: b.t - pinTop, b: b.b - pinTop }))];
-      // (stacked, the ball counts too: held still under reduced motion, the quotes scroll past it)
-      const ball = stack && glass ? { r: glass.r * f.glass * L.vh, x: glass.x * L.vw, y: glass.y * L.vh } : null;
+      // (stacked and held still under reduced motion, the ball counts too while the held shot is through it: it stays where
+      // the shot has it and the quotes scroll past it. Otherwise it rides its slot in the page, in the gap between the quotes,
+      // never over a line, and it is not the pendant: left out, or its full disc joined to the pendant's box (padded) would
+      // reach the quotes' lines round the slot and send the pendant behind them all the way through the glass)
+      const ball = stack && reduced && glass && f.glass > GLASS_MIN ? { r: glass.r * L.vh, x: glass.x * L.vw, y: glass.y * L.vh } : null;
       const guarded = ball
         ? { l: Math.min(box.l, ball.x - ball.r), r: Math.max(box.r, ball.x + ball.r), t: Math.min(box.t, ball.y - ball.r), b: Math.max(box.b, ball.y + ball.r) }
         : box;
@@ -639,7 +657,7 @@ export function AboutPendant() {
       const tag = ++frameNo;
       if (hook.gpuMs) perfFrames.set(tag, { s: sAt, shot: nearestShot(sAt) });
       // (held still, nothing is smeared: every frame starts the blur afresh)
-      sc.draw(f, glass, dim, glass ? glassRim() : null, { dt, reset: jumped || reduced, tag });
+      sc.draw(f, glass, dim, glass ? glassLight() : null, { dt, reset: jumped || reduced, tag });
       jumped = false;
       drawn = true;
       if (stack) {
@@ -680,7 +698,7 @@ export function AboutPendant() {
       hook.box = drawnBox;
       hook.yaw = motion.yaw;
       hook.dragging = drag !== null;
-      hook.glass = glass && { x: glass.x, y: glass.y, r: glass.r * f.glass }; // (the scene grows the ball with f.glass)
+      hook.glass = glass && { x: glass.x, y: glass.y, r: glass.r };
       if (!hook.ready) { hook.ready = true; canvas.dataset.ready = ""; }
       glassShown(releaseGlass !== null);
     };

@@ -236,7 +236,7 @@ test("handed to the pendant, the ball never leaves the slot: the light's fades o
   await hideCanvases(false);
   /** The ball's mark: the share of the disc (to r + 3 px) that differs from the bare page by more than 24 levels (r + g + b),
    *  and the bright rim pixels (r + g + b > 150, at r ± 3 px). Either ball shows in the first: the light's in its glass and
-   *  rim glints, the pendant's in its dark rim and the brass inside. (Its rim catches no light before Task 3.) */
+   *  rim glints, the pendant's in its rim and the brass inside. */
   const mark = async () => {
     const png = (await page.screenshot({ clip })).toString("base64");
     return page.evaluate(async ({ png, bare, r }) => {
@@ -292,4 +292,147 @@ test("handed to the pendant, the ball never leaves the slot: the light's fades o
   // and the handoff is done: the pendant's ball alone
   expect((await hook(page)).ownBall).toBe(false);
   expect(errors).toEqual([]);
+});
+
+// ---------- Task 3: the pendant's ball catches the light ----------
+
+/** With the slot centred, q held at `q` (< 1) by shifting Yoav's quote (hidden) to where the light's scrub reads that q; 1
+ *  puts it back. The ball and the light then show that q, wherever the slot is. */
+async function holdQ(page: Page, q: number) {
+  await page.evaluate((q) => {
+    const el = document.querySelector<HTMLElement>("[data-pendant='quote1']")!;
+    el.style.transform = ""; el.style.visibility = "";
+    if (q >= 1) return;
+    const vw = document.querySelector<HTMLElement>(".ab-clip")!.clientWidth, r = el.getBoundingClientRect();
+    const want = q <= 0 ? 1.2 * vw : 1.05 * vw - (2 / Math.PI) * Math.acos(1 - q) * 0.4 * vw;
+    el.style.transform = `translateX(${want - (r.left + r.width / 2)}px)`;
+    el.style.visibility = "hidden";
+  }, q);
+}
+
+/** The pendant's ball as drawn (screen px), from its hook. */
+const pendantBall = (page: Page) => page.evaluate(() => {
+  const g = window.__pendant?.glass;
+  return g ? { x: g.x * innerWidth, y: g.y * innerHeight, r: g.r * innerHeight } : null;
+});
+
+/** The ball's rim, round its outline (r ± 5 px: off the screen's middle a sphere in perspective shows a few percent wider
+ *  across than its radius, so its outline lies a little past r at the sides), in 24 sectors round it: each sector's mean colour, and the
+ *  share of warm pixels (red above 60, leading, and over green or blue by more than 30; the glass's own grey reflections
+ *  are neutral). The light's own canvas is hidden first, so this is the
+ *  pendant's ball alone. */
+async function rimSectors(page: Page, ball: { x: number; y: number; r: number }) {
+  await setLight(page, false);
+  const S = Math.ceil(ball.r + 8);
+  const clip = { x: Math.round(ball.x - S), y: Math.round(ball.y - S), width: 2 * S, height: 2 * S };
+  const png = (await page.screenshot({ clip })).toString("base64");
+  await setLight(page, true);
+  return page.evaluate(async ({ png, r, ox, oy }) => {
+    const img = new Image();
+    img.src = `data:image/png;base64,${png}`;
+    await img.decode();
+    const c = document.createElement("canvas");
+    c.width = img.width; c.height = img.height;
+    const x = c.getContext("2d")!;
+    x.drawImage(img, 0, 0);
+    const d = x.getImageData(0, 0, c.width, c.height).data;
+    const N = 24, sum = Array.from({ length: N }, () => [0, 0, 0, 0]);
+    let warm = 0, n = 0;
+    for (let py = 0; py < c.height; py++) {
+      for (let px = 0; px < c.width; px++) {
+        const dx = px + 0.5 - ox, dy = py + 0.5 - oy, dist = Math.hypot(dx, dy);
+        if (dist < r - 5 || dist > r + 5) continue;
+        const i = (py * c.width + px) * 4, k = Math.min(N - 1, Math.floor(((Math.atan2(dy, dx) + Math.PI) / (2 * Math.PI)) * N));
+        sum[k][0] += d[i]; sum[k][1] += d[i + 1]; sum[k][2] += d[i + 2]; sum[k][3]++;
+        n++;
+        // (every edge colour has red full: pink, orange, yellow and coral all lead with red, over green or blue by far)
+        if (d[i] > 60 && d[i] >= Math.max(d[i + 1], d[i + 2]) - 4 && d[i] - Math.min(d[i + 1], d[i + 2]) > 30) warm++;
+      }
+    }
+    const sectors = sum.map(([r, g, b, m]) => ({ r: r / m, g: g / m, b: b / m }));
+    return { sectors, warm: warm / n, n };
+  }, { png, r: ball.r, ox: ball.x - clip.x, oy: ball.y - clip.y });
+}
+
+/** The rim sampled `n` times, 250 ms apart: its arcs come and go (for a second or two at a time all of it can rest at the
+ *  arcs' floor, a quarter of their brightness) and its colours travel, so one look can catch a quiet moment. */
+async function rimSamples(page: Page, ball: { x: number; y: number; r: number }, n = 12) {
+  const out: Awaited<ReturnType<typeof rimSectors>>[] = [];
+  for (let i = 0; i < n; i++) {
+    out.push(await rimSectors(page, ball));
+    await page.waitForTimeout(250);
+  }
+  return out;
+}
+
+test.describe("the pendant's ball catches the light", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/about");
+    await lightLoaded(page);
+    await page.waitForFunction(() => window.__pendant?.ready === true, null, { timeout: 20_000 });
+    await page.mouse.move(1430, 890);
+  });
+
+  test("at q 1 its rim glints warm, in arcs: the colour and the brightness differ round the rim", async ({ page }) => {
+    const errors = collectErrors(page);
+    await scrollTo(page, "slot");
+    await expect.poll(async () => (await hook(page)).q).toBeGreaterThan(0.999);
+    await page.waitForTimeout(2500); // (the pendant's follow settles)
+    expect((await hook(page)).ownBall).toBe(false); // (the pendant draws the ball)
+    const ball = (await pendantBall(page))!;
+    expect(ball).not.toBeNull();
+    const samples = await rimSamples(page, ball);
+    const best = samples.reduce((a, b) => (b.warm > a.warm ? b : a));
+    expect(best.warm, `warm rim pixels (${samples.map((x) => x.warm.toFixed(3)).join(", ")})`).toBeGreaterThan(0.15);
+    for (const rim of samples.filter((x) => x.warm > 0.05)) {
+      const lum = rim.sectors.map((s) => s.r + s.g + s.b);
+      expect(Math.max(...lum)).toBeGreaterThan(2 * Math.min(...lum)); // (arcs, not an even ring)
+    }
+    // the edges' colours, not one tint: the green share differs round the rim (orange and yellow against pink and red)
+    const green = best.sectors.map((s) => s.g / Math.max(1, s.r + s.g + s.b));
+    expect(Math.max(...green) - Math.min(...green)).toBeGreaterThan(0.05);
+    expect(errors).toEqual([]);
+  });
+
+  test("at q 0 its rim has no warm hue: the ball as it was before the light", async ({ page }) => {
+    await scrollTo(page, "slot");
+    await holdQ(page, 0);
+    await page.waitForTimeout(400);
+    await expect.poll(async () => (await hook(page)).q).toBe(0);
+    await page.waitForTimeout(2500);
+    const ball = (await pendantBall(page))!;
+    expect(ball).not.toBeNull();
+    const dark = await rimSamples(page, ball);
+    expect(Math.max(...dark.map((x) => x.warm)), `warm rim pixels at q 0: ${dark.map((x) => x.warm.toFixed(3))}`).toBeLessThan(0.01);
+    // and the light's colour comes back with q: at 1 the same rim is warm
+    await holdQ(page, 1);
+    await expect.poll(async () => (await hook(page)).q).toBeGreaterThan(0.999);
+    await page.waitForTimeout(300);
+    const lit = await rimSamples(page, (await pendantBall(page))!);
+    expect(Math.max(...lit.map((x) => x.warm)), `warm rim pixels at q 1: ${lit.map((x) => x.warm.toFixed(3))}`).toBeGreaterThan(0.15);
+  });
+
+  test("the ball is there whenever the slot is on screen, full size, far from the glass shot too", async ({ page }) => {
+    const errors = collectErrors(page);
+    const slot = await scrollTo(page, "slot");
+    const full = 0.44 * slot.w;
+    // the slot near either edge of the screen, the shot far from the glass key (0.4 of a screen of travel away)
+    for (const at of [0.9, 0.1]) {
+      await page.evaluate((at) => window.scrollTo(0, window.scrollY + (0.5 - at) * innerWidth), at);
+      await page.waitForTimeout(2500);
+      const ball = await pendantBall(page);
+      expect(ball, `a ball with the slot at ${at} of the width`).not.toBeNull();
+      expect(Math.abs(ball!.r - full)).toBeLessThan(2); // (full size: not grown in with the shot)
+      expect(Math.abs(ball!.x - at * page.viewportSize()!.width)).toBeLessThan(2);
+      // drawn, and catching the light (q is 1 there)
+      const rim = await rimSamples(page, ball!);
+      expect(Math.max(...rim.map((x) => x.warm)), `warm rim pixels with the slot at ${at}: ${rim.map((x) => x.warm.toFixed(3))}`).toBeGreaterThan(0.1);
+      await page.evaluate((at) => window.scrollTo(0, window.scrollY - (0.5 - at) * innerWidth), at);
+    }
+    // and none once the slot is more than its width off the screen
+    await page.evaluate((w) => window.scrollTo(0, window.scrollY - 0.5 * innerWidth - 1.2 * w), slot.w);
+    await page.waitForTimeout(600);
+    expect(await pendantBall(page)).toBeNull();
+    expect(errors).toEqual([]);
+  });
 });

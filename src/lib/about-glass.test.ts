@@ -1,6 +1,6 @@
 // src/lib/about-glass.test.ts
 import { afterEach, describe, expect, it } from "vitest";
-import { claimGlass, glassOwner, glassRim, resetGlassForTests, setGlassRim } from "./about-glass";
+import { claimGlass, glassLight, glassOwner, resetGlassForTests, setGlassLight } from "./about-glass";
 
 describe("about-glass: one ball between the testimonials, owned by whoever draws it", () => {
   afterEach(() => resetGlassForTests());
@@ -23,26 +23,26 @@ describe("about-glass: one ball between the testimonials, owned by whoever draws
     expect(glassOwner()).toBe("testimonials");
   });
 
-  it("the test reset drops every claim and the rim", () => {
+  it("resetGlassForTests clears the light", () => {
     claimGlass("pendant");
-    setGlassRim([1, 1, 1]);
+    setGlassLight({ q: 1, t: 3, pulse: 1 });
     resetGlassForTests();
     expect(glassOwner()).toBe("testimonials");
-    expect(glassRim()).toBeNull();
+    expect(glassLight()).toBeNull();
   });
 
-  it("rim colour round-trips and clears with null", () => {
-    expect(glassRim()).toBeNull();
-    setGlassRim([1, 0.53, 0.88]);
-    expect(glassRim()).toEqual([1, 0.53, 0.88]);
-    setGlassRim(null);
-    expect(glassRim()).toBeNull();
+  it("glass light round-trips and clears with null", () => {
+    expect(glassLight()).toBeNull();
+    setGlassLight({ q: 0.3, t: 12.5, pulse: -1 });
+    expect(glassLight()).toEqual({ q: 0.3, t: 12.5, pulse: -1 });
+    setGlassLight(null);
+    expect(glassLight()).toBeNull();
   });
 
-  it("the rim is copied in: changing the caller's array later doesn't change it", () => {
-    const rgb: [number, number, number] = [0.2, 0.4, 0.6];
-    setGlassRim(rgb);
-    rgb[0] = 1;
-    expect(glassRim()).toEqual([0.2, 0.4, 0.6]);
+  it("the light is copied in: changing the caller's object later doesn't change it", () => {
+    const l = { q: 0.5, t: 1, pulse: 0.2 };
+    setGlassLight(l);
+    l.q = 1;
+    expect(glassLight()).toEqual({ q: 0.5, t: 1, pulse: 0.2 });
   });
 });

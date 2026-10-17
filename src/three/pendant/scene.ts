@@ -7,12 +7,15 @@
  *   - depth of field is three's BokehPass with its "alpha = 1" line removed, so the page shows through the blur (bokeh.ts:
  *     it can run at half resolution, the governor's last step, setBokehScale);
  *   - the dimming (behind the words) is a ShaderPass, never a CSS filter: a CSS filter on a canvas costs a compositor
- *     layer every frame;
+ *     layer every frame; it is the glass's finish pass too (glass.ts), which adds the ball's rim glints on the colours the
+ *     screen shows and leaves the ball out of the dim;
  *   - motion blur (motion-blur.ts) right after the depth of field, on the fast moves only: the pass is off while the
  *     longest smear is under a pixel;
  *   - the testimonials' glass ball is a pass after the motion blur (glass.ts): a true sphere, ray-traced per pixel, that
  *     looks up the pendant behind it in a zoomed render of it, so the pendant reads sharp, magnified and upside down in it
- *     (after the blur, so neither the ball nor its lens view is ever smeared).
+ *     (after the blur, so neither the ball nor its lens view is ever smeared). The ball is drawn full size wherever the slot
+ *     is on screen; only the pendant seen through it follows the shot (`f.glass`), and the zoomed lens view is drawn only
+ *     while there is a pendant to see.
  * The mount (Task 7) poses the rig itself, `poseRig(f, motion, t, look, vw, vh, scene.camera, scene.outer, scene.inner)`,
  * then calls `draw`. `draw` never moves the camera: it draws from the camera as posed.
  */
@@ -22,7 +25,7 @@ import {
   Vector3, WebGLRenderer, WebGLRenderTarget,
 } from "three";
 import type { BufferGeometry, Material, Texture } from "three";
-import type { Rgb } from "@/lib/about-glass";
+import type { GlassLight } from "@/lib/about-glass";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
@@ -33,7 +36,7 @@ import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { FXAAPass } from "three/addons/postprocessing/FXAAPass.js";
 import { distanceFor } from "./camera";
-import { GLASS_MAG, glassAt, glassMaterial, LENS_DENSITY, LENS_SPAN } from "./glass";
+import { GLASS_MAG, glassAt, glassFinishMaterial, glassMaterial, LENS_DENSITY, LENS_SPAN } from "./glass";
 import { ScaledBokehPass } from "./bokeh";
 import { MotionBlurPass, SHUTTER } from "./motion-blur";
 import { buildEdges, patchBokeh, patchOutput, patchShadingR170 } from "./passes";
@@ -47,36 +50,16 @@ const BASE = "/about/pendant/";
 const D = Math.PI / 180;
 /** The depth-of-field blur's ceiling (a share of the screen). */
 const MAX_BLUR = 0.012;
-/** Below this the glass is faded out: not drawn at all. */
+/** Below this the shot isn't through the glass: the ball shows the empty room, and the lens view isn't drawn. */
 const GLASS_MIN = 0.02;
-/** The rim light (brief: a DirectionalLight behind the ball, intensity 1.2), tinted by the testimonials' edge colour. */
-const RIM_INTENSITY = 1.2;
-/** Where it stands, as seen from the ball: behind it, a little to the right and up (toward Andrada's quote), so the colour
- *  catches the rim as an arc, heavier on one side, not a ring. Camera space. */
-const RIM_FROM = new Vector3(0.38, 0.18, -1).normalize();
+/** The pendant seen through the ball fades in from GLASS_MIN to here (smoothstep) as the shot turns to the glass, then is
+ *  the plain refracted view: the room is empty while the shot is elsewhere, and there is no half-faded ghost of the pendant
+ *  for most of the move in (where it isn't behind the ball the trace shows the empty room anyway). */
+const SEE_FULL = 0.35;
 /** Where a clip plane parks to clip nothing (keeps the program the same, so nothing recompiles mid-scroll). */
 const CLIP_OFF = 1e6;
 
 const url = (file: string) => `${BASE}${file}?v=${PENDANT_VERSION}`;
-
-/** The dim pass: rgb times `dim`, alpha untouched (the canvas is premultiplied, so this darkens without turning it opaque). */
-const DimShader = {
-  uniforms: { tDiffuse: { value: null as Texture | null }, dim: { value: 1 } },
-  vertexShader: /* glsl */ `
-    varying vec2 vUv;
-    void main() {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-    }`,
-  fragmentShader: /* glsl */ `
-    uniform sampler2D tDiffuse;
-    uniform float dim;
-    varying vec2 vUv;
-    void main() {
-      vec4 c = texture2D( tDiffuse, vUv );
-      gl_FragColor = vec4( c.rgb * dim, c.a );
-    }`,
-};
 
 /** One frame's step, for the motion blur: `dt` (s) scales the smear to a 1/60 s shutter; `reset` after a jump the mount
  *  knows of (a scroll jump, a new solve, the loop resuming), so the move from the last frame isn't smeared; `tag` labels
@@ -133,8 +116,7 @@ export class PendantScene {
   private readonly viewProj = new Matrix4();
   private timer: GpuTimer | null = null;
   private readonly glass: ReturnType<typeof glassMaterial>;
-  /** Behind the ball, lighting only its rim (it is never added to the scene: the brass's lights and look stay as approved). */
-  readonly rimLight = new DirectionalLight(0xffffff, 0);
+  private readonly finish: ReturnType<typeof glassFinishMaterial>;
   /** The lens view (glass.ts): the pendant drawn again, zoomed onto the ball, for the magnified image inside it. */
   private readonly lensTarget: WebGLRenderTarget;
   private readonly lensCam = new PerspectiveCamera();
@@ -222,8 +204,11 @@ export class PendantScene {
     out.needsUpdate = true;
     this.composer.addPass(this.outputPass);
     // the dim goes after the tone mapping, on what the screen will show, so `dim` means what a CSS brightness() meant
-    // in the prototype (Liam's approved look); the pass is off while the pendant is at full brightness
-    this.dimPass = new ShaderPass(DimShader);
+    // in the prototype (Liam's approved look); the same pass adds the ball's rim glints there (glass.ts, the finish: rgb times
+    // `dim` except on the ball, alpha untouched, so it darkens without turning the see-through canvas opaque). Off while the
+    // pendant is at full brightness and the ball has no light to catch.
+    this.finish = glassFinishMaterial(this.glass.uniforms);
+    this.dimPass = new ShaderPass(this.finish);
     this.dimPass.enabled = false;
     this.composer.addPass(this.dimPass);
     // FXAA at the very end, on the colours the screen shows: a frame drawn under the screen's own pixel ratio (a 3x phone at
@@ -441,22 +426,23 @@ export class PendantScene {
 
   /**
    * Draws one frame from the camera as `poseRig` posed it. `glass`: the testimonials' ball (centre as a share of the
-   * viewport, radius as a share of its height), or null when it isn't on screen (or the testimonials draw it). `dim`: 0..1
-   * brightness. `rim`: the testimonials' edge colour at the ball (about-glass.ts `glassRim()`), or null for no rim light.
-   * `step`: the frame's dt and whether the pose jumped (the motion blur).
+   * viewport, radius as a share of its height), drawn full size, or null when it isn't on screen (or the testimonials draw
+   * it); the pendant shows through it as far as the shot is through the glass (`f.glass`). `dim`: 0..1 brightness (the ball
+   * left out). `light`: the testimonials' light (about-glass.ts `glassLight()`), whose edge colours the ball's rim catches, or
+   * null for none. `step`: the frame's dt and whether the pose jumped (the motion blur).
    */
-  draw(f: Frame, glass: GlassSlot | null, dim: number, rim: Rgb | null = null, step: DrawStep = { dt: SHUTTER }): void {
+  draw(f: Frame, glass: GlassSlot | null, dim: number, light: GlassLight | null = null, step: DrawStep = { dt: SHUTTER }): void {
     if (this.gone) return;
     this.scene.updateMatrixWorld(); // (fresh matrices for the blur's estimate; the camera's inverse too)
     this.beginTimer(step.tag ?? 0);
     try {
-      this.drawFrame(f, glass, dim, rim, step);
+      this.drawFrame(f, glass, dim, light, step);
     } finally {
       this.endTimer(); // (a draw that throws must not leave the GPU query open: the next beginQuery would fail)
     }
   }
 
-  private drawFrame(f: Frame, glass: GlassSlot | null, dim: number, rim: Rgb | null, step: DrawStep): void {
+  private drawFrame(f: Frame, glass: GlassSlot | null, dim: number, light: GlassLight | null, step: DrawStep): void {
     const cam = this.camera;
     const dist = distanceFor(f.h, f.fov);
 
@@ -475,10 +461,13 @@ export class PendantScene {
     }
 
     // the glass: a sphere between the camera and the pendant, exactly over the slot, as far out as makes the pendant
-    // behind it look GLASS_MAG times its size (upside down); it grows in with f.glass where it stands
-    const showGlass = glass !== null && f.glass > GLASS_MIN;
+    // behind it look GLASS_MAG times its size (upside down); full size wherever the slot is (the pendant seen through it
+    // follows f.glass)
+    const showGlass = glass !== null;
     this.glassPass.enabled = showGlass;
-    if (showGlass) this.placeGlass(glass, f, dist, rim);
+    if (showGlass) this.placeGlass(glass, f, dist, light);
+    this.finish.uniforms.ball.value = showGlass ? 1 : 0;
+    const lit = showGlass && this.glass.uniforms.A.value > 0;
 
     // depth of field, focused on the aim point
     this.bokeh.materialBokeh.uniforms.focus.value = dist;
@@ -487,8 +476,8 @@ export class PendantScene {
 
     // behind the words it dims, so they stay easy to read
     const d = Math.min(1, Math.max(0, dim));
-    this.dimPass.uniforms.dim.value = d;
-    this.dimPass.enabled = d < 0.999;
+    this.finish.uniforms.dim.value = d;
+    this.dimPass.enabled = d < 0.999 || lit;
 
     // motion blur: the move since the last frame, camera and pendant together (off while it smears under a pixel)
     this.viewProj.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
@@ -552,15 +541,16 @@ export class PendantScene {
     this.timer.gl.endQuery(this.timer.ext.TIME_ELAPSED_EXT);
   }
 
-  /** The glass pass's uniforms for this frame: the ball, the camera it is seen from, the plane through the pendant, the rim. */
-  private placeGlass(glass: GlassSlot, f: Frame, dist: number, rim: Rgb | null): void {
+  /** The glass passes' uniforms for this frame: the ball, the camera it is seen from, the plane through the pendant, the
+   *  light. The lens view is drawn only while the shot is through the glass. */
+  private placeGlass(glass: GlassSlot, f: Frame, dist: number, light: GlassLight | null): void {
     const cam = this.camera;
     const u = this.glass.uniforms;
     const gd = dist * glassAt(glass.r, f.fov);
     this.tmp.set(glass.x * 2 - 1, 1 - glass.y * 2, 0.5).unproject(cam).sub(cam.position).normalize();
     this.centre.copy(cam.position).addScaledVector(this.tmp, gd);
     u.centre.value.copy(this.centre);
-    u.radius.value = glass.r * 2 * gd * Math.tan((f.fov * D) / 2) * f.glass;
+    u.radius.value = glass.r * 2 * gd * Math.tan((f.fov * D) / 2);
     u.camPos.value.copy(cam.position);
     u.camWorld.value.copy(cam.matrixWorld);
     u.projInv.value.copy(cam.projectionMatrixInverse);
@@ -570,15 +560,18 @@ export class PendantScene {
     cam.getWorldDirection(this.fwd);
     u.planeNormal.value.copy(this.fwd);
     u.planePoint.value.set(0, 0, 0);
-    this.drawLens(glass);
-    // the rim light: behind the ball, its colour the testimonials' edge (none when they give none)
-    const light = this.rimLight;
-    light.intensity = rim ? RIM_INTENSITY : 0;
-    if (rim) light.color.setRGB(rim[0], rim[1], rim[2], SRGBColorSpace);
-    light.target.position.copy(this.centre);
-    light.position.copy(RIM_FROM).transformDirection(cam.matrixWorld).multiplyScalar(gd).add(this.centre);
-    u.rimDir.value.copy(light.position).sub(light.target.position).transformDirection(cam.matrixWorldInverse);
-    u.rimColor.value.copy(light.color).multiplyScalar(light.intensity);
+    // the pendant through it as far as the shot is through the glass; under GLASS_MIN the empty room, and no lens view
+    const k = Math.min(1, Math.max(0, (f.glass - GLASS_MIN) / (SEE_FULL - GLASS_MIN)));
+    u.see.value = k * k * (3 - 2 * k);
+    if (u.see.value > 0) this.drawLens(glass);
+    // the light, as the testimonials' canvas draws it (field.ts): this canvas's own pixels, y up, so the edge each point of
+    // the rim faces is the screen's edge the light draws there; A 0 with no light (the ball as it was: no colour anywhere)
+    const W = this.vw * this.dpr, H = this.vh * this.dpr;
+    u.R.value.set(W, H);
+    u.BC.value.set(glass.x * W, (1 - glass.y) * H);
+    u.A.value = light ? Math.min(1, Math.max(0, light.q)) : 0;
+    u.T.value = light ? light.t : 0;
+    u.PAD.value = Math.min(50, Math.min(this.vw, this.vh) * 0.1) * this.dpr;
   }
 
   /**

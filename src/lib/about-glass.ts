@@ -5,16 +5,19 @@
  * ray-traced ball). Whichever is built first, one ball is drawn:
  *   - the pendant claims the glass once its scene is ready, and releases it on unmount or a lost context;
  *   - the testimonials draw their ball only while `glassOwner() === "testimonials"` (nobody has claimed it), and every frame
- *     tell the pendant the colour of the screen edge the ball faces (`setGlassRim`), so the pendant's ball catches it too.
+ *     they draw tell the pendant the light's state (`setGlassLight`: its strength q, its own clock t, the arrival pulse), so
+ *     the pendant's ball works out the same edge colours the light shows and glints in them.
  * A module-level store: no React, no DOM.
  */
 
 export type GlassOwner = "pendant" | "testimonials";
-export type Rgb = readonly [number, number, number];
+/** The testimonials' light as the ball needs it: `q` its strength 0..1, `t` the light's own clock (s; the colour field turns
+ *  on it, so both shaders agree), `pulse` the arrival wave's phase (−1 none, else 0..1). */
+export type GlassLight = { q: number; t: number; pulse: number };
 
 /** Live claims, oldest first: the newest decides. */
 const claims: { owner: GlassOwner }[] = [];
-let rim: Rgb | null = null;
+let light: GlassLight | null = null;
 
 /** Takes the ball. Returns the release (its own claim only: calling it twice, or after a newer claim, is harmless). */
 export function claimGlass(owner: GlassOwner): () => void {
@@ -31,17 +34,17 @@ export function glassOwner(): GlassOwner {
   return claims.length ? claims[claims.length - 1].owner : "testimonials";
 }
 
-/** The edge light's colour where the ball faces it, sRGB 0..1 (as the testimonials' shader mixes it), or null for none. */
-export function setGlassRim(rgb: Rgb | null): void {
-  rim = rgb ? [rgb[0], rgb[1], rgb[2]] : null;
+/** The light this frame, or null when it is off (q 0, not drawing, or gone). Copied in. */
+export function setGlassLight(l: GlassLight | null): void {
+  light = l ? { q: l.q, t: l.t, pulse: l.pulse } : null;
 }
 
-export function glassRim(): Rgb | null {
-  return rim;
+export function glassLight(): GlassLight | null {
+  return light;
 }
 
-/** Tests only: every claim dropped and the rim cleared (the store is global, so a test must not leak a claim into the next). */
+/** Tests only: every claim dropped and the light cleared (the store is global, so a test must not leak a claim into the next). */
 export function resetGlassForTests(): void {
   claims.length = 0;
-  rim = null;
+  light = null;
 }
