@@ -11,8 +11,9 @@ import { EDGE_COLOURS, EDGE_GLSL } from "./field";
 /** The canvas's pixel ratio never goes above this (cost). */
 export const MAX_DPR = 1.5;
 
-/** The ball, in CSS px from the screen's top-left: centre and radius. */
-export type LightBall = { x: number; y: number; r: number };
+/** The ball, in CSS px from the screen's top-left: centre and radius; `a` its opacity (1 when left out: the handoff to the
+ *  pendant fades it out while the pendant's fades in). */
+export type LightBall = { x: number; y: number; r: number; a?: number };
 
 export type LightFrame = {
   /** The light's strength, 0..1 (the testimonials' scrub). */
@@ -39,6 +40,8 @@ export type LightUniforms = {
   /** The sphere itself (canvas px, the screen at z 0, the eye in front of it): centre and radius (0: no ball). */
   BP: [number, number, number];
   BR: number;
+  /** The ball's opacity, 0..1. */
+  BA: number;
 };
 
 /** The shader's eye: centred over the screen, 2.2 screen heights in front of it (the mockup's camera). */
@@ -82,6 +85,7 @@ export function lightUniforms(f: LightFrame, w: number, h: number, cssW: number,
     BC: bc,
     BP: sphere ? sphere.c : [0, 0, 0],
     BR: sphere ? sphere.rho : 0,
+    BA: f.ball ? Math.min(1, Math.max(0, f.ball.a ?? 1)) : 0,
   };
 }
 
@@ -99,6 +103,7 @@ uniform vec2 R; uniform float T, A, P, PAD; uniform vec3 C0, C1, C2, C3;
 uniform vec2 PO;                      // the arrival wave's origin (uv)
 uniform vec2 BC;                      // the glass ball's centre as seen (canvas px)
 uniform vec3 BP; uniform float BR;    // the sphere: centre and radius (BR 0: none)
+uniform float BA;                     // the ball's opacity (its handoff to the pendant)
 ${EDGE_GLSL}
 void main() {
   vec2 uv = gl_FragCoord.xy / R, aspect = vec2(R.x / R.y, 1.);
@@ -111,7 +116,7 @@ void main() {
   vec3 fu = field(uv);
   vec3 c = A * fu * e + wave * (e * .05 + fu * .05);
   // the glass ball, ray-traced: a real sphere behind the screen, reflecting and refracting (index 1.5) what it sees
-  if (BR > 0.) {
+  if (BR > 0. && BA > 0.) {
     vec3 eye = vec3(R * .5, R.y * 2.2), C = BP;   // (placed so it shows centred on BC at the slot's 0.44: sphereFor)
     vec3 ro = vec3(gl_FragCoord.xy, 0.), rd = normalize(ro - eye);
     vec3 oc = ro - C; float bq = dot(oc, rd), dp = sqrt(max(dot(oc, oc) - bq * bq, 0.));
@@ -129,7 +134,7 @@ void main() {
       vec3 glass = mix(refr, refl, F);
       // the bounce: the edge's colour only in the highlights (rim glints in uneven arcs; the lamp's glints take a little)
       vec2 fd = normalize(n.xy + 1e-5);
-      c += (glass * lampTint(glass, fd, BC) + rimGlint(n, rd, fd, BC)) * aa;
+      c += (glass * lampTint(glass, fd, BC) + rimGlint(n, rd, fd, BC)) * aa * BA;
     }
   }
   // premultiplied, alpha = the brightest channel: over the near-black page this composites as about a screen blend
@@ -149,7 +154,7 @@ export class TestimonialsLight {
     private readonly gl: WebGLRenderingContext,
     private readonly prog: WebGLProgram,
     private readonly buf: WebGLBuffer,
-    private readonly u: Record<"R" | "T" | "A" | "P" | "PAD" | "PO" | "BC" | "BP" | "BR", Loc>,
+    private readonly u: Record<"R" | "T" | "A" | "P" | "PAD" | "PO" | "BC" | "BP" | "BR" | "BA", Loc>,
   ) {}
 
   /** null: no WebGL, or the shader doesn't build here (the page then reads as before; nothing in the console). */
@@ -195,7 +200,7 @@ export class TestimonialsLight {
     EDGE_COLOURS.forEach((h, i) => ctx.uniform3fv(U(`C${i}`), hex(h)));
     ctx.disable(ctx.BLEND); // (the triangle writes every pixel: no clear, no blend)
     return new TestimonialsLight(canvas, ctx, prog, buf, {
-      R: U("R"), T: U("T"), A: U("A"), P: U("P"), PAD: U("PAD"), PO: U("PO"), BC: U("BC"), BP: U("BP"), BR: U("BR"),
+      R: U("R"), T: U("T"), A: U("A"), P: U("P"), PAD: U("PAD"), PO: U("PO"), BC: U("BC"), BP: U("BP"), BR: U("BR"), BA: U("BA"),
     });
   }
 
@@ -222,6 +227,7 @@ export class TestimonialsLight {
     gl.uniform2f(u.BC, v.BC[0], v.BC[1]);
     gl.uniform3f(u.BP, v.BP[0], v.BP[1], v.BP[2]);
     gl.uniform1f(u.BR, v.BR);
+    gl.uniform1f(u.BA, v.BA);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 

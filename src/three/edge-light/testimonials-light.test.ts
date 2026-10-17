@@ -33,6 +33,13 @@ describe("the light's uniforms", () => {
     }
   });
 
+  test("the ball's opacity: 1 when left out, clamped, 0 with no ball", () => {
+    expect(lightUniforms(frame({ ball: { x: 10, y: 10, r: 5 } }), 100, 100, 100, 100).BA).toBe(1);
+    expect(lightUniforms(frame({ ball: { x: 10, y: 10, r: 5, a: 0.4 } }), 100, 100, 100, 100).BA).toBe(0.4);
+    expect(lightUniforms(frame({ ball: { x: 10, y: 10, r: 5, a: 1.5 } }), 100, 100, 100, 100).BA).toBe(1);
+    expect(lightUniforms(frame(), 100, 100, 100, 100).BA).toBe(0);
+  });
+
   test("the pulse starts just outside the right edge's middle (track) or the bottom edge's middle (stack)", () => {
     expect(PULSE_ORIGIN.right).toEqual([1.001, 0.5]);
     expect(PULSE_ORIGIN.bottom).toEqual([0.5, -0.001]);
@@ -60,7 +67,8 @@ describe("the shader", () => {
     expect(LIGHT_FS).toContain("c = clamp(c, 0., 1.);");
     expect(LIGHT_FS).toContain("gl_FragColor = vec4(c, max(c.r, max(c.g, c.b)));");
     expect(LIGHT_FS).toContain("rimGlint(n, rd, fd, BC)");
-    expect(LIGHT_FS).toContain("if (BR > 0.)");
+    expect(LIGHT_FS).toContain("if (BR > 0. && BA > 0.)");
+    expect(LIGHT_FS).toContain("* aa * BA;");
   });
 
   test("no WebGL: create returns null", () => {

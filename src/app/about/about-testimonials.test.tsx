@@ -47,10 +47,18 @@ function rect(cx: number, w: number): DOMRect {
 }
 
 let rafs: FrameRequestCallback[] = [];
+/** Reduced motion, switchable mid-test (the mount listens for the change). */
+let reducedNow = false;
+let onReducedChange: (() => void) | null = null;
 const runFrame = async (now = 1000) => { await act(async () => { rafs.splice(0).forEach((cb) => cb(now)); }); };
 
 function setup() {
-  window.matchMedia = vi.fn(() => ({ matches: false, addEventListener() {}, removeEventListener() {} })) as never;
+  reducedNow = false;
+  window.matchMedia = vi.fn(() => ({
+    get matches() { return reducedNow; },
+    addEventListener: (_: string, cb: () => void) => { onReducedChange = cb; },
+    removeEventListener() {},
+  })) as never;
   Object.defineProperty(document, "fonts", { configurable: true, value: { ready: Promise.resolve() } });
   const idle: (() => void)[] = [];
   g.requestIdleCallback = vi.fn((cb: () => void) => idle.push(cb));
@@ -144,23 +152,97 @@ test("runs while the slot is within a slot's width of the screen, and while q > 
   expect(rafs).toHaveLength(0);
 });
 
+/** The pendant's canvas, as about-pendant.tsx mounts it in `.ab-pin`, at an opacity (its fade-in, as the page computes it). */
+function pendantCanvas(opacity: number) {
+  const pc = document.createElement("canvas");
+  pc.className = "ab-pendant";
+  pc.style.opacity = String(opacity);
+  document.querySelector(".ab-pin")!.appendChild(pc);
+  return pc;
+}
+
 test("the light draws its own ball only while nobody has claimed the glass", async () => {
   await mount();
+  const pc = pendantCanvas(0);
   at = { q1: 100, slot: 500, q2: 900 }; // (the slot centred)
   window.dispatchEvent(new Event("scroll"));
-  await runFrame();
+  await runFrame(1000);
   expect(window.__testimonials!.ownBall).toBe(true);
   const ball = draw.mock.lastCall![0].ball;
   expect(ball.x).toBeCloseTo(500, 9);
   expect(ball.y).toBeCloseTo(H / 2, 9);
   expect(ball.r).toBeCloseTo(0.44 * SLOT, 9);
+  expect(ball.a).toBe(1);
   const release = claimGlass("pendant");
+  pc.style.opacity = "1"; // (its fade done)
   await runFrame(1100);
   expect(window.__testimonials!.ownBall).toBe(false);
   expect(draw.mock.lastCall![0].ball).toBeNull();
+  // given back (the pendant's context lost: its canvas hidden): the light's ball at once
   release();
+  pc.hidden = true;
   await runFrame(1200);
   expect(window.__testimonials!.ownBall).toBe(true);
+  expect(draw.mock.lastCall![0].ball.a).toBe(1);
+});
+
+test("handed to the pendant, the light's ball fades out as the pendant's canvas fades in: 1 − its opacity", async () => {
+  await mount();
+  const pc = pendantCanvas(0);
+  at = { q1: 100, slot: 500, q2: 900 };
+  window.dispatchEvent(new Event("scroll"));
+  await runFrame(1000);
+  claimGlass("pendant");
+  await runFrame(1100); // (claimed, not drawn yet: the light's ball holds)
+  expect(draw.mock.lastCall![0].ball.a).toBe(1);
+  expect(window.__testimonials!.ownBall).toBe(true);
+  pc.style.opacity = "0.25";
+  await runFrame(1200);
+  expect(draw.mock.lastCall![0].ball.a).toBeCloseTo(0.75, 9);
+  pc.style.opacity = "0.9";
+  await runFrame(1300);
+  expect(draw.mock.lastCall![0].ball.a).toBeCloseTo(0.1, 9);
+  pc.style.opacity = "1";
+  await runFrame(1400);
+  expect(draw.mock.lastCall![0].ball).toBeNull();
+  expect(window.__testimonials!.ownBall).toBe(false);
+  pc.style.opacity = "0.5"; // (done: the pendant's later fades, its outro, don't bring the light's ball back)
+  await runFrame(1500);
+  expect(draw.mock.lastCall![0].ball).toBeNull();
+});
+
+test("a pendant that claimed the glass before the light drew a ball: no ball fades in from nowhere", async () => {
+  claimGlass("pendant");
+  await mount();
+  at = { q1: 100, slot: 500, q2: 900 };
+  window.dispatchEvent(new Event("scroll"));
+  await runFrame(1000);
+  expect(draw.mock.lastCall![0].ball).toBeNull();
+  expect(window.__testimonials!.ownBall).toBe(false);
+});
+
+test("the light is sized from its own box (a classic scrollbar left out), not the window", async () => {
+  vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(function (this: HTMLElement) { return this instanceof HTMLCanvasElement ? 985 : 0; });
+  vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockImplementation(function (this: HTMLElement) { return this instanceof HTMLCanvasElement ? 785 : 0; });
+  await mount();
+  at = { q1: 600, slot: 900, q2: 1300 };
+  window.dispatchEvent(new Event("scroll"));
+  await runFrame();
+  expect(resize).toHaveBeenLastCalledWith(985, 785, expect.any(Number));
+});
+
+test("the hook publishes the pulse as drawn: −1 under reduced motion", async () => {
+  await mount();
+  at = { q1: 600, slot: 900, q2: 1300 }; // (straight in: a wave)
+  window.dispatchEvent(new Event("scroll"));
+  await runFrame(1000);
+  await runFrame(1500);
+  expect(window.__testimonials!.pulse).toBeCloseTo(0.25, 9);
+  reducedNow = true;
+  act(() => onReducedChange?.());
+  await runFrame(1600);
+  expect(draw.mock.lastCall![0].pulse).toBe(-1);
+  expect(window.__testimonials!.pulse).toBe(-1);
 });
 
 test("the debug hook is read-only", async () => {

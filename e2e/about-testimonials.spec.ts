@@ -212,3 +212,84 @@ test("without the pendant, the light draws its own ball in the slot", async ({ p
   expect(inner.bright).toBeLessThan(inner.n * 0.15);
   expect(errors).toEqual([]);
 });
+
+test("handed to the pendant, the ball never leaves the slot: the light's fades out as the pendant's fades in", async ({ page }) => {
+  const errors = collectErrors(page);
+  // the pendant's model held back until the light's ball is showing in the slot (a reload into the testimonials)
+  let release!: () => void;
+  const gate = new Promise<void>((r) => { release = r; });
+  await page.route(PENDANT_GLB, async (r) => { await gate; await r.continue(); });
+  await page.goto("/about");
+  await lightLoaded(page);
+  await page.mouse.move(1430, 890);
+  const slot = await scrollTo(page, "slot");
+  await expect.poll(async () => (await hook(page)).ownBall).toBe(true);
+  await expect.poll(async () => (await hook(page)).pulse, { timeout: 5000 }).toBe(1);
+  const r = 0.44 * slot.w, S = Math.ceil(r + 6);
+  const clip = { x: Math.round(slot.x - S), y: Math.round(slot.y - S), width: 2 * S, height: 2 * S };
+  // the slot as the page alone shows it (both canvases hidden: the edge light doesn't reach it)
+  const hideCanvases = (hidden: boolean) => page.evaluate((hidden) => {
+    document.querySelectorAll<HTMLElement>("canvas.ab-light, canvas.ab-pendant").forEach((c) => { c.style.visibility = hidden ? "hidden" : ""; });
+  }, hidden);
+  await hideCanvases(true);
+  const bare = (await page.screenshot({ clip })).toString("base64");
+  await hideCanvases(false);
+  /** The ball's mark: the share of the disc (to r + 3 px) that differs from the bare page by more than 24 levels (r + g + b),
+   *  and the bright rim pixels (r + g + b > 150, at r ± 3 px). Either ball shows in the first: the light's in its glass and
+   *  rim glints, the pendant's in its dark rim and the brass inside. (Its rim catches no light before Task 3.) */
+  const mark = async () => {
+    const png = (await page.screenshot({ clip })).toString("base64");
+    return page.evaluate(async ({ png, bare, r }) => {
+      const read = async (src: string) => {
+        const img = new Image();
+        img.src = `data:image/png;base64,${src}`;
+        await img.decode();
+        const c = document.createElement("canvas");
+        c.width = img.width; c.height = img.height;
+        const x = c.getContext("2d")!;
+        x.drawImage(img, 0, 0);
+        return { d: x.getImageData(0, 0, c.width, c.height).data, w: c.width };
+      };
+      const A = await read(png), B = await read(bare);
+      let disc = 0, changed = 0, rim = 0;
+      for (let i = 0; i < A.d.length; i += 4) {
+        const p = i / 4, dist = Math.hypot((p % A.w) + 0.5 - A.w / 2, Math.floor(p / A.w) + 0.5 - A.w / 2);
+        if (dist > r + 3) continue;
+        disc++;
+        const v = A.d[i] + A.d[i + 1] + A.d[i + 2];
+        if (Math.abs(v - (B.d[i] + B.d[i + 1] + B.d[i + 2])) > 24) changed++;
+        if (dist >= r - 3 && v > 150) rim++;
+      }
+      return { changed: changed / disc, rim };
+    }, { png, bare, r });
+  };
+  const before = await mark();
+  expect(before.rim).toBeGreaterThan(100); // (the light's ball, its rim glints)
+  // the pendant's fade-in slowed to 3 s, so a gap between the balls (the light's dropped at the claim) lasts long enough
+  // for the samples to see it; the light follows the canvas's opacity whatever its pace
+  await page.addStyleTag({ content: ".ab-pendant{transition-duration:3s !important}" });
+  release();
+  // sampled from the release until the pendant's canvas has fully faded in (and 300 ms on): a ball in every sample
+  const samples: { t: number; own: boolean; changed: number }[] = [];
+  let claimedAt = 0, fadedAt = 0;
+  const t0 = Date.now();
+  while (Date.now() - t0 < 30_000) {
+    const own = (await hook(page)).ownBall;
+    const { ready, opacity } = await page.evaluate(() => ({
+      ready: window.__pendant?.ready === true,
+      opacity: Number(getComputedStyle(document.querySelector("canvas.ab-pendant") ?? document.body).opacity),
+    }));
+    const m = await mark();
+    samples.push({ t: Date.now() - t0, own, changed: m.changed });
+    if (ready && !claimedAt) claimedAt = Date.now();
+    if (opacity < 1) fadedAt = 0; else if (claimedAt && !fadedAt) fadedAt = Date.now();
+    if (fadedAt && Date.now() - fadedAt > 300) break;
+  }
+  expect(claimedAt, "the pendant took the glass").toBeGreaterThan(0);
+  // (the light's ball alone marks about 0.45 of the disc and the pendant's about 0.5; dropped at the claim, the slot reads empty)
+  for (const s of samples) expect(s.changed, `a ball in the slot at ${s.t} ms (light's own: ${s.own})`).toBeGreaterThan(0.3);
+  expect(samples.filter((s) => s.own).length, "samples during the cross-fade").toBeGreaterThan(5);
+  // and the handoff is done: the pendant's ball alone
+  expect((await hook(page)).ownBall).toBe(false);
+  expect(errors).toEqual([]);
+});

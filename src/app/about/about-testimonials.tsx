@@ -25,6 +25,10 @@ declare global {
   }
 }
 
+/** Canvases whose context the light has given up (dispose loses it): a re-run of the effect on one (Fast Refresh) mounts a
+ *  fresh canvas instead, as the pendant does. */
+const spent = new WeakSet<HTMLCanvasElement>();
+
 /** About's text first: the fonts, then a quiet moment (as the pendant). */
 function afterPaint(): Promise<void> {
   const fonts = document.fonts?.ready ?? Promise.resolve();
@@ -46,10 +50,17 @@ function afterPaint(): Promise<void> {
 export function AboutTestimonials() {
   const ref = useRef<HTMLCanvasElement>(null);
   const [gone, setGone] = useState(false);
+  /** One canvas per light: after dispose's forced loss a canvas can never be given a context again. */
+  const [gen, setGen] = useState(0);
 
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas) return;
+    if (spent.has(canvas)) {
+      // (the effect ran again on a canvas whose context it already let go: Fast Refresh. A fresh one, next render.)
+      queueMicrotask(() => setGen((n) => n + 1));
+      return;
+    }
     const sec = canvas.closest<HTMLElement>(".ab");
     const pin = canvas.parentElement;
     const tr = sec?.querySelector<HTMLElement>(".ab-track") ?? null;
@@ -69,6 +80,25 @@ export function AboutTestimonials() {
     let moodQ = "";
     let shown = false;
     const t0 = performance.now();
+    /** The ball's handoff to the pendant. The pendant claims the glass once its scene is ready, but its canvas then fades in
+     *  (about.css: `.ab-pendant` opacity, 0.6 s ease). Until that fade is done the light keeps its own ball at 1 − the
+     *  canvas's opacity, read each frame, so the two balls, centred on one slot, cross-fade at whatever pace the canvas
+     *  shows. `ballA`: the opacity drawn last frame; `handing`: a handoff under way ("on") or finished ("done"). */
+    let ballA = 0;
+    let handing: "on" | "done" | null = null;
+    const ballOpacity = () => {
+      if (glassOwner() === "testimonials") { handing = null; return 1; }
+      if (handing === null) {
+        if (ballA <= 0) { handing = "done"; return 0; } // (the pendant had it before the light drew one: nothing to hand over)
+        handing = "on";
+      }
+      if (handing === "done") return 0;
+      const pc = pin?.querySelector<HTMLElement>(".ab-pendant");
+      const op = pc && !pc.hidden ? parseFloat(getComputedStyle(pc).opacity) : 1;
+      const a = 1 - Math.min(1, Math.max(0, Number.isFinite(op) ? op : 1));
+      if (a <= 0) handing = "done";
+      return a;
+    };
 
     const setMood = (q: number) => {
       const s = q > 0 ? q.toFixed(3) : "";
@@ -111,11 +141,14 @@ export function AboutTestimonials() {
       setMood(q);
       const drawing = !!m && (q > 0 || m.near);
       const pulse = reduced ? -1 : pulsePhase(arrival, now);
-      const ball = m && drawing && m.near && glassOwner() === "testimonials" ? { x: m.slot.x, y: m.slot.y, r: 0.44 * m.slot.w } : null;
-      publish({ q, pulse: pulsePhase(arrival, now), drawing, ownBall: ball !== null });
+      const a = m && drawing && m.near ? ballOpacity() : 0;
+      ballA = a;
+      const ball = m && a > 0 ? { x: m.slot.x, y: m.slot.y, r: 0.44 * m.slot.w, a } : null;
+      publish({ q, pulse, drawing, ownBall: ball !== null });
       if (!drawing) { show(false); return; }
       try {
-        light.resize(window.innerWidth, window.innerHeight, window.devicePixelRatio || 1);
+        // (its own box: fixed at inset 0, it leaves out a classic scrollbar, as the quotes' and the pendant's client sizes do)
+        light.resize(canvas.clientWidth || window.innerWidth, canvas.clientHeight || window.innerHeight, window.devicePixelRatio || 1);
         light.draw({ q, t: reduced ? 0 : (now - t0) / 1000, pulse, pulseFrom: "right", ball });
       } catch {
         fail();
@@ -152,6 +185,7 @@ export function AboutTestimonials() {
       // (before the dispose: its forced loss fires a context-lost event this canvas must not answer)
       canvas.removeEventListener("webglcontextlost", onLost);
       setMood(0);
+      if (light) spent.add(canvas);
       try { light?.dispose(); } catch { /* the GPU is already gone */ }
       light = null;
     };
@@ -192,8 +226,8 @@ export function AboutTestimonials() {
       teardown();
       if (window.__testimonials) delete window.__testimonials;
     };
-  }, []);
+  }, [gen]);
 
   if (gone) return null;
-  return <canvas ref={ref} className="ab-light" aria-hidden style={{ pointerEvents: "none" }} />;
+  return <canvas key={gen} ref={ref} className="ab-light" aria-hidden style={{ pointerEvents: "none" }} />;
 }
