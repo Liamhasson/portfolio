@@ -7,7 +7,10 @@
  *   - the testimonials draw their ball only while `glassOwner() === "testimonials"` (nobody has claimed it), and every frame
  *     they draw tell the pendant the light's state (`setGlassLight`: its strength q, its own clock t, the arrival pulse), so
  *     the pendant's ball works out the same edge colours the light shows and glints in them.
- * A module-level store: no React, no DOM.
+ * And the stack's glass slot (about.css: `data-glass="on"` on the section opens it) is shown by both, each for itself
+ * (`showGlassSlot`): it opens while either one says it will draw the ball there, and collapses only when neither does, so
+ * one side letting go never collapses the slot under the other's ball.
+ * A module-level store: no React, and no DOM beyond the one attribute `showGlassSlot` writes.
  */
 
 export type GlassOwner = "pendant" | "testimonials";
@@ -49,8 +52,27 @@ export function glassLight(): Readonly<GlassLight> | null {
   return lit ? light : null;
 }
 
-/** Tests only: every claim dropped and the light cleared (the store is global, so a test must not leak a claim into the next). */
+/** Who shows each section's glass slot. */
+let slotShowers = new WeakMap<object, Set<GlassOwner>>();
+
+/**
+ * `who` shows the glass slot (on) or no longer does (off). The section carries `data-glass="on"` while anyone shows it, and
+ * none once nobody does; the attribute is written only when it changes, so calling this every frame costs nothing.
+ */
+export function showGlassSlot(sec: { dataset: DOMStringMap }, who: GlassOwner, on: boolean): void {
+  let showers = slotShowers.get(sec);
+  if (on) {
+    if (!showers) slotShowers.set(sec, (showers = new Set()));
+    showers.add(who);
+  } else showers?.delete(who);
+  if (showers && showers.size > 0) { if (sec.dataset.glass !== "on") sec.dataset.glass = "on"; }
+  else if (sec.dataset.glass !== undefined) delete sec.dataset.glass;
+}
+
+/** Tests only: every claim dropped, the light cleared and nobody showing a slot (the store is global, so a test must not
+ *  leak a claim into the next). */
 export function resetGlassForTests(): void {
   claims.length = 0;
   lit = false;
+  slotShowers = new WeakMap();
 }

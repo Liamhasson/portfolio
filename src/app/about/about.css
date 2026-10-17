@@ -108,8 +108,9 @@ a.ab-proof:hover, a.ab-proof:focus-visible { color: #f4efe9; }
 .ab[data-mode="stack"] .ab-pic-cap { margin-top: 1.6vw; white-space: normal; }
 .ab[data-mode="stack"] .ab-deskvid { width: min(100%, 520px); margin: 0; align-self: flex-start; }
 /* the glass ball's slot between the stacked quotes (Liam, 2026-10-17): the pendant draws the ball in it, 0.44 of its width
-   (a ball 0.88 of the slot across: at most 37% of the screen's height).
-   It takes its room only while the pendant holds the ball and draws (about-pendant.tsx sets data-glass): no empty square. */
+   (a ball 0.88 of the slot across: at most 37% of the screen's height), or the testimonials' light draws its own there.
+   It takes its room only while one of them is there to draw the ball (each shows it for itself: about-glass.ts
+   showGlassSlot sets data-glass): no empty square. */
 .ab[data-mode="stack"] .ab-glass { display: none; }
 /* (capped for every stacked screen, not only a portrait phone: a landscape phone, reduced motion on a desktop, a short window) */
 .ab[data-mode="stack"][data-glass="on"] .ab-glass { display: flex; width: min(50vw, 42svh, 360px); height: min(50vw, 42svh, 360px); min-height: 0; align-self: center; }
@@ -119,11 +120,18 @@ a.ab-proof:hover, a.ab-proof:focus-visible { color: #f4efe9; }
    (0, under the track's 1), the black warming with a radial plum-brown at 0.6 x q; and the light, one see-through canvas
    fixed over the screen above everything in the pinned frame (4), drawn premultiplied (no blend mode: a blend over a canvas
    costs about 14 ms a frame). It never takes the pointer, and shows only while it runs. Liam's one exception to no glow:
-   coloured light at the screen's far edges. (The mood is the track's for now: stacked, .ab-clip is static and a z0 layer
-   would paint over the words; Task 5 brings the stack's.) */
+   coloured light at the screen's far edges. */
 .ab[data-mode="track"] .ab-mood { position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: calc(var(--q, 0) * 0.6); background: radial-gradient(120% 90% at 70% 40%, #24120f 0%, #160d0c 50%, #0b0908 100%); will-change: opacity; }
 .ab-light { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 4; pointer-events: none; visibility: hidden; }
 .ab-light[data-on] { visibility: visible; }
+/* stacked (phones, reduced motion: plan Task 5): the mood and the light fixed to the screen at the large viewport's height
+   (a phone's toolbar never resizes them, as the pendant). The stacked column isn't a positioned layer of its own (.ab-clip
+   is static), so the mood goes under its words at -1 (before the pendant's -1 behind them, so under that too); a z0 layer
+   would paint over them. The resume, fixed at the screen's foot there, sits inside the light's band: lifted over the
+   light (5) so it reads as crisply as on the track. */
+.ab[data-mode="stack"] .ab-mood { position: fixed; top: 0; left: 0; width: 100%; height: 100vh; height: 100lvh; z-index: -1; pointer-events: none; opacity: calc(var(--q, 0) * 0.6); background: radial-gradient(120% 90% at 70% 40%, #24120f 0%, #160d0c 50%, #0b0908 100%); will-change: opacity; }
+.ab[data-mode="stack"] .ab-light { inset: auto; top: 0; left: 0; width: 100%; height: 100vh; height: 100lvh; }
+.ab[data-mode="stack"] .ab-resume { z-index: 5; }
 /* the glass edges (about-testimonials.tsx, edge-lens.ts; plan Task 4): as the quotes pass, the screen's far edges turn to
    glass, a crisp lens band at the rounded edge bending what passes under it, the words magnifying toward the rim, no blur.
    An SVG displacement on the backdrop, so Chromium only (the elements are rendered nowhere else). Four fixed strips, each

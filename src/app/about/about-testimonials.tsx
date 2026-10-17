@@ -2,11 +2,12 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { glassOwner, setGlassLight, type GlassLight, type GlassOwner } from "@/lib/about-glass";
+import { glassOwner, setGlassLight, showGlassSlot, type GlassLight, type GlassOwner } from "@/lib/about-glass";
 import type { TestimonialsLight } from "@/three/edge-light/testimonials-light";
 import { lensBand, lensDepth, lensMap, lensScale, lensStrips, lensSupported, type LensEdge } from "./edge-lens";
 import { pulsePhase, stepArrival, testimonialsQ, type Arrival } from "./testimonials-q";
 import { trackProgress, trackX } from "./track";
+import { resizeKind } from "./viewport";
 
 /** What the page tells the e2e tests, rewritten (frozen: read-only) every frame the light runs. */
 export interface TestimonialsHook {
@@ -47,6 +48,14 @@ const screenSize = () => ({
   h: document.documentElement.clientHeight || window.innerHeight,
 });
 
+/** A stacked slide's rise-in (about.css: translateY until it has come into view), px: taken out of its rect, so the stack is
+ *  measured where each slide stands once risen, as the pendant measures it. */
+function rising(el: Element): number {
+  const t = getComputedStyle(el).transform;
+  if (!t || t === "none") return 0;
+  try { return new DOMMatrixReadOnly(t).m42; } catch { return 0; }
+}
+
 /** About's text first: the fonts, then a quiet moment (as the pendant). */
 function afterPaint(): Promise<void> {
   const fonts = document.fonts?.ready ?? Promise.resolve();
@@ -65,7 +74,10 @@ function afterPaint(): Promise<void> {
  * within one slot width of the screen, and anything wrong (no WebGL, a lost context) leaves the quotes as they were. Every
  * frame it draws with q > 0 it tells the pendant the light's state (about-glass.ts `setGlassLight`), so the pendant's own
  * ball glints in the same edge colours; null whenever the light is off.
- * Track mode only for now: the stack comes in Task 5.
+ * Stacked (portrait phones, reduced motion: plan Task 5) the same, scrubbed by the page's vertical scroll: q from the quotes'
+ * vertical centres and the large viewport's height, the wave from the bottom edge, the canvas fixed at the large viewport's
+ * height (the phone's toolbar never resizes it), and the stack's glass slot opened while the light is there to draw the
+ * ball (about-glass.ts showGlassSlot: the pendant shows it too, while it draws).
  */
 export function AboutTestimonials() {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -81,9 +93,10 @@ export function AboutTestimonials() {
    *  whole strip by half the scale). */
   const lensReady = useRef(false);
 
-  // The lens's map: built at half the screen's resolution (rounded up), first once About's text has painted and the section is on the
-  // track (the only layout the lens shows in: a visit that stays in the stack, or never reaches the testimonials before the
-  // page is idle, pays nothing during load), then again 150 ms after a resize settles that changed the screen's size. Each
+  // The lens's map: built at half the screen's resolution (rounded up), first once About's text has painted (on the track or
+  // stacked: a visit that never reaches the testimonials before the page is idle pays nothing during load), then again
+  // 150 ms after a resize settles that changed the screen's size (a phone's URL bar, which leaves the screen's client size
+  // as it was, rebuilds nothing). Each
   // strip gets its own slice as a PNG (a filter reading only its strip's pixels is far cheaper than four reading the whole
   // map), placed where the full map would put it, so the strips meet without a seam. Meanwhile each old slice is stretched
   // over its strip's new box at once, so no part of a strip is ever left outside its map. Gone with the light (a failure):
@@ -92,7 +105,6 @@ export function AboutTestimonials() {
     if (!lensOn || gone) return;
     const box = lensRef.current, defs = defsRef.current;
     if (!box || !defs) return;
-    const sec = box.closest<HTMLElement>(".ab");
     const imgs = LENS_EDGES.map((e) => defs.querySelector<SVGFEImageElement>(`#ab-edge-lens-${e} feImage`));
     if (imgs.some((i) => !i)) return;
     const c = document.createElement("canvas");
@@ -148,23 +160,20 @@ export function AboutTestimonials() {
       built = shown = key;
       lensReady.current = true;
     };
-    /** The first build: once painted, on the track. */
+    /** The first build: once painted. */
     const ensure = () => {
-      if (!off && painted && !built && sec?.dataset.mode === "track") build();
+      if (!off && painted && !built) build();
     };
     const onResize = () => {
       if (built) fit();
       clearTimeout(timer);
       timer = window.setTimeout(() => (built ? build() : ensure()), 150);
     };
-    const modeObs = sec && typeof MutationObserver === "function" ? new MutationObserver(ensure) : null;
-    modeObs?.observe(sec!, { attributes: true, attributeFilter: ["data-mode"] });
     void afterPaint().then(() => { painted = true; ensure(); });
     window.addEventListener("resize", onResize);
     return () => {
       off = true;
       clearTimeout(timer);
-      modeObs?.disconnect();
       window.removeEventListener("resize", onResize);
       lensReady.current = false;
     };
@@ -234,6 +243,15 @@ export function AboutTestimonials() {
       if (on) canvas.dataset.on = ""; else delete canvas.dataset.on;
     };
     const publish = (h: TestimonialsHook) => { window.__testimonials = Object.freeze(h); };
+    /** The stack's glass slot is open while the light is there to draw the ball (its own while nobody claims it). */
+    const slotShown = (on: boolean) => showGlassSlot(sec, "testimonials", on);
+    /** Stacked, the screen as the light covers it: its canvas's own box (fixed, 100lvh: the large viewport), read once and
+     *  again only after a real resize or a change of layout. A phone's toolbar showing or hiding (viewport.ts: a height-only
+     *  change under 150 px on a touch screen) keeps it, so neither the drawing buffer nor q jumps with the toolbar. */
+    let stackBox: { w: number; h: number } | null = null;
+    let lastWin = { w: window.innerWidth, h: window.innerHeight };
+    const coarseQ = window.matchMedia("(pointer: coarse)");
+    const screenBox = () => (stackBox ??= { w: canvas.clientWidth || window.innerWidth, h: canvas.clientHeight || window.innerHeight });
     /** The glass edges, each frame the light runs: shown only while q > 0.01 (and its map is in place), the filter's scale
      *  touched only when it moves by 0.1 or more. Returns the scale as set while it shows, else 0. */
     let lensShown = false, lensSet = -1, lensEl: HTMLDivElement | null = null;
@@ -261,11 +279,17 @@ export function AboutTestimonials() {
       return on ? lensSet : 0;
     };
 
-    /** Where the quotes and the slot are this frame (screen px), or null off the track. Rects are read relative to the
-     *  track (its transform cancels out) and placed at the travel the page's scroll gives (about-track.tsx's own formula),
-     *  so the light never lags the track by the frame its scroll handler hasn't run yet. */
+    /** Where the quotes and the slot are this frame (screen px): `size` the axis q is scrubbed along (the screen's width on
+     *  the track, the large viewport's height stacked), `c0` Yoav's centre along it. Null in any other layout. */
     const measure = () => {
+      if (sec.dataset.mode === "stack") return measureStack();
       if (sec.dataset.mode !== "track") return null;
+      return measureTrack();
+    };
+    /** On the track: rects are read relative to the track (its transform cancels out) and placed at the travel the page's
+     *  scroll gives (about-track.tsx's own formula), so the light never lags the track by the frame its scroll handler hasn't
+     *  run yet. */
+    const measureTrack = () => {
       const vw = clip.clientWidth || window.innerWidth;
       const x = trackX(trackProgress(window.scrollY, sec.offsetTop, sec.offsetHeight, window.innerHeight), tr.scrollWidth, vw);
       const trR = tr.getBoundingClientRect(), left = clip.getBoundingClientRect().left + x;
@@ -273,10 +297,23 @@ export function AboutTestimonials() {
       const s = slot.getBoundingClientRect();
       const c0 = centre(q1.getBoundingClientRect()), c1 = centre(q2.getBoundingClientRect()), sx = centre(s);
       return {
-        vw, c0,
+        size: vw, c0, stack: false,
         q: vw > 0 ? testimonialsQ(c0, c1, vw) : 0,
         slot: { x: sx, y: s.top + s.height / 2, w: s.width },
         near: s.width > 0 && sx > -s.width && sx < vw + s.width,
+      };
+    };
+    /** Stacked: the page scrolls the column itself, so each rect is where it is on screen (its rise-in taken out); the
+     *  canvas is fixed at the screen's top, so screen px are the canvas's. */
+    const measureStack = () => {
+      const vh = screenBox().h;
+      const middle = (el: HTMLElement) => { const r = el.getBoundingClientRect(); return { r, y: r.top - rising(el) + r.height / 2 }; };
+      const a = middle(q1), b = middle(q2), s = middle(slot);
+      return {
+        size: vh, c0: a.y, stack: true,
+        q: vh > 0 ? testimonialsQ(a.y, b.y, vh) : 0,
+        slot: { x: s.r.left + s.r.width / 2, y: s.y, w: s.r.width },
+        near: s.r.width > 0 && s.y > -s.r.width && s.y < vh + s.r.width,
       };
     };
 
@@ -287,7 +324,7 @@ export function AboutTestimonials() {
       if (owner !== lastOwner) { lastOwner = owner; handing = null; }
       const m = measure();
       const q = m ? m.q : 0;
-      if (m) arrival = stepArrival(arrival, q, m.c0, m.vw, now, reduced);
+      if (m) arrival = stepArrival(arrival, q, m.c0, m.size, now, reduced);
       setMood(q);
       const drawing = !!m && (q > 0 || m.near);
       const pulse = reduced ? -1 : pulsePhase(arrival, now);
@@ -303,9 +340,11 @@ export function AboutTestimonials() {
       toPendant.q = q; toPendant.t = t; toPendant.pulse = pulse;
       setGlassLight(q > 0 ? toPendant : null);
       try {
-        // (its own box: fixed at inset 0, it leaves out a classic scrollbar, as the quotes' and the pendant's client sizes do)
-        light.resize(canvas.clientWidth || window.innerWidth, canvas.clientHeight || window.innerHeight, window.devicePixelRatio || 1);
-        light.draw({ q, t, pulse, pulseFrom: "right", ball });
+        // (its own box: fixed at inset 0, it leaves out a classic scrollbar, as the quotes' and the pendant's client sizes do;
+        // stacked, the box as last measured, the toolbar left out)
+        const box = m.stack ? screenBox() : { w: canvas.clientWidth || window.innerWidth, h: canvas.clientHeight || window.innerHeight };
+        light.resize(box.w, box.h, window.devicePixelRatio || 1);
+        light.draw({ q, t, pulse, pulseFrom: m.stack ? "bottom" : "right", ball });
       } catch {
         fail();
         return;
@@ -318,13 +357,26 @@ export function AboutTestimonials() {
 
     const onReduced = () => { reduced = reducedQ.matches; wake(); };
     const onLost = (e: Event) => { e.preventDefault(); fail(); };
-    /** A change of layout (about-track.tsx sets data-mode): the light loads on the track, and stops in the stack. */
-    const onMode = () => { ensure(); wake(); };
+    /** A change of layout (about-track.tsx sets data-mode, on every resize: only a new value counts): the stack's box is
+     *  measured afresh. */
+    let lastMode = sec.dataset.mode;
+    const onMode = () => {
+      if (sec.dataset.mode === lastMode) return;
+      lastMode = sec.dataset.mode;
+      stackBox = null;
+      wake();
+    };
+    /** A resize: stacked on a touch screen, the toolbar (viewport.ts) keeps the box; anything else measures it again. */
+    const onResize = () => {
+      const now = { w: window.innerWidth, h: window.innerHeight };
+      if (!(sec.dataset.mode === "stack" && resizeKind(lastWin, now, coarseQ.matches) === "toolbar")) { lastWin = now; stackBox = null; }
+      wake();
+    };
     const modeObs = typeof MutationObserver === "function" ? new MutationObserver(onMode) : null;
     modeObs?.observe(sec, { attributes: true, attributeFilter: ["data-mode"] });
     reducedQ.addEventListener?.("change", onReduced);
     window.addEventListener("scroll", wake, { passive: true });
-    window.addEventListener("resize", wake);
+    window.addEventListener("resize", onResize);
     canvas.addEventListener("webglcontextlost", onLost);
 
     let torn = false;
@@ -337,12 +389,13 @@ export function AboutTestimonials() {
       modeObs?.disconnect();
       reducedQ.removeEventListener?.("change", onReduced);
       window.removeEventListener("scroll", wake);
-      window.removeEventListener("resize", wake);
+      window.removeEventListener("resize", onResize);
       // (before the dispose: its forced loss fires a context-lost event this canvas must not answer)
       canvas.removeEventListener("webglcontextlost", onLost);
       setMood(0);
       lensFrame(0, 0);
       setGlassLight(null);
+      slotShown(false);
       if (light) spent.add(canvas);
       try { light?.dispose(); } catch { /* the GPU is already gone */ }
       light = null;
@@ -355,9 +408,9 @@ export function AboutTestimonials() {
       setGone(true);
     };
 
-    /** Loads the light once About's text has painted, on the track (the stack's light is Task 5). */
+    /** Loads the light once About's text has painted (on the track or stacked). */
     const ensure = () => {
-      if (light || loading || off || sec.dataset.mode !== "track") return;
+      if (light || loading || off) return;
       loading = true;
       void (async () => {
         try {
@@ -369,6 +422,7 @@ export function AboutTestimonials() {
           if (!made) { fail(); return; }
           if (off) { made.dispose(); return; }
           light = made;
+          slotShown(true);
           publish({ q: 0, pulse: -1, drawing: false, ownBall: false, lens: 0 });
           wake();
         } catch {

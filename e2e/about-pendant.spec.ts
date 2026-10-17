@@ -581,13 +581,19 @@ test.describe("on a phone, the glass", () => {
 
 test.describe("on a phone, without the pendant", () => {
   test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
-  test("no empty glass slot between the quotes", async ({ page }) => {
+  // (with the pendant's files blocked but WebGL there, the testimonials' light draws its own ball in the slot instead:
+  // about-testimonials.spec.ts, Task 5. Here nothing can draw one.)
+  test("no WebGL at all: no empty glass slot between the quotes", async ({ page }) => {
     test.setTimeout(60_000);
-    let aborted = 0;
-    await page.route("**/about/pendant/**", (r) => { aborted++; return r.abort(); });
+    await page.addInitScript(() => {
+      const get = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, id: string, ...rest: unknown[]) {
+        return /webgl/i.test(id) ? null : (get as (...a: unknown[]) => RenderingContext | null).call(this, id, ...rest);
+      } as typeof get;
+    });
     await page.goto("/about");
-    await expect.poll(() => aborted, { timeout: 15_000 }).toBeGreaterThan(0);
     await expect(page.locator("canvas.ab-pendant")).toHaveCount(0, { timeout: 15_000 });
+    await expect(page.locator("canvas.ab-light")).toHaveCount(0, { timeout: 15_000 });
     expect(await page.locator("[data-pendant='glass']").evaluate((el) => el.getBoundingClientRect().height)).toBe(0);
     await expect(page.locator("section.ab")).not.toHaveAttribute("data-glass", "on");
   });

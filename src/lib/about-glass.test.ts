@@ -1,6 +1,6 @@
 // src/lib/about-glass.test.ts
 import { afterEach, describe, expect, it } from "vitest";
-import { claimGlass, glassLight, glassOwner, resetGlassForTests, setGlassLight } from "./about-glass";
+import { claimGlass, glassLight, glassOwner, resetGlassForTests, setGlassLight, showGlassSlot } from "./about-glass";
 
 describe("about-glass: one ball between the testimonials, owned by whoever draws it", () => {
   afterEach(() => resetGlassForTests());
@@ -56,5 +56,39 @@ describe("about-glass: one ball between the testimonials, owned by whoever draws
     expect(glassLight()).toBe(first);
     expect(glassLight()).toEqual({ q: 0.9, t: 2, pulse: -1 });
   });
-});
 
+  it("the stack's slot: open while either side shows it, collapsed only when neither does; one side never clears the other's", () => {
+    const sec = { dataset: {} as DOMStringMap };
+    showGlassSlot(sec, "pendant", true);
+    expect(sec.dataset.glass).toBe("on");
+    showGlassSlot(sec, "testimonials", true);
+    showGlassSlot(sec, "pendant", false); // (the pendant gone: the light still draws its ball there)
+    expect(sec.dataset.glass).toBe("on");
+    showGlassSlot(sec, "pendant", false); // (twice is harmless)
+    expect(sec.dataset.glass).toBe("on");
+    showGlassSlot(sec, "testimonials", false);
+    expect(sec.dataset.glass).toBeUndefined();
+    // the light gone first, then the pendant
+    showGlassSlot(sec, "testimonials", true);
+    showGlassSlot(sec, "pendant", true);
+    showGlassSlot(sec, "testimonials", false);
+    expect(sec.dataset.glass).toBe("on");
+    showGlassSlot(sec, "pendant", false);
+    expect(sec.dataset.glass).toBeUndefined();
+    // one section's showers are its own
+    const other = { dataset: {} as DOMStringMap };
+    showGlassSlot(sec, "pendant", true);
+    showGlassSlot(other, "pendant", false);
+    expect(sec.dataset.glass).toBe("on");
+    expect(other.dataset.glass).toBeUndefined();
+  });
+
+  it("the slot's attribute is written only when it changes (called every frame)", () => {
+    let writes = 0;
+    const store: Record<string, string> = {};
+    const dataset = new Proxy(store, { set: (t, k, v) => { writes++; t[k as string] = v; return true; } }) as DOMStringMap;
+    const sec = { dataset };
+    for (let i = 0; i < 5; i++) showGlassSlot(sec, "pendant", true);
+    expect(writes).toBe(1);
+  });
+});

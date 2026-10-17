@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { claimGlass, glassLight, glassOwner } from "@/lib/about-glass";
+import { claimGlass, glassLight, glassOwner, showGlassSlot } from "@/lib/about-glass";
 import type { Box, Look } from "@/three/pendant/camera";
 import { clipBox, hits, padBox, type TextRect } from "@/three/pendant/layout";
 import { REST, stepMotion, type MotionState } from "@/three/pendant/motion";
@@ -224,12 +224,10 @@ export function AboutPendant() {
     /** The glass ball is one ball: the pendant claims it once its scene is ready (the testimonials then don't draw theirs),
      *  and gives it back on unmount or a lost context (about-glass.ts). */
     let releaseGlass: (() => void) | null = null;
-    /** The glass slot between the stacked quotes takes its room only while the pendant holds the ball and draws
-     *  (about.css: `data-glass` on the section); without the pendant the stack has no empty square. */
-    const glassShown = (on: boolean) => {
-      if (!sec) return;
-      if (on) { if (sec.dataset.glass !== "on") sec.dataset.glass = "on"; } else delete sec.dataset.glass;
-    };
+    /** The glass slot between the stacked quotes takes its room while the pendant holds the ball and draws (about.css:
+     *  `data-glass` on the section), or while the testimonials' light draws its own (about-testimonials.tsx): each side
+     *  shows it for itself (about-glass.ts showGlassSlot), so the pendant letting go never collapses the light's. */
+    const glassShown = (on: boolean) => { if (sec) showGlassSlot(sec, "pendant", on); };
     const giveGlassBack = () => { releaseGlass?.(); releaseGlass = null; glassShown(false); };
 
     // ---------- layout: the track measured (on load, resize, fonts, and whenever the track or section changes size) ----------

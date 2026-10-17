@@ -17,14 +17,14 @@ vi.mock("@/three/edge-light/testimonials-light", async (orig) => {
   };
 });
 
-import { claimGlass, glassLight, resetGlassForTests, setGlassLight } from "@/lib/about-glass";
+import { claimGlass, glassLight, resetGlassForTests, setGlassLight, showGlassSlot } from "@/lib/about-glass";
 import { AboutTestimonials } from "./about-testimonials";
 
 const g = globalThis as unknown as Record<string, unknown>;
 
 /** About's pinned frame with the two quotes and the glass slot between them, as about-track.tsx renders it. */
-const Page = () => (
-  <section className="ab" data-mode="track">
+const Page = ({ mode = "track" }: { mode?: "track" | "stack" }) => (
+  <section className="ab" data-mode={mode}>
     <div className="ab-pin">
       <div className="ab-mood" aria-hidden />
       <div className="ab-clip">
@@ -39,24 +39,29 @@ const Page = () => (
   </section>
 );
 
-/** Where the quotes and the slot sit on screen (jsdom has no layout: the rects are stubbed; the track at 0, a 1000 px screen). */
+/** Where the quotes and the slot sit on screen (jsdom has no layout: the rects are stubbed; the track at 0, a 1000 px screen).
+ *  Along the track (`axis` "x") the centres are horizontal at mid-height; stacked ("y"), vertical at mid-width. */
 let at = { q1: 0, slot: 0, q2: 0 };
+let axis: "x" | "y" = "x";
 const W = 1000, H = 800, SLOT = 170;
-function rect(cx: number, w: number): DOMRect {
-  return { left: cx - w / 2, right: cx + w / 2, top: H / 2 - w / 2, bottom: H / 2 + w / 2, width: w, height: w, x: cx - w / 2, y: H / 2 - w / 2, toJSON() {} } as DOMRect;
+function rect(c: number, w: number): DOMRect {
+  const [cx, cy] = axis === "x" ? [c, H / 2] : [W / 2, c];
+  return { left: cx - w / 2, right: cx + w / 2, top: cy - w / 2, bottom: cy + w / 2, width: w, height: w, x: cx - w / 2, y: cy - w / 2, toJSON() {} } as DOMRect;
 }
 
 let rafs: FrameRequestCallback[] = [];
-/** Reduced motion, switchable mid-test (the mount listens for the change). */
+/** Reduced motion, switchable mid-test (the mount listens for the change); a touch screen (`pointer: coarse`). */
 let reducedNow = false;
+let coarseNow = false;
 let onReducedChange: (() => void) | null = null;
 const runFrame = async (now = 1000) => { await act(async () => { rafs.splice(0).forEach((cb) => cb(now)); }); };
 
 function setup() {
   reducedNow = false;
-  window.matchMedia = vi.fn(() => ({
-    get matches() { return reducedNow; },
-    addEventListener: (_: string, cb: () => void) => { onReducedChange = cb; },
+  coarseNow = false;
+  window.matchMedia = vi.fn((query: string) => ({
+    get matches() { return query.includes("coarse") ? coarseNow : reducedNow; },
+    addEventListener: (_: string, cb: () => void) => { if (!query.includes("coarse")) onReducedChange = cb; },
     removeEventListener() {},
   })) as never;
   Object.defineProperty(document, "fonts", { configurable: true, value: { ready: Promise.resolve() } });
@@ -84,9 +89,9 @@ function setup() {
 }
 
 /** Mounted and loaded: the light made, the first frame asked for. */
-async function mount() {
+async function mount(mode: "track" | "stack" = "track") {
   const { runIdle } = setup();
-  const view = render(<Page />);
+  const view = render(<Page mode={mode} />);
   await runIdle();
   await waitFor(() => expect(window.__testimonials).toBeDefined());
   return view;
@@ -96,6 +101,7 @@ beforeEach(() => {
   real.on = false;
   draw.mockReset(); resize.mockReset(); dispose.mockReset();
   at = { q1: 2400, slot: 2800, q2: 3200 }; // (far right: q 0, the slot off screen)
+  axis = "x";
 });
 afterEach(() => {
   resetGlassForTests();
@@ -434,21 +440,23 @@ test("unmounting hides the lens and stops listening for resizes", async () => {
 
 // ---------- Task 4, fix round 2: the map waits; no work after a failure or an unchanged resize ----------
 
-test("no map is built before About has painted, nor while the section is stacked; it comes once on the track", async () => {
+test("no map is built before About has painted; once painted it comes, stacked as on the track", async () => {
   const { toDataURL } = asChromium();
   const { runIdle } = setup();
-  const { container } = render(<Page />);
-  const sec = container.querySelector<HTMLElement>("section.ab")!;
-  sec.dataset.mode = "stack"; // (the layout before paint: stacked)
+  render(<Page mode="stack" />);
   await act(async () => { await Promise.resolve(); });
   expect(toDataURL).not.toHaveBeenCalled(); // (before paint)
-  await runIdle();
-  await new Promise((r) => setTimeout(r, 0));
-  expect(toDataURL).not.toHaveBeenCalled(); // (painted, but stacked: the lens can't show)
   expect(document.querySelector("#ab-edge-lens-top feImage")!.getAttribute("href")).toBeNull();
-  sec.dataset.mode = "track";
-  await waitFor(() => expect(toDataURL).toHaveBeenCalledTimes(4));
+  await runIdle();
+  await waitFor(() => expect(toDataURL).toHaveBeenCalledTimes(4)); // (painted: stacked, the lens shows too)
   expect(document.querySelector("#ab-edge-lens-top feImage")!.getAttribute("href")).toBe("data:image/png;base64,TEST");
+  // a phone's URL bar showing (the window's height changes, the screen's client size doesn't): nothing rebuilt
+  vi.spyOn(Element.prototype, "clientWidth", "get").mockImplementation(function (this: Element) { return this === document.documentElement ? W : 0; });
+  vi.spyOn(Element.prototype, "clientHeight", "get").mockImplementation(function (this: Element) { return this === document.documentElement ? H : 0; });
+  Object.defineProperty(window, "innerHeight", { configurable: true, value: H - 60 });
+  window.dispatchEvent(new Event("resize"));
+  await new Promise((r) => setTimeout(r, 250));
+  expect(toDataURL).toHaveBeenCalledTimes(4);
 });
 
 test("after the light fails, the lens is gone and a resize builds nothing", async () => {
@@ -497,4 +505,148 @@ test("on a very short screen the strips' depth is clamped to half of it, as lens
   // (the top and bottom strips meet: the side strips have no height left, their slices the 1 map px minimum)
   expect(placed(filters()[0].img)[3]).toBe(36); // (35 px, its slice rounded outward to whole map px: 18)
   expect(placed(filters()[1].img)[3]).toBeLessThanOrEqual(2);
+});
+
+// ---------- Task 5: the stack (portrait phones, reduced motion) ----------
+
+/** A stacked slide's rise-in as the computed transform shows it (jsdom has no DOMMatrixReadOnly: a stub that reads it). */
+function withMatrix() {
+  g.DOMMatrixReadOnly = class { m42: number; constructor(t: string) { const m = /translateY\((-?[\d.]+)px\)/.exec(t); this.m42 = m ? Number(m[1]) : 0; } };
+}
+afterEach(() => { delete g.DOMMatrixReadOnly; });
+
+test("stacked: q from the quotes' vertical centres and the screen's height; the wave from the bottom; the ball in the slot", async () => {
+  axis = "y";
+  await mount("stack");
+  // Yoav's centre at 85% of the height (q's rising half at 0.5: sineIn(0.5)), Andrada below the screen
+  at = { q1: 0.85 * H, slot: 0.85 * H + 400, q2: 0.85 * H + 800 };
+  window.dispatchEvent(new Event("scroll"));
+  await runFrame(1000);
+  expect(window.__testimonials!.q).toBeCloseTo(1 - Math.cos(Math.PI / 4), 9);
+  expect(draw).toHaveBeenLastCalledWith(expect.objectContaining({ pulseFrom: "bottom" }));
+  expect(window.__testimonials!.pulse).toBe(0); // (the arrival wave started)
+  // both quotes in, the slot centred: q 1, the light's own ball (nobody claimed the glass) at the slot
+  at = { q1: 0.2 * H, slot: 0.5 * H, q2: 0.8 * H };
+  await runFrame(1100);
+  expect(window.__testimonials!.q).toBeCloseTo(1, 9);
+  expect(window.__testimonials!.ownBall).toBe(true);
+  const ball = draw.mock.lastCall![0].ball;
+  expect(ball.x).toBeCloseTo(W / 2, 9);
+  expect(ball.y).toBeCloseTo(0.5 * H, 9);
+  expect(ball.r).toBeCloseTo(0.44 * SLOT, 9);
+  expect((document.querySelector(".ab-mood") as HTMLElement).style.getPropertyValue("--q")).toBe("1.000");
+  // Andrada's centre past −5% of the height: q 0; the slot more than its width above the screen: idle
+  at = { q1: -1200, slot: -900, q2: -0.2 * H };
+  await runFrame(1200);
+  expect(window.__testimonials).toMatchObject({ q: 0, drawing: false });
+  expect(rafs).toHaveLength(0);
+});
+
+test("stacked: a slide's rise-in is taken out, so q and the ball are where the slides stand once risen", async () => {
+  withMatrix();
+  axis = "y";
+  await mount("stack");
+  at = { q1: 0.2 * H, slot: 0.5 * H, q2: 0.8 * H };
+  window.dispatchEvent(new Event("scroll"));
+  await runFrame(1000);
+  const risen = { q: window.__testimonials!.q, y: draw.mock.lastCall![0].ball.y };
+  // the same places, each slide still 28 px down on its way in
+  const slot = document.querySelector<HTMLElement>("[data-pendant='glass']")!;
+  for (const el of document.querySelectorAll<HTMLElement>("[data-pendant]")) el.style.transform = "translateY(28px)";
+  at = { q1: 0.2 * H + 28, slot: 0.5 * H + 28, q2: 0.8 * H + 28 };
+  await runFrame(1100);
+  expect(window.__testimonials!.q).toBeCloseTo(risen.q, 9);
+  expect(draw.mock.lastCall![0].ball.y).toBeCloseTo(risen.y, 9);
+  expect(slot.style.transform).toBe("translateY(28px)");
+});
+
+test("stacked: sized from its own box (100lvh), kept while a phone's toolbar shows; a real resize measures it again", async () => {
+  let boxH = 790;
+  vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(function (this: HTMLElement) { return this instanceof HTMLCanvasElement ? 1000 : 0; });
+  vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockImplementation(function (this: HTMLElement) { return this instanceof HTMLCanvasElement ? boxH : 0; });
+  axis = "y";
+  await mount("stack");
+  coarseNow = true;
+  at = { q1: 0.2 * H, slot: 0.5 * H, q2: 0.8 * H };
+  window.dispatchEvent(new Event("scroll"));
+  await runFrame(1000);
+  expect(resize).toHaveBeenLastCalledWith(1000, 790, expect.any(Number));
+  const q = window.__testimonials!.q;
+  // the toolbar: the window 80 px shorter (and a box that would follow it, as 100vh can): the box kept, q unmoved
+  boxH = 710;
+  Object.defineProperty(window, "innerHeight", { configurable: true, value: H - 80 });
+  window.dispatchEvent(new Event("resize"));
+  await runFrame(1100);
+  expect(resize).toHaveBeenLastCalledWith(1000, 790, expect.any(Number));
+  expect(window.__testimonials!.q).toBe(q);
+  // a rotation (the width changes): measured again
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: W - 1 });
+  window.dispatchEvent(new Event("resize"));
+  await runFrame(1200);
+  expect(resize).toHaveBeenLastCalledWith(1000, 710, expect.any(Number));
+  // with a mouse, a height-only change is a real resize too
+  coarseNow = false;
+  boxH = 650;
+  Object.defineProperty(window, "innerHeight", { configurable: true, value: H - 140 });
+  window.dispatchEvent(new Event("resize"));
+  await runFrame(1300);
+  expect(resize).toHaveBeenLastCalledWith(1000, 650, expect.any(Number));
+});
+
+test("the track's toolbar-sized resize is a resize: the light follows its box every frame there, as before", async () => {
+  let boxH = 790;
+  vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(function (this: HTMLElement) { return this instanceof HTMLCanvasElement ? 1000 : 0; });
+  vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockImplementation(function (this: HTMLElement) { return this instanceof HTMLCanvasElement ? boxH : 0; });
+  await mount();
+  coarseNow = true;
+  at = { q1: 600, slot: 900, q2: 1300 };
+  window.dispatchEvent(new Event("scroll"));
+  await runFrame(1000);
+  boxH = 720;
+  window.dispatchEvent(new Event("resize"));
+  await runFrame(1100);
+  expect(resize).toHaveBeenLastCalledWith(1000, 720, expect.any(Number));
+});
+
+test("the stack's glass slot opens once the light is there to draw the ball, and closes with it; never the pendant's", async () => {
+  const { runIdle } = setup();
+  const { container, unmount } = render(<Page mode="stack" />);
+  const sec = container.querySelector<HTMLElement>("section.ab")!;
+  expect(sec.dataset.glass).toBeUndefined(); // (nothing loaded yet: no empty square)
+  await runIdle();
+  await waitFor(() => expect(window.__testimonials).toBeDefined());
+  expect(sec.dataset.glass).toBe("on");
+  // the pendant shows it too, then lets go (its context lost): the light's ball still needs it
+  showGlassSlot(sec, "pendant", true);
+  showGlassSlot(sec, "pendant", false);
+  expect(sec.dataset.glass).toBe("on");
+  // the light gone while the pendant still draws: the pendant's slot stays open
+  showGlassSlot(sec, "pendant", true);
+  unmount();
+  expect(sec.dataset.glass).toBe("on");
+  showGlassSlot(sec, "pendant", false);
+  expect(sec.dataset.glass).toBeUndefined();
+});
+
+test("the light failing closes the slot it opened", async () => {
+  axis = "y";
+  const view = await mount("stack");
+  const sec = view.container.querySelector<HTMLElement>("section.ab")!;
+  expect(sec.dataset.glass).toBe("on");
+  draw.mockImplementation(() => { throw new Error("context lost"); });
+  at = { q1: 0.2 * H, slot: 0.5 * H, q2: 0.8 * H };
+  window.dispatchEvent(new Event("scroll"));
+  await runFrame();
+  await waitFor(() => expect(document.querySelector("canvas.ab-light")).toBeNull());
+  expect(sec.dataset.glass).toBeUndefined();
+});
+
+test("no WebGL, stacked: no slot is opened", async () => {
+  real.on = true;
+  const { runIdle } = setup();
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation((() => null) as never);
+  const { container } = render(<Page mode="stack" />);
+  await runIdle();
+  await waitFor(() => expect(container.querySelector("canvas.ab-light")).toBeNull());
+  expect(container.querySelector<HTMLElement>("section.ab")!.dataset.glass).toBeUndefined();
 });

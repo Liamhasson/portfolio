@@ -1,7 +1,8 @@
 // e2e/about-testimonials.spec.ts: the testimonials' light on About's desktop track (plan 2026-10-17-about-testimonials-light,
-// Task 2). Run with `npx playwright test -c playwright.about.config.ts` (a GPU-backed Chromium at 1440 x 900).
+// Task 2), and stacked on phones (Task 5). Run with `npx playwright test -c playwright.about.config.ts` (a GPU-backed Chromium at 1440 x 900).
 import { expect, test, type Page } from "@playwright/test";
 import { lensBand, lensMap } from "../src/app/about/edge-lens";
+import { testimonialsQ } from "../src/app/about/testimonials-q";
 
 /** The pendant's model, blocked (its URL carries a ?v= cache token, so a plain glob wouldn't match). */
 const PENDANT_GLB = /\/pendant\.glb(\?|$)/;
@@ -92,7 +93,8 @@ async function diffLines(a: Buffer, b: Buffer, page: Page) {
 
 /** Mean colour, and the count of bright pixels (r + g + b > 150), in a clip; `ring`: only pixels between two radii from its centre. */
 async function colourIn(page: Page, clip: { x: number; y: number; width: number; height: number }, ring?: { r0: number; r1: number }) {
-  const png = (await page.screenshot({ clip })).toString("base64");
+  // (one pixel per CSS px, so the ring's radii hold on a phone's 3x screen too)
+  const png = (await page.screenshot({ clip, scale: "css" })).toString("base64");
   return page.evaluate(async ({ png, ring }) => {
     const img = new Image();
     img.src = `data:image/png;base64,${png}`;
@@ -776,5 +778,212 @@ test.describe("the glass edges", () => {
       expect(s.href).not.toBe(before.find((b) => b.edge === s.edge)!.href);
     }
     expect(errors).toEqual([]);
+  });
+});
+
+// ---------- Task 5: the stack (portrait phones) ----------
+
+/** Stacked, the column's places (page px, each slide's rise-in taken out, as the light measures them) and the screen's
+ *  height as the light takes it (its canvas: 100lvh). */
+const stackPlaces = (page: Page) => page.evaluate(() => {
+  const mid = (sel: string) => {
+    const el = document.querySelector<HTMLElement>(sel)!, r = el.getBoundingClientRect(), t = getComputedStyle(el).transform;
+    const rise = t && t !== "none" ? new DOMMatrixReadOnly(t).m42 : 0;
+    return r.top - rise + r.height / 2 + window.scrollY;
+  };
+  const c = document.querySelector<HTMLElement>("canvas.ab-light");
+  return { y0: mid("[data-pendant='quote1']"), y1: mid("[data-pendant='quote2']"), slot: mid("[data-pendant='glass']"), vh: c?.clientHeight || innerHeight, scrollY: window.scrollY };
+});
+
+/** Stacked: scrolls so Yoav's centre stands where q has risen to `q`, or the slot is centred. Waits two frames and a settle. */
+async function stackTo(page: Page, where: { q: number } | "slot" | { y: number }) {
+  const p = await stackPlaces(page);
+  let y: number;
+  if (typeof where === "object" && "q" in where) {
+    const u = (2 / Math.PI) * Math.acos(1 - where.q);
+    y = p.y0 - (p.vh * 1.05 - u * 0.4 * p.vh);
+  } else if (where === "slot") y = p.slot - p.vh / 2;
+  else y = where.y;
+  await page.evaluate((y) => window.scrollTo(0, y), y);
+  await page.waitForTimeout(300);
+}
+
+for (const [w, h] of [[390, 844], [430, 932]] as const) {
+  test.describe(`stacked on a ${w} x ${h} phone`, () => {
+    test.use({ viewport: { width: w, height: h }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+
+    test("q rises and falls with the vertical scroll, from the quotes' vertical centres and the screen's height", async ({ page }) => {
+      test.setTimeout(90_000);
+      const errors = collectErrors(page);
+      await page.goto("/about");
+      await expect(page.locator("section.ab")).toHaveAttribute("data-mode", "stack");
+      await lightLoaded(page);
+      await expect(page.locator("canvas.ab-light")).toHaveCSS("position", "fixed");
+      expect(await page.locator("canvas.ab-light").evaluate((c) => [c.getBoundingClientRect().top, c.clientHeight])).toEqual([0, h]);
+      // from Yoav's centre below the screen (1.2 x its height) to Andrada's above it (−0.2): 30 steps
+      const p = await stackPlaces(page);
+      const from = p.y0 - 1.2 * p.vh, to = p.y1 + 0.2 * p.vh;
+      const qs: number[] = [];
+      for (let i = 0; i <= 30; i++) {
+        await page.evaluate((y) => window.scrollTo(0, y), from + ((to - from) * i) / 30);
+        await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+        await page.waitForTimeout(60);
+        const [q, now] = await Promise.all([hook(page).then((x) => x.q), stackPlaces(page)]);
+        const off = now.scrollY;
+        expect(q, `step ${i}`).toBeCloseTo(testimonialsQ(now.y0 - off, now.y1 - off, now.vh), 2);
+        qs.push(q);
+      }
+      expect(qs[0]).toBe(0);
+      expect(qs[30]).toBe(0);
+      const top = qs.findIndex((q) => q > 0.999), last = qs.length - 1 - [...qs].reverse().findIndex((q) => q > 0.999);
+      expect(top, `q along the scroll: ${qs.map((q) => q.toFixed(2)).join(" ")}`).toBeGreaterThan(0);
+      for (let i = 1; i <= top; i++) expect(qs[i]).toBeGreaterThanOrEqual(qs[i - 1] - 1e-6); // (rises)
+      for (let i = last + 1; i <= 30; i++) expect(qs[i]).toBeLessThanOrEqual(qs[i - 1] + 1e-6); // (falls)
+      expect(qs.slice(1, top).some((q) => q > 0.1 && q < 0.9), "a scrub, not a switch").toBe(true);
+      expect(errors).toEqual([]);
+    });
+
+    test("the light at the edges leaves the stacked quotes' text in the middle untouched; the mood paints under the words", async ({ page }) => {
+      test.setTimeout(60_000);
+      await page.goto("/about");
+      await lightLoaded(page);
+      await page.waitForFunction(() => window.__pendant?.ready === true, null, { timeout: 30_000 });
+      // Yoav's quote across the middle of the screen: q 1
+      const p = await stackPlaces(page);
+      await stackTo(page, { y: p.y0 - p.vh / 2 });
+      await page.waitForTimeout(1200); // (the slide's rise-in done)
+      await expect.poll(async () => (await hook(page)).q).toBeGreaterThan(0.999);
+      expect((await hook(page)).drawing).toBe(true);
+      await expect.poll(async () => (await hook(page)).pulse, { timeout: 5000 }).toBe(1);
+      await page.locator("canvas.ab-pendant").evaluate((c) => { (c as HTMLElement).style.visibility = "hidden"; });
+      // the middle: past the light's reach (about 3.2 x its padding in from every edge)
+      const pad = Math.min(50, 0.1 * Math.min(w, h)), inset = Math.ceil(3.2 * pad);
+      const clip = { x: inset, y: inset, width: w - 2 * inset, height: h - 2 * inset };
+      const lit = await page.screenshot({ clip });
+      await setLight(page, false);
+      const bare = await page.screenshot({ clip });
+      await setLight(page, true);
+      expect((await inkIn(page, clip)).n, "the quote's words are in the middle").toBeGreaterThan(500);
+      expect(await changedPixels(lit, bare, page)).toBeLessThanOrEqual(5);
+      // the mood under the words: painted solid blue at full strength, the words still show over it (a layer over them
+      // would leave pure blue)
+      await setLight(page, false);
+      await page.addStyleTag({ content: ".ab-mood { background: #00f !important; opacity: 1 !important; }" });
+      await page.waitForTimeout(100);
+      const over = await colourIn(page, clip);
+      expect(over.b, "the mood shows").toBeGreaterThan(150);
+      expect(over.bright, "the words over the mood").toBeGreaterThan(500);
+      expect(await page.locator(".ab-mood").evaluate((m) => [getComputedStyle(m).position, getComputedStyle(m).zIndex])).toEqual(["fixed", "-1"]);
+    });
+
+    test("the pendant draws the ball in the opened slot; the light draws none of its own", async ({ page }) => {
+      test.setTimeout(60_000);
+      const errors = collectErrors(page);
+      await page.goto("/about");
+      await lightLoaded(page);
+      await page.waitForFunction(() => window.__pendant?.ready === true, null, { timeout: 30_000 });
+      await expect(page.locator("section.ab")).toHaveAttribute("data-glass", "on");
+      const y = await page.evaluate(() => window.__pendant!.keys.find((k) => k.id === "glass")!.y);
+      await page.evaluate((y) => window.scrollTo(0, y), y);
+      await page.waitForTimeout(2500);
+      const slot = await slotNow(page);
+      expect(slot.w).toBeGreaterThan(0.4 * w); // (open: 50vw, capped)
+      const ball = await pendantBall(page);
+      expect(ball, "the pendant's ball").not.toBeNull();
+      expect(Math.abs(ball!.y - slot.y)).toBeLessThan(2);
+      expect((await hook(page)).ownBall).toBe(false);
+      expect(errors).toEqual([]);
+    });
+
+    test("without the pendant the light draws its own ball in the opened slot: no empty square", async ({ page }) => {
+      test.setTimeout(60_000);
+      const errors = collectErrors(page, /Failed to load resource/);
+      let aborted = 0;
+      await page.route(PENDANT_GLB, (r) => { aborted++; return r.abort(); });
+      await page.goto("/about");
+      await lightLoaded(page);
+      await expect.poll(() => aborted, { timeout: 15_000 }).toBeGreaterThan(0);
+      await expect(page.locator("canvas.ab-pendant")).toHaveCount(0, { timeout: 15_000 });
+      await expect(page.locator("section.ab")).toHaveAttribute("data-glass", "on");
+      await stackTo(page, "slot");
+      await page.waitForTimeout(1200); // (the slot's rise-in done)
+      await expect.poll(async () => (await hook(page)).ownBall).toBe(true);
+      const slot = await slotNow(page);
+      expect(slot.w).toBeGreaterThan(0.4 * w);
+      expect(Math.abs(slot.y - h / 2)).toBeLessThan(2);
+      // its rim glints (r ± 3 px), none there without the light; mostly glass inside
+      const r = 0.44 * slot.w, S = Math.ceil(r + 6);
+      const clip = { x: Math.round(slot.x - S), y: Math.round(slot.y - S), width: 2 * S, height: 2 * S };
+      const lit = await colourIn(page, clip, { r0: r - 3, r1: r + 3 });
+      await setLight(page, false);
+      const bare = await colourIn(page, clip, { r0: r - 3, r1: r + 3 });
+      await setLight(page, true);
+      expect(lit.bright).toBeGreaterThan(lit.n * 0.15);
+      expect(bare.bright).toBeLessThan(5);
+      const inner = await colourIn(page, clip, { r0: 0, r1: r * 0.6 });
+      expect(inner.bright).toBeLessThan(inner.n * 0.15);
+      expect(errors).toEqual([]);
+    });
+
+    test("the glass edges show on Chromium at q 1, and the wave comes from the bottom", async ({ page }) => {
+      test.setTimeout(60_000);
+      const errors = collectErrors(page);
+      await page.goto("/about");
+      await lightLoaded(page);
+      const top = page.locator(".ab-lens-strip[data-edge='top']");
+      await expect(top).toBeHidden();
+      await stackTo(page, "slot");
+      await expect.poll(async () => (await hook(page)).q).toBeGreaterThan(0.999);
+      await expect(top).toBeVisible();
+      await expect.poll(async () => (await hook(page)).lens).toBeGreaterThan(52 * 0.8 - 0.1);
+      expect(await page.locator(".ab-lens-strip").evaluateAll((els) => els.map((el) => {
+        const s = getComputedStyle(el), r = el.getBoundingClientRect();
+        return { pos: s.position, pe: s.pointerEvents, w: r.width, h: r.height, x: r.x, y: r.y };
+      }))).toEqual(expect.arrayContaining([expect.objectContaining({ pos: "fixed", pe: "none", x: 0, y: 0, w })]));
+      // each strip's map is in place (a slice of the screen's map)
+      expect(await page.evaluate(() => [...document.querySelectorAll(".ab-lens-defs feImage")].every((i) => (i.getAttribute("href") ?? "").startsWith("data:image/png")))).toBe(true);
+      // back above the testimonials: hidden
+      await stackTo(page, { y: 0 });
+      await expect(top).toBeHidden();
+      expect(errors).toEqual([]);
+    });
+  });
+}
+
+test.describe("stacked on a phone, the toolbar", () => {
+  test.use({ viewport: { width: 390, height: 664 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+  test("its showing (a height-only change under 150 px) resizes neither the light's canvas nor moves q", async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.goto("/about");
+    await lightLoaded(page);
+    await stackTo(page, { q: 0.5 });
+    await page.waitForTimeout(1200);
+    await expect.poll(async () => (await hook(page)).drawing).toBe(true);
+    const read = () => page.evaluate(() => {
+      const c = document.querySelector<HTMLCanvasElement>("canvas.ab-light")!;
+      return { coarse: matchMedia("(pointer: coarse)").matches, w: c.width, h: c.height, q: window.__testimonials!.q };
+    });
+    const before = await read();
+    test.skip(!before.coarse, "this browser doesn't report a coarse pointer");
+    expect([before.w, before.h]).toEqual([Math.round(390 * 1.5), Math.round(664 * 1.5)]);
+    // (as the pendant's toolbar test: the window reports the shorter height a toolbar leaves, and says so with a resize
+    // event. And the canvas's own box made to follow it, as 100vh does where lvh isn't known: the light keeps the box it
+    // measured.)
+    await page.evaluate(() => {
+      Object.defineProperty(window, "innerHeight", { configurable: true, get: () => 664 - 80 });
+      document.querySelector<HTMLElement>("canvas.ab-light")!.style.height = `${664 - 80}px`;
+      window.dispatchEvent(new Event("resize"));
+    });
+    await page.evaluate(() => window.scrollBy(0, 1)); // (a frame runs)
+    await page.waitForTimeout(400);
+    const after = await read();
+    expect([after.w, after.h]).toEqual([before.w, before.h]);
+    expect(Math.abs(after.q - before.q)).toBeLessThan(0.01);
+    // a real resize (the width changes, a rotation): the canvas follows its box
+    await page.setViewportSize({ width: 400, height: 664 });
+    await page.evaluate(() => window.scrollBy(0, 1));
+    await page.waitForTimeout(400);
+    const rotated = await read();
+    expect(rotated.w).toBe(Math.round(400 * 1.5));
   });
 });
