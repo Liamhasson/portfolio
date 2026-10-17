@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- a CommonJS script */
 // The pendant's frame cost on the GPU (plan Task 10): Playwright with the GPU flags at 1440 x 900, the mount's GPU timer on
-// (`window.__pendantPerf`: an EXT_disjoint_timer_query_webgl2 query round each frame's draws, read back into
+// (`window.__pendantPerf`, with ?pendant-debug: an EXT_disjoint_timer_query_webgl2 query round each frame's draws, read back into
 // `window.__pendant.gpuMs`), the whole track scrolled end to end, then a dwell at the expensive shots (the whirl, the glass).
 // Prints the median and p95 GPU ms, overall and per shot. Budget: median under 6 ms.
 //   node scripts/about/pendant-perf.cjs
@@ -157,7 +157,8 @@ for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => { stopServer(); p
     const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: DPR });
     await page.addInitScript(() => { window.__pendantPerf = true; });
     page.on("console", (m) => m.type() === "error" && !m.text().includes("404") && console.error(m.text().slice(0, 400)));
-    const query = [GOVERNOR ? "" : "governor=0", process.env.QUERY ?? ""].filter(Boolean).join("&");
+    // (pendant-debug: the mount reads window.__pendantPerf only with it)
+    const query = ["pendant-debug", GOVERNOR ? "" : "governor=0", process.env.QUERY ?? ""].filter(Boolean).join("&");
     await page.goto(`${BASE}/about${query ? `?${query}` : ""}`);
     await page.waitForFunction(() => window.__pendant?.ready, null, { timeout: 120_000 });
     await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });

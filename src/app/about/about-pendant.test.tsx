@@ -249,3 +249,22 @@ test("the stack's glass slot takes its room only while the pendant holds the bal
   unmount();
 });
 
+
+test("the debug hooks are ignored without ?pendant-debug: no GPU timer from window.__pendantPerf", async () => {
+  const scene = await liveScene();
+  const enableGpuTiming = vi.fn(() => true);
+  Object.assign(scene, { enableGpuTiming });
+  window.__pendantPerf = true;
+  try {
+    const { fontsDone, runIdle } = setup();
+    const { unmount } = render(<Page />);
+    await fontsDone();
+    await runIdle();
+    await waitFor(() => expect(window.__pendant?.ready).toBe(true));
+    expect(enableGpuTiming).not.toHaveBeenCalled();
+    expect(window.__pendant!.gpuMs).toBeNull();
+    unmount();
+  } finally {
+    delete window.__pendantPerf;
+  }
+});

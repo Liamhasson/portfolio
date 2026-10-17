@@ -146,8 +146,12 @@ export function AboutTrack() {
     layout();
     void document.fonts?.ready.then(layout);
     window.addEventListener("resize", layout);
+    // reduced motion turned on (or off) mid-visit: the section stacks (or goes back to the track) at once, and the pendant
+    // follows its data-mode
+    const reducedQ = window.matchMedia("(prefers-reduced-motion: reduce)");
+    reducedQ.addEventListener?.("change", layout);
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => { cancelAnimationFrame(raf); loops.destroy(); io?.disconnect(); ioSec?.disconnect(); sec.removeEventListener("focusin", onFocus); window.removeEventListener("resize", layout); window.removeEventListener("scroll", onScroll); };
+    return () => { cancelAnimationFrame(raf); loops.destroy(); io?.disconnect(); ioSec?.disconnect(); sec.removeEventListener("focusin", onFocus); window.removeEventListener("resize", layout); reducedQ.removeEventListener?.("change", layout); window.removeEventListener("scroll", onScroll); };
   }, []);
   return (
     <>

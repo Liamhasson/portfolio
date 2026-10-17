@@ -124,3 +124,24 @@ test("a line's two colours stay one run of text: its spans are wrapped together,
   const { container } = render(<AboutTrack />);
   for (const slide of container.querySelectorAll(".ab-slide.ab-big")) expect(slide.children).toHaveLength(1);
 });
+
+test("reduced motion turned on mid-visit stacks the section at once, and off again goes back to the track", () => {
+  const q = { matches: false, listeners: [] as (() => void)[] };
+  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    get matches() { return query.includes("reduce") && q.matches; },
+    addEventListener: (_: string, cb: () => void) => { if (query.includes("reduce")) q.listeners.push(cb); },
+    removeEventListener: (_: string, cb: () => void) => { q.listeners = q.listeners.filter((l) => l !== cb); },
+  })) as never;
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
+  Object.defineProperty(window, "innerHeight", { configurable: true, value: 900 });
+  const { container, unmount } = render(<AboutTrack />);
+  const sec = container.querySelector<HTMLElement>("section.ab")!;
+  expect(sec.dataset.mode).toBe("track");
+  expect(q.listeners.length).toBeGreaterThan(0);
+  act(() => { q.matches = true; q.listeners.forEach((l) => l()); });
+  expect(sec.dataset.mode).toBe("stack");
+  act(() => { q.matches = false; q.listeners.forEach((l) => l()); });
+  expect(sec.dataset.mode).toBe("track");
+  unmount();
+  expect(q.listeners).toHaveLength(0); // (and it stops listening when About goes)
+});

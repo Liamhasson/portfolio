@@ -195,6 +195,8 @@ describe("PendantGovernor (the level follows the frame time, both ways)", () => 
     const r = run(g, (l) => cost[l], 1_800_000);
     expect(r.share["1.5"]).toBeGreaterThan(0.9); // (the highest level at 60 fps; the rest is step-up tries at 1.75x)
     expect(r.share["2"] ?? 0).toBeLessThan(0.01);
+    // (the run may end in a step-up try: within a few seconds of the same load it is back where it holds)
+    feedLoad(g, cost, 5000);
     expect(L(g.level)).toBe("1.5");
   });
 
@@ -213,6 +215,7 @@ describe("PendantGovernor (the level follows the frame time, both ways)", () => 
     feed(g, 25, 1000);
     const r = run(g, (l) => cost[l], 300_000);
     expect(r.share["1.5+half"]).toBeGreaterThan(0.9);
+    feedLoad(g, cost, 5000); // (as above: past any step-up try still under way)
     expect(L(g.level)).toBe("1.5+half");
   });
 
@@ -257,6 +260,45 @@ describe("PendantGovernor (the level follows the frame time, both ways)", () => 
     feed(k, 16.7, 2500);
     k.resume();
     expect(feed(k, 16.7, 2000)).toEqual([]);
+  });
+
+  test("failed climbs space out, doubling, to at most a minute apart", () => {
+    // 2x misses every other vsync, 1.75x doesn't: each climb back to 2x fails at once
+    const cost: Record<string, number> = { "2": 33.3, "1.75": 16.7, "1.5": 16.7, "1.5+half": 16.7 };
+    const g = at60();
+    const ups: number[] = [];
+    let t = 0;
+    for (; t < 1_200_000;) {
+      const ms = cost[L(g.level)!];
+      const c = g.sample(ms);
+      t += ms;
+      if (c !== null && L(c) === "2") ups.push(t);
+    }
+    const gaps = ups.slice(1).map((x, i) => x - ups[i]);
+    expect(gaps.length).toBeGreaterThan(5);
+    expect(Math.max(...gaps)).toBeGreaterThan(55_000); // (it reached the cap...)
+    expect(Math.max(...gaps)).toBeLessThan(66_000); // (...a minute, plus the window and cooldown round each try)
+    expect(gaps.at(-1)!).toBeGreaterThan(55_000); // (and stays there)
+  });
+
+  test("a short pause keeps the step-down wait; one over pauseResetMs starts it over", () => {
+    /** ms of slow frames until the next change. */
+    const until = (g: PendantGovernor) => { let t = 0; for (; t < 120_000; t += 33) if (g.sample(33) !== null) return t; return Infinity; };
+    // slow at every level alike (not the pendant's load): each step down is tried, then the bottom, then undone, and the
+    // wait before the next try doubles (5 s, then 10 s)
+    const make = () => {
+      const g = at60();
+      const changes: string[] = [];
+      while (changes.filter((c) => c === "2").length < 2) { const c = feedUntilChange(g, 33, 120_000); if (c === null) break; changes.push(c); }
+      return g; // (two undone tries: the next waits 10 s)
+    };
+    const short = make();
+    short.resume(5_000);
+    const long = make();
+    long.resume(45_000);
+    const tShort = until(short), tLong = until(long);
+    expect(tShort).toBeGreaterThan(tLong + 3000); // (the short pause kept the longer wait)
+    expect(tLong).toBeLessThan(7000); // (the long one started over at 5 s)
   });
 
   test("a new screen ratio starts over from its own ladder", () => {

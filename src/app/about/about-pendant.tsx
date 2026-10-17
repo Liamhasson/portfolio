@@ -38,7 +38,7 @@ export interface PendantHook {
   /** The motion blur this frame: the longest smear (CSS px, scaled to a 1/60 s shutter), whether the pass drew, and whether
    *  the frame counted as a jump (nothing smeared). */
   blur: { smear: number; on: boolean; jump: boolean };
-  /** With `window.__pendantPerf` set before load: each frame's GPU time (ms), with the travel and the nearest shot it was
+  /** With `window.__pendantPerf` set before load and ?pendant-debug: each frame's GPU time (ms), with the travel and the nearest shot it was
    *  drawn at (scripts/about/pendant-perf.cjs); null if the GPU can't time (no EXT_disjoint_timer_query_webgl2). */
   gpuMs: { ms: number; s: number; shot: string }[] | null;
   /** The pixel ratio the pendant is drawn at (the governor's, under the screen's own), and whether its depth of field runs at
@@ -59,9 +59,9 @@ export interface PendantHook {
 declare global {
   interface Window {
     __pendant?: PendantHook;
-    /** Diagnostics: time the GPU (set before the page loads). */
+    /** Diagnostics: time the GPU (set before the page loads; read only with ?pendant-debug). */
     __pendantPerf?: boolean;
-    /** Diagnostics: a fixed frame step (ms) in place of the real one (the frame script's STEP). */
+    /** Diagnostics: a fixed frame step (ms) in place of the real one (the frame script's STEP; read only with ?pendant-debug). */
     __pendantStep?: number;
   }
 }
@@ -118,6 +118,10 @@ const STACK_PIC = ".ab-portrait";
  *  comes up the screen. */
 const PULL = ".ab-end";
 const PULL_FADE = 0.85;
+/** The pendant's live box is the wire copy's outline (scene.ts `outline`, a decimation of the brass), grown by this share of
+ *  its size plus a pixel: the drawn brass bulges past the decimated edges (measured at 1440 x 900: up to 0.5% of the hero's
+ *  height, 0.9% of the glide's length past the outline's box), and the edge's antialiasing adds a pixel. */
+const DRAWN_SLACK = 0.012;
 
 const clamp01 = (v: number) => Math.min(Math.max(v, 0), 1);
 
@@ -231,6 +235,9 @@ export function AboutPendant() {
     const query = new URLSearchParams(window.location.search);
     const forceHalf = query.get("bokehHalf") === "1";
     const govOn = query.get("governor") !== "0" && !forceHalf;
+    /** Diagnostics, only with ?pendant-debug (read once, here): `window.__pendantStep` (a fixed frame step) and
+     *  `window.__pendantPerf` (the GPU timer) are ignored without it. */
+    const debug = query.has("pendant-debug");
     /** Diagnostics: ?fxaa=0 holds FXAA off (its cost is measured against it). */
     const fxaaOk = query.get("fxaa") !== "0";
     const gov = new PendantGovernor(Math.min(window.devicePixelRatio || 1, 2));
@@ -544,7 +551,7 @@ export function AboutPendant() {
     };
 
     const step = (now: number, sc: PendantScene, cm: NonNullable<typeof cam>) => {
-      const fixedStep = window.__pendantStep;
+      const fixedStep = debug ? window.__pendantStep : undefined;
       const stepped = typeof fixedStep === "number" && fixedStep > 0;
       // the governor's step first, then the frame: a resize clears the canvas, so one made after the draw would show blank
       const next = govOn && !stepped ? gov.sample(now - last) : null;
@@ -600,9 +607,11 @@ export function AboutPendant() {
       // (through a drawn ball the lean is eased down: the ball magnifies it and turns it over, see PendantScene.glassLook)
       leanFor(look, glass !== null, f.glass, sc.glassLook, leaned);
       cm.poseRig(f, motion, time, leaned, L.vw, L.vh, sc.camera, sc.outer, sc.inner, { still: reduced });
-      const box = outline?.hull.length
+      const wireBox = outline?.hull.length
         ? cm.outlineBox(outline.hull, sc.inner, sc.camera, L.vw, L.vh)
         : cm.screenBox(sc.bounds, sc.inner, sc.camera, L.vw, L.vh);
+      // (the outline is the low-poly wire copy's: the brass drawn round it reaches a little further, DRAWN_SLACK of its size)
+      const box = padBox(wireBox, DRAWN_SLACK * Math.max(wireBox.r - wireBox.l, wireBox.b - wireBox.t) + 1);
       // The layer: the one solved for this screen at this travel, not the shot's own. Then the live guard: the live outline,
       // grown by half the solve's padding, against the words where the page shows them (they ride the real scroll, the
       // pendant the eased one, so after a jump they part for a moment) and the chrome where it is (the site's chrome holds to
@@ -651,6 +660,8 @@ export function AboutPendant() {
         setOpacity(appear * clearK * fadeK * (1 - away));
       } else setOpacity(null);
       hook.blur = sc.blurState;
+      // (the box the page is told: what is drawn, the motion blur's smear included)
+      const drawnBox = hook.blur?.on ? padBox(box, hook.blur.smear) : box;
       hook.pixelRatio = L.pr;
       hook.bokehHalf = L.half;
       hook.baseMs = gov.base;
@@ -666,7 +677,7 @@ export function AboutPendant() {
       hook.s = sAt;
       hook.shot = reduced ? held : nearestIndex(sAt);
       hook.layer = layer;
-      hook.box = box;
+      hook.box = drawnBox;
       hook.yaw = motion.yaw;
       hook.dragging = drag !== null;
       hook.glass = glass && { x: glass.x, y: glass.y, r: glass.r * f.glass }; // (the scene grows the ball with f.glass)
@@ -695,11 +706,12 @@ export function AboutPendant() {
     /** Runs the loop while About is on screen, the tab is showing and the scene is live. */
     const run = () => {
       if (raf || off || lost || !scene || !cam || !inView || document.hidden) return;
-      last = performance.now();
+      const now = performance.now(), paused = now - last;
+      last = now;
       jumped = true; // (the loop was stopped: the scroll may have moved meanwhile)
       // (a pause isn't a frame: the governor starts its reading afresh, and returns a step it hadn't finished judging; the
-      // resize, if any, lands before the next frame is drawn)
-      const back = gov.resume();
+      // resize, if any, lands before the next frame is drawn. A short pause keeps its step-down wait.)
+      const back = gov.resume(paused);
       if (back !== null && govOn) applyLevel(back, scene);
       raf = requestAnimationFrame(frame);
     };
@@ -848,7 +860,7 @@ export function AboutPendant() {
         if (off) { loaded.dispose(); return; }
         endProbe();
         scene = loaded;
-        if (window.__pendantPerf) hook.gpuMs = loaded.enableGpuTiming() ? [] : null;
+        if (debug && window.__pendantPerf) hook.gpuMs = loaded.enableGpuTiming() ? [] : null;
         cam = camMod;
         sv = solveMod;
         const b = loaded.bounds;

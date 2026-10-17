@@ -107,8 +107,10 @@ a.ab-proof:hover, a.ab-proof:focus-visible { color: #f4efe9; }
 .ab[data-mode="stack"] .ab-strip .ab-pic { width: 28vw; }
 .ab[data-mode="stack"] .ab-pic-cap { margin-top: 1.6vw; white-space: normal; }
 .ab[data-mode="stack"] .ab-deskvid { width: min(100%, 520px); margin: 0; align-self: flex-start; }
-/* the glass ball's slot between the stacked quotes (Liam, 2026-10-17): the pendant draws the ball in it, 0.44 of its width.
+/* the glass ball's slot between the stacked quotes (Liam, 2026-10-17): the pendant draws the ball in it, 0.44 of its width
+   (a ball 0.88 of the slot across: at most 37% of the screen's height).
    It takes its room only while the pendant holds the ball and draws (about-pendant.tsx sets data-glass): no empty square. */
 .ab[data-mode="stack"] .ab-glass { display: none; }
-.ab[data-mode="stack"][data-glass="on"] .ab-glass { display: flex; width: 50vw; height: 50vw; min-height: 0; align-self: center; }
+/* (capped for every stacked screen, not only a portrait phone: a landscape phone, reduced motion on a desktop, a short window) */
+.ab[data-mode="stack"][data-glass="on"] .ab-glass { display: flex; width: min(50vw, 42svh, 360px); height: min(50vw, 42svh, 360px); min-height: 0; align-self: center; }
 .ab[data-mode="stack"] .ab-verb-body { max-width: none; }   /* (the 60vw cap is the track's; the slide itself is already uncapped) */

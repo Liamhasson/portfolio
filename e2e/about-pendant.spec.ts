@@ -696,3 +696,150 @@ test.describe("under reduced motion", () => {
     expect(front).toBeGreaterThan(15);
   });
 });
+
+// ---------- final review: the glass on every stacked screen, reduced motion turned on live, the box against the pixels ----------
+
+/** The glass ball at the glass shot's key, and the quotes' text rows round it (screen px). */
+async function glassAtKey(page: Page) {
+  const y = await page.evaluate(() => window.__pendant!.keys.find((k) => k.id === "glass")!.y);
+  await page.evaluate((y) => window.scrollTo(0, y), y);
+  await page.waitForTimeout(2500);
+  return page.evaluate(() => {
+    const g = window.__pendant!.glass;
+    const rows = (sel: string) => {
+      const range = document.createRange();
+      const out: DOMRect[] = [];
+      const walk = document.createTreeWalker(document.querySelector(sel)!, NodeFilter.SHOW_TEXT);
+      for (let n = walk.nextNode(); n; n = walk.nextNode()) { range.selectNodeContents(n); out.push(...[...range.getClientRects()].filter((r) => r.height > 0)); }
+      return out;
+    };
+    if (!g) return null;
+    const cx = g.x * innerWidth, cy = g.y * innerHeight, R = g.r * innerHeight;
+    return {
+      l: cx - R, r: cx + R, t: cy - R, b: cy + R, d: 2 * R, vw: innerWidth, vh: innerHeight,
+      q1: Math.max(...rows("[data-pendant='quote1']").map((q) => q.bottom)), q2: Math.min(...rows("[data-pendant='quote2']").map((q) => q.top)),
+    };
+  });
+}
+
+test.describe("under reduced motion on a desktop, the glass", () => {
+  test.use({ viewport: { width: 1440, height: 900 }, reducedMotion: "reduce" });
+  test("the stacked ball is sized for the screen: at most 42% of its height across", async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.goto("/about");
+    await ready(page, 30_000);
+    await page.waitForTimeout(1500);
+    const g = await glassAtKey(page);
+    expect(g).not.toBeNull();
+    expect(g!.d).toBeLessThanOrEqual(0.42 * g!.vh);
+    expect(g!.t).toBeGreaterThan(g!.q1);
+    expect(g!.b).toBeLessThan(g!.q2);
+  });
+});
+
+test.describe("on a landscape phone (844x390, stacked), the glass", () => {
+  test.use({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+  test("the ball fits inside the screen and the quotes stay readable", async ({ page }) => {
+    test.setTimeout(60_000);
+    const errors = collectErrors(page);
+    await page.goto("/about");
+    await expect(page.locator("section.ab")).toHaveAttribute("data-mode", "stack");
+    await ready(page, 30_000);
+    await page.waitForTimeout(1500);
+    const g = await glassAtKey(page);
+    expect(g).not.toBeNull();
+    expect(g!.t).toBeGreaterThanOrEqual(0);
+    expect(g!.b).toBeLessThanOrEqual(g!.vh);
+    expect(g!.l).toBeGreaterThanOrEqual(0);
+    expect(g!.r).toBeLessThanOrEqual(g!.vw);
+    expect(g!.t).toBeGreaterThan(g!.q1); // (between the quotes' words, touching neither)
+    expect(g!.b).toBeLessThan(g!.q2);
+    expect(await stackedOverlaps(page)).toEqual([]);
+    expect(errors).toEqual([]);
+  });
+});
+
+test("reduced motion turned on mid-visit stacks the page and the pendant follows it", async ({ page }) => {
+  test.setTimeout(60_000);
+  const errors = collectErrors(page);
+  await page.goto("/about");
+  await ready(page, 30_000);
+  await page.waitForTimeout(1500);
+  await expect(page.locator("section.ab")).toHaveAttribute("data-mode", "track");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(page.locator("section.ab")).toHaveAttribute("data-mode", "stack");
+  await expect(page.locator("canvas.ab-pendant")).toHaveAttribute("data-mode", "still");
+  await expect.poll(() => page.evaluate(() => window.__pendant!.mode)).toBe("stack");
+  await expect.poll(() => page.evaluate(() => window.__pendant!.keys.map((k) => k.id))).toEqual(["opening", "tumble", "above", "glass", "whirl", "hero"]);
+  await expect.poll(() => page.evaluate(() => getComputedStyle(document.querySelector("canvas.ab-pendant")!).position)).toBe("fixed");
+  // and back: the track again
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await expect(page.locator("section.ab")).toHaveAttribute("data-mode", "track");
+  await expect.poll(() => page.evaluate(() => window.__pendant!.keys.length)).toBe(12);
+  expect(errors).toEqual([]);
+});
+
+test("the pendant's box holds what is drawn: no brass outside it at the worm, whirl, glide and hero", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.goto("/about");
+  await ready(page, 30_000);
+  await page.waitForTimeout(1500);
+  await page.mouse.move(1430, 890);
+  const out: { id: string; inside: number; outside: number; at: number[][] }[] = [];
+  for (const id of ["worm", "whirl", "glide", "hero"]) {
+    const y = await page.evaluate((id) => window.__pendant!.keys.find((k) => k.id === id)!.y, id);
+    await page.evaluate((y) => window.scrollTo(0, y), y);
+    await page.waitForTimeout(2500);
+    // only the canvas painted (the page's words and pictures hidden; the ground stays near black), and the box recorded on
+    // every frame while the screenshot is taken (the pendant never stops moving): the mask is their union plus 4 px
+    await page.evaluate(() => {
+      const st = document.createElement("style");
+      st.id = "only-pendant";
+      st.textContent = "body * { visibility: hidden !important; } canvas.ab-pendant { visibility: visible !important; }";
+      document.head.appendChild(st);
+      const w = window as unknown as { __boxes: { l: number; t: number; r: number; b: number }[]; __stop: boolean };
+      w.__boxes = [];
+      w.__stop = false;
+      const tick = () => { w.__boxes.push({ ...window.__pendant!.box }); if (!w.__stop) requestAnimationFrame(tick); };
+      requestAnimationFrame(tick);
+    });
+    await page.waitForTimeout(100);
+    const png = (await page.screenshot()).toString("base64");
+    const r = await page.evaluate(async (src) => {
+      const w = window as unknown as { __boxes: { l: number; t: number; r: number; b: number }[]; __stop: boolean };
+      w.__stop = true;
+      document.getElementById("only-pendant")!.remove();
+      const bs = w.__boxes;
+      const m = { l: Math.min(...bs.map((b) => b.l)) - 4, t: Math.min(...bs.map((b) => b.t)) - 4, r: Math.max(...bs.map((b) => b.r)) + 4, b: Math.max(...bs.map((b) => b.b)) + 4 };
+      const img = new Image();
+      img.src = `data:image/png;base64,${src}`;
+      await img.decode();
+      const c = document.createElement("canvas");
+      c.width = img.width;
+      c.height = img.height;
+      const x = c.getContext("2d")!;
+      x.drawImage(img, 0, 0);
+      const d = x.getImageData(0, 0, c.width, c.height).data;
+      const k = c.width / innerWidth;
+      let inside = 0, outside = 0;
+      const at: number[][] = [];
+      for (let py = 0; py < c.height; py++) {
+        for (let px = 0; px < c.width; px++) {
+          const i = (py * c.width + px) * 4;
+          if (d[i] + d[i + 1] + d[i + 2] <= 150) continue; // (bright: brass; the ground is near black)
+          const X = (px + 0.5) / k, Y = (py + 0.5) / k;
+          if (X >= m.l && X <= m.r && Y >= m.t && Y <= m.b) inside++;
+          else { outside++; if (at.length < 5) at.push([Math.round(X), Math.round(Y)]); }
+        }
+      }
+      return { inside, outside, at };
+    }, png);
+    out.push({ id, ...r });
+  }
+  // a real pendant in every box, and almost nothing bright outside: at most 0.1% of what is inside (a stray antialiased or
+  // smeared pixel is not a covered line; a box short by even 2 px along one edge of these shots leaves hundreds outside)
+  for (const r of out) {
+    expect(r.inside, r.id).toBeGreaterThan(5000);
+    expect(r.outside, `${r.id}: ${r.outside} bright px outside the box, e.g. ${JSON.stringify(r.at)}`).toBeLessThanOrEqual(0.001 * r.inside);
+  }
+});

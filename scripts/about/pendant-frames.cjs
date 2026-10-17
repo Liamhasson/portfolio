@@ -5,7 +5,7 @@
 //   OUT=test-results/pendant BASE=http://localhost:3000 DPR=1 node scripts/about/pendant-frames.cjs
 // W, H: the viewport (1440 x 900 by default); ONLY: a comma list of key ids to grab (all by default), e.g. ONLY=glass.
 // QUERY: appended to /about, e.g. QUERY=bokehHalf=1 (the governor's half-resolution bokeh held on); TAG: a file-name suffix.
-// STEP: a fixed frame step in ms (the mount's `window.__pendantStep`), e.g. STEP=30 to see the motion blur at 30 ms frames.
+// STEP: a fixed frame step in ms (the mount's `window.__pendantStep`, read with ?pendant-debug, which this script adds), e.g. STEP=30 to see the motion blur at 30 ms frames.
 const path = require("node:path");
 const fs = require("node:fs");
 const { chromium } = require("playwright"); // (resolved up from here: a worktree finds the main checkout's node_modules)
@@ -17,7 +17,8 @@ const W = Number(process.env.W) || 1440;
 const H = Number(process.env.H) || 900;
 const ONLY = process.env.ONLY ? process.env.ONLY.split(",") : null;
 const STEP = Number(process.env.STEP) || 0;
-const QUERY = process.env.QUERY ? `?${process.env.QUERY}` : "";
+// (pendant-debug: the mount reads window.__pendantStep only with it)
+const QUERY = `?${["pendant-debug", process.env.QUERY].filter(Boolean).join("&")}`;
 const TAG = process.env.TAG ? `-${process.env.TAG}` : "";
 
 (async () => {

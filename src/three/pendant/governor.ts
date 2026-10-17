@@ -42,6 +42,9 @@ export interface PendantGovernorOptions {
   /** Good frames needed before a step up, ms (doubled after a climb that had to come back down), and the most it grows to. */
   upAfterMs?: number;
   backoffMaxMs?: number;
+  /** A pause longer than this (ms) starts the step-down wait over on resume; a shorter one keeps it (a quick scroll past
+   *  About and back is the same device in the same state). */
+  pauseResetMs?: number;
   /** A climb that brings slow frames back within this long was a failed try, ms. */
   failWithinMs?: number;
   /** A frame longer than this is a stall (a tab switch, an upload), not a measure of the device, ms. */
@@ -105,7 +108,7 @@ export class PendantGovernor {
   constructor(maxPr: number, opts: PendantGovernorOptions = {}) {
     this.o = {
       warmupMs: 2500, baseFrames: 30, baseMinMs: 1000 / 60, windowMs: 1000, slowRatio: 1.15, goodRatio: 1.05, noGainRatio: 0.95,
-      downWaitMs: 5000, downWaitMaxMs: 60_000, upAfterMs: 3000, backoffMaxMs: 30_000, failWithinMs: 5000, stallMs: 250,
+      downWaitMs: 5000, downWaitMaxMs: 60_000, upAfterMs: 3000, backoffMaxMs: 60_000, pauseResetMs: 30_000, failWithinMs: 5000, stallMs: 250,
       cooldownMs: 700, ...opts,
     };
     this.levels = ladder(maxPr);
@@ -154,19 +157,22 @@ export class PendantGovernor {
     this.downBlocked = 0;
   }
 
-  /** After a pause (the loop stopped: a hidden tab, About off screen): the partial window and the good run are dropped, a
-   *  step still being judged is returned (untested, it goes back to the level it left), the step-down wait starts over
-   *  (conditions may have changed), and it settles for a cooldown. The pause itself never counts (only sampled frames move
-   *  its clocks). Returns the new level if that changed it, else null. */
-  resume(): PendantLevel | null {
+  /** After a pause (the loop stopped: a hidden tab, About off screen) of `pausedMs`: the partial window and the good run
+   *  are dropped, a step still being judged is returned (untested, it goes back to the level it left), and it settles for a
+   *  cooldown. The step-down wait starts over only after a pause longer than pauseResetMs (conditions may have changed);
+   *  after a short one it is kept, as is what is left of it. The pause itself never counts (only sampled frames move its
+   *  clocks). Without `pausedMs` the pause counts as long. Returns the new level if that changed it, else null. */
+  resume(pausedMs = Infinity): PendantLevel | null {
     const was = this.at;
     if (this.pending) this.at = this.pending.from;
     this.pending = null;
     this.samples = 0;
     this.elapsed = 0;
     this.good = 0;
-    this.downWait = this.o.downWaitMs;
-    this.downBlocked = Math.min(this.downBlocked, this.o.downWaitMs);
+    if (pausedMs > this.o.pauseResetMs) {
+      this.downWait = this.o.downWaitMs;
+      this.downBlocked = Math.min(this.downBlocked, this.o.downWaitMs);
+    }
     this.cooldown = this.o.cooldownMs;
     return this.at === was ? null : this.level;
   }
