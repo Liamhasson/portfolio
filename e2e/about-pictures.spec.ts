@@ -246,7 +246,7 @@ test("the loops play only while their picture is on screen", async ({ page }) =>
   await playing("desk");
   await scrollTrack(page, 0.3);
   await stopped("desk");
-  expect(mp4s).toContain("/work/eventread.mp4");
+  expect(mp4s).toContain("/about/loops/eventread.mp4");
 });
 
 test("a loop whose file fails keeps its poster and says nothing", async ({ page }) => {
@@ -255,7 +255,7 @@ test("a loop whose file fails keeps its poster and says nothing", async ({ page 
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
   // nothing has been fetched yet (preload="none"), so a route set now catches the first request for the file
   let tries = 0;
-  await page.route("**/work/eventread.mp4", (r) => { tries++; return r.abort(); });
+  await page.route("**/about/loops/eventread.mp4", (r) => { tries++; return r.abort(); });
   await scrollTrack(page, 0.3);
   const state = () => page.evaluate(() => {
     const v = document.querySelector<HTMLVideoElement>('.ab-pic[data-pic="eventread"] video')!;
@@ -273,7 +273,7 @@ test("a loop whose file fails keeps its poster and says nothing", async ({ page 
   await scrollTrack(page, 0.3);
   await page.waitForTimeout(500);
   expect(tries, "requests for the failed file after leaving and coming back").toBe(1);
-  expect(mp4s.filter((u) => u === "/work/eventread.mp4")).toHaveLength(1);
+  expect(mp4s.filter((u) => u === "/about/loops/eventread.mp4")).toHaveLength(1);
   expectRule(await readPics(page), "after the failure");
   // the only console line is the browser's own network error for the file
   expect(errors.filter((e) => !/Failed to load resource/.test(e))).toEqual([]);

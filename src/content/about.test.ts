@@ -64,6 +64,11 @@ describe("About and Contact content (spec 2026-10-12-about-contact-design.md)", 
     expect(ABOUT.pictures.strip.map((p) => p.href)).toEqual(["/cyvore", "/eventread", "/nordic-logic"]);
     expect(ABOUT.pictures.strip.map((p) => p.caption)).toEqual(["Cyvore", "Eventread", "Nordic Logic"]);
   });
+  test("the band and strip loops play About's own right-sized copies, not the shared full-size files (Liam, 2026-10-17)", () => {
+    // (two 1280-wide /work or /playground files playing at once dropped the page to 30 fps; the posters stay the shared ones)
+    for (const p of [...ABOUT.pictures.bands, ...ABOUT.pictures.strip]) expect(p.src).toMatch(/^\/about\/loops\/[a-z-]+\.mp4$/);
+    expect(ABOUT.pictures.strip.map((p) => p.poster)).toEqual(["/work/cyvore.jpg", "/work/eventread.jpg", "/work/nordic-logic-live.jpg"]);
+  });
   test("Pulse is not in About's pictures", () => {
     for (const p of pictures()) {
       for (const v of [p.src, p.poster, p.caption, p.title, p.alt, p.href]) expect(v ?? "").not.toMatch(/pulse/i);
@@ -71,8 +76,8 @@ describe("About and Contact content (spec 2026-10-12-about-contact-design.md)", 
   });
   test("the bands, the studio and the desk are the spec's table, verbatim", () => {
     expect(ABOUT.pictures.bands.map((p) => [p.src, p.poster, p.title])).toEqual([
-      ["/playground/after-heartbreaks-loop.mp4", "/playground/after-heartbreaks-film.jpg", "Marni Came"],
-      ["/playground/my-small-world-loop.mp4", "/playground/my-small-world.jpg", "Sanskrit"],
+      ["/about/loops/after-heartbreaks-loop.mp4", "/playground/after-heartbreaks-film.jpg", "Marni Came"],
+      ["/about/loops/my-small-world-loop.mp4", "/playground/my-small-world.jpg", "Sanskrit"],
     ]);
     expect(ABOUT.pictures.studio).toMatchObject({ src: "/playground/studio-overhead.jpg", caption: "Producing · Marni Came", loop: false });
     expect(ABOUT.pictures.desk).toMatchObject({ src: "/about/desk-build.mp4", poster: "/about/desk-build.jpg", caption: "This desk · wire to final", loop: true });

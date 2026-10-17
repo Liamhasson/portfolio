@@ -24,18 +24,20 @@ type Pictures = {
   desk: Picture;
 };
 const PICTURES: Pictures = {
-  // word-sized loops, inline right after "two rock bands", part of the link to /playground; the title shows on hover
+  // word-sized loops, inline right after "two rock bands", part of the link to /playground; the title shows on hover.
+  // (The loops here play About's own right-sized copies in /about/loops/: the bands 320 x 180, the strip 480 x 300, limited-range
+  // yuv420p. The shared /playground and /work files are 1280 wide; two of those playing at once dropped the page to 30 fps.)
   bands: [
-    { id: "marni-came", src: "/playground/after-heartbreaks-loop.mp4", poster: "/playground/after-heartbreaks-film.jpg", alt: "Marni Came on stage", title: "Marni Came", loop: true },
-    { id: "sanskrit", src: "/playground/my-small-world-loop.mp4", poster: "/playground/my-small-world.jpg", alt: "Sanskrit, my band before Marni Came", title: "Sanskrit", loop: true },
+    { id: "marni-came", src: "/about/loops/after-heartbreaks-loop.mp4", poster: "/playground/after-heartbreaks-film.jpg", alt: "Marni Came on stage", title: "Marni Came", loop: true },
+    { id: "sanskrit", src: "/about/loops/my-small-world-loop.mp4", poster: "/playground/my-small-world.jpg", alt: "Sanskrit, my band before Marni Came", title: "Sanskrit", loop: true },
   ],
   // right of the second paragraph, a still
   studio: { id: "studio", src: "/playground/studio-overhead.jpg", alt: "The studio desk from above, mid-session", caption: "Producing · Marni Came", loop: false },
   // under "End to end", each loop captioned and linking to its case study
   strip: [
-    { id: "cyvore", src: "/work/cyvore.mp4", poster: "/work/cyvore.jpg", alt: "The Cyvore investor site", caption: "Cyvore", href: "/cyvore", loop: true },
-    { id: "eventread", src: "/work/eventread.mp4", poster: "/work/eventread.jpg", alt: "Eventread, the night's risk read in the app", caption: "Eventread", href: "/eventread", loop: true },
-    { id: "nordic-logic", src: "/work/nordic-logic-live.mp4", poster: "/work/nordic-logic-live.jpg", alt: "The Nordic Logic site, live", caption: "Nordic Logic", href: "/nordic-logic", loop: true },
+    { id: "cyvore", src: "/about/loops/cyvore.mp4", poster: "/work/cyvore.jpg", alt: "The Cyvore investor site", caption: "Cyvore", href: "/cyvore", loop: true },
+    { id: "eventread", src: "/about/loops/eventread.mp4", poster: "/work/eventread.jpg", alt: "Eventread, the night's risk read in the app", caption: "Eventread", href: "/eventread", loop: true },
+    { id: "nordic-logic", src: "/about/loops/nordic-logic-live.mp4", poster: "/work/nordic-logic-live.jpg", alt: "The Nordic Logic site, live", caption: "Nordic Logic", href: "/nordic-logic", loop: true },
   ],
   // right of "Build it.": the desk film, wire to final
   desk: { id: "desk", src: "/about/desk-build.mp4", poster: "/about/desk-build.jpg", alt: "The desk on this site being built, from wireframe to the final render", caption: "This desk · wire to final", loop: true },
