@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { pulsePhase, stepPulse, testimonialsQ, type Pulse } from "./testimonials-q";
+import { pulsePhase, stepArrival, stepPulse, testimonialsQ, type Arrival, type Pulse } from "./testimonials-q";
 
 const sineIn = (t: number) => 1 - Math.cos((t * Math.PI) / 2);
 
@@ -89,5 +89,60 @@ describe("the arrival pulse", () => {
 
   test("pulsePhase before the start clamps to 0", () => {
     expect(pulsePhase({ at: 1000, on: true }, 900)).toBe(0);
+  });
+});
+
+describe("the arrival (the mount's pulse rule: stepPulse, for an arrival only)", () => {
+  const W = 1000;
+  // Yoav's centre before he arrives (1100: q 0), mid-arrival (850), both quotes in (600); Andrada gone (c0 −900, q 0)
+  const start: Arrival = { at: null, on: false, armed: true };
+
+  test("arriving from before Yoav fires the wave once", () => {
+    let p = stepArrival(start, testimonialsQ(1100, 1500, W), 1100, W, 0, false);
+    expect(p.at).toBeNull();
+    p = stepArrival(p, testimonialsQ(850, 1250, W), 850, W, 100, false);
+    expect(p.at).toBe(100);
+    p = stepArrival(p, testimonialsQ(600, 1000, W), 600, W, 200, false);
+    expect(p.at).toBe(100);
+  });
+
+  test("a jump past Andrada (q falling past 0.02) and back in doesn't fire it again", () => {
+    let p = stepArrival(start, 0, 1100, W, 0, false);
+    p = stepArrival(p, 1, 600, W, 100, false);
+    expect(p.at).toBe(100);
+    p = stepArrival(p, 0, -900, W, 5000, false); // (gone past the exit)
+    expect(p.armed).toBe(false);
+    p = stepArrival(p, 1, 600, W, 6000, false); // (straight back to the middle)
+    expect(p.at).toBe(100);
+    p = stepArrival(p, 0, -900, W, 7000, false);
+    p = stepArrival(p, 0.5, -300, W, 8000, false); // (back into Andrada from the far side)
+    expect(p.at).toBe(100);
+  });
+
+  test("going back before Yoav re-arms it: a new arrival fires a new wave", () => {
+    let p = stepArrival(start, 1, 600, W, 100, false);
+    p = stepArrival(p, 0, -900, W, 5000, false);
+    p = stepArrival(p, 0, 1100, W, 6000, false);
+    expect(p.armed).toBe(true);
+    p = stepArrival(p, 0.3, 900, W, 7000, false);
+    expect(p.at).toBe(7000);
+  });
+
+  test("jitter round 0.02 while a wave runs doesn't restart it", () => {
+    let p = stepArrival(start, 0.03, 940, W, 100, false);
+    expect(p.at).toBe(100);
+    p = stepArrival(p, 0.01, 960, W, 300, false);
+    p = stepArrival(p, 0.03, 940, W, 500, false);
+    expect(p.at).toBe(100);
+  });
+
+  test("a reload straight into the middle fires one wave", () => {
+    expect(stepArrival(start, 1, 600, W, 50, false).at).toBe(50);
+  });
+
+  test("never under reduced motion", () => {
+    let p = stepArrival(start, 0, 1100, W, 0, true);
+    p = stepArrival(p, 1, 600, W, 100, true);
+    expect(p.at).toBeNull();
   });
 });

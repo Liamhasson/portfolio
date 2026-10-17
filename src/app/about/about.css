@@ -114,3 +114,12 @@ a.ab-proof:hover, a.ab-proof:focus-visible { color: #f4efe9; }
 /* (capped for every stacked screen, not only a portrait phone: a landscape phone, reduced motion on a desktop, a short window) */
 .ab[data-mode="stack"][data-glass="on"] .ab-glass { display: flex; width: min(50vw, 42svh, 360px); height: min(50vw, 42svh, 360px); min-height: 0; align-self: center; }
 .ab[data-mode="stack"] .ab-verb-body { max-width: none; }   /* (the 60vw cap is the track's; the slide itself is already uncapped) */
+
+/* the testimonials' light (about-testimonials.tsx; plan 2026-10-17-about-testimonials-light): the mood, behind the words
+   (0, under the track's 1), the black warming with a radial plum-brown at 0.6 x q; and the light, one see-through canvas
+   fixed over the screen above everything in the pinned frame (4), drawn premultiplied (no blend mode: a blend over a canvas
+   costs about 14 ms a frame). It never takes the pointer, and shows only while it runs. Liam's one exception to no glow:
+   coloured light at the screen's far edges. */
+.ab-mood { position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: calc(var(--q, 0) * 0.6); background: radial-gradient(120% 90% at 70% 40%, #24120f 0%, #160d0c 50%, #0b0908 100%); will-change: opacity; }
+.ab-light { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 4; pointer-events: none; visibility: hidden; }
+.ab-light[data-on] { visibility: visible; }

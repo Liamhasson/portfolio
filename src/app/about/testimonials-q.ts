@@ -32,3 +32,22 @@ export function stepPulse(p: Pulse, q: number, now: number, reduced: boolean): P
 export function pulsePhase(p: Pulse, now: number): number {
   return p.at === null ? -1 : clamp01((now - p.at) / PULSE_MS);
 }
+
+/** `armed`: q last rested (at or under PULSE_Q) on the arrival side, before Yoav, not past Andrada. */
+export type Arrival = Pulse & { armed: boolean };
+
+/**
+ * The mount's pulse rule (plan Review Focus 3: the wave plays as q first crosses PULSE_Q going up, not on every jump):
+ * stepPulse, but only for an arrival, from before Yoav (a jump past Andrada and back in, or a scroll up into Andrada from
+ * the far side, is no arrival), and never over a wave still running (jitter round PULSE_Q doesn't restart it). `c0`:
+ * Yoav's centre along an axis of `size`, as testimonialsQ takes it. Start with `armed: true` (a load straight into the
+ * testimonials plays one wave).
+ */
+export function stepArrival(p: Arrival, q: number, c0: number, size: number, now: number, reduced: boolean): Arrival {
+  const phase = pulsePhase(p, now);
+  const running = phase >= 0 && phase < 1;
+  const next = stepPulse(p, q, now, reduced || !p.armed || running);
+  // (at rest the side decides: Yoav not yet fully in means before the testimonials; fully in with q at rest means past them)
+  const armed = q <= PULSE_Q ? fit(size * 1.05 - c0, 0, size * 0.4) < 1 : p.armed;
+  return { ...next, armed };
+}

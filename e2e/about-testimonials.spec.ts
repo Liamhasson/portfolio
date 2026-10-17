@@ -1,0 +1,214 @@
+// e2e/about-testimonials.spec.ts: the testimonials' light on About's desktop track (plan 2026-10-17-about-testimonials-light,
+// Task 2). Run with `npx playwright test -c playwright.about.config.ts` (a GPU-backed Chromium at 1440 x 900).
+import { expect, test, type Page } from "@playwright/test";
+
+/** The pendant's model, blocked (its URL carries a ?v= cache token, so a plain glob wouldn't match). */
+const PENDANT_GLB = /\/pendant\.glb(\?|$)/;
+
+function collectErrors(page: Page, ignore?: RegExp): string[] {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  page.on("console", (m) => { if (m.type() === "error" && !(ignore && ignore.test(m.text()))) errors.push(m.text()); });
+  return errors;
+}
+
+const lightLoaded = (page: Page) => page.waitForFunction(() => window.__testimonials !== undefined, null, { timeout: 20_000 });
+const hook = (page: Page) => page.evaluate(() => window.__testimonials!);
+
+/** Scrolls the track to a place: Yoav's quote where q has risen to `q`, the glass slot centred (both quotes in: q 1), past
+ *  Andrada (q 0 again, the slot gone), or the closing screen. Returns the slot's rect after a settle. */
+async function scrollTo(page: Page, where: { q: number } | "slot" | "past" | "end" | "start") {
+  await page.evaluate((where) => {
+    const sec = document.querySelector<HTMLElement>("section.ab")!, tr = sec.querySelector(".ab-track")!, clip = tr.parentElement!;
+    const trR = tr.getBoundingClientRect(), clipL = clip.getBoundingClientRect().left, vw = clip.clientWidth;
+    const top = sec.getBoundingClientRect().top + window.scrollY;
+    const off = (sel: string) => { const r = document.querySelector(sel)!.getBoundingClientRect(); return r.left - trR.left + r.width / 2; };
+    let y = 0;
+    if (typeof where === "object") {
+      const u = (2 / Math.PI) * Math.acos(1 - where.q); // (q = sineIn(u))
+      y = top + clipL + off("[data-pendant='quote1']") - (vw * 1.05 - u * 0.4 * vw);
+    } else if (where === "slot") y = top + clipL + off("[data-pendant='glass']") - vw / 2;
+    else if (where === "past") y = top + clipL + off("[data-pendant='quote2']") + 0.2 * vw; // (Andrada's centre at −20%)
+    else if (where === "end") y = top + sec.offsetHeight - window.innerHeight;
+    window.scrollTo(0, y);
+  }, where);
+  await page.waitForTimeout(400);
+  return page.evaluate(() => {
+    const r = document.querySelector("[data-pendant='glass']")!.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width };
+  });
+}
+
+/** Two PNG screenshots of one clip, compared in the page: the count of pixels that differ by more than 2 levels. */
+async function changedPixels(a: Buffer, b: Buffer, page: Page) {
+  return page.evaluate(async ({ a, b }) => {
+    const read = async (src: string) => {
+      const img = new Image();
+      img.src = `data:image/png;base64,${src}`;
+      await img.decode();
+      const c = document.createElement("canvas");
+      c.width = img.width; c.height = img.height;
+      const x = c.getContext("2d")!;
+      x.drawImage(img, 0, 0);
+      return { d: x.getImageData(0, 0, c.width, c.height).data };
+    };
+    const A = await read(a), B = await read(b);
+    let n = 0;
+    for (let i = 0; i < A.d.length; i += 4) {
+      if (Math.max(Math.abs(A.d[i] - B.d[i]), Math.abs(A.d[i + 1] - B.d[i + 1]), Math.abs(A.d[i + 2] - B.d[i + 2])) > 2) n++;
+    }
+    return n;
+  }, { a: a.toString("base64"), b: b.toString("base64") });
+}
+
+/** Mean colour, and the count of bright pixels (r + g + b > 150), in a clip; `ring`: only pixels between two radii from its centre. */
+async function colourIn(page: Page, clip: { x: number; y: number; width: number; height: number }, ring?: { r0: number; r1: number }) {
+  const png = (await page.screenshot({ clip })).toString("base64");
+  return page.evaluate(async ({ png, ring }) => {
+    const img = new Image();
+    img.src = `data:image/png;base64,${png}`;
+    await img.decode();
+    const c = document.createElement("canvas");
+    c.width = img.width; c.height = img.height;
+    const x = c.getContext("2d")!;
+    x.drawImage(img, 0, 0);
+    const d = x.getImageData(0, 0, c.width, c.height).data;
+    let r = 0, g = 0, b = 0, n = 0, bright = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      const p = i / 4, px = p % c.width, py = Math.floor(p / c.width);
+      if (ring) { const dist = Math.hypot(px + 0.5 - c.width / 2, py + 0.5 - c.height / 2); if (dist < ring.r0 || dist > ring.r1) continue; }
+      r += d[i]; g += d[i + 1]; b += d[i + 2]; n++;
+      if (d[i] + d[i + 1] + d[i + 2] > 150) bright++;
+    }
+    return { r: r / n, g: g / n, b: b / n, bright, n };
+  }, { png, ring });
+}
+
+const setLight = (page: Page, shown: boolean) =>
+  page.locator("canvas.ab-light").evaluate((c, shown) => { (c as HTMLElement).style.visibility = shown ? "" : "hidden"; }, shown);
+
+test("q scrubs with the track: 0 at the portrait, about 0.3 mid-arrival, 1 with both quotes in; no console errors", async ({ page }) => {
+  const errors = collectErrors(page);
+  await page.goto("/about");
+  await lightLoaded(page);
+  await page.waitForFunction(() => window.__pendant?.ready === true, null, { timeout: 20_000 });
+  await expect(page.locator("canvas.ab-light")).toHaveAttribute("aria-hidden", "true");
+  expect(await page.locator("canvas.ab-light").evaluate((c) => getComputedStyle(c).pointerEvents)).toBe("none");
+  await scrollTo(page, "start");
+  await expect.poll(async () => (await hook(page)).q).toBe(0);
+  expect((await hook(page)).drawing).toBe(false);
+  await scrollTo(page, { q: 0.3 });
+  await expect.poll(async () => (await hook(page)).q).toBeGreaterThan(0.25);
+  expect((await hook(page)).q).toBeLessThan(0.35);
+  expect((await hook(page)).drawing).toBe(true);
+  await expect(page.locator("canvas.ab-light")).toBeVisible();
+  await scrollTo(page, "slot");
+  await expect.poll(async () => (await hook(page)).q).toBeGreaterThan(0.999);
+  // the mood behind the words follows: 0.6 x q
+  expect(Number(await page.locator(".ab-mood").evaluate((m) => getComputedStyle(m).opacity))).toBeCloseTo(0.6, 2);
+  // the pendant holds the glass: one ball, the pendant's
+  expect((await hook(page)).ownBall).toBe(false);
+  expect(errors).toEqual([]);
+});
+
+test("the arrival wave plays once; a jump past Andrada and back doesn't play it again", async ({ page }) => {
+  await page.goto("/about");
+  await lightLoaded(page);
+  await scrollTo(page, { q: 0.005 });
+  await expect.poll(async () => (await hook(page)).q).toBeLessThan(0.02);
+  expect((await hook(page)).pulse).toBe(-1);
+  // a slow arrival, through 0.02
+  for (const q of [0.01, 0.03, 0.08, 0.2, 0.5, 0.9]) await scrollTo(page, { q });
+  await expect.poll(async () => (await hook(page)).pulse).toBeGreaterThanOrEqual(0);
+  await page.waitForTimeout(2200); // (the wave's 2 s)
+  await expect.poll(async () => (await hook(page)).pulse).toBe(1);
+  // past the exit (q falls through 0.02) and straight back in: no new wave
+  await scrollTo(page, "past");
+  await expect.poll(async () => (await hook(page)).q).toBe(0);
+  await scrollTo(page, "slot");
+  await expect.poll(async () => (await hook(page)).q).toBeGreaterThan(0.999);
+  for (let i = 0; i < 5; i++) {
+    expect((await hook(page)).pulse).toBe(1);
+    await page.waitForTimeout(100);
+  }
+});
+
+test("at q 1 the far edges are warm and the words in the middle are untouched", async ({ page }) => {
+  await page.goto("/about");
+  await lightLoaded(page);
+  await page.waitForFunction(() => window.__pendant?.ready === true, null, { timeout: 20_000 });
+  await page.mouse.move(1430, 890);
+  await scrollTo(page, "slot");
+  await expect.poll(async () => (await hook(page)).q).toBeGreaterThan(0.999);
+  // (the arrival wave has crossed: as it passes it tints the whole screen faintly, as the mockup's does)
+  await expect.poll(async () => (await hook(page)).pulse, { timeout: 5000 }).toBe(1);
+  // the left and right edges: warm light (every corner colour is full red), dark without the light
+  for (const x of [0, 1432]) {
+    const clip = { x, y: 600, width: 8, height: 140 }; // (below the quotes and their captions, above the resume)
+    const lit = await colourIn(page, clip);
+    await setLight(page, false);
+    const dark = await colourIn(page, clip);
+    await setLight(page, true);
+    // (the band breathes in and out and its colours travel, so: clearly lit, red leading, over a near-black ground)
+    expect(dark.r).toBeLessThan(40);
+    expect(lit.r).toBeGreaterThan(dark.r + 30);
+    expect(lit.r).toBeGreaterThanOrEqual(lit.g);
+    expect(lit.r).toBeGreaterThanOrEqual(lit.b);
+  }
+  // the middle (160 px in from every edge, past the light's reach): the same with the light and without. (The pendant, which
+  // moves on its own and holds the glass, is hidden for the comparison: the light draws no ball while the pendant owns it.)
+  await page.locator("canvas.ab-pendant").evaluate((c) => { (c as HTMLElement).style.visibility = "hidden"; });
+  const inset = 160, vp = page.viewportSize()!;
+  const clip = { x: inset, y: inset, width: vp.width - 2 * inset, height: vp.height - 2 * inset };
+  const lit = await page.screenshot({ clip });
+  await setLight(page, false);
+  const bare = await page.screenshot({ clip });
+  await setLight(page, true);
+  expect((await hook(page)).ownBall).toBe(false);
+  expect(await changedPixels(lit, bare, page)).toBeLessThanOrEqual(5);
+});
+
+test("the light stays idle on the closing screen", async ({ page }) => {
+  const errors = collectErrors(page);
+  await page.goto("/about");
+  await lightLoaded(page);
+  await scrollTo(page, "slot");
+  await expect.poll(async () => (await hook(page)).drawing).toBe(true);
+  await scrollTo(page, "end");
+  await expect.poll(async () => (await hook(page)).drawing).toBe(false);
+  expect((await hook(page)).q).toBe(0);
+  await expect(page.locator("canvas.ab-light")).toBeHidden();
+  // idle: no frame runs (each one rewrites the hook; it is the same object several frames later)
+  expect(await page.evaluate(() => {
+    const h = window.__testimonials;
+    return new Promise<boolean>((done) => { let n = 0; const f = () => (++n < 6 ? requestAnimationFrame(f) : done(h === window.__testimonials)); requestAnimationFrame(f); });
+  })).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test("without the pendant, the light draws its own ball in the slot", async ({ page }) => {
+  const errors = collectErrors(page, /Failed to load resource/); // (the aborted file's own network line)
+  let aborted = 0;
+  await page.route(PENDANT_GLB, (r) => { aborted++; return r.abort(); });
+  await page.goto("/about");
+  await lightLoaded(page);
+  await expect.poll(() => aborted, { timeout: 15_000 }).toBeGreaterThan(0);
+  await expect(page.locator("canvas.ab-pendant")).toHaveCount(0, { timeout: 15_000 }); // (the pendant draws none)
+  await page.mouse.move(1430, 890);
+  const slot = await scrollTo(page, "slot");
+  await expect.poll(async () => (await hook(page)).ownBall).toBe(true);
+  await page.waitForTimeout(300);
+  // bright glints at its rim (r ± 3 px), none there without the light
+  const r = 0.44 * slot.w, S = Math.ceil(r + 6);
+  const clip = { x: Math.round(slot.x - S), y: Math.round(slot.y - S), width: 2 * S, height: 2 * S };
+  const lit = await colourIn(page, clip, { r0: r - 3, r1: r + 3 });
+  await setLight(page, false);
+  const bare = await colourIn(page, clip, { r0: r - 3, r1: r + 3 });
+  await setLight(page, true);
+  expect(lit.bright).toBeGreaterThan(lit.n * 0.15);
+  expect(bare.bright).toBeLessThan(5);
+  // mostly glass: the inside (within 0.6 of the radius) is dark, no colour fill
+  const inner = await colourIn(page, clip, { r0: 0, r1: r * 0.6 });
+  expect(inner.bright).toBeLessThan(inner.n * 0.15);
+  expect(errors).toEqual([]);
+});

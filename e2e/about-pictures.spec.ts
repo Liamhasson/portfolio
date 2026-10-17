@@ -180,6 +180,9 @@ test("a link picture that is fully cut leaves no hairline", async ({ page }) => 
   const links = (await readPics(page)).filter((s) => s.link).map((s) => s.id);
   expect(links.sort()).toEqual(["cyvore", "eventread", "marni-came", "nordic-logic", "sanskrit"]);
   let compared = 0;
+  // (the testimonials' light is already arriving at the strip's margin, animating at the screen's left edge: held off, so
+  // the two shots compare the picture only)
+  await page.addStyleTag({ content: ".ab-light{visibility:hidden !important}" });
   // (with the old clip, the empty one at the picture's right edge, a hairline showed for some of these at both widths: 1440 and 1333 put the margin on a fraction)
   for (const [w, h] of [[1440, 900], [1333, 850]]) {
     await page.setViewportSize({ width: w, height: h });

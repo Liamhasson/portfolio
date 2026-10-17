@@ -7,6 +7,7 @@ import { Fragment, useEffect, useRef, type ReactNode } from "react";
 import { NextPagePull } from "@/components/shell/next-page-pull";
 import { ABOUT, type Line, type Picture } from "@/content/about";
 import { AboutPendant } from "./about-pendant";
+import { AboutTestimonials } from "./about-testimonials";
 import { watchLoops } from "./loops";
 import { pictureState } from "./picture-motion";
 import { scrollForSlide, sectionHeight, trackLayout, trackProgress, trackX } from "./track";
@@ -158,6 +159,8 @@ export function AboutTrack() {
       <section ref={section} className="ab" data-mode="track" aria-labelledby="about-h">
         <h1 id="about-h" className="sr-only">About</h1>
         <div className="ab-pin">
+          {/* the testimonials' mood: the black behind the words warms as the quotes pass (about-testimonials.tsx sets its --q) */}
+          <div className="ab-mood" aria-hidden />
           <div className="ab-clip">
             <div ref={track} className="ab-track">
               {/* Liam's photo opens the track, left of the first line: it holds still while the words roll past and is cropped away from the left, gone before the first line reaches it (Liam, 2026-10-15) */}
@@ -215,6 +218,7 @@ export function AboutTrack() {
             </div>
           </div>
           <AboutPendant />
+          <AboutTestimonials />
           <span className="ab-bar" aria-hidden><span ref={bar} /></span>
           {/* the resume holds still in the middle for the whole of About (Liam, 2026-10-12): above the progress line on the
               pinned track, fixed at the bottom on phones while About is on screen */}
