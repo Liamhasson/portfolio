@@ -1,6 +1,7 @@
 // e2e/about-testimonials.spec.ts: the testimonials' light on About's desktop track (plan 2026-10-17-about-testimonials-light,
 // Task 2). Run with `npx playwright test -c playwright.about.config.ts` (a GPU-backed Chromium at 1440 x 900).
 import { expect, test, type Page } from "@playwright/test";
+import { lensBand, lensMap } from "../src/app/about/edge-lens";
 
 /** The pendant's model, blocked (its URL carries a ?v= cache token, so a plain glob wouldn't match). */
 const PENDANT_GLB = /\/pendant\.glb(\?|$)/;
@@ -58,6 +59,34 @@ async function changedPixels(a: Buffer, b: Buffer, page: Page) {
       if (Math.max(Math.abs(A.d[i] - B.d[i]), Math.abs(A.d[i + 1] - B.d[i + 1]), Math.abs(A.d[i + 2] - B.d[i + 2])) > 2) n++;
     }
     return n;
+  }, { a: a.toString("base64"), b: b.toString("base64") });
+}
+
+/** Two PNG screenshots of one clip: the count of pixels that differ by more than 2 levels, and how many of those lie off
+ *  the busiest row and the busiest column (a line of rounding differences counts as none). */
+async function diffLines(a: Buffer, b: Buffer, page: Page) {
+  return page.evaluate(async ({ a, b }) => {
+    const read = async (src: string) => {
+      const img = new Image();
+      img.src = `data:image/png;base64,${src}`;
+      await img.decode();
+      const c = document.createElement("canvas");
+      c.width = img.width; c.height = img.height;
+      const x = c.getContext("2d")!;
+      x.drawImage(img, 0, 0);
+      return { d: x.getImageData(0, 0, c.width, c.height).data, w: c.width };
+    };
+    const A = await read(a), B = await read(b);
+    const rows = new Map<number, number>(), cols = new Map<number, number>(), px: [number, number][] = [];
+    for (let i = 0; i < A.d.length; i += 4) {
+      if (Math.max(Math.abs(A.d[i] - B.d[i]), Math.abs(A.d[i + 1] - B.d[i + 1]), Math.abs(A.d[i + 2] - B.d[i + 2])) <= 2) continue;
+      const p = i / 4, x = p % A.w, y = Math.floor(p / A.w);
+      px.push([x, y]);
+      rows.set(y, (rows.get(y) ?? 0) + 1); cols.set(x, (cols.get(x) ?? 0) + 1);
+    }
+    const busiest = (m: Map<number, number>) => [...m.entries()].reduce((best, e) => (e[1] > best[1] ? e : best), [-1, 0])[0];
+    const row = busiest(rows), col = busiest(cols);
+    return { n: px.length, offLine: px.filter(([x, y]) => y !== row && x !== col).length };
   }, { a: a.toString("base64"), b: b.toString("base64") });
 }
 
@@ -613,61 +642,78 @@ test.describe("the glass edges", () => {
     expect(errors).toEqual([]);
   });
 
-  test("the strips meet without a seam: a corner as one full-screen lens with the same map would bend it", async ({ page }) => {
-    await scrollTo(page, "slot");
-    await expect.poll(async () => (await hook(page)).q).toBeGreaterThan(0.999);
-    await stillPage(page);
-    // Yoav's lines across the top-left corner, over the seam between the top strip and the left one (y 90)
-    await page.evaluate(() => {
-      const q1 = document.querySelector<HTMLElement>("[data-pendant='quote1']")!;
-      const r = q1.querySelector("blockquote")!.getBoundingClientRect();
-      q1.style.transform = `translate(${10 - r.left}px, ${30 - r.top}px)`;
-      document.querySelector<HTMLElement>("[data-pendant='quote2']")!.style.visibility = "hidden";
-    });
-    // the scale held at the full 52 (the breath eases it), on the strips and the reference alike
-    await page.evaluate(() => {
-      document.querySelectorAll(".ab-lens-defs feDisplacementMap").forEach((d) => {
-        const set = d.setAttribute.bind(d);
-        d.setAttribute = (k: string, v: string) => (k === "scale" ? undefined : set(k, v));
-        set("scale", "52");
-      });
-    });
-    await page.waitForTimeout(200);
-    await expect(page.locator(".ab-lens-strip[data-edge='top']")).toBeVisible();
-    const corner = { x: 0, y: 0, width: 260, height: 220 };
-    const strips = await page.screenshot({ clip: corner });
-    // the reference: one full-screen layer, its map the four slices put back together (the middle neutral)
-    await page.evaluate(async () => {
-      const W = document.documentElement.clientWidth, H = document.documentElement.clientHeight;
-      const c = document.createElement("canvas");
-      c.width = Math.round(W / 2); c.height = Math.round(H / 2);
-      const x = c.getContext("2d")!;
-      x.fillStyle = "rgb(128,128,128)";
-      x.fillRect(0, 0, c.width, c.height);
-      for (const el of document.querySelectorAll<HTMLElement>(".ab-lens-strip")) {
-        const r = el.getBoundingClientRect(), img = document.querySelector(`#ab-edge-lens-${el.dataset.edge} feImage`)!;
-        const i = new Image(); i.src = img.getAttribute("href")!; await i.decode();
-        x.drawImage(i, (r.x + Number(img.getAttribute("x"))) / 2, (r.y + Number(img.getAttribute("y"))) / 2);
+  for (const [W, H] of [[1440, 900], [1441, 901]] as const) {
+    test(`${W} x ${H}: the strips meet without a seam: every corner as one full-screen lens with the map from lensMap would bend it`, async ({ page }) => {
+      if (W !== 1440 || H !== 900) {
+        await page.setViewportSize({ width: W, height: H });
+        await page.waitForTimeout(500); // (the strips rebuilt for the new size)
       }
-      const NS = "http://www.w3.org/2000/svg", svg = document.createElementNS(NS, "svg");
-      svg.setAttribute("width", "0"); svg.setAttribute("height", "0"); svg.style.position = "absolute";
-      svg.innerHTML = `<filter id="t4-ref" x="0" y="0" width="1" height="1" filterUnits="objectBoundingBox" color-interpolation-filters="sRGB"><feImage href="${c.toDataURL()}" result="map" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="none"/><feDisplacementMap in="SourceGraphic" in2="map" scale="52" xChannelSelector="R" yChannelSelector="G"/></filter>`;
-      const ref = document.createElement("div");
-      ref.style.cssText = "position:fixed;inset:0;z-index:3;pointer-events:none;backdrop-filter:url(#t4-ref)";
-      const lens = document.querySelector(".ab-lens")!;
-      lens.before(svg, ref);
-      (lens as HTMLElement).style.visibility = "hidden";
-      document.querySelectorAll<HTMLElement>(".ab-lens-strip").forEach((s) => { s.style.display = "none"; });
+      await scrollTo(page, "slot");
+      await expect.poll(async () => (await hook(page)).q).toBeGreaterThan(0.999);
+      await stillPage(page);
+      // Yoav's lines across the top-left corner, over the seam between the top strip and the left one (y 90)
+      await page.evaluate(() => {
+        const q1 = document.querySelector<HTMLElement>("[data-pendant='quote1']")!;
+        const r = q1.querySelector("blockquote")!.getBoundingClientRect();
+        q1.style.transform = `translate(${10 - r.left}px, ${30 - r.top}px)`;
+        document.querySelector<HTMLElement>("[data-pendant='quote2']")!.style.visibility = "hidden";
+      });
+      // the scale held at the full 52 (the breath eases it), on the strips and the reference alike
+      await page.evaluate(() => {
+        document.querySelectorAll(".ab-lens-defs feDisplacementMap").forEach((d) => {
+          const set = d.setAttribute.bind(d);
+          d.setAttribute = (k: string, v: string) => (k === "scale" ? undefined : set(k, v));
+          set("scale", "52");
+        });
+      });
+      await page.waitForTimeout(200);
+      await expect(page.locator(".ab-lens-strip[data-edge='top']")).toBeVisible();
+      expect(await page.evaluate(() => [document.documentElement.clientWidth, document.documentElement.clientHeight])).toEqual([W, H]);
+      const S = { width: 260, height: 220 };
+      const corners = [{ x: 0, y: 0 }, { x: W - S.width, y: 0 }, { x: 0, y: H - S.height }, { x: W - S.width, y: H - S.height }].map((c) => ({ ...c, ...S }));
+      const strips = [];
+      for (const c of corners) strips.push(await page.screenshot({ clip: c }));
+      // the reference: one full-screen layer whose map is lensMap's own, at the size the page builds it (half the screen,
+      // rounded up, at exactly twice its size): no slices in it, so a slice put in the wrong place can't hide in both
+      const w = Math.ceil(W / 2), h = Math.ceil(H / 2);
+      const rgba = Buffer.from(lensMap(w, h, lensBand(W, H) * 0.5).buffer).toString("base64");
+      await page.evaluate(({ rgba, w, h }) => {
+        const bin = atob(rgba), data = new Uint8ClampedArray(bin.length);
+        for (let i = 0; i < bin.length; i++) data[i] = bin.charCodeAt(i);
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        c.getContext("2d")!.putImageData(new ImageData(data, w, h), 0, 0);
+        const NS = "http://www.w3.org/2000/svg", svg = document.createElementNS(NS, "svg");
+        svg.setAttribute("width", "0"); svg.setAttribute("height", "0"); svg.style.position = "absolute";
+        svg.innerHTML = `<filter id="t4-ref" x="0" y="0" width="1" height="1" filterUnits="objectBoundingBox" color-interpolation-filters="sRGB"><feImage href="${c.toDataURL()}" result="map" x="0" y="0" width="${2 * w}" height="${2 * h}" preserveAspectRatio="none"/><feDisplacementMap in="SourceGraphic" in2="map" scale="52" xChannelSelector="R" yChannelSelector="G"/></filter>`;
+        const ref = document.createElement("div");
+        ref.id = "t4-ref-layer";
+        ref.style.cssText = "position:fixed;inset:0;z-index:3;pointer-events:none;backdrop-filter:url(#t4-ref)";
+        const lens = document.querySelector(".ab-lens")!;
+        lens.before(svg, ref);
+        document.querySelectorAll<HTMLElement>(".ab-lens-strip").forEach((s) => { s.style.display = "none"; });
+      }, { rgba, w, h });
+      await page.waitForTimeout(300);
+      const whole = [];
+      for (const c of corners) whole.push(await page.screenshot({ clip: c }));
+      // (the corner does bend: the same top-left corner with no lens differs)
+      await page.evaluate(() => { document.getElementById("t4-ref-layer")!.style.display = "none"; });
+      await page.waitForTimeout(200);
+      const bare = await page.screenshot({ clip: corners[0] });
+      expect(await changedPixels(strips[0], bare, page)).toBeGreaterThan(200);
+      // Even sizes: identical. Odd: the bottom and right strips start on odd pixels, so their slices sit a pixel off their own
+      // origin (at the same place on the screen) and the samples along that one row or column of map pixels can round the
+      // other way: a few levels, in the grain, all on one line. So the check at an odd size: off the busiest row and the
+      // busiest column, at most 10 pixels differ. (A slice misplaced by one map pixel, or scaled by the 0.5003 an odd screen
+      // gives a rounded half-size map, differs in some 600 to 700 pixels per corner, all over its band.)
+      const even = W % 2 === 0 && H % 2 === 0;
+      for (let i = 0; i < corners.length; i++) {
+        const d = await diffLines(strips[i], whole[i], page);
+        if (even) expect(d.n, `corner ${i} (${corners[i].x}, ${corners[i].y})`).toBe(0);
+        else expect(d.offLine, `corner ${i} (${corners[i].x}, ${corners[i].y}): ${d.n} differ, ${d.offLine} off the busiest row and column`).toBeLessThanOrEqual(10);
+      }
     });
-    await page.waitForTimeout(300);
-    const whole = await page.screenshot({ clip: corner });
-    // (the corner does bend: the same corner with no lens differs)
-    await page.evaluate(() => { (document.querySelector("#t4-ref")!.parentElement!.nextElementSibling as HTMLElement).style.display = "none"; });
-    await page.waitForTimeout(200);
-    const bare = await page.screenshot({ clip: corner });
-    expect(await changedPixels(strips, bare, page)).toBeGreaterThan(200);
-    expect(await changedPixels(strips, whole, page)).toBe(0);
-  });
+  }
 
   test("at q 1 the words at the left edge move toward the rim; the middle of the screen and the resume are pixel-identical", async ({ page }) => {
     await scrollTo(page, "slot");

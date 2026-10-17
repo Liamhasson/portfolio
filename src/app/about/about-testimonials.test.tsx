@@ -431,3 +431,70 @@ test("unmounting hides the lens and stops listening for resizes", async () => {
   await new Promise((r) => setTimeout(r, 250));
   expect(toDataURL).toHaveBeenCalledTimes(4);
 });
+
+// ---------- Task 4, fix round 2: the map waits; no work after a failure or an unchanged resize ----------
+
+test("no map is built before About has painted, nor while the section is stacked; it comes once on the track", async () => {
+  const { toDataURL } = asChromium();
+  const { runIdle } = setup();
+  const { container } = render(<Page />);
+  const sec = container.querySelector<HTMLElement>("section.ab")!;
+  sec.dataset.mode = "stack"; // (the layout before paint: stacked)
+  await act(async () => { await Promise.resolve(); });
+  expect(toDataURL).not.toHaveBeenCalled(); // (before paint)
+  await runIdle();
+  await new Promise((r) => setTimeout(r, 0));
+  expect(toDataURL).not.toHaveBeenCalled(); // (painted, but stacked: the lens can't show)
+  expect(document.querySelector("#ab-edge-lens-top feImage")!.getAttribute("href")).toBeNull();
+  sec.dataset.mode = "track";
+  await waitFor(() => expect(toDataURL).toHaveBeenCalledTimes(4));
+  expect(document.querySelector("#ab-edge-lens-top feImage")!.getAttribute("href")).toBe("data:image/png;base64,TEST");
+});
+
+test("after the light fails, the lens is gone and a resize builds nothing", async () => {
+  const { toDataURL } = asChromium();
+  await mount();
+  expect(toDataURL).toHaveBeenCalledTimes(4);
+  draw.mockImplementation(() => { throw new Error("context lost"); });
+  at = { q1: 600, slot: 900, q2: 1300 };
+  window.dispatchEvent(new Event("scroll"));
+  await runFrame();
+  await waitFor(() => expect(document.querySelector("canvas.ab-light")).toBeNull());
+  expect(document.querySelector(".ab-lens")).toBeNull();
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1200 });
+  window.dispatchEvent(new Event("resize"));
+  await new Promise((r) => setTimeout(r, 250));
+  expect(toDataURL).toHaveBeenCalledTimes(4);
+});
+
+test("a resize that leaves the screen's size as it was rebuilds nothing and touches no placement", async () => {
+  const { toDataURL } = asChromium();
+  await mount();
+  const fs = filters();
+  const sets = fs.map((f) => vi.spyOn(f.img, "setAttribute"));
+  window.dispatchEvent(new Event("resize")); // (the same 1000 x 800)
+  await new Promise((r) => setTimeout(r, 250));
+  expect(toDataURL).toHaveBeenCalledTimes(4);
+  for (const set of sets) expect(set).not.toHaveBeenCalled();
+  // away and straight back before the rebuild: stretched, then the exact placements put back, still no rebuild
+  Object.defineProperty(window, "innerHeight", { configurable: true, value: 700 });
+  window.dispatchEvent(new Event("resize"));
+  expect(placed(fs[1].img)).toEqual([0, 0, 86, 528]);
+  Object.defineProperty(window, "innerHeight", { configurable: true, value: H });
+  window.dispatchEvent(new Event("resize"));
+  expect(fs.map((f) => placed(f.img))).toEqual([[0, 0, 1000, 86], [0, 0, 86, 628], [0, 0, 1000, 86], [0, 0, 86, 628]]);
+  await new Promise((r) => setTimeout(r, 250));
+  expect(toDataURL).toHaveBeenCalledTimes(4);
+});
+
+test("on a very short screen the strips' depth is clamped to half of it, as lensStrips clamps it", async () => {
+  asChromium();
+  const { runIdle } = setup();
+  Object.defineProperty(window, "innerHeight", { configurable: true, value: 70 }); // (band 4.55 px: 39 px strips, more than half)
+  render(<Page />);
+  await runIdle();
+  await waitFor(() => expect(document.querySelector<HTMLElement>(".ab-lens")!.style.getPropertyValue("--lens-d")).toBe("35px"));
+  // (the top and bottom strips meet: the side strips have no height left, their slices the 1 map px minimum)
+  expect(placed(filters()[0].img)[3]).toBe(36); // (35 px, its slice rounded outward to whole map px: 18)
+  expect(placed(filters()[1].img)[3]).toBeLessThanOrEqual(2);
+});

@@ -81,29 +81,46 @@ export function AboutTestimonials() {
    *  whole strip by half the scale). */
   const lensReady = useRef(false);
 
-  // The lens's map: built at half the screen's resolution once the lens is there, and again 150 ms after a resize settles.
-  // Each strip gets its own slice as a PNG (a filter reading only its strip's pixels is far cheaper than four reading the
-  // whole map), placed where the full map would put it, so the strips meet without a seam. Meanwhile each old slice is
-  // stretched over its strip's new box at once, so no part of a strip is ever left outside its map.
+  // The lens's map: built at half the screen's resolution (rounded up), first once About's text has painted and the section is on the
+  // track (the only layout the lens shows in: a visit that stays in the stack, or never reaches the testimonials before the
+  // page is idle, pays nothing during load), then again 150 ms after a resize settles that changed the screen's size. Each
+  // strip gets its own slice as a PNG (a filter reading only its strip's pixels is far cheaper than four reading the whole
+  // map), placed where the full map would put it, so the strips meet without a seam. Meanwhile each old slice is stretched
+  // over its strip's new box at once, so no part of a strip is ever left outside its map. Gone with the light (a failure):
+  // no more work.
   useEffect(() => {
-    if (!lensOn) return;
+    if (!lensOn || gone) return;
     const box = lensRef.current, defs = defsRef.current;
     if (!box || !defs) return;
+    const sec = box.closest<HTMLElement>(".ab");
     const imgs = LENS_EDGES.map((e) => defs.querySelector<SVGFEImageElement>(`#ab-edge-lens-${e} feImage`));
     if (imgs.some((i) => !i)) return;
     const c = document.createElement("canvas");
-    let timer = 0, depth = 0;
+    let timer = 0, depth = 0, off = false, painted = false;
+    /** The screen size the slices were built for, and the one their placement shows now ("WxH"). */
+    let built = "", shown = "";
+    /** The exact placements of the last build, to put back when a resize returns to the built size. */
+    let exact: [number, number, number, number][] = [];
+    const sizeKey = (W: number, H: number) => `${W}x${H}`;
     const place = (img: SVGFEImageElement, x: number, y: number, w: number, h: number) => {
       img.setAttribute("x", String(x)); img.setAttribute("y", String(y));
       img.setAttribute("width", String(w)); img.setAttribute("height", String(h));
     };
+    /** The slices over the strips' boxes at the screen's size now: exact at the built size, stretched at any other. */
     const fit = () => {
-      const { w: W, h: H } = screenSize();
+      const { w: W, h: H } = screenSize(), key = sizeKey(W, H);
+      if (key === shown) return;
+      shown = key;
+      if (key === built) { imgs.forEach((img, i) => place(img!, ...exact[i])); return; }
       lensStrips(W, H, depth).forEach((s, i) => place(imgs[i]!, 0, 0, s.w, s.h));
     };
     const build = () => {
-      const { w: W, h: H } = screenSize();
-      const w = Math.max(1, Math.round(W * 0.5)), h = Math.max(1, Math.round(H * 0.5)), kx = w / W, ky = h / H;
+      if (off) return;
+      const { w: W, h: H } = screenSize(), key = sizeKey(W, H);
+      if (key === built) { fit(); return; } // (a resize that came back to the built size: nothing to rebuild)
+      // (exactly half: on an odd screen the map runs a pixel past its edge rather than scale by some 0.5003, which would
+      // put the slices at fractional places and sizes that the filter rounds, each strip a little differently)
+      const w = Math.max(1, Math.ceil(W / 2)), h = Math.max(1, Math.ceil(H / 2));
       const band = lensBand(W, H), D = lensDepth(band);
       const urls: string[] = [];
       const at: [number, number, number, number][] = [];
@@ -113,34 +130,45 @@ export function AboutTestimonials() {
         const full = new ImageData(lensMap(w, h, band * 0.5) as Uint8ClampedArray<ArrayBuffer>, w, h);
         for (const s of lensStrips(W, H, D)) {
           // (the slice: the map's pixels under the strip, rounded outward; placed in the strip's own space)
-          const sx = Math.floor(s.x * kx), sy = Math.floor(s.y * ky);
-          const sw = Math.max(1, Math.min(w, Math.ceil((s.x + s.w) * kx)) - sx), sh = Math.max(1, Math.min(h, Math.ceil((s.y + s.h) * ky)) - sy);
+          const sx = Math.floor(s.x / 2), sy = Math.floor(s.y / 2);
+          const sw = Math.max(1, Math.min(w, Math.ceil((s.x + s.w) / 2)) - sx), sh = Math.max(1, Math.min(h, Math.ceil((s.y + s.h) / 2)) - sy);
           c.width = sw; c.height = sh;
           x.putImageData(full, -sx, -sy, sx, sy, sw, sh);
           urls.push(c.toDataURL("image/png"));
-          at.push([sx / kx - s.x, sy / ky - s.y, sw / kx, sh / ky]);
+          at.push([2 * sx - s.x, 2 * sy - s.y, 2 * sw, 2 * sh]);
         }
       } catch {
         return; // (no 2D canvas: no map, so no lens)
       }
       depth = D;
-      box.style.setProperty("--lens-d", `${D}px`);
+      // (clamped as lensStrips clamps it: on a very short screen the CSS strips and the slices agree)
+      box.style.setProperty("--lens-d", `${Math.min(D, W / 2, H / 2)}px`);
       imgs.forEach((img, i) => { img!.setAttribute("href", urls[i]); place(img!, ...at[i]); });
+      exact = at;
+      built = shown = key;
       lensReady.current = true;
     };
-    const onResize = () => {
-      if (lensReady.current) fit();
-      clearTimeout(timer);
-      timer = window.setTimeout(build, 150);
+    /** The first build: once painted, on the track. */
+    const ensure = () => {
+      if (!off && painted && !built && sec?.dataset.mode === "track") build();
     };
-    build();
+    const onResize = () => {
+      if (built) fit();
+      clearTimeout(timer);
+      timer = window.setTimeout(() => (built ? build() : ensure()), 150);
+    };
+    const modeObs = sec && typeof MutationObserver === "function" ? new MutationObserver(ensure) : null;
+    modeObs?.observe(sec!, { attributes: true, attributeFilter: ["data-mode"] });
+    void afterPaint().then(() => { painted = true; ensure(); });
     window.addEventListener("resize", onResize);
     return () => {
+      off = true;
       clearTimeout(timer);
+      modeObs?.disconnect();
       window.removeEventListener("resize", onResize);
       lensReady.current = false;
     };
-  }, [lensOn]);
+  }, [lensOn, gone]);
 
   useEffect(() => {
     const canvas = ref.current;
