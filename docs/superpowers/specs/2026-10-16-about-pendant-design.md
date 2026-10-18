@@ -20,7 +20,7 @@ Quality bar (standing rule): Lusion-level craft, the highest-quality option at e
 
 ## 3. The shots
 
-Each shot is fully on when its anchor's centre reaches `fx` of the screen width on the track. Between two shots, every value blends (smoothstep; size in log space), so the camera is always moving.
+Each shot is fully on when its anchor's centre reaches `fx` of the screen width on the track. Between two shots, every value blends (smootherstep: zero speed and acceleration at each key; size in log space; a locked face turns on the shortest arc, and a lock eases in and out with the blend), so the camera is always moving.
 
 | # | Anchor (`fx`) | Shot | Camera | Pendant | Layer |
 |---|---|---|---|---|---|

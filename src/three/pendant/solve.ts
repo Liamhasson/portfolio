@@ -190,8 +190,10 @@ export function solve(input: SolveInput): Solved {
   const sample = (s: number, shots: readonly Shot[], spots: readonly Spot[]): At => {
     const f = shotAt(s, keys, shots, at(s));
     applySpot(f, spots);
-    // (a lock easing in or out counts once it holds at least half: where the old switch at the blend's halfway point had it)
-    const locked = f.lock !== null && f.lockMix >= 0.5;
+    // (a face turning toward its lock or letting go of it may face any way: every yaw (`ring`) while the lock is easing in
+    // or out; the locked face's own outline only where it holds, which is the locked shot's rest window, the stretch the
+    // solve takes as that shot at rest: there the lock has settled the face)
+    const locked = f.lock !== null && f.lockMix >= 1 - REST_T;
     const pts = locked ? outline.all : outline.ring;
     const pitches = f.tumble > TUMBLE_OFF ? PITCHES : [0];
     let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
@@ -264,16 +266,42 @@ export function solve(input: SolveInput): Solved {
     return lo;
   };
   const over = (s: number): boolean => xs2.length > 0 && tight[sampleAt(s)];
-  const textsX = texts.filter((x) => x.axis !== "y"), textsY = texts.filter((x) => x.axis === "y");
+  /** Per sample, the lines `overLagging` can meet there, as plain numbers (l, t, r, b, and 1 for a line riding the y axis):
+   *  those across the box's other axis (a sweep along the way a line rides never changes that), worked out once each. */
+  const reach: (Float64Array | undefined)[] = [];
+  const reachOf = (j: number): Float64Array => {
+    const had = reach[j];
+    if (had) return had;
+    const b = tightBox[j], at = xs2[j], out: number[] = [];
+    for (const x of texts) {
+      const alongY = x.axis === "y";
+      let l = x.l - (alongY ? 0 : at), t = x.t - (alongY ? at : 0);
+      const r = l + x.w, bt = t + x.h;
+      if (x.shown) {
+        const c = x.shown(at);
+        if (c === null) continue;
+        l = Math.max(l, c.x);
+        t = Math.max(t, c.y);
+        if (l >= r || t >= bt) continue; // (cut past its own edge: none of it shows)
+      }
+      if (alongY ? b.l < r && b.r > l : b.t < bt && b.b > t) out.push(l, t, r, bt, alongY ? 1 : 0);
+    }
+    return (reach[j] = Float64Array.from(out));
+  };
   const overLagging = (s: number, lag: number): boolean => {
     if (xs2.length === 0) return false;
     const j = sampleAt(s), b = tightBox[j];
     if (tight[j] || lag === 0) return tight[j];
     if (b.r <= b.l || b.b <= b.t) return false; // (off screen)
-    // lines `lag` further along sit `lag` back on screen: the box swept `lag` forward meets every one in between
-    const alongX = { ...b, l: Math.min(b.l, b.l + lag), r: Math.max(b.r, b.r + lag) };
-    const alongY = { ...b, t: Math.min(b.t, b.t + lag), b: Math.max(b.b, b.b + lag) };
-    return hits(alongX, textsX, xs2[j]) > 0 || hits(alongY, textsY, xs2[j]) > 0;
+    // lines `lag` further along sit `lag` back on screen: the box swept `lag` forward (along the way each line rides) meets
+    // every one in between. (layout.ts `hits` with plain numbers, and only the lines across the box: the look ahead asks
+    // this many times a frame.)
+    const lo = Math.min(0, lag), hi = Math.max(0, lag), xs = reachOf(j);
+    for (let k = 0; k < xs.length; k += 5) {
+      const y = xs[k + 4] === 1;
+      if (y ? b.t + lo < xs[k + 3] && b.b + hi > xs[k + 1] : b.l + lo < xs[k + 2] && b.r + hi > xs[k]) return true;
+    }
+    return false;
   };
   const behind = input.shots
     .filter((sh, i) => sh.layer === "front" && keys[i] >= 0 && keys[i] <= travel && (unsolved.includes(i) || layer(keys[i]) === "back"))

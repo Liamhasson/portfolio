@@ -18,6 +18,15 @@
 // W, H: the viewport; DPR: the pixel ratio (1 by default: the motion is geometry, the pixels don't change it); SPEED: page px a
 // second; SETTLE_MS: held at the start before the run; TAIL: frames held at the end (the follow catching up); OUT: the JSON.
 // FROM=<a JSON this wrote>: report that run again (no server, no browser), e.g. to compare an old run with today's columns.
+// Speeds are per drawn frame (each a fixed 1/60 s step), and every scroll step is checked: a step whose page scroll isn't
+// SPEED's 1/60 s share (nor 0, the held tail) is counted and left out of the peaks.
+// The brightness: of the frames drawn in front, the share dimmed below 0.9 (the look ahead dimming for a pass behind the
+// words, or the brightness coming back after one; frames past the track's end, where the pull to Contact fades it, left
+// out), sorted into those within LEAD_F frames before a real pass (a frame the
+// solve has behind and over a line), those within BACK_F after the pendant was last behind, and the rest (unexplained); and
+// the front frames where the look ahead dims beyond Task 1's own rule (the words where they are at rest, `pose.aheadBase`).
+// MODE=pagedown: the same brightness count for a Page Down sequence instead (the key pressed every PAGE_MS from the track's
+// start to its end, the frames recorded throughout); no transition table (the scroll isn't steady).
 const fs = require("node:fs");
 const path = require("node:path");
 const http = require("node:http");
@@ -34,6 +43,13 @@ const DPR = Number(process.env.DPR) || 1;
 const SPEED = Number(process.env.SPEED) || 1500;
 const SETTLE_MS = Number(process.env.SETTLE_MS) || 3000;
 const TAIL = Number(process.env.TAIL) || 90;
+const MODE = process.env.MODE || "steady";
+if (!["steady", "pagedown"].includes(MODE)) throw new Error(`MODE must be steady or pagedown (got ${MODE})`);
+const PAGE_MS = Number(process.env.PAGE_MS) || 1000;
+/** The brightness count's windows (frames): before a real pass behind the words (the look ahead's AHEAD_T, 0.9 s, and a
+ *  little), and after the pendant was last behind (the brightness easing back from the behind level to 0.9 takes ~0.65 s). */
+const LEAD_F = Number(process.env.LEAD_F) || 75;
+const BACK_F = Number(process.env.BACK_F) || 60;
 const FRAME_MS = 1000 / 60;
 /** The brief's bounds, per 1/60 s frame. */
 const MAX_VW = 1.2;
@@ -117,16 +133,21 @@ const fmt = (v, d = 2) => (Number.isFinite(v) ? v.toFixed(d) : "-");
 /** The per-frame steps between consecutive drawn frames: speed of the middle (vw a frame), height change (% a frame), roll
  *  change (degrees a frame), each attributed to the transition the later frame is in. A pair of samples more than one drawn
  *  frame apart is divided by the frames between (and one with no new frame is skipped). */
-function steps(poses, w, h) {
+function steps(poses, w, h, per) {
   const out = [];
+  const yEnd = Math.max(...poses.map((p) => p.y ?? -Infinity)); // (the last step onto the end may be short: clamped there)
   let last = null; // (the previous step's velocity, vw a frame, for the acceleration)
   for (let k = 1; k < poses.length; k++) {
     const a = poses[k - 1], b = poses[k];
     const n = b.n - a.n;
     if (n <= 0) continue;
     const vx = ((b.cx - a.cx) * w) / (w / 100) / n, vy = ((b.cy - a.cy) * h) / (w / 100) / n;
+    // (the scroll that step: SPEED's share a frame while scrolling, 0 once held at the end; anything else is irregular)
+    const dy = a.y === undefined || b.y === undefined ? null : b.y - a.y;
+    const irregular = per !== undefined && dy !== null && Math.abs(dy - per * n) > 0.5 && Math.abs(dy) > 0.5
+      && !(b.y === yEnd && dy > 0 && dy < per * n);
     out.push({
-      index: b.index, t: b.t, s: b.s,
+      index: b.index, t: b.t, s: b.s, irregular,
       v: Math.hypot(vx, vy),
       acc: last ? Math.hypot(vx - last.vx, vy - last.vy) / n : 0,
       dh: (Math.abs(b.h / a.h - 1) * 100) / n,
@@ -161,11 +182,101 @@ async function measure(page) {
     };
     requestAnimationFrame(tick);
   }), { y0, y1, per, tail: TAIL });
-  return { keys, poses };
+  return { keys, poses, mode: "steady" };
 }
 
-function report({ keys, poses }, w = W, h = H, dpr = DPR, speed = SPEED) {
-  const st = steps(poses, w, h);
+/** MODE=pagedown: Page Down pressed every PAGE_MS from the track's start until the page reaches its end, every frame's pose
+ *  recorded meanwhile (and SETTLE_MS more after the last press). */
+async function pagedown(page) {
+  await page.waitForFunction(() => window.__pendant?.ready && window.__pendant.pose, null, { timeout: 120_000 });
+  await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
+  await page.mouse.move(W - 10, H - 10);
+  const keys = await page.evaluate(() => window.__pendant.keys);
+  const mode = await page.evaluate(() => window.__pendant.mode);
+  if (mode !== "track") throw new Error(`About isn't on its sideways track at ${W}x${H} (mode ${mode})`);
+  const y0 = keys[0].y, y1 = keys[keys.length - 1].y;
+  await page.evaluate((y) => window.scrollTo(0, y), y0);
+  await page.waitForTimeout(SETTLE_MS);
+  await page.evaluate(() => {
+    window.__poses = [];
+    window.__rec = true;
+    let lastN = -1;
+    const tick = () => {
+      const p = window.__pendant.pose;
+      if (p && p.n !== lastN) { window.__poses.push({ ...p, y: window.scrollY }); lastN = p.n; }
+      if (window.__rec) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  const ys = [];
+  for (let i = 0; i < 60; i++) {
+    await page.keyboard.press("PageDown");
+    await page.waitForTimeout(PAGE_MS);
+    const y = await page.evaluate(() => window.scrollY);
+    ys.push(Math.round(y));
+    if (y >= y1) break;
+    if (ys.length >= 3 && ys.at(-1) === ys.at(-3)) throw new Error(`Page Down doesn't move the page (scroll ${ys.join(", ")})`);
+  }
+  await page.waitForTimeout(SETTLE_MS);
+  const poses = await page.evaluate(() => { window.__rec = false; return window.__poses; });
+  console.log(`  page after each press: ${ys.join(", ")} (track ${Math.round(y0)} to ${Math.round(y1)})`);
+  return { keys, poses, mode: "pagedown" };
+}
+
+/** The brightness of the frames drawn in front: the share dimmed below 0.9, and why (see the header). */
+function dimming(poses, yEnd) {
+  if (!poses.length || poses[0].layer === undefined) return { share: NaN }; // (a run from before the pose had the layer)
+  // (past the track's end the pull to Contact fades it out: not the look ahead's doing, left out)
+  poses = poses.filter((p) => !(p.y > yEnd + 0.5));
+  const front = [], why = { before: 0, after: 0, other: 0 }, others = [];
+  let lastBack = -Infinity;
+  const passAt = poses.map((p) => p.back && p.over);
+  for (let k = 0; k < poses.length; k++) {
+    const p = poses[k];
+    if (p.layer === "back") { lastBack = k; continue; }
+    front.push(p);
+    if (!(p.bright < 0.9)) continue;
+    let before = false;
+    for (let j = k + 1; j <= Math.min(k + LEAD_F, poses.length - 1); j++) if (passAt[j]) { before = true; break; }
+    if (before) why.before++;
+    else if (k - lastBack <= BACK_F) why.after++;
+    else { why.other++; if (others.length < 8) others.push(Math.round(p.s)); }
+  }
+  const dimmed = why.before + why.after + why.other;
+  const share = (n) => (front.length ? (100 * n) / front.length : NaN);
+  const ahead = front.filter((p) => p.ahead).length;
+  // (the look ahead dimming where Task 1's own rule, the words where they are at rest, wouldn't: the lag's doing)
+  const extra = front.filter((p) => p.ahead && p.aheadBase === false).length;
+  const extraDim = front.filter((p) => p.ahead && p.aheadBase === false && p.bright < 0.9).length;
+  const hasBase = front.some((p) => p.aheadBase !== undefined);
+  return {
+    front: front.length, dimmed, share: share(dimmed), before: share(why.before), after: share(why.after), other: share(why.other),
+    aheadShare: share(ahead), extraShare: hasBase ? share(extra) : NaN, extraDimShare: hasBase ? share(extraDim) : NaN, others,
+  };
+}
+function reportDimming(d) {
+  if (!Number.isFinite(d.share)) return console.log("\n  brightness: no frames in front (this run has no layer data)");
+  console.log(`\n  brightness in front: ${d.dimmed} of ${d.front} frames under 0.9 (${fmt(d.share, 1)}%): ${fmt(d.before, 1)}% within ${LEAD_F} frames before a pass behind and over a line, ${fmt(d.after, 1)}% within ${BACK_F} after it was behind, ${fmt(d.other, 1)}% otherwise${d.others.length ? ` (at s ${d.others.join(", ")}...)` : ""}`);
+  console.log(`  frames in front with the look ahead dimming: ${fmt(d.aheadShare, 1)}%; of them beyond Task 1's own rule (the lag's doing): ${fmt(d.extraShare, 1)}% of the front frames (${fmt(d.extraDimShare, 1)}% under 0.9 meanwhile)`);
+}
+
+function report({ keys, poses, mode = "steady" }, w = W, h = H, dpr = DPR, speed = SPEED) {
+  const per = mode === "steady" ? (speed * FRAME_MS) / 1000 : undefined;
+  const all = steps(poses, w, h, per);
+  const irregular = all.filter((x) => x.irregular).length;
+  const st = all.filter((x) => !x.irregular);
+  const dim = dimming(poses, keys[keys.length - 1].y);
+  if (mode === "pagedown") {
+    console.log(`\npendant on a Page Down sequence, ${w}x${h} at DPR ${dpr}, headless, a press every ${PAGE_MS} ms, ${poses.length} frames`);
+    console.log(`  peak speed of its middle ${fmt(Math.max(...st.map((x) => x.v)))} vw/f; peak height change ${fmt(Math.max(...st.map((x) => x.dh)))} %/f`);
+    reportDimming(dim);
+    if (process.env.OUT) {
+      fs.mkdirSync(path.dirname(path.resolve(process.env.OUT)), { recursive: true });
+      fs.writeFileSync(process.env.OUT, JSON.stringify({ mode, W: w, H: h, DPR: dpr, PAGE_MS, keys, dimming: dim, poses }, null, 1));
+      console.log(`  wrote ${process.env.OUT}`);
+    }
+    return;
+  }
   const top = keys[0].y;
   const rows = [];
   for (let i = 0; i < keys.length - 1; i++) {
@@ -195,9 +306,11 @@ function report({ keys, poses }, w = W, h = H, dpr = DPR, speed = SPEED) {
   console.log(`  bound: peak speed <= ${MAX_VW} vw a frame: ${allV <= MAX_VW ? "PASS" : "OVER"} (${fmt(allV)}); height <= ${MAX_H_PCT}% a frame: ${allH <= MAX_H_PCT ? "PASS" : "OVER"} (${fmt(allH)})`);
   const busy = rows.filter((r) => r.busy).map((r) => `${r.from} -> ${r.to}`);
   console.log(`  more than 2x the median: ${busy.length ? busy.join(", ") : "none"}`);
+  console.log(`  scroll steps checked: ${all.length - irregular} of ${all.length} at ${fmt(per, 1)} px a frame (or held)${irregular ? `; ${irregular} irregular, left out` : ""}`);
+  reportDimming(dim);
   if (process.env.OUT) {
     fs.mkdirSync(path.dirname(path.resolve(process.env.OUT)), { recursive: true });
-    fs.writeFileSync(process.env.OUT, JSON.stringify({ W: w, H: h, DPR: dpr, SPEED: speed, top, keys, median: med, rows, steps: st, poses }, null, 1));
+    fs.writeFileSync(process.env.OUT, JSON.stringify({ mode, W: w, H: h, DPR: dpr, SPEED: speed, top, keys, median: med, rows, dimming: dim, steps: st, poses }, null, 1));
     console.log(`  wrote ${process.env.OUT}`);
   }
 }
@@ -205,7 +318,7 @@ function report({ keys, poses }, w = W, h = H, dpr = DPR, speed = SPEED) {
 (async () => {
   if (process.env.FROM) {
     const run = JSON.parse(fs.readFileSync(process.env.FROM, "utf8"));
-    report(run, run.W, run.H, run.DPR, run.SPEED);
+    report(run, run.W, run.H, run.DPR, run.SPEED ?? SPEED);
     return;
   }
   if (OWN_SERVER) {
@@ -232,7 +345,7 @@ function report({ keys, poses }, w = W, h = H, dpr = DPR, speed = SPEED) {
     page.on("console", (m) => m.type() === "error" && !m.text().includes("404") && console.error(m.text().slice(0, 400)));
     // (pendant-debug: the mount fills `pose` and reads __pendantStep only with it; the governor held, so nothing resizes)
     await page.goto(`${BASE}/about?pendant-debug&governor=0`);
-    report(await measure(page));
+    report(MODE === "pagedown" ? await pagedown(page) : await measure(page));
   } finally {
     await browser.close();
     stopServer();

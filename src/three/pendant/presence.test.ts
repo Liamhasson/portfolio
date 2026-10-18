@@ -1,6 +1,6 @@
 // src/three/pendant/presence.test.ts
 import { describe, expect, test } from "vitest";
-import { AHEAD_STEP, ARRIVE, behindAhead, BRIGHT_TAU, FADE_IN, FADE_OUT, HOLD, MIN_BACK, stepPresence, type Presence } from "./presence";
+import { AHEAD_STEP, ARRIVE, behindAhead, BRIGHT_TAU, FADE_IN, FADE_OUT, HOLD, lagAhead, MIN_BACK, stepPresence, type Presence } from "./presence";
 import type { Layer } from "./shots";
 
 const DT = 1 / 60;
@@ -177,5 +177,31 @@ describe("behindAhead", () => {
     expect(behindAhead(back([600, 600 + MIN_BACK - AHEAD_STEP], [900, 1500]), 500, 800, 1)).toBe(true);
     // (a stretch that starts inside the lead and runs on past it counts)
     expect(behindAhead(back([590, 5000]), 500, 100, 1)).toBe(true);
+  });
+});
+
+describe("lagAhead", () => {
+  const TAU = 0.25;
+  test("the page held: the lag shrinks as the pendant catches up, to nothing where the page is", () => {
+    // after a Page Down: the page 900 px ahead and still
+    expect(lagAhead(1000, 1000, 900, 0, TAU)).toBe(900);
+    expect(lagAhead(1300, 1000, 900, 0, TAU)).toBe(600);
+    expect(lagAhead(1900, 1000, 900, 0, TAU)).toBe(0);
+    expect(lagAhead(2500, 1000, 900, 0, TAU)).toBe(0);
+    // and going back up the same
+    expect(lagAhead(800, 1000, -400, 0, TAU)).toBe(-200);
+  });
+  test("a page still scrolling the same way keeps its pace times the time constant, never more than today's lag", () => {
+    // a steady 1500 px/s: about 375 px, kept all the way ahead
+    expect(lagAhead(3000, 1000, 375, 1500, TAU)).toBe(375);
+    // a page that slowed: the lag shrinks only to what its pace keeps
+    expect(lagAhead(3000, 1000, 600, 800, TAU)).toBe(200);
+    // speeding up: never more than today's
+    expect(lagAhead(3000, 1000, 100, 4000, TAU)).toBe(100);
+    // a page turned back the other way keeps nothing of today's
+    expect(lagAhead(1500, 1000, 375, -1500, TAU)).toBe(0);
+  });
+  test("no lag, none ahead", () => {
+    expect(lagAhead(1500, 1000, 0, 1500, TAU)).toBe(0);
   });
 });

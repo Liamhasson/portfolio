@@ -56,6 +56,10 @@ const HAND_DECAY = 0.05;
 const HAND_PITCH_DECAY = 0.08;
 const LEAN_EASE = 0.02;
 const LOCK_EASE = 0.02;
+/** The share of the scroll's push a fully locked face still feels (it gives a little to a scroll, about 7 degrees at 1500
+ *  px/s, and holds up to about 12000 px/s; with the whole push, the pull let it go round above about 2450). The push comes
+ *  back as the lock lets go: 1 - (1 - LOCK_PUSH) x the lock's strength. */
+const LOCK_PUSH = 0.2;
 const UPRIGHT_EASE = 0.03;
 /** Below this many turns per second the pendant counts as not tumbling and rights itself. */
 const TUMBLE_OFF = 0.02;
@@ -67,7 +71,9 @@ export function stepMotion(s: MotionState, i: MotionInput): MotionState {
   const { dt, reduced, dragging } = i;
   const spin = reduced ? 0 : i.spin;
   const tumble = reduced ? 0 : i.tumble;
-  const push = reduced ? 0 : i.scrollVel;
+  const mix = i.lockMix === undefined ? 1 : clamp(i.lockMix, 0, 1);
+  const held = i.lock === null || dragging ? 0 : mix;
+  const push = reduced ? 0 : i.scrollVel * (1 - (1 - LOCK_PUSH) * held);
 
   // spin: the shot's own turn + the scroll's push + the hand's leftover momentum (which only coasts once let go)
   let yaw = s.yaw + (spin * TAU + push * SCROLL_SPIN + (dragging || reduced ? 0 : s.handVel * HAND_COAST)) * dt;
@@ -77,11 +83,10 @@ export function stepMotion(s: MotionState, i: MotionInput): MotionState {
   // a lock pulls the nearest equivalent angle of that face to the camera, unless a hand is on it. The pull goes as the sine
   // of the gap: the same as the gap itself near the face, and smooth all the way round, so a pendant still spinning past
   // the face (a lock easing in under a fast scroll's push) is slowed and sped evenly, never kicked where the nearest
-  // equivalent flips over at half a turn. Scaled by the lock's strength, which eases in and out with the blend.
-  const mix = i.lockMix === undefined ? 1 : clamp(i.lockMix, 0, 1);
-  if (i.lock !== null && !dragging && mix > 0) {
-    yaw += Math.sin(i.lock * D - yaw) * (1 - LOCK_EASE ** dt) * mix;
-  }
+  // equivalent flips over at half a turn. Scaled by the lock's strength, which eases in and out with the blend; and the
+  // scroll's push on a held face is cut to LOCK_PUSH (above), so a locked face holds under a fast scroll. (A stronger pull
+  // away from the face, sin g (1 + 2 (1 - cos g)), held too, but caught a spinning pendant on its face with a grab.)
+  if (held > 0) yaw += Math.sin(i.lock! * D - yaw) * (1 - LOCK_EASE ** dt) * held;
 
   // end over end, and righting itself to the nearest whole turn once it stops
   let pitch = s.pitch + tumble * TAU * dt;
