@@ -98,3 +98,15 @@ export function behindAhead(dimAt: (s: number) => boolean, s: number, lead: numb
   }
   return false;
 }
+
+/**
+ * The follow's lag (track px: the page's travel minus the pendant's) the pendant will have once it reaches travel `x`, from
+ * `s` with `lag` now: what is left of today's once it has caught up that far (the page held still), but never less than a
+ * page still scrolling the same way keeps (`pageVel`, travel px per second, times the follow's time constant `tau`), and
+ * never more than today's. The brightness's look ahead pairs each stretch ahead with the words where this lag puts them.
+ */
+export function lagAhead(x: number, s: number, lag: number, pageVel: number, tau: number): number {
+  const now = Math.abs(lag);
+  const keeps = Math.sign(pageVel) === Math.sign(lag) ? Math.min(Math.abs(pageVel) * tau, now) : 0;
+  return Math.sign(lag) * Math.max(keeps, now - Math.abs(x - s));
+}

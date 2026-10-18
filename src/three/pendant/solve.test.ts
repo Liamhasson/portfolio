@@ -61,6 +61,26 @@ describe("solve", () => {
     expect(into.over(500)).toBe(true);
   });
 
+  it("with a scroll's lag, counts the lines the trailing pendant meets as the words ride the page (overLagging)", () => {
+    // a line that passes right of the pendant at rest (at travel 500 it is at 900..940 on screen, the rest outline about
+    // 644..796): never over it at rest, so the shots stay in front and `over` says no
+    const line: TextRect = { l: 1400, t: 440, w: 40, h: 20 };
+    const r = solve(input([line]));
+    expect(r.moved).toEqual([]);
+    expect(r.layer(500)).toBe("front");
+    expect(r.over(500)).toBe(false);
+    expect(r.overLagging(500, 0)).toBe(false);
+    // the page 150 px further along than the pendant: the line is 150 px further left on screen, over the pendant
+    expect(r.overLagging(500, 150)).toBe(true);
+    // the page behind the pendant (scrolling back): the line is further right, clear; a small lag doesn't reach it either
+    expect(r.overLagging(500, -150)).toBe(false);
+    expect(r.overLagging(500, 60)).toBe(false);
+    // a long lag sweeps the line right across the pendant and out the other side: met on the way, so it counts
+    expect(r.overLagging(500, 420)).toBe(true);
+    // nothing on the track: nothing to meet
+    expect(solve(input([])).overLagging(500, 300)).toBe(false);
+  });
+
   it("puts a shot behind the words when nothing within the limits clears it", () => {
     // a bar across the whole middle of the screen that holds still (chrome): no move or shrink gets clear of it
     const r = solve(input([], [{ l: 0, t: 400, r: 1440, b: 500 }]));

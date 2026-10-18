@@ -44,6 +44,31 @@ describe("stepMotion", () => {
     expect(Math.abs(s.yaw - (target + k * TAU))).toBeLessThan(1e-3);
   });
 
+  it("a locked face holds under a fast scroll's push (about 4000 px/s), and still settles once it stops", () => {
+    const target = -62 * D;
+    let s: MotionState = { ...REST, yaw: target };
+    let far = 0;
+    for (let n = 0; n < 5 * 60; n++) {
+      s = stepMotion(s, { ...calm, lock: -62, scrollVel: 4000 });
+      far = Math.max(far, Math.abs(s.yaw - target));
+    }
+    // pushed a little off the face but held: under a quarter turn away, never once round (with the whole push, the pull let
+    // go above ~2450 px/s)
+    expect(far).toBeLessThan(Math.PI / 2);
+    // and at 10000 px/s too
+    let fast: MotionState = { ...REST, yaw: target };
+    for (let n = 0; n < 5 * 60; n++) fast = stepMotion(fast, { ...calm, lock: -62, scrollVel: 10_000 });
+    expect(Math.abs(fast.yaw - target)).toBeLessThan(Math.PI / 2);
+    // free (no lock), the same push turns it round and round
+    expect(run(REST, 1, { scrollVel: 4000 }).yaw).toBeCloseTo(0.0016 * 4000, 6);
+    const back = run(s, 3, { lock: -62 });
+    expect(Math.abs(back.yaw - target)).toBeLessThan(1e-3);
+    // and both ways: pushed backward just the same
+    s = { ...REST, yaw: target };
+    for (let n = 0; n < 5 * 60; n++) s = stepMotion(s, { ...calm, lock: -62, scrollVel: -4000 });
+    expect(Math.abs(s.yaw - target)).toBeLessThan(Math.PI / 2);
+  });
+
   it("tumble stops upright", () => {
     const s = run({ ...REST, pitch: 1.0 }, 3, { tumble: 0 });
     expect(Math.abs(s.pitch)).toBeLessThan(1e-3);
