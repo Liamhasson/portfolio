@@ -688,7 +688,19 @@ export function AboutPendant() {
           if (fadeK === 0) hold(want);
         } else fadeK = Math.min(fadeK + dt / (CROSSFADE / 2), 1);
       } else { held = -1; fadeK = 1; }
-      const sAt = reduced ? L.keys[held] ?? 0 : sSm;
+      let sAt = reduced ? L.keys[held] ?? 0 : sSm;
+      // Out of the glass (Liam, 2026-10-18: "bring it back sooner after the ball leaves"): the ball rides the page, the
+      // pendant the eased travel, a quarter second behind on a brisk scroll, so it would come back that long after the ball
+      // has taken it off the screen. From the glass to the hold it follows the riding travel instead (eased over RIDE_TAU,
+      // about a quarter of the lag): held in the ball all the way to glassEnd (the same pose, so the switch never shows),
+      // then handed back to the eased travel over the way to the hold. (Scrolling back, the riding travel trails: no change.)
+      if (!reduced && !stack) {
+        const gi = L.shots.findIndex((sh) => sh.id === "glass");
+        if (gi >= 0 && L.shots[gi + 1]?.id === "glassEnd" && sSm >= L.keys[gi] && sSm < L.keys[gi + 2]) {
+          const k = clamp01((sSm - L.keys[gi + 1]) / Math.max(L.keys[gi + 2] - L.keys[gi + 1], 1));
+          sAt = sSm + (1 - k * k * (3 - 2 * k)) * Math.max(sRide - sSm, 0);
+        }
+      }
       // the glass rides with the page as the page shows it (not the smoothed travel): it is a place in the page. Held, it is
       // where the held shot has it.
       const gp = glassAt(reduced ? sAt : sTarget);
