@@ -1170,6 +1170,7 @@ export function SandLab({ hero }: { hero: boolean }) {
         else window.removeEventListener(type, fn);
       }
       if (deskFiles && !deskTaken) deskFiles.then(releaseDesk).catch(() => {});
+      document.documentElement.style.cursor = "";   // (a hand over the laptop, a note or the drive never outlives the page)
       disposeNotes?.();
       paint?.dispose();
       field?.dispose();

@@ -110,7 +110,9 @@ test("on the desk, a click on the laptop ends at the index, as the nav's Project
   // no hand left behind on the index
   expect(await page.evaluate(() => document.documentElement.style.cursor)).toBe("");
 
-  // the nav's Projects, from the same spot
+  // the nav's Projects, from the same spot (the hash cleared first, so the comparison below means something)
+  await page.evaluate(() => history.replaceState(null, "", location.pathname + location.search));
+  expect(await page.evaluate(() => location.hash)).toBe("");
   await page.mouse.move(60, 860);
   await onDesk(page);
   await track(page, 4000);
