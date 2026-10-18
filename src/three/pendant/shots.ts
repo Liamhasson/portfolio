@@ -64,9 +64,10 @@ export interface Shot {
 export type ShotChange = Partial<Omit<Shot, "id" | "anchor" | "alt">>;
 
 /** What the camera and the pendant do at one scroll position: the blend of the two shots around it. */
-export interface Frame extends Omit<Shot, "id" | "anchor" | "fx" | "ax" | "ay" | "alt"> {
+export interface Frame extends Omit<Shot, "id" | "anchor" | "fx" | "ax" | "ay" | "alt" | "layer"> {
   /** The earlier of the two shots (the last shot's own index once past the end). The shot currently showing is
-   *  `t >= 0.5 ? index + 1 : index`, the same halfway point where `layer` and `lock` switch. */
+   *  `t >= 0.5 ? index + 1 : index`, the same halfway point where `lock` switches. (No layer: the mount takes it from the
+   *  readability solve's timeline plus its live guard, presence.ts; the solve reads the shots' own with `shotLayer`.) */
   index: number;
   /** 0..1 eased progress from that shot to the next. */
   t: number;
@@ -219,7 +220,7 @@ export function solveKeys(shots: readonly Shot[], centreX: (a: Anchor) => number
 
 /**
  * The frame at scroll `s`: the two shots around it, blended by smoothstep (size in log space, so a dolly from macro to wide
- * reads evenly). `layer` and `lock` can't blend, so they switch at the halfway point. `at` supplies the live screen spots
+ * reads evenly). `lock` can't blend, so it switches at the halfway point. `at` supplies the live screen spots
  * for the "line1" and "glass" aims. Before the first key it is the first shot; past the last it is the last.
  */
 export function shotAt(
@@ -250,10 +251,16 @@ export function shotAt(
     tumble: lerp(A.tumble, B.tumble, t),
     rz: lerp(A.rz, B.rz, t),
     lock: pick(A.lock, B.lock),
-    layer: pick(A.layer, B.layer),
     dim: lerp(A.dim, B.dim, t),
     aperture: lerp(A.aperture, B.aperture, t),
     glass: lerp(A.glass, B.glass, t),
     wire: lerp(A.wire, B.wire, t),
   };
+}
+
+/** The layer the shots themselves want at a frame (what the readability solve starts from): the nearer shot's, switching at
+ *  the blend's halfway point. Never the layer drawn: that is the solve's timeline plus the mount's live guard. */
+export function shotLayer(f: Pick<Frame, "index" | "t">, shots: readonly Shot[]): Layer {
+  const i = Math.min(f.t < 0.5 ? f.index : f.index + 1, shots.length - 1);
+  return shots[Math.max(i, 0)]?.layer ?? "back";
 }

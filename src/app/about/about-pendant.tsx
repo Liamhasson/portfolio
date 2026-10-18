@@ -7,6 +7,7 @@ import type { Box, Look } from "@/three/pendant/camera";
 import { clipBox, hits, padBox, type TextRect } from "@/three/pendant/layout";
 import { REST, stepMotion, type MotionState } from "@/three/pendant/motion";
 import { PendantGovernor } from "@/three/pendant/governor";
+import { stepPresence, type Presence } from "@/three/pendant/presence";
 import type { GlassSlot, PendantScene } from "@/three/pendant/scene";
 import { heldIndex, SHOTS, SHOTS_STACK, shotAt, solveKeys, type Layer, type Shot } from "@/three/pendant/shots";
 import type { Outline } from "@/three/pendant/solve";
@@ -24,7 +25,13 @@ export interface PendantHook {
   keys: { id: string; y: number }[];
   /** The smoothed travel (track px) the frame was drawn at. */
   s: number;
+  /** The layer drawn (presence.ts: the solve's timeline plus the live guard, swapped only clear of the words or through a
+   *  fade dip), its eased brightness (the dim drawn, 0..1), the canvas's own fade (1 except during a dip) and the layer it
+   *  is heading for (another than `layer` while a dip is under way). */
   layer: Layer;
+  bright: number;
+  fade: number;
+  goal: Layer;
   /** The pendant's projected bounds on screen (px from the pinned frame's top-left). */
   box: Box;
   /** The glass ball as drawn (centre as a share of the viewport, radius as a share of its height), or null. Drawn full size
@@ -65,6 +72,9 @@ declare global {
     __pendantPerf?: boolean;
     /** Diagnostics: a fixed frame step (ms) in place of the real one (the frame script's STEP; read only with ?pendant-debug). */
     __pendantStep?: number;
+    /** Diagnostics: the layer asked for, in place of the solve's and the guard's (the e2e's forced swap; read only with
+     *  ?pendant-debug). */
+    __pendantLayer?: Layer;
   }
 }
 
@@ -105,9 +115,6 @@ const CHROME_PIN = ".ab-resume";
 const SOLVE_QUIET = 150;
 /** The live guard hands the front back only after the pendant has been clear for this long (s): no pumping at an edge. */
 const GUARD_HOLD = 0.2;
-/** How fast a solved-behind shot dims to solve.ts FORCED_DIM and comes back (what is left of the gap after a second): the
- *  layer flips while the pendant is clear of the words, so the dim eases in behind them instead of popping. */
-const FORCED_EASE = 0.0001;
 /** Stacked, the canvas fades in over this long once drawn (s), as the track's CSS fades it in. Under reduced motion a change
  *  of shot crossfades it: out over half of CROSSFADE, the new shot held, back in over the other half. */
 const APPEAR = 0.6;
@@ -208,7 +215,7 @@ export function AboutPendant() {
     reducedQ.addEventListener?.("change", onReduced);
 
     const hook: PendantHook = {
-      ready: false, keys: [], s: 0, layer: "front", box: { l: 0, t: 0, r: 0, b: 0 }, glass: null, solve: { moved: [], behind: [] },
+      ready: false, keys: [], s: 0, layer: "front", bright: 1, fade: 1, goal: "front", box: { l: 0, t: 0, r: 0, b: 0 }, glass: null, solve: { moved: [], behind: [] },
       yaw: 0, dragging: false, blur: { smear: 0, on: false, jump: false }, gpuMs: null, pixelRatio: 1,
       bokehHalf: false, baseMs: null, mode: "track", shot: 0, opacity: 0, fxaa: false,
     };
@@ -360,6 +367,7 @@ export function AboutPendant() {
         motion = REST;
         appear = 0;
         clearK = 0;
+        presence = null;
         setOpacity(null);
       }
       hook.mode = mode;
@@ -519,7 +527,10 @@ export function AboutPendant() {
     const leaned: Look = { x: 0, y: 0 };
     const mouse = { x: 0, y: 0 };
     let drag: { x: number; y: number } | null = null, dragDX = 0, dragDY = 0;
-    let last = 0, time = 0, sSm = 0, sPrev = 0, first = true, forcedK = 0;
+    let last = 0, time = 0, sSm = 0, sPrev = 0, first = true;
+    /** The brightness, the layer and the canvas's fade (presence.ts), stepped every frame; null until the first frame (and
+     *  again for a new film), which starts where it is asked: no fade-in, no ease from full bright. */
+    let presence: Presence | null = null;
     /** The motion blur's reset: the pose jumped since the last frame (the loop resumed, a new solve, reduced motion
      *  toggled, the scroll jumped), so the move between the two frames is not smeared. */
     let jumped = true, sTargetPrev = 0;
@@ -648,13 +659,25 @@ export function AboutPendant() {
         : box;
       const near = sv !== null && hits(clipBox(padBox(guarded, sv.PAD / 2), L.vw, L.vh), L.texts, sTarget, fixed) > 0;
       if (near) { guardBack = true; clearFor = 0; } else if (guardBack && (clearFor += dt) >= GUARD_HOLD) guardBack = false;
-      const layer: Layer = (L.layer ? L.layer(sAt) : f.layer) === "front" && !guardBack ? "front" : "back";
-      // a shot that wanted the front but is behind the words dims to the tumble's brightness, eased in behind them
-      const forced = layer === "back" && f.layer === "front" ? 1 : 0;
-      forcedK += (forced - forcedK) * (1 - FORCED_EASE ** dt);
-      const shotDim = f.dim + (Math.min(f.dim, sv?.FORCED_DIM ?? f.dim) - f.dim) * forcedK;
-      // (on the track the pinned frame carries it off; stacked it fades instead, below)
-      const dim = stack ? shotDim : shotDim * (1 - o);
+      const forcedLayer = debug ? window.__pendantLayer : undefined;
+      const asked: Layer = forcedLayer ?? (L.layer?.(sAt) === "front" && !guardBack ? "front" : "back");
+      // Whether a layer change now would show: the outline itself (unpadded) over a line or the chrome, while the canvas
+      // shows at all (a reduced-motion crossfade at 0 swaps unseen, at once).
+      const overlapping = fadeK > 0 && hits(clipBox(guarded, L.vw, L.vh), L.texts, sTarget, fixed) > 0;
+      // The brightness wanted: the shot's dim, at most solve.ts FORCED_DIM while it is behind the words or going there (a
+      // shot that wanted the front and the tumble alike), and on the track the outro (the pinned frame carries it off;
+      // stacked it fades instead, below). presence.ts eases the brightness to it, swaps the layer only clear of the words
+      // or through a quick fade dip, and holds a request to come in front for its HOLD.
+      // (stacked, the opening coming in is unseen until the layers have it in front, then fades in: it arrives at full
+      // brightness, never dimmed for the moment it was behind unseen)
+      const opening = stack && (reduced ? held === 0 : f.index === 0 && f.t < 0.5);
+      const behind = (asked === "back" || presence?.layer === "back") && !(opening && clearK < 1);
+      const shotDim = behind ? Math.min(f.dim, sv?.FORCED_DIM ?? f.dim) : f.dim;
+      const wantDim = stack ? shotDim : shotDim * (1 - o);
+      presence = presence
+        ? stepPresence(presence, { layer: asked, dim: wantDim, overlapping }, dt)
+        : { layer: asked, bright: wantDim, fade: 1 };
+      const { layer, bright: dim, fade } = presence;
       const tag = ++frameNo;
       if (hook.gpuMs) perfFrames.set(tag, { s: sAt, shot: nearestShot(sAt) });
       // (held still, nothing is smeared: every frame starts the blur afresh)
@@ -670,14 +693,16 @@ export function AboutPendant() {
         const away = clamp01((y - foot) / Math.max(gap * PULL_FADE, 1));
         appear = Math.min(appear + dt / APPEAR, 1);
         // the opening, while its outline is on the chrome (the resume pill at the page's top): unseen, not dimmed behind it
-        const opening = reduced ? held === 0 : f.index === 0 && f.t < 0.5;
         // (and, while it is still coming in, until the layers have it in front: there it is clear of the chrome by the motion's
         // whole reach, so it arrives at full brightness rather than dimmed behind; once in, behind the words dims as ever)
         const onChrome = opening && hits(clipBox(padBox(box, (sv?.PAD ?? 8) / 2), L.vw, L.vh), [], 0, fixed) > 0;
         const unseen = onChrome || (opening && layer === "back" && clearK < 1);
         clearK = unseen ? Math.max(clearK - dt / CLEAR_FADE, 0) : Math.min(clearK + dt / CLEAR_FADE, 1);
-        setOpacity(appear * clearK * fadeK * (1 - away));
-      } else setOpacity(null);
+        setOpacity(appear * clearK * fadeK * fade * (1 - away));
+      } else {
+        // the track: about.css's opacity, but for a dip (handed back once it is whole again: "1", then about.css's own 1)
+        setOpacity(fade < 1 ? fade : opacityNow === null || opacityNow === "1" ? null : 1);
+      }
       hook.blur = sc.blurState;
       // (the box the page is told: what is drawn, the motion blur's smear included)
       const drawnBox = hook.blur?.on ? padBox(box, hook.blur.smear) : box;
@@ -696,6 +721,9 @@ export function AboutPendant() {
       hook.s = sAt;
       hook.shot = reduced ? held : nearestIndex(sAt);
       hook.layer = layer;
+      hook.bright = dim;
+      hook.fade = fade;
+      hook.goal = presence.goal ?? layer;
       hook.box = drawnBox;
       hook.yaw = motion.yaw;
       hook.dragging = drag !== null;

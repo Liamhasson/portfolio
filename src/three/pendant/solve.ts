@@ -20,7 +20,7 @@ import { Object3D, PerspectiveCamera } from "three";
 import { motionMargin, outlineBox, poseRig, reachOf, type Box } from "./camera";
 import { clipBox, findSpot, hits, layerTimeline, padBox, SAME, type Probe, type Sample, type Spot, type TextRect } from "./layout";
 import { REST } from "./motion";
-import { shotAt, variants, type Frame, type Layer, type Shot } from "./shots";
+import { shotAt, shotLayer, variants, type Frame, type Layer, type Shot } from "./shots";
 
 /** Px of travel between samples. */
 export const STEP = 8;
@@ -236,7 +236,7 @@ export function solve(input: SolveInput): Solved {
   const changed = shots.map((s, i) => s !== input.shots[i] || spots[i] !== SAME);
   const touches = (f: Frame) => changed[f.index] || changed[Math.min(f.index + 1, last)];
   const final = first.map((a) => (touches(a.f) ? sample(a.s, shots, spots) : a));
-  const samples: Sample[] = final.map((a) => ({ s: a.s, wanted: a.f.layer, box: clipBox(padBox(a.box, a.pad), vw, vh) }));
+  const samples: Sample[] = final.map((a) => ({ s: a.s, wanted: shotLayer(a.f, shots), box: clipBox(padBox(a.box, a.pad), vw, vh) }));
   const layer = layerTimeline(samples, texts, fixed);
   const behind = input.shots
     .filter((sh, i) => sh.layer === "front" && keys[i] >= 0 && keys[i] <= travel && (unsolved.includes(i) || layer(keys[i]) === "back"))

@@ -194,11 +194,13 @@ const CHROME = ".sh-name, .sh-nav, .sh-burger, .ab-resume";
 
 /** What the pendant covers right now while in front of the words: each line of text (one box per line, as the mount
  *  measures them: the text's own rects, not the element's block box) or picture / chrome box its on-screen box overlaps by more than
- *  1 px both ways (sub-pixel rounding aside). Empty when it is behind, not drawn, or clear. The box is clipped to the
+ *  1 px both ways (sub-pixel rounding aside). Empty when it is behind, not drawn, fading out to go behind, or clear. The box is clipped to the
  *  screen: a part of the pendant past the screen's edge covers nothing anyone can read. Runs in the page. */
 function coveredNow({ TEXT, CHROME, STILLS = "" }: { TEXT: string; CHROME: string; STILLS?: string }): string[] {
   const h = window.__pendant;
-  if (!h?.ready || h.layer !== "front") return [];
+  // (mid-dip it is fading out of the front to go behind a line it has come onto (a jump, a hand): 0.15 s, the z flip at 0,
+  // pinned by the motion pass's tests below. Whole, in front over a line, it always counts.)
+  if (!h?.ready || h.layer !== "front" || (h.fade < 1 && h.goal === "back")) return [];
   const c = document.querySelector("canvas.ab-pendant")!.getBoundingClientRect();
   const b = {
     l: Math.max(h.box.l + c.left, 0), r: Math.min(h.box.r + c.left, innerWidth),
@@ -438,6 +440,134 @@ test("a press on the pendant drags; elsewhere links work", async ({ page }) => {
   expect(new URL(page.url()).pathname).toBe(target!.href);
 });
 
+// ---------- the motion pass, Task 1: one eased brightness, layer swaps that never cut through the words ----------
+
+/** Frames by hand, so every sample is exactly one of the pendant's steps (a deterministic stepping, not wall-clock frames):
+ *  set before load, the mount's fixed step (1/60 s, read with ?pendant-debug) and a requestAnimationFrame that, once
+ *  `__manual` is on, queues its callbacks for `__tick()` to run, one frame per call. */
+function manualFrames() {
+  const w = window as unknown as { __manual: boolean; __tick: () => void; __pendantStep: number };
+  w.__pendantStep = 1000 / 60;
+  w.__manual = false;
+  const real = window.requestAnimationFrame.bind(window), cancel = window.cancelAnimationFrame.bind(window);
+  let q: [number, FrameRequestCallback][] = [];
+  let id = 1e9;
+  window.requestAnimationFrame = (cb) => { if (!w.__manual) return real(cb); q.push([++id, cb]); return id; };
+  window.cancelAnimationFrame = (n) => { q = q.filter(([k]) => k !== n); cancel(n); };
+  w.__tick = () => { const run = q; q = []; const t = performance.now(); for (const [, cb] of run) cb(t); };
+}
+
+/** One sample a step: the canvas as the page paints it (opacity, z-index) and the hook, plus whether the pendant's box is
+ *  over a line of the words right now. `stepAt(i)` returns the page y for step i (null to stop) or undefined to stay put;
+ *  `then(i)` may change the asked layer. Runs in the page; each step yields one real frame (the scroll events fire, the
+ *  track's own frame is queued) and then ticks exactly one frame. */
+type Sample = { op: number; z: string; bright: number; fade: number; layer: string; s: number; over: boolean };
+const stepFrames = (page: Page, args: { ys?: number[]; n?: number; force?: { at: number; layer: "front" | "back" | null }[] }) =>
+  page.evaluate(async ({ ys, n, force, TEXT }) => {
+    const w = window as unknown as { __manual: boolean; __tick: () => void; __pendantLayer?: string };
+    const real = (cb: () => void) => setTimeout(cb, 16);
+    const c = document.querySelector<HTMLCanvasElement>("canvas.ab-pendant")!;
+    const lines = () => {
+      const out: DOMRect[] = [];
+      const range = document.createRange();
+      for (const el of document.querySelectorAll<HTMLElement>(TEXT)) {
+        const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+        for (let t = walk.nextNode(); t; t = walk.nextNode()) {
+          if (!t.textContent?.trim()) continue;
+          range.selectNodeContents(t);
+          for (const r of range.getClientRects()) if (r.width > 0 && r.height > 0) out.push(r);
+        }
+      }
+      return out;
+    };
+    const out: Sample[] = [];
+    w.__manual = true;
+    const steps = ys ? ys.length : n ?? 0;
+    for (let i = 0; i < steps; i++) {
+      for (const f of force ?? []) if (f.at === i) { if (f.layer) w.__pendantLayer = f.layer; else delete w.__pendantLayer; }
+      if (ys) window.scrollTo(0, ys[i]);
+      await new Promise<void>((r) => real(r));
+      w.__tick();
+      const h = window.__pendant!, cs = getComputedStyle(c), cr = c.getBoundingClientRect();
+      const b = { l: h.box.l + cr.left, r: h.box.r + cr.left, t: h.box.t + cr.top, b: h.box.b + cr.top };
+      const over = lines().some((r) => Math.min(b.r, r.right) - Math.max(b.l, r.left) > 1 && Math.min(b.b, r.bottom) - Math.max(b.t, r.top) > 1);
+      out.push({ op: Number(cs.opacity), z: cs.zIndex, bright: h.bright, fade: h.fade, layer: h.layer, s: h.s, over });
+    }
+    delete w.__pendantLayer;
+    w.__manual = false;
+    w.__tick(); // (the queued frames back on the real clock)
+    return out;
+  }, { ys: args.ys, n: args.n, force: args.force, TEXT });
+
+/** The largest change between one sample and the next. */
+const maxStep = (xs: number[]) => xs.slice(1).reduce((m, x, i) => Math.max(m, Math.abs(x - xs[i])), 0);
+
+test.describe("the motion pass: brightness and layers", () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+
+  test("a slow scroll through the tumble and the worm: the opacity and the brightness never step more than 0.08 a frame", async ({ page }) => {
+    test.setTimeout(180_000);
+    const errors = collectErrors(page);
+    await page.addInitScript(manualFrames);
+    await page.goto("/about?pendant-debug");
+    await ready(page, 30_000);
+    await page.mouse.move(1430, 890); // (the cursor parked in a corner)
+    const keys = await page.evaluate(() => window.__pendant!.keys);
+    const at = (id: string) => keys.find((k) => k.id === id)!.y;
+    const from = at("letgo"), to = (at("worm") + at("above")) / 2;
+    await page.evaluate((y) => window.scrollTo(0, y), from);
+    await page.waitForTimeout(2500); // (the arrival, the follow and the 0.6 s fade-in settle)
+    // 4 px of page a frame: a slow, steady scroll (240 px a second at 60 fps)
+    const ys: number[] = [];
+    for (let y = from; y <= to; y += 4) ys.push(y);
+    const got = await stepFrames(page, { ys });
+    expect(got.length).toBeGreaterThan(200);
+    // it really went behind the words, dimmed, and came back out in front at full brightness
+    expect(got.some((g) => g.layer === "back" && g.bright < 0.45)).toBe(true);
+    expect(got.some((g) => g.layer === "front" && g.bright > 0.95)).toBe(true);
+    expect(maxStep(got.map((g) => g.op))).toBeLessThanOrEqual(0.08);
+    expect(maxStep(got.map((g) => g.bright))).toBeLessThanOrEqual(0.08);
+    // and every z change on the way happened clear of the words, or at the bottom of a fade dip
+    const flips = got.flatMap((g, i) => (i > 0 && g.z !== got[i - 1].z ? [{ i, ...g }] : []));
+    expect(flips.length).toBeGreaterThan(0);
+    expect(flips.filter((f) => f.over && f.fade >= 0.05)).toEqual([]);
+    expect(errors).toEqual([]);
+  });
+
+  test("over a line, a forced layer change fades out, flips z at fade 0, and fades back in", async ({ page }) => {
+    test.setTimeout(120_000);
+    const errors = collectErrors(page);
+    await page.addInitScript(manualFrames);
+    await page.goto("/about?pendant-debug");
+    await ready(page, 30_000);
+    await page.mouse.move(1430, 890);
+    // the tumble: behind "eight years managing two rock bands", its box well over the words
+    const y = await page.evaluate(() => window.__pendant!.keys.find((k) => k.id === "tumble")!.y);
+    await page.evaluate((y) => window.scrollTo(0, y), y);
+    await page.waitForTimeout(2500);
+    // asked in front, held there; then handed back to the solve and the guard (behind), each over a line throughout
+    const got = await stepFrames(page, { n: 150, force: [{ at: 5, layer: "front" }, { at: 75, layer: null }] });
+    const flips = got.flatMap((g, i) => (i > 0 && g.z !== got[i - 1].z ? [{ i, ...g }] : []));
+    expect(got[0]).toMatchObject({ layer: "back", fade: 1, over: true });
+    expect(flips.map((f) => f.layer)).toEqual(["front", "back"]);
+    for (const f of flips) {
+      expect(f.over).toBe(true);
+      expect(f.fade).toBeLessThan(0.05);
+      expect(f.op).toBeLessThan(0.05);
+      // out before it (the fade only falls), in after it (only rises, back to whole)
+      const before = got.slice(Math.max(0, f.i - 6), f.i + 1).map((g) => g.op);
+      const after = got.slice(f.i, f.i + 7).map((g) => g.op);
+      for (let k = 1; k < before.length; k++) expect(before[k]).toBeLessThanOrEqual(before[k - 1]);
+      for (let k = 1; k < after.length; k++) expect(after[k]).toBeGreaterThanOrEqual(after[k - 1]);
+    }
+    expect(got[74]).toMatchObject({ layer: "front", fade: 1, op: 1 });
+    expect(got.at(-1)).toMatchObject({ layer: "back", fade: 1, op: 1 });
+    // no step of the dip is a cut: 0.15 s each way at 1/60 s is about 0.11 a frame
+    expect(maxStep(got.map((g) => g.op))).toBeLessThan(0.12);
+    expect(errors).toEqual([]);
+  });
+});
+
 // ---------- Task 11: phones and reduced motion (About stacked) ----------
 
 /** The stacked column's still pictures, avoided like the words (Liam's photo above the first line). */
@@ -640,13 +770,13 @@ test.describe("under reduced motion", () => {
     await page.evaluate((y) => window.scrollTo(0, y), keys[0].y);
     await page.waitForTimeout(1500);
     // every frame: the hook, and the canvas's opacity as the page paints it
-    const watch = (ms: number) => page.evaluate((ms) => new Promise<{ yaw: number; shot: number; op: number; box: number[]; blur: boolean }[]>((done) => {
-      const out: { yaw: number; shot: number; op: number; box: number[]; blur: boolean }[] = [];
+    const watch = (ms: number) => page.evaluate((ms) => new Promise<{ yaw: number; shot: number; op: number; fade: number; box: number[]; blur: boolean }[]>((done) => {
+      const out: { yaw: number; shot: number; op: number; fade: number; box: number[]; blur: boolean }[] = [];
       const c = document.querySelector<HTMLCanvasElement>("canvas.ab-pendant")!;
       const t0 = performance.now();
       const tick = () => {
         const h = window.__pendant!;
-        out.push({ yaw: h.yaw, shot: h.shot, op: Number(getComputedStyle(c).opacity), box: [h.box.l, h.box.t, h.box.r, h.box.b], blur: h.blur.on });
+        out.push({ yaw: h.yaw, shot: h.shot, op: Number(getComputedStyle(c).opacity), fade: h.fade, box: [h.box.l, h.box.t, h.box.r, h.box.b], blur: h.blur.on });
         if (performance.now() - t0 < ms) requestAnimationFrame(tick); else done(out);
       };
       requestAnimationFrame(tick);
@@ -661,10 +791,12 @@ test.describe("under reduced motion", () => {
     const held = await page.evaluate(() => ({ box: window.__pendant!.box, layer: window.__pendant!.layer }));
     expect(held.layer).toBe("front");
     expect(await brightPixels(page, held.box)).toBeGreaterThan(300);
-    // just past the halfway point to the tumble's key: still held (no crossfade back and forth at the middle)
+    // just past the halfway point to the tumble's key: still held (no crossfade back and forth at the middle). The jump
+    // brings a line onto the held opening, so it goes behind it through a layer dip (motion pass, Task 1): the canvas's
+    // opacity is that dip's fade and nothing else (no crossfade: the crossfade's own factor stays 1)
     await page.evaluate((y) => window.scrollTo(0, y), keys[0].y + 0.53 * (keys[1].y - keys[0].y));
     const middle = await watch(800);
-    expect(middle.every((f) => f.shot === 0 && f.op === 1)).toBe(true);
+    expect(middle.every((f) => f.shot === 0 && Math.abs(f.op - f.fade) < 0.002)).toBe(true);
     // well past it: out to nothing, the tumble put in place, back in, over about 0.6 s
     await page.evaluate((y) => window.scrollTo(0, y), keys[0].y + 0.7 * (keys[1].y - keys[0].y));
     const fade = await watch(1500);

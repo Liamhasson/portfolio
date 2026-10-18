@@ -12,7 +12,7 @@ const NO_LOOK = { x: 0, y: 0 };
 
 const frame = (over: Partial<Frame> = {}): Frame => ({
   az: 0, el: 0, roll: 0, fov: 30, h: 0.4, aim: [0, 0, 0], spin: 0, tumble: 0, rz: 0, lock: null,
-  layer: "front", dim: 1, aperture: 0.001, glass: 0, wire: 1, index: 0, t: 0, ax: 0.5, ay: 0.5,
+  dim: 1, aperture: 0.001, glass: 0, wire: 1, index: 0, t: 0, ax: 0.5, ay: 0.5,
   ...over,
 });
 

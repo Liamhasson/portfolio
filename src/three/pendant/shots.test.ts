@@ -1,6 +1,6 @@
 // src/three/pendant/shots.test.ts
 import { describe, expect, it, test } from "vitest";
-import { heldIndex, HOLD_PAST, SHOTS, SHOTS_STACK, shotAt, solveKeys, variants, type Anchor, type Shot } from "./shots";
+import { heldIndex, HOLD_PAST, SHOTS, SHOTS_STACK, shotAt, shotLayer, solveKeys, variants, type Anchor, type Shot } from "./shots";
 
 const VW = 1440;
 const TRAVEL = 9000;
@@ -173,7 +173,8 @@ describe("shotAt", () => {
     expect(f.az).toBe(30);
     expect(f.el).toBe(-62);
     expect(f.h).toBe(1.15);
-    expect(f.layer).toBe("front");
+    expect("layer" in f).toBe(false); // (the layer is the solve's and the guard's, never the frame's)
+    expect(shotLayer(f, SHOTS)).toBe("front");
     expect(f.index).toBe(2);
     expect(f.t).toBe(1);
   });
@@ -240,15 +241,17 @@ describe("shotAt", () => {
     expect(f.ay).toBeCloseTo((AT.glass.y + 0.13) / 2, 9);
   });
 
-  test("layer and lock switch at the halfway point", () => {
+  test("lock switches at the halfway point, and so does the shots' own layer (shotLayer, what the solve starts from)", () => {
     const a: Shot = { ...SHOTS[0], layer: "front", lock: null };
     const b: Shot = { ...SHOTS[1], layer: "back", lock: -62 };
     const before = shotAt(49, [0, 100], [a, b], AT);
-    expect(before.layer).toBe("front");
+    expect(shotLayer(before, [a, b])).toBe("front");
     expect(before.lock).toBeNull();
     const after = shotAt(51, [0, 100], [a, b], AT);
-    expect(after.layer).toBe("back");
+    expect(shotLayer(after, [a, b])).toBe("back");
     expect(after.lock).toBe(-62);
+    // past the last key: the last shot's
+    expect(shotLayer(shotAt(500, [0, 100], [a, b], AT), [a, b])).toBe("back");
   });
 });
 
