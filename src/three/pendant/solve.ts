@@ -46,8 +46,10 @@ const PROBES = 9;
 export const FORCED_DIM = 0.4;
 
 const D = Math.PI / 180;
-/** Faces posed between the one a turning lock left and the one it asks now (see `sample`). */
+/** Between two different locks, the faces posed: TURN_STEPS + 1 of them, within TRAIL degrees of the one asked, either side
+ *  (a face trails a turning lock by up to about 30 degrees at 1500 px/s: see `sample`). */
 const TURN_STEPS = 4;
+const TRAIL = 35;
 /** The shortest way round from angle `a` to `b` (degrees), in [-180, 180). */
 const arcDeg = (a: number, b: number) => ((((b - a) % 360) + 540) % 360) - 180;
 const PITCHES = [0, 45, 90, 135].map((d) => d * D);
@@ -202,16 +204,25 @@ export function solve(input: SolveInput): Solved {
     applySpot(f, spots);
     // (a face turning toward its lock or letting go of it may face any way: every yaw (`ring`) while the lock is easing in
     // or out; the locked face's own outline only where it holds, which is the locked shot's rest window, the stretch the
-    // solve takes as that shot at rest: there the lock has settled the face. Between two different locks (buildEnd to the
-    // hero, 0 to -62) the lock itself turns, faster than its pull can follow on a quick scroll, so the face drawn trails it
-    // mid-blend (by about 30 degrees at 1500 px/s): there, outside the two rest windows, every face from the one the
-    // blend left to the one it asks now (TURN_STEPS of them), so a trailing face is inside the outline.)
+    // solve takes as that shot at rest: there the lock has settled the face. A shot that settles early (shots.ts `settle`:
+    // the build, its lock fully on by half of the move into it) is still `ring` until its own rest window too: on a brisk
+    // scroll its face is still coming round after the lock is on.
+    // Between two different locks (buildEnd to the hero, 0 to -62) the lock itself turns, faster than its pull can follow
+    // on a quick scroll, so the face drawn trails the one asked by up to about 30 degrees at 1500 px/s, on the side the blend
+    // came from: toward the first lock scrolling down, toward the second scrolling up. There, outside the two rest windows,
+    // every face within TRAIL of the one asked, either side, kept inside the arc between the two locks (TURN_STEPS + 1 of
+    // them), so a trailing face is inside the outline whichever way the page goes.)
     const A = shots[f.index], B = shots[Math.min(f.index + 1, shots.length - 1)];
     const turning = A !== B && A.lock !== null && B.lock !== null && A.lock !== B.lock && f.t > REST_T && f.t < 1 - REST_T;
-    const locked = f.lock !== null && f.lockMix >= 1 - REST_T;
+    const settling = A !== B && A.lock === null && B.lock !== null && B.settle < 1 && f.t < 1 - REST_T;
+    const locked = f.lock !== null && f.lockMix >= 1 - REST_T && !settling;
     const pts = locked ? outline.all : outline.ring;
-    const yaws = !locked ? [0] : !turning ? [(f.lock as number) * D]
-      : Array.from({ length: TURN_STEPS + 1 }, (_, k) => ((A.lock as number) + (k / TURN_STEPS) * arcDeg(A.lock as number, f.lock as number)) * D);
+    let yaws = [locked ? (f.lock as number) * D : 0];
+    if (locked && turning) {
+      const span = arcDeg(A.lock as number, B.lock as number), at = arcDeg(A.lock as number, f.lock as number) / span;
+      const lo = Math.max(at - TRAIL / Math.abs(span), 0), hi = Math.min(at + TRAIL / Math.abs(span), 1);
+      yaws = Array.from({ length: TURN_STEPS + 1 }, (_, k) => ((A.lock as number) + (lo + ((hi - lo) * k) / TURN_STEPS) * span) * D);
+    }
     const pitches = f.tumble > TUMBLE_OFF ? PITCHES : [0];
     let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
     for (const yaw of yaws) for (const pitch of pitches) {
@@ -314,13 +325,20 @@ export function solve(input: SolveInput): Solved {
     // (a shot riding with the page, shots.ts `ride`, is carried that much of the lag with the words, at a steady scroll
     // RIDE_STEADY of it: only the rest trails)
     lag -= rideShift(final[j].f.ride * RIDE_STEADY, lag, vw);
-    const cap = Math.max(r0.r - r0.l, r0.b - r0.t) / 2, g = (v: number) => Math.min(Math.max(v, 0), cap);
-    const gl = g(grow?.l ?? 0), gt = g(grow?.t ?? 0), gr = g(grow?.r ?? 0), gb = g(grow?.b ?? 0);
+    // (the reach, each side clamped to 0..half the box's longer side; the grown box kept in plain numbers, clipped to the
+    // screen: no objects, the look ahead asks this up to a couple of hundred times a frame)
+    const cap = Math.max(r0.r - r0.l, r0.b - r0.t) / 2;
+    const gl = Math.min(Math.max(grow ? grow.l : 0, 0), cap), gt = Math.min(Math.max(grow ? grow.t : 0, 0), cap);
+    const gr = Math.min(Math.max(grow ? grow.r : 0, 0), cap), gb = Math.min(Math.max(grow ? grow.b : 0, 0), cap);
     const grown = gl + gt + gr + gb >= 0.5;
     if (tight[j] || (Math.abs(lag) < 0.5 && !grown)) return tight[j];
-    const b = grown ? clipBox({ l: r0.l - gl, t: r0.t - gt, r: r0.r + gr, b: r0.b + gb }, vw, vh) : t0;
-    if (b.r <= b.l || b.b <= b.t) return false; // (off screen)
-    if (grown && hits(b, [], 0, fixed) > 0) return true; // (grown onto the chrome, which holds still)
+    const bl = grown ? Math.max(r0.l - gl, 0) : t0.l, bt = grown ? Math.max(r0.t - gt, 0) : t0.t;
+    const br = grown ? Math.min(r0.r + gr, vw) : t0.r, bb = grown ? Math.min(r0.b + gb, vh) : t0.b;
+    if (br <= bl || bb <= bt) return false; // (off screen)
+    if (grown) for (let k = 0; k < fixed.length; k++) {
+      const c = fixed[k];
+      if (bl < c.r && br > c.l && bt < c.b && bb > c.t) return true; // (grown onto the chrome, which holds still)
+    }
     // lines `lag` further along sit `lag` back on screen: the box swept `lag` forward (along the way each line rides) meets
     // every one in between. (layout.ts `hits` with plain numbers, and only the lines across the box at its most grown: the
     // look ahead asks this many times a frame.)
@@ -328,8 +346,8 @@ export function solve(input: SolveInput): Solved {
     for (let k = 0; k < xs.length; k += 5) {
       const y = xs[k + 4] === 1;
       if (y
-        ? b.l < xs[k + 2] && b.r > xs[k] && b.t + lo < xs[k + 3] && b.b + hi > xs[k + 1]
-        : b.t < xs[k + 3] && b.b > xs[k + 1] && b.l + lo < xs[k + 2] && b.r + hi > xs[k]) return true;
+        ? bl < xs[k + 2] && br > xs[k] && bt + lo < xs[k + 3] && bb + hi > xs[k + 1]
+        : bt < xs[k + 3] && bb > xs[k + 1] && bl + lo < xs[k + 2] && br + hi > xs[k]) return true;
     }
     return false;
   };

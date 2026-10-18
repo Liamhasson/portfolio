@@ -546,9 +546,13 @@ async function pendantOutlineAt(page: Page, at: number) {
   await page.waitForTimeout(1500);
   expect(await pendantBall(page)).not.toBeNull();
   const slot = await slotNow(page);
-  // (scanned from the side away from the pendant itself: from the left when it is right of the ball's middle)
-  const box = await page.evaluate(() => window.__pendant!.box);
-  const from: "left" | "right" = (box.l + box.r) / 2 > slot.x ? "left" : "right";
+  // (scanned from the side away from the pendant itself: from the left when it is right of the ball's middle. Its box is
+  // the canvas's own px, the slot the viewport's: the canvas's left edge added, as coveredNow does)
+  const mid = await page.evaluate(() => {
+    const b = window.__pendant!.box, c = document.querySelector("canvas.ab-pendant")!.getBoundingClientRect();
+    return c.left + (b.l + b.r) / 2;
+  });
+  const from: "left" | "right" = mid > slot.x ? "left" : "right";
   return { slot, from, o: await drawnOutline(page, "canvas.ab-pendant", "#fff", "dark", slot, from) };
 }
 

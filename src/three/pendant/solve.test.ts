@@ -106,7 +106,7 @@ describe("solve", () => {
     expect(q.overLagging(500, 0, { l: 0, t: 0, r: 900 - q.rest(500).r + 5, b: 0 })).toBe(true);
   });
 
-  it("between two different locks, mid-blend, it takes every face from the one left to the one asked (a face drawn trails a turning lock); at rest and between equal locks, the locked face's", () => {
+  it("between two different locks, mid-blend, it takes every face within 35 degrees of the one asked, either side, inside the arc (a face drawn trails a turning lock, down or up); at rest and between equal locks, the locked face's", () => {
     // a plank, wide one way and thin the other: its box depends on the face shown
     const plank = (() => {
       const p: number[] = [];
@@ -137,6 +137,36 @@ describe("solve", () => {
     const wide = solve(input([], bar, { shots: two(edge, broad), outline: o }));
     expect(wide.layer(0)).toBe("front");
     expect(wide.layer(500)).toBe("back");
+    // both ways: just past its first rest window the lock asks a face only about 5 degrees on, but scrolling up the face
+    // drawn trails it on the far side (toward the second lock), so the box takes the faces up to TRAIL (35) beyond it too:
+    // as wide as the face 35 degrees on, never the broad face's
+    const w35 = width(edge + 35);
+    const early = wide.rest(200), wEarly = early.r - early.l;
+    expect(wEarly).toBeGreaterThanOrEqual(w35 - 2);
+    expect(wEarly).toBeLessThan(Math.max(w0, w90) - 20);
+    // and the same from the other end, scrolling down onto the second lock: the faces back toward the first
+    const back = solve(input([], [], { shots: two(broad, edge), outline: o })).rest(800);
+    expect(back.r - back.l).toBeGreaterThanOrEqual(w35 - 2);
+  });
+
+  it("a shot whose lock settles early (settle under 1) is taken at every yaw until its own rest window: its face may still be coming round", () => {
+    const plank = (() => {
+      const p: number[] = [];
+      for (let j = 0; j <= 10; j++) for (const x of [-0.4, 0.4]) for (const z of [-0.02, 0.02]) p.push(x, -0.5 + j / 10, z);
+      return new Float32Array(p);
+    })();
+    const o = outlineOf(plank);
+    const free: Shot = { ...base, id: "a", anchor: "start", lock: null };
+    const width = (r: Box) => r.r - r.l;
+    const held = (lock: number, settle: number) => solve(input([], [], { shots: [free, { ...base, id: "b", anchor: "end", lock, settle }], outline: o }));
+    // locked edge-on, the plank is far narrower than at every yaw (`ring`)
+    const edge = width(held(0, 1).rest(1000)) < width(held(90, 1).rest(1000)) ? 0 : 90;
+    const ring = width(held(edge, 1).rest(300)); // (the lock easing in with the whole blend: every yaw)
+    const lockedW = width(held(edge, 1).rest(1000));
+    expect(ring - lockedW).toBeGreaterThan(100);
+    const early = held(edge, 0.5);
+    expect(width(early.rest(700))).toBeCloseTo(ring, 6); // (its lock fully on since half way: still every yaw)
+    expect(width(early.rest(1000))).toBeCloseTo(lockedW, 6); // (its rest window: the locked face)
   });
 
   it("puts a shot behind the words when nothing within the limits clears it", () => {
