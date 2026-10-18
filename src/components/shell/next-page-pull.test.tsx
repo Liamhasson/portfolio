@@ -46,6 +46,22 @@ describe("NextPagePull", () => {
     expect(push).toHaveBeenCalledWith("/about");
     expect(push).toHaveBeenCalledTimes(1);
   });
+  test("at the end the page holds still while the line fills: no elastic overscroll there, and the top keeps its own (Liam, 2026-10-19)", () => {
+    setPage(1500);
+    const { unmount } = render(<NextPagePull href="/about" label="About" line="x" />);
+    expect(document.documentElement.style.overscrollBehaviorY).toBe("");
+    scrollY = 2000;
+    act(() => { fireEvent.scroll(window); });
+    expect(document.documentElement.style.overscrollBehaviorY).toBe("none");
+    expect(document.body.style.overscrollBehaviorY).toBe("none");
+    scrollY = 1200;
+    act(() => { fireEvent.scroll(window); });
+    expect(document.documentElement.style.overscrollBehaviorY).toBe("");
+    scrollY = 2000;
+    act(() => { fireEvent.scroll(window); });
+    unmount();
+    expect(document.documentElement.style.overscrollBehaviorY).toBe("");
+  });
   test("arriving back at the end (history) lands just above it: nothing fires by itself (Review Focus 2)", () => {
     setPage(2000);
     render(<NextPagePull href="/about" label="About" line="x" />);

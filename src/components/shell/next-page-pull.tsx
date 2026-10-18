@@ -107,11 +107,28 @@ export function NextPagePull({ href, label, line, className, active = true }: { 
       feed(touchY - y, touchFrom ?? window);
       touchY = y;
     };
+    // At the end the page holds still while the line fills (Liam, 2026-10-19): no elastic overscroll (iOS Safari drags
+    // the whole page up under the finger and springs it back, a trackpad's bounce on a Mac the same). Only at the end, so
+    // the top keeps its own behaviour (pull to refresh).
+    let still = false;
+    const hold = () => {
+      const want = atEnd();
+      if (want === still) return;
+      still = want;
+      root.style.overscrollBehaviorY = want ? "none" : "";
+      document.body.style.overscrollBehaviorY = want ? "none" : "";
+    };
+    hold();
+    window.addEventListener("scroll", hold, { passive: true });
+    window.addEventListener("resize", hold, { passive: true });
     window.addEventListener("wheel", onWheel, { passive: true });
     window.addEventListener("touchstart", onTouchStart, { passive: true });
     window.addEventListener("touchmove", onTouchMove, { passive: true });
     return () => {
       stopLater();
+      window.removeEventListener("scroll", hold);
+      window.removeEventListener("resize", hold);
+      if (still) { root.style.overscrollBehaviorY = ""; document.body.style.overscrollBehaviorY = ""; }
       window.removeEventListener("wheel", onWheel);
       window.removeEventListener("touchstart", onTouchStart);
       window.removeEventListener("touchmove", onTouchMove);

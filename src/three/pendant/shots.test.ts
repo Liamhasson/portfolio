@@ -59,8 +59,11 @@ describe("the pendant's shots (spec 2026-10-16 §3)", () => {
 });
 
 describe("the stacked shots (spec §8, plan Task 11)", () => {
-  test("SHOTS_STACK keeps the six phone shots in order", () => {
-    expect(SHOTS_STACK.map((s) => s.id)).toEqual(["opening", "tumble", "above", "glass", "whirl", "hero"]);
+  test("SHOTS_STACK keeps the six phone shots in order, with the build before the hero (Liam, 2026-10-19)", () => {
+    expect(SHOTS_STACK.map((s) => s.id)).toEqual(["opening", "tumble", "above", "glass", "whirl", "build", "buildEnd", "hero"]);
+    const by = (id: string) => SHOTS_STACK.find((s) => s.id === id)!;
+    expect([by("build").layer, by("build").bright, by("build").wire, by("build").glass]).toEqual(["front", true, 1, 0]);
+    expect(by("hero").bright).toBe(false);
   });
 
   test("each phone shot keeps its desktop character: the tumble behind and dimmed, the glass through the ball, the hero's face locked", () => {
@@ -83,14 +86,15 @@ describe("the stacked shots (spec §8, plan Task 11)", () => {
 
   test("fx reads as fy: keys solve on the vertical scroll (key = anchor centre - fy x screen height)", () => {
     const VH = 844, H_TRAVEL = 6070;
-    const ys = { line1: 1066, band: 1657, strip: 2872, quote1: 3429, quote2: 4020, check: 5201 };
+    const ys = { line1: 1066, band: 1657, strip: 2872, quote1: 3429, quote2: 4020, check: 5201, buildstage: 5900 };
     const keys = solveKeys(SHOTS_STACK, centres(ys), VH, H_TRAVEL);
     expect(keys[0]).toBeCloseTo(1066 - 0.67 * VH, 9);
     expect(keys[1]).toBeCloseTo(1657 - 0.5 * VH, 9);
     expect(keys[2]).toBeCloseTo(2872 - 0.3 * VH, 9);
     expect(keys[3]).toBeCloseTo((3429 + 4020) / 2 - 0.5 * VH, 9); // (no slot in the stack: the quotes' midpoint)
     expect(keys[4]).toBeCloseTo(5201 - 0.68 * VH, 9);
-    expect(keys[5]).toBe(H_TRAVEL);
+    expect(keys[5]).toBeCloseTo(5900 - 0.5 * VH, 9); // (the mount then keys the build to the stage's top and foot)
+    expect(keys[7]).toBe(H_TRAVEL);
   });
 });
 

@@ -17,6 +17,7 @@ import { parseTierOverride, pickTier, readSignals, settingsFor } from "@/three/t
 import { Brief, type BriefHandle, BriefGrowth } from "@/app/lab/sand/brief";
 import { contactAt, contactStalled, wordsShown } from "./contact-timeline";
 import { ContactEnd } from "./contact-end";
+import { contactLayout, type ContactLayout } from "./contact-layout";
 import "./contact.css";
 
 const damp = (a: number, b: number, k: number, dt: number) => b + (a - b) * Math.exp(-k * dt);
@@ -29,6 +30,7 @@ const damp = (a: number, b: number, k: number, dt: number) => b + (a - b) * Math
  * an error or a stalled load: the ball as a still with the brief over it, and the words.
  */
 export function ContactScene() {
+  const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const briefRef = useRef<BriefHandle>(null);
   const [words, setWords] = useState(0);
@@ -44,7 +46,22 @@ export function ContactScene() {
     progress.expect("/lab/grain.png", 60e3);
     progress.expect("haze", 90e3);
     const growth = new BriefGrowth();
-    let ball = { cx: window.innerWidth / 2, cy: window.innerHeight * 0.42, r: window.innerHeight * 0.15 };
+    // the layout (contact-layout.ts): upright, the ball and the words one group in what is visible; on every resize (a
+    // phone's toolbars change what is visible without resizing the canvas)
+    let lay: ContactLayout = contactLayout(window.innerWidth, window.innerHeight, window.innerHeight, 0);
+    const relayout = () => {
+      const words = rootRef.current?.querySelector<HTMLElement>(".ct-words");
+      lay = contactLayout(window.innerWidth, window.innerHeight, canvas.clientHeight || window.innerHeight, words?.offsetHeight ?? 0);
+      const root = rootRef.current;
+      if (root) {
+        root.toggleAttribute("data-upright", lay.wordsTop !== null);
+        root.style.setProperty("--ct-words-top", lay.wordsTop === null ? "auto" : `${lay.wordsTop}px`);
+        root.style.setProperty("--ct-ball-d", `${2 * lay.r}px`);
+        root.style.setProperty("--ct-ball-cy", `${lay.cy}px`);
+      }
+    };
+    relayout();
+    let ball = { cx: lay.cx, cy: lay.cy, r: lay.r };
     let since = 0, last = performance.now(), lastP = -1, stalledFor = 0, raf = 0, growing = true, gaveUp = false;
     // the words: the timeline's, but never later than CONTACT_T.wordsBy since the page opened (a slow link)
     const mountAt = performance.now();
@@ -61,7 +78,8 @@ export function ContactScene() {
       // gone for good: a load finishing later, or the tab coming back, never restarts it (final review I2)
       stage?.dispose(); stage = null;
       setStill(true); setWords(1);
-      briefRef.current?.update({ cx: window.innerWidth / 2, cy: window.innerHeight * 0.42, r: window.innerHeight * 0.15, alpha: 1, dash: 0, squares: Array(9).fill(1), round: 1 });
+      relayout();
+      briefRef.current?.update({ cx: lay.cx, cy: lay.cy, r: lay.r, alpha: 1, dash: 0, squares: Array(9).fill(1), round: 1 });
     };
     // the brief grows on its own frames while the sand loads (the stage isn't there yet)
     const grow = (now: number) => {
@@ -77,6 +95,15 @@ export function ContactScene() {
       if (growing) raf = requestAnimationFrame(grow);
     };
     raf = requestAnimationFrame(grow);
+    // (the stage reframes on its own canvas's resize; a change in what is visible alone moves the group here)
+    let reframe: (() => void) | null = null;
+    const onResize = () => {
+      if (reframe) reframe();
+      else { relayout(); ball = { cx: lay.cx, cy: lay.cy, r: lay.r }; }
+      if (gaveUp) briefRef.current?.update({ cx: lay.cx, cy: lay.cy, r: lay.r, alpha: 1, dash: 0, squares: Array(9).fill(1), round: 1 });
+    };
+    window.addEventListener("resize", onResize);
+    cleanups.push(() => window.removeEventListener("resize", onResize));
 
     (async () => {
       const probe = document.createElement("canvas").getContext("webgl2");
@@ -94,13 +121,15 @@ export function ContactScene() {
       // the framing (contact-view.ts) and the brief on the ball's projected outline, on every resize
       const frame = () => {
         st.setView(home, q, camera.lens_mm);
-        st.setView(contactView(q, ballC, ballR, THREE.MathUtils.degToRad(st.camera.fov)), q, camera.lens_mm);
+        relayout();
+        st.setView(contactView(q, ballC, ballR, THREE.MathUtils.degToRad(st.camera.fov), { share: lay.share, at: lay.at }), q, camera.lens_mm);
         right.setFromMatrixColumn(st.camera.matrixWorld, 0).normalize();
         up.setFromMatrixColumn(st.camera.matrixWorld, 1).normalize();
         const p0 = ballC.clone().project(st.camera), p1 = ballC.clone().addScaledVector(right, ballR).project(st.camera);
         const W = canvas.clientWidth || window.innerWidth, H = canvas.clientHeight || window.innerHeight;
         ball = { cx: ((p0.x + 1) / 2) * W, cy: ((1 - p0.y) / 2) * H, r: (Math.abs(p1.x - p0.x) / 2) * W };
       };
+      reframe = frame;
       st.onSettings((s) => { frame(); field?.setGrains(s.grains); field?.setPointScale(st.bufferHeight, THREE.MathUtils.degToRad(st.camera.fov)); });
       const data = await loadSandParts(meta, settingsFor("low", window.devicePixelRatio || 1).grains, SAND_BASE, progress);
       if (disposed || gaveUp) return;
@@ -193,7 +222,7 @@ export function ContactScene() {
   }, []);
 
   return (
-    <div className="ct">
+    <div ref={rootRef} className="ct">
       {still ? (
         // eslint-disable-next-line @next/next/no-img-element -- the approved still, the no-WebGL fallback
         <img src={`${SAND_BASE}/targets/ball.jpg`} alt="" className="ct-still" />

@@ -801,7 +801,52 @@ const stackPaint = (page: Page) => page.evaluate(() => {
 for (const [w, h] of [[390, 844], [430, 932]] as const) {
   test.describe(`on a ${w}x${h} phone`, () => {
     test.use({ viewport: { width: w, height: h }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
-    test("stacked: the six phone shots, at most 2x, never in front of a line, and gone before Contact", async ({ page }) => {
+    test("stacked: the build in its frame (Liam, 2026-10-19): the screen holds clear of words, the pendant centred in front, lit, wire to brass", async ({ page }) => {
+      test.setTimeout(120_000);
+      const errors = collectErrors(page);
+      await page.goto("/about?pendant-debug");
+      await ready(page, 30_000);
+      await page.waitForTimeout(1500);
+      const k = await page.evaluate(() => Object.fromEntries(window.__pendant!.keys.map((x) => [x.id, x.y])));
+      const span = k.buildEnd - k.build;
+      expect(span).toBeGreaterThan(2 * h);
+      const seen: number[] = [];
+      for (const at of [0.3, 0.6, 0.85]) {
+        await page.evaluate((y) => window.scrollTo(0, y), Math.round(k.build + at * span));
+        await page.waitForTimeout(2500); // (a jump: the brightness eases up over its 0.6 s time constant)
+        const st = await page.evaluate(() => {
+          const p = window.__pendant!, f = document.querySelector("svg.ab-frame [data-frame='box']")?.getBoundingClientRect();
+          // any line of the page's words on screen
+          const range = document.createRange();
+          let lines = 0;
+          for (const el of document.querySelectorAll<HTMLElement>("section.ab p, section.ab h1, section.ab h2, section.ab h3, section.ab li")) {
+            const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+            for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+              if (!n.textContent?.trim()) continue;
+              range.selectNodeContents(n);
+              for (const r of range.getClientRects()) if (r.width > 0 && r.bottom > 0 && r.top < innerHeight) lines++;
+            }
+          }
+          return { phase: p.pause!.phase, wire: p.pause!.wire, layer: p.layer, bright: p.bright, box: p.box, frame: f && f.width > 0 ? { cx: f.left + f.width / 2, w: f.width } : null, lines };
+        });
+        expect(st.phase, `k ${at}`).toBe("build");
+        expect(st.layer, `k ${at}`).toBe("front");
+        expect(st.bright, `k ${at}`).toBeGreaterThan(0.95);
+        expect(st.frame, `k ${at}: the frame is drawn`).not.toBeNull();
+        expect(Math.abs((st.box.l + st.box.r) / 2 - st.frame!.cx), `k ${at}: centred in its frame`).toBeLessThanOrEqual(0.06 * w);
+        expect(st.frame!.w, `k ${at}: within the screen's margins`).toBeLessThanOrEqual(0.9 * w);
+        expect(st.lines, `k ${at}: no words on screen while it builds`).toBe(0);
+        seen.push(st.wire);
+      }
+      expect(seen).toEqual([...seen].sort((a, b) => a - b));
+      expect(seen[0]).toBeLessThan(seen[2]);
+      // past the pause: no frame, brass
+      await page.evaluate((y) => window.scrollTo(0, y), Math.round(k.buildEnd + 0.5 * h));
+      await page.waitForTimeout(1200);
+      expect(await page.evaluate(() => ({ phase: window.__pendant!.pause!.phase, wire: window.__pendant!.pause!.wire }))).toEqual({ phase: null, wire: 1 });
+      expect(errors).toEqual([]);
+    });
+    test("stacked: the phone shots (six and the build), at most 2x, never in front of a line, and gone before Contact", async ({ page }) => {
       test.setTimeout(300_000);
       const errors = collectErrors(page);
       await page.goto("/about");
@@ -810,7 +855,7 @@ for (const [w, h] of [[390, 844], [430, 932]] as const) {
       await page.waitForTimeout(1500); // (the nav's entrance)
       const hook = await page.evaluate(() => ({ mode: window.__pendant!.mode, ids: window.__pendant!.keys.map((k) => k.id), pr: window.__pendant!.pixelRatio, fxaa: window.__pendant!.fxaa }));
       expect(hook.mode).toBe("stack");
-      expect(hook.ids).toEqual(["opening", "tumble", "above", "glass", "whirl", "hero"]);
+      expect(hook.ids).toEqual(["opening", "tumble", "above", "glass", "whirl", "build", "buildEnd", "hero"]);
       expect(hook.pr).toBeLessThanOrEqual(2); // (a 3x phone draws at 2x at most)
       expect(hook.fxaa).toBe(true); // (and so is smoothed: under the screen's own ratio there is no multisampling)
       await expect(page.locator("canvas.ab-pendant")).toBeVisible();
@@ -962,7 +1007,7 @@ test.describe("under reduced motion", () => {
     await ready(page, 30_000);
     await expect(page.locator("canvas.ab-pendant")).toHaveAttribute("data-mode", "still");
     const keys = await page.evaluate(() => window.__pendant!.keys);
-    expect(keys.map((k) => k.id)).toEqual(["opening", "tumble", "above", "glass", "whirl", "hero"]);
+    expect(keys.map((k) => k.id)).toEqual(["opening", "tumble", "above", "glass", "whirl", "build", "buildEnd", "hero"]);
     await page.evaluate((y) => window.scrollTo(0, y), keys[0].y);
     await page.waitForTimeout(1500);
     // every frame: the hook, and the canvas's opacity as the page paints it
@@ -1104,7 +1149,7 @@ test("reduced motion turned on mid-visit stacks the page and the pendant follows
   await expect(page.locator("section.ab")).toHaveAttribute("data-mode", "stack");
   await expect(page.locator("canvas.ab-pendant")).toHaveAttribute("data-mode", "still");
   await expect.poll(() => page.evaluate(() => window.__pendant!.mode)).toBe("stack");
-  await expect.poll(() => page.evaluate(() => window.__pendant!.keys.map((k) => k.id))).toEqual(["opening", "tumble", "above", "glass", "whirl", "hero"]);
+  await expect.poll(() => page.evaluate(() => window.__pendant!.keys.map((k) => k.id))).toEqual(["opening", "tumble", "above", "glass", "whirl", "build", "buildEnd", "hero"]);
   await expect.poll(() => page.evaluate(() => getComputedStyle(document.querySelector("canvas.ab-pendant")!).position)).toBe("fixed");
   // and back: the track again
   await page.emulateMedia({ reducedMotion: "no-preference" });

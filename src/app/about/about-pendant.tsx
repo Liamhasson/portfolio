@@ -343,6 +343,10 @@ export function AboutPendant() {
       dwell: null as Dwell | null,
       /** The build stage's width (px): the frame is never wider. */
       stageW: 0,
+      /** Stacked, the build's pause (Liam, 2026-10-19: the build on phones too): the travel over which the empty stage fills
+       *  the screen, from its top at the screen's top to its foot at the screen's foot; null on the track, under reduced
+       *  motion, or without a stage. */
+      stackPause: null as { from: number; to: number } | null,
     };
     /** The shots for the layout: the track's, or the stack's. */
     const baseShots = () => (L.mode === "stack" ? SHOTS_STACK : SHOTS);
@@ -444,7 +448,7 @@ export function AboutPendant() {
       L.top = sec.offsetTop;
       L.H = sec.offsetHeight;
       if (stack) { L.dwell = null; measureStack(vw, vh); }
-      else measureTrack(vw, vh);
+      else { L.stackPause = null; measureTrack(vw, vh); }
       // (the section is a screen plus the travel, so travel px and scroll px are one to one; stacked, travel is the scroll)
       hook.keys = L.shots.map((s, i) => ({ id: s.id, y: L.top + (stack ? L.keys[i] : scrollForTravel(L.keys[i], L.dwell)) }));
       const seen = (el: HTMLElement) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 ? r : null; };
@@ -535,6 +539,22 @@ export function AboutPendant() {
         L.glassR = 0;
       }
       L.keys = solveKeys(L.shots, (a) => (typeof a === "object" ? mid(a.pendant)?.y ?? null : null), vh, L.travel);
+      // the build's pause: the build shot is fully on as the stage's top reaches the screen's top, and holds to its end key as
+      // the stage's foot reaches the large viewport's foot (a phone's toolbars, showing, leave the stage below what is visible:
+      // the screen stays clear, and their coming and going never moves a key), the stage filling the screen between
+      const stage = anchor("buildstage"), bi = L.shots.findIndex((sh) => sh.id === "build");
+      const stR = stage?.getBoundingClientRect();
+      L.stackPause = null;
+      L.stageW = 0;
+      if (stage && stR && stR.height > 0 && bi >= 0 && L.shots[bi + 1]?.id === "buildEnd" && !reducedQ.matches) {
+        const sb = inSection(rectBox(stR), stage, secTop);
+        const from = Math.min(Math.max(sb.t, 0), L.travel), to = Math.min(Math.max(sb.b - vh, from + 1), L.travel);
+        L.keys[bi] = Math.max(from, (L.keys[bi - 1] ?? 0) + 1);
+        L.keys[bi + 1] = Math.max(to, L.keys[bi] + 1);
+        for (let i = bi + 2; i < L.keys.length; i++) L.keys[i] = Math.max(L.keys[i], L.keys[i - 1] + 1);
+        L.stackPause = { from: L.keys[bi], to: L.keys[bi + 1] };
+        L.stageW = stR.width;
+      }
       const rect = (b: Box): TextRect => ({ l: b.l, t: b.t, w: b.r - b.l, h: b.b - b.t, axis: "y" });
       const of = (el: Element) => (b: Box) => rect(inSection(b, el, secTop));
       const words = [...tr.querySelectorAll<HTMLElement>(TEXT)].flatMap((el) => lineBoxes(el).map(of(el)));
@@ -659,7 +679,8 @@ export function AboutPendant() {
       const stack = L.mode === "stack";
       // the travel: the track's progress across its overflow, or (stacked) the page's scroll through the section
       const vh = stack ? L.vh : window.innerHeight, y = window.scrollY;
-      const pause = stack ? { s: Math.min(Math.max(y - L.top, 0), L.travel), k: 0 } : dwellTravel(Math.min(Math.max(y - L.top, 0), Math.max(L.H - vh, 0)), L.travel, L.dwell);
+      const sp = L.stackPause, sStack = Math.min(Math.max(y - L.top, 0), L.travel);
+      const pause = stack ? { s: sStack, k: sp ? clamp01((sStack - sp.from) / Math.max(sp.to - sp.from, 1)) : 0 } : dwellTravel(Math.min(Math.max(y - L.top, 0), Math.max(L.H - vh, 0)), L.travel, L.dwell);
       const sTarget = pause.s;
       if (first) { sSm = sPrev = sTargetPrev = sRide = sTarget; first = false; } // (a page opened mid-track starts where it is, no fly-in)
       if (Math.abs(sTarget - sTargetPrev) > vh) { jumped = true; sRide = sTarget; } // (a jump, not a scroll: an anchor, a key, a restore)
@@ -702,8 +723,10 @@ export function AboutPendant() {
       // (the move from the centre hold, as the shots blend), snaps to the frame's centre, the frame grows behind it, and it
       // builds itself (wire, clay, brass) as the scroll runs on, locked there: still turning in place, the cursor's lean and
       // a drag turn it, nothing moves it. At the end the frame pulls back into its corners and the page carries on.
-      const inPause = !stack && L.dwell !== null && pause.k > 0 && pause.k < 1;
-      const pastPause = !stack && L.dwell !== null && pause.k >= 1;
+      // (stacked, the page itself scrolls on through the empty stage, which fills the screen: the screen holds all the same)
+      const hasPause = stack ? L.stackPause !== null && !reduced : L.dwell !== null;
+      const inPause = hasPause && pause.k > 0 && pause.k < 1;
+      const pastPause = hasPause && pause.k >= 1;
       const bi = L.shots.findIndex((sh) => sh.id === "build");
       const b0 = L.shots[bi];
       let wire = f.wire;

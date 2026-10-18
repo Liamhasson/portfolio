@@ -124,7 +124,7 @@ test("stacked (phones, reduced motion), it loads too: the phone framing, not a h
   await waitFor(() => expect(load).toHaveBeenCalledTimes(1));
 });
 
-test("stacked, it films the stack's six shots on the page's own scroll", async () => {
+test("stacked, it films the stack's shots (the six, and the build) on the page's own scroll", async () => {
   await liveScene();
   const { fontsDone, runIdle } = setup();
   render(<Page mode="stack" />);
@@ -132,7 +132,7 @@ test("stacked, it films the stack's six shots on the page's own scroll", async (
   await runIdle();
   await waitFor(() => expect(window.__pendant?.ready).toBe(true));
   expect(window.__pendant!.mode).toBe("stack");
-  expect(window.__pendant!.keys.map((k) => k.id)).toEqual(["opening", "tumble", "above", "glass", "whirl", "hero"]);
+  expect(window.__pendant!.keys.map((k) => k.id)).toEqual(["opening", "tumble", "above", "glass", "whirl", "build", "buildEnd", "hero"]);
 });
 
 test("a change of layout films the other shots", async () => {
@@ -144,7 +144,7 @@ test("a change of layout films the other shots", async () => {
   await waitFor(() => expect(window.__pendant?.ready).toBe(true));
   expect(window.__pendant!.keys).toHaveLength(12);
   await act(async () => { container.querySelector<HTMLElement>(".ab")!.dataset.mode = "stack"; });
-  await waitFor(() => expect(window.__pendant!.keys).toHaveLength(6));
+  await waitFor(() => expect(window.__pendant!.keys).toHaveLength(8));
   expect(window.__pendant!.mode).toBe("stack");
 });
 

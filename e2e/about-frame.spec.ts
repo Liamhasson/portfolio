@@ -132,13 +132,17 @@ test("it follows a resize: the frame covers the new screen and redraws at the ne
   expect(m.box.width).toBeCloseTo(stage.w, 0);
 });
 
-test("stacked (a portrait phone): no frame, whatever the state says", async ({ page }) => {
+test("stacked (a portrait phone): the frame draws there too, as the build writes it (Liam, 2026-10-19: the build on phones)", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/about?pendant-debug");
   await page.waitForFunction(() => !!window.__frame, null, { timeout: 15_000 });
   await expect(page.locator("section.ab")).toHaveAttribute("data-mode", "stack");
   await setFrame(page, { cx: 195, cy: 422, w: 300, h: 260, phase: "build" });
   await expect(page.locator("svg.ab-frame")).toHaveAttribute("data-phase", "build");
-  await expect(page.locator("svg.ab-frame")).toBeHidden();
-  expect(await page.locator("svg.ab-frame").evaluate((el) => getComputedStyle(el).display)).toBe("none");
+  await expect(page.locator("svg.ab-frame")).toBeVisible();
+  const cx = await page.evaluate(() => {
+    const rs = [...document.querySelectorAll("svg.ab-frame [data-frame='box']")].map((n) => n.getBoundingClientRect());
+    return (Math.min(...rs.map((r) => r.left)) + Math.max(...rs.map((r) => r.right))) / 2;
+  });
+  expect(cx).toBeCloseTo(195, 0);
 });

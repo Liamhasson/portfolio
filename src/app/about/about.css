@@ -32,7 +32,9 @@ a.ab-proof:hover, a.ab-proof:focus-visible { color: #f4efe9; }
 .ab[data-mode="stack"] .ab-slide { max-width: none; min-height: 70svh; display: flex; flex-direction: column; justify-content: center; }
 .ab[data-mode="stack"] .ab-big { font-size: clamp(28px, 7.5vw, 48px); }
 .ab[data-mode="stack"] .ab-skills { grid-template-columns: 1fr; gap: 18px; }
-.ab[data-mode="stack"] .ab-portrait { height: auto; width: min(64vw, 340px); }
+/* (the full text width on a phone, its tall crop kept; on an upright tablet no taller than 70% of the screen, centred.
+   Liam, 2026-10-19: it sat at two thirds of the width, an empty strip beside it) */
+.ab[data-mode="stack"] .ab-portrait { height: auto; width: min(100%, calc(70svh * 760 / 1273)); margin-inline: auto; }
 .ab[data-mode="stack"] .ab-bar { display: none; }
 /* the ground: the site's film grain over the graded black (spec §3.3), fixed so it doesn't scroll with the words */
 .ab::before { content: ""; position: fixed; inset: 0; pointer-events: none; background: url("/lab/grain.png"); opacity: 0.05; z-index: 0; }
@@ -76,7 +78,7 @@ a.ab-proof:hover, a.ab-proof:focus-visible { color: #f4efe9; }
    the pin, so the pendant draws over its lines. Never takes the pointer or the focus. The track only: no build shot when
    stacked. */
 .ab-frame { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; overflow: visible; }
-.ab[data-mode="stack"] .ab-frame { display: none; }
+.ab[data-mode="stack"] .ab-frame { z-index: 1; }   /* (stacked: under the fixed canvas, which sits at 2 in front) */
 
 /* the pictures along the track (spec 2026-10-16-about-pictures-design.md §2; the v26 mockup): every one is an .ab-pic, a frame
    (.ab-pic-f) with an optional caption under it. Corners 10px. */
@@ -109,7 +111,11 @@ a.ab-proof:hover, a.ab-proof:focus-visible { color: #f4efe9; }
 .ab-buildstage { flex: 0 0 auto; width: 36vw; align-self: stretch; }
 /* stacked (phones, reduced motion): the pictures simply flow under their text */
 .ab[data-mode="stack"] .ab-row, .ab[data-mode="stack"] .ab-verbrow { flex-direction: column; align-items: flex-start; gap: 6vw; }
-.ab[data-mode="stack"] .ab-buildstage { display: none; }   /* (no build shot on phones: Liam's six phone shots) */
+/* stacked (Liam, 2026-10-19: the build on phones too): the empty stage under "Build it.", three and a half screens tall, so
+   it fills the screen for two and a half screens of scroll while the pendant builds in its frame at the middle (the
+   screen holds still). Under reduced motion there is no pause: one screen for the finished pendant. */
+.ab[data-mode="stack"] .ab-buildstage { display: block; width: 100%; height: 350svh; }
+@media (prefers-reduced-motion: reduce) { .ab[data-mode="stack"] .ab-buildstage { height: 100svh; } }
 .ab[data-mode="stack"] .ab-row .ab-big, .ab[data-mode="stack"] .ab-lead .ab-big { max-width: none; }
 .ab[data-mode="stack"] .ab-studio { width: min(40vw, 220px); margin: 0; }
 .ab[data-mode="stack"] .ab-strip { gap: 3vw; margin-top: 6vw; }

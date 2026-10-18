@@ -178,10 +178,15 @@ export const SHOTS_STACK: readonly Shot[] = fill([
   { id: "glass", anchor: { pendant: "glass", fallback: ["quote1", "quote2"] }, fx: 0.5, az: 150, el: 8, roll: 0, fov: 30, h: 0.15, ax: "glass", ay: "glass", aim: [0, 0, 0], spin: 0.16, aperture: 0.0005, glass: 1, bright: true },
   // 08 Whirl: stands up spinning fast in the band above "Check I'm right", slows to a new face
   { id: "whirl", anchor: { pendant: "check" }, fx: 0.68, az: 20, el: 10, roll: 0, fov: 34, h: 0.21, ax: 0.5, ay: 0.3, aim: [0, 0, 0], spin: 1.3, aperture: 0.0008, glass: 0, bright: false },
+  // 09 The build, in its frame (Liam, 2026-10-19: on phones too): as on the track, at the screen's middle while the empty
+  // stage under "Build it." fills the screen (the mount keys it to the stage's top and foot), brass as it flies in, the
+  // wireframe once it snaps into the frame, built up once with the scroll
+  { id: "build", anchor: { pendant: "buildstage" }, fx: 0.5, az: -35, el: 12, roll: 0, fov: 30, h: 0.5, ax: 0.5, ay: 0.46, aim: [0, 0, 0], spin: 0.06, tumble: 0, lock: null, aperture: 0.0012, wire: 1, layer: "front", bright: true, glass: 0 },
+  { id: "buildEnd", anchor: { pendant: "buildstage" }, fx: 0.5, wire: 1 },
   // 10 Hero: rising from the bottom left corner under the last line, cut by the left and bottom edges, a face turned toward the
   // line. (Smaller than the track's close-up: the fixed resume pill holds the bottom's middle, and the last line rises through
   // the band below it on the way in, so the corner left of the pill is the one free place; the solve fits it there.)
-  { id: "hero", anchor: "end", az: -62, el: -12, roll: 6, fov: 24, h: 0.32, ax: 0.08, ay: 0.9, aim: [0, 0.02, -0.1], spin: 0, lock: -30, aperture: 0.0016 },
+  { id: "hero", anchor: "end", az: -62, el: -12, roll: 6, fov: 24, h: 0.32, ax: 0.08, ay: 0.9, aim: [0, 0.02, -0.1], spin: 0, lock: -30, aperture: 0.0016, bright: false },
 ]);
 
 /** The most of the follow's lag a riding shot (`ride`) is carried with the page, as a share of the width: more than a steady

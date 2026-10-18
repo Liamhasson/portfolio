@@ -186,7 +186,7 @@ export function AboutTrack() {
               {/* Liam's photo opens the track, left of the first line: it holds still while the words roll past and is cropped away from the left, gone before the first line reaches it (Liam, 2026-10-15) */}
               {ABOUT.portrait && (
                 <figure className="ab-slide ab-photo">
-                  <Image className="ab-portrait" src={ABOUT.portrait.src} alt={ABOUT.portrait.alt} width={ABOUT.portrait.width} height={ABOUT.portrait.height} sizes="(max-width: 1023px) 70vw, 30vw" priority />
+                  <Image className="ab-portrait" src={ABOUT.portrait.src} alt={ABOUT.portrait.alt} width={ABOUT.portrait.width} height={ABOUT.portrait.height} sizes="(max-aspect-ratio: 1/1) 100vw, 30vw" priority />
                 </figure>
               )}
               {ABOUT.lines.map((l, i) => i === 1
