@@ -1371,3 +1371,169 @@ test.describe("Safari (WebKit) @webkit", () => {
     });
   });
 });
+
+// ---------- About round 3, Task 5: the glass ball under the cursor (both balls) ----------
+
+/** Two PNG screenshots of one square clip round a ball (centre `ox, oy` and radius `r` in clip px), compared in the page (a
+ *  pixel changed when a channel moved by more than 2 levels): the changes inside the disc between `in0` and `in1` of the
+ *  radius; on the outline (0.97 to 1.05 r) on the side facing `toward` (radians, screen y down: within 45 degrees of it); and
+ *  outside 1.05 r (to the clip's edge). */
+async function ballChanges(a: Buffer, b: Buffer, page: Page, ball: { ox: number; oy: number; r: number }, opts: { in0: number; in1: number; toward: number }) {
+  return page.evaluate(async ({ a, b, ball, opts }) => {
+    const read = async (src: string) => {
+      const img = new Image();
+      img.src = `data:image/png;base64,${src}`;
+      await img.decode();
+      const c = document.createElement("canvas");
+      c.width = img.width; c.height = img.height;
+      const x = c.getContext("2d")!;
+      x.drawImage(img, 0, 0);
+      return { d: x.getImageData(0, 0, c.width, c.height).data, w: c.width, h: c.height };
+    };
+    const A = await read(a), B = await read(b);
+    let inside = 0, outline = 0, outside = 0, worstOutside = 0;
+    for (let py = 0; py < A.h; py++) {
+      for (let px = 0; px < A.w; px++) {
+        const i = (py * A.w + px) * 4;
+        const dl = Math.max(Math.abs(A.d[i] - B.d[i]), Math.abs(A.d[i + 1] - B.d[i + 1]), Math.abs(A.d[i + 2] - B.d[i + 2]));
+        const dx = px + 0.5 - ball.ox, dy = py + 0.5 - ball.oy, k = Math.hypot(dx, dy) / ball.r;
+        if (k > 1.05) { worstOutside = Math.max(worstOutside, dl); if (dl > 2) outside++; continue; }
+        if (dl <= 2) continue;
+        let da = Math.abs(Math.atan2(dy, dx) - opts.toward);
+        if (da > Math.PI) da = 2 * Math.PI - da;
+        if (k >= opts.in0 && k <= opts.in1) inside++;
+        if (k >= 0.97 && da < Math.PI / 4) outline++;
+      }
+    }
+    return { inside, outline, outside, worstOutside };
+  }, { a: a.toString("base64"), b: b.toString("base64"), ball, opts });
+}
+
+/** The track at the glass slot, q held at 0 (no light: both balls show a still glass room, their rim glints off), the cursor
+ *  parked in the corner. Returns the ball (screen px) and a square clip round it, 1.35 r out. */
+async function stillBallAtSlot(page: Page, own: "pendant" | "light") {
+  await page.mouse.move(1430, 890);
+  const slot = await scrollTo(page, "slot");
+  await holdQ(page, 0);
+  await expect.poll(async () => (await hook(page)).q).toBe(0);
+  if (own === "light") await expect.poll(async () => (await hook(page)).ownBall).toBe(true);
+  await page.waitForTimeout(700);
+  const pb = own === "pendant" ? await pendantBall(page) : null;
+  const ball = pb ?? { x: slot.x, y: slot.y, r: 0.44 * slot.w };
+  const S = Math.ceil(1.35 * ball.r);
+  const clip = { x: Math.round(ball.x - S), y: Math.round(ball.y - S), width: 2 * S, height: 2 * S };
+  return { ball, clip, at: { ox: ball.x - clip.x, oy: ball.y - clip.y, r: ball.r } };
+}
+
+test.describe("the glass ball under the cursor", () => {
+  for (const own of ["pendant", "light"] as const) {
+    test(`${own === "pendant" ? "the pendant's ball" : "the light's own ball"}: hovering at its edge sends rings across the disc and leans the outline toward the cursor; nothing changes outside 1.05 r`, async ({ page }) => {
+      test.setTimeout(90_000);
+      const errors = collectErrors(page, own === "light" ? /Failed to load resource/ : undefined);
+      if (own === "light") await page.route(PENDANT_GLB, (r) => r.abort());
+      await page.goto("/about");
+      await lightLoaded(page);
+      if (own === "pendant") await page.waitForFunction(() => window.__pendant?.ready === true, null, { timeout: 30_000 });
+      else await expect(page.locator("canvas.ab-pendant")).toHaveCount(0, { timeout: 15_000 });
+      const { ball, clip, at } = await stillBallAtSlot(page, own);
+      // still: two looks 300 ms apart (the pendant inside turns; the glass round it doesn't)
+      const rest = await page.screenshot({ clip });
+      await page.waitForTimeout(300);
+      const rest2 = await page.screenshot({ clip });
+      const still = await ballChanges(rest, rest2, page, at, { in0: 0.78, in1: 0.97, toward: 0 });
+      expect(still.outside, "still: nothing outside the ball moves").toBe(0);
+      expect(still.outline, "still: the outline holds").toBe(0);
+      // onto the ball from the right, to 0.9 r: a ring starts there and the outline leans toward it
+      await page.mouse.move(ball.x + 1.25 * ball.r, ball.y);
+      await page.mouse.move(ball.x + 0.9 * ball.r, ball.y, { steps: 4 });
+      await page.waitForTimeout(250);
+      const hovered = await page.screenshot({ clip });
+      const h = await page.evaluate(() => window.__glassRipple!);
+      expect(h.over).toBe(true);
+      expect(h.rings).toBeGreaterThanOrEqual(1);
+      const moved = await ballChanges(rest2, hovered, page, at, { in0: 0.78, in1: 0.97, toward: 0 });
+      expect(moved.inside, `rings inside the disc (still: ${still.inside})`).toBeGreaterThan(still.inside + 150);
+      expect(moved.outline, "the outline leans toward the cursor").toBeGreaterThan(10);
+      expect(moved.outside, `nothing outside 1.05 r (most a pixel moved there: ${moved.worstOutside})`).toBe(0);
+      // and it settles: off the ball, the rings die away and the outline goes back
+      await page.mouse.move(1430, 890, { steps: 3 });
+      await page.waitForTimeout(2200);
+      expect(await page.evaluate(() => window.__glassRipple!)).toMatchObject({ rings: 0, over: false });
+      const after = await page.screenshot({ clip });
+      const back = await ballChanges(rest2, after, page, at, { in0: 0.78, in1: 0.97, toward: 0 });
+      expect(back.outline, "the outline back where it was").toBe(0);
+      expect(back.outside).toBe(0);
+      expect(errors).toEqual([]);
+    });
+  }
+
+  test("under reduced motion, hovering the ball changes nothing: no rings, no lean", async ({ page }) => {
+    test.setTimeout(90_000);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto("/about");
+    await lightLoaded(page);
+    await page.waitForFunction(() => window.__pendant?.ready === true, null, { timeout: 30_000 });
+    await page.mouse.move(1430, 890);
+    // (reduced motion stacks the page: the glass shot's place, the ball held there)
+    const y = await page.evaluate(() => window.__pendant!.keys.find((k) => k.id === "glass")!.y);
+    await page.evaluate((y) => window.scrollTo(0, y), y);
+    await page.waitForTimeout(2500);
+    const ball = await pendantBall(page);
+    expect(ball, "the pendant's ball").not.toBeNull();
+    const S = Math.ceil(1.35 * ball!.r);
+    const clip = { x: Math.round(ball!.x - S), y: Math.round(ball!.y - S), width: 2 * S, height: 2 * S };
+    const before = await page.screenshot({ clip });
+    await page.mouse.move(ball!.x + 1.25 * ball!.r, ball!.y);
+    await page.mouse.move(ball!.x + 0.9 * ball!.r, ball!.y, { steps: 4 });
+    await page.waitForTimeout(150);
+    await page.mouse.move(ball!.x + 0.3 * ball!.r, ball!.y - 0.4 * ball!.r, { steps: 6 });
+    await page.waitForTimeout(400);
+    const after = await page.screenshot({ clip });
+    expect(await changedPixels(before, after, page)).toBe(0);
+    expect(await page.evaluate(() => window.__glassRipple)).toMatchObject({ rings: 0, lean: 0, spawned: 0 });
+  });
+});
+
+test.describe("the glass ball under a finger, stacked on a 390 x 844 phone", () => {
+  test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+
+  test("a tap on the ball sends one ring across it; nothing outside 1.05 r changes", async ({ page }) => {
+    test.setTimeout(90_000);
+    const errors = collectErrors(page);
+    await page.goto("/about");
+    await expect(page.locator("section.ab")).toHaveAttribute("data-mode", "stack");
+    await lightLoaded(page);
+    await page.waitForFunction(() => window.__pendant?.ready === true, null, { timeout: 30_000 });
+    const y = await page.evaluate(() => window.__pendant!.keys.find((k) => k.id === "glass")!.y);
+    await page.evaluate((y) => window.scrollTo(0, y), y);
+    await page.waitForTimeout(2500);
+    // the light off (both quotes moved far below: q 0), so the ball's rim doesn't glint and the glass round the pendant is still
+    await page.evaluate(() => {
+      for (const s of ["quote1", "quote2"]) { const el = document.querySelector<HTMLElement>(`[data-pendant='${s}']`)!; el.style.position = "relative"; el.style.top = "6000px"; }
+    });
+    await expect.poll(async () => (await hook(page)).q).toBe(0);
+    await page.waitForTimeout(600);
+    const b = await pendantBall(page);
+    expect(b, "the pendant's ball in the opened slot").not.toBeNull();
+    const S = Math.ceil(1.35 * b!.r);
+    const clip = { x: Math.round(b!.x - S), y: Math.round(b!.y - S), width: 2 * S, height: 2 * S };
+    const at = { ox: (b!.x - clip.x) * 3, oy: (b!.y - clip.y) * 3, r: b!.r * 3 }; // (the screenshots at the phone's 3x)
+    const rest = await page.screenshot({ clip });
+    await page.waitForTimeout(350);
+    const rest2 = await page.screenshot({ clip });
+    const still = await ballChanges(rest, rest2, page, at, { in0: 0.78, in1: 0.97, toward: 0 });
+    expect(still.outside).toBe(0);
+    expect(await page.evaluate(() => window.__glassRipple?.spawned ?? 0)).toBe(0);
+    await page.touchscreen.tap(b!.x + 0.5 * b!.r, b!.y);
+    await page.waitForTimeout(350);
+    const tapped = await page.screenshot({ clip });
+    expect(await page.evaluate(() => window.__glassRipple!)).toMatchObject({ spawned: 1, rings: 1, over: false });
+    const moved = await ballChanges(rest2, tapped, page, at, { in0: 0.78, in1: 0.97, toward: 0 });
+    expect(moved.inside, `the ring inside the disc (still: ${still.inside})`).toBeGreaterThan(still.inside + 300);
+    expect(moved.outside, `nothing outside 1.05 r (most a pixel moved there: ${moved.worstOutside})`).toBe(0);
+    // one ring, gone after about 1.5 s
+    await page.waitForTimeout(1500);
+    expect(await page.evaluate(() => window.__glassRipple!)).toMatchObject({ spawned: 1, rings: 0 });
+    expect(errors).toEqual([]);
+  });
+});

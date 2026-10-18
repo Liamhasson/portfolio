@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { bufferSize, emptyUniforms, eyeOf, LIGHT_FS, lightUniforms, MAX_DPR, PULSE_ORIGIN, sphereFor, TestimonialsLight, type LightFrame } from "./testimonials-light";
+import { RIPPLE_GLSL, RIPPLE_UNIFORMS } from "./field";
 
 const frame = (o: Partial<LightFrame> = {}): LightFrame => ({ q: 1, t: 0, pulse: -1, pulseFrom: "right", ball: null, ...o });
 
@@ -121,5 +122,42 @@ describe("no allocation per frame", () => {
       [out.R, out.PO, out.BC, out.BP].forEach((a, i) => expect(a).toBe(arrays[i]));
       expect(out).toEqual(lightUniforms(f, 2160, 1350, 1440, 900));
     }
+  });
+});
+
+describe("the water under the cursor on the light's own ball (round 3, Task 5)", () => {
+  const ripple = () => {
+    const waves = new Float32Array(16);
+    waves.set([0.5, -0.25, 0.4, 0.6], 4); // (ring 1: origin, age, strength)
+    return { waves, lean: new Float32Array([0.3, -0.4]) };
+  };
+
+  test("the rings and the lean go to RW and RB as given (disc units: nothing to scale), the ball's radius in canvas px", () => {
+    const w = ripple();
+    const u = lightUniforms(frame({ ball: { x: 720, y: 300, r: 100 }, ripple: w }), 2160, 1350, 1440, 900);
+    expect(Array.from(u.RW)).toEqual(Array.from(w.waves));
+    expect(u.RB[0]).toBeCloseTo(0.3, 6);
+    expect(u.RB[1]).toBeCloseTo(-0.4, 6);
+    expect(u.RB[2]).toBeCloseTo(150, 9);
+  });
+
+  test("no water without a ball, or with none given; the out object's own arrays are rewritten, never replaced", () => {
+    const out = emptyUniforms(), rw = out.RW;
+    lightUniforms(frame({ ball: { x: 720, y: 300, r: 100 }, ripple: ripple() }), 1440, 900, 1440, 900, out);
+    lightUniforms(frame({ ball: null, ripple: ripple() }), 1440, 900, 1440, 900, out);
+    expect(out.RW).toBe(rw);
+    expect(Array.from(out.RW).every((v) => v === 0)).toBe(true);
+    expect(out.RB).toEqual([0, 0, 0]);
+    lightUniforms(frame({ ball: { x: 720, y: 300, r: 100 } }), 1440, 900, 1440, 900, out);
+    expect(Array.from(out.RW).every((v) => v === 0)).toBe(true);
+    expect(out.RB).toEqual([0, 0, 100]);
+  });
+
+  test("the shader takes the shared water (field.ts RIPPLE_GLSL), grows the sphere by the lean and tilts the normal by the rings", () => {
+    expect(LIGHT_FS).toContain(RIPPLE_UNIFORMS);
+    expect(LIGHT_FS).toContain(RIPPLE_GLSL);
+    expect(LIGHT_FS).toContain("float br = BR * (1. + rippleBulge(normalize(q + 1e-5)));");
+    expect(LIGHT_FS).toContain("- vec3(rippleSlope(q), 0.)");
+    expect(LIGHT_FS).toContain("float aa = clamp(br - dp + .5, 0., 1.);");
   });
 });

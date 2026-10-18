@@ -13,6 +13,7 @@ import { heldIndex, rideShift, SHOTS, SHOTS_STACK, shotAt, shotBright, solveKeys
 import type { Outline } from "@/three/pendant/solve";
 import type { Spot } from "@/three/pendant/layout";
 import { leanFor } from "./glass-lean";
+import { glassPointerIn } from "./glass-pointer";
 import { pictureShown } from "./pendant-pictures";
 import { dwellTravel, scrollForTravel, type Dwell } from "./track";
 import { setFrameState, type FramePhase } from "./build-frame-state";
@@ -239,6 +240,8 @@ export function AboutPendant() {
     const pin = canvas.parentElement;
     const tr = sec?.querySelector<HTMLElement>(".ab-track") ?? null;
     const clip = tr?.parentElement ?? null;
+    /** The water under the cursor on the ball (glass-pointer.ts: the slot's own listener, shared with the light's ball). */
+    const ripples = glassPointerIn(tr);
 
     const reducedQ = window.matchMedia("(prefers-reduced-motion: reduce)");
     let reduced = reducedQ.matches;
@@ -1051,6 +1054,7 @@ export function AboutPendant() {
       canvas.removeEventListener("webglcontextrestored", onRestored);
       hook.ready = false;
       giveGlassBack();
+      ripples?.release();
       try { scene?.dispose(); } catch { /* the GPU is already gone */ }
       scene = null;
     };
@@ -1076,6 +1080,7 @@ export function AboutPendant() {
         if (off) { loaded.dispose(); return; }
         endProbe();
         scene = loaded;
+        loaded.ripple = ripples && (() => ripples.read(performance.now()));
         if (debug && window.__pendantPerf) hook.gpuMs = loaded.enableGpuTiming() ? [] : null;
         cam = camMod;
         sv = solveMod;

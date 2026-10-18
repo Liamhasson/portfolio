@@ -5,8 +5,9 @@
  * frame, the arrival wave, and (only while nobody else draws it) the glass ball between the quotes, ray-traced.
  * It composites without a CSS blend (a blend over a canvas costs about 14 ms a frame: perf lesson 2026-10-11): each pixel
  * is premultiplied colour with alpha max(r, g, b), close to a screen blend over the near-black page.
+ * Its ball ripples and leans under the cursor exactly as the pendant's does (field.ts RIPPLE_GLSL, the frame's `ripple`).
  */
-import { ballCone, EDGE_COLOURS, EDGE_GLSL, type Cone } from "./field";
+import { ballCone, EDGE_COLOURS, EDGE_GLSL, RIPPLE_GLSL, RIPPLE_MAX, RIPPLE_UNIFORMS, type Cone, type GlassRipple } from "./field";
 
 /** ballCone's and sphereFor's answers inside lightUniforms, written in place (they run every frame the light draws a ball). */
 const coneTmp: Cone = { phi: 0, alpha: 0 };
@@ -30,6 +31,9 @@ export type LightFrame = {
   pulseFrom: "right" | "bottom";
   /** Only when the light draws the ball itself. */
   ball: LightBall | null;
+  /** The water under the cursor on that ball (field.ts RIPPLE_GLSL; app/about/glass-pointer.ts keeps it), as the
+   *  pendant's ball has it; absent or null for none. */
+  ripple?: Readonly<GlassRipple> | null;
 };
 
 export type LightUniforms = {
@@ -46,6 +50,10 @@ export type LightUniforms = {
   BR: number;
   /** The ball's opacity, 0..1. */
   BA: number;
+  /** The water (field.ts RIPPLE_GLSL): the rings (x, y, age, strength each), and the lean (x, y, disc units) with the ball's
+   *  radius on the canvas (px). */
+  RW: Float32Array;
+  RB: [number, number, number];
 };
 
 /** The shader's eye: centred over the screen, 2.2 screen heights in front of it (the mockup's camera). */
@@ -101,12 +109,15 @@ export function lightUniforms(f: LightFrame, w: number, h: number, cssW: number,
   out.BP[0] = sphere ? sphere.c[0] : 0; out.BP[1] = sphere ? sphere.c[1] : 0; out.BP[2] = sphere ? sphere.c[2] : 0;
   out.BR = sphere ? sphere.rho : 0;
   out.BA = b ? Math.min(1, Math.max(0, b.a ?? 1)) : 0;
+  const rip = b ? f.ripple : null;
+  if (rip) out.RW.set(rip.waves); else out.RW.fill(0);
+  out.RB[0] = rip ? rip.lean[0] : 0; out.RB[1] = rip ? rip.lean[1] : 0; out.RB[2] = b ? b.r * k : 0;
   return out;
 }
 
 /** A fresh set of uniforms for lightUniforms to write into. */
 export function emptyUniforms(): LightUniforms {
-  return { R: [0, 0], T: 0, A: 0, P: -1, PAD: 0, PO: [0, 0], BC: [0, 0], BP: [0, 0, 0], BR: 0, BA: 0 };
+  return { R: [0, 0], T: 0, A: 0, P: -1, PAD: 0, PO: [0, 0], BC: [0, 0], BP: [0, 0, 0], BR: 0, BA: 0, RW: new Float32Array(RIPPLE_MAX * 4), RB: [0, 0, 0] };
 }
 
 /** The drawing buffer for a screen: the CSS size times the pixel ratio, capped at MAX_DPR, at least 1 px. Written into
@@ -127,7 +138,9 @@ uniform vec2 PO;                      // the arrival wave's origin (uv)
 uniform vec2 BC;                      // the glass ball's centre as seen (canvas px)
 uniform vec3 BP; uniform float BR;    // the sphere: centre and radius (BR 0: none)
 uniform float BA;                     // the ball's opacity (its handoff to the pendant)
+${RIPPLE_UNIFORMS}
 ${EDGE_GLSL}
+${RIPPLE_GLSL}
 void main() {
   vec2 uv = gl_FragCoord.xy / R, aspect = vec2(R.x / R.y, 1.);
   // the arrival wave: from the origin's edge across the screen, pushing the frame outward as it passes
@@ -143,14 +156,18 @@ void main() {
     vec3 eye = vec3(R * .5, R.y * 2.2), C = BP;   // (placed so it shows centred on BC at the slot's 0.44: sphereFor)
     vec3 ro = vec3(gl_FragCoord.xy, 0.), rd = normalize(ro - eye);
     vec3 oc = ro - C; float bq = dot(oc, rd), dp = sqrt(max(dot(oc, oc) - bq * bq, 0.));
-    float aa = clamp(BR - dp + .5, 0., 1.);
+    // the water under the cursor (field.ts RIPPLE_GLSL, as the pendant's ball): the sphere grown here by the outline's lean
+    vec2 q = (gl_FragCoord.xy - BC) / max(RB.z, 1.);
+    float br = BR * (1. + rippleBulge(normalize(q + 1e-5)));
+    float aa = clamp(br - dp + .5, 0., 1.);
     if (aa > 0.) {
-      float hh = sqrt(max(BR * BR - dp * dp, 0.));
-      vec3 hp = ro + rd * (-bq - hh), n = normalize(hp - C);
+      float hh = sqrt(max(br * br - dp * dp, 0.));
+      // (the front's normal tilted by the rings' slope: what the ball shows wobbles with the water)
+      vec3 hp = ro + rd * (-bq - hh), n = normalize(normalize(hp - C) - vec3(rippleSlope(q), 0.));
       float F = .04 + .96 * pow(1. - max(dot(-rd, n), 0.), 5.);
       vec3 refl = env(reflect(rd, n), 0.);
       vec3 r1 = refract(rd, n, 1. / 1.5);
-      vec3 o2 = hp - C; float b2 = dot(o2, r1), t2 = -b2 + sqrt(max(b2 * b2 - (dot(o2, o2) - BR * BR), 0.));
+      vec3 o2 = hp - C; float b2 = dot(o2, r1), t2 = -b2 + sqrt(max(b2 * b2 - (dot(o2, o2) - br * br), 0.));
       vec3 ep = hp + r1 * t2, n2 = normalize(ep - C);
       vec3 r2 = refract(r1, -n2, 1.5); if (dot(r2, r2) < 1e-4) r2 = reflect(r1, -n2);
       vec3 refr = env(r2, 0.) * vec3(.96, .94, .91);
@@ -191,7 +208,7 @@ export class TestimonialsLight {
     private readonly gl: WebGLRenderingContext,
     private readonly prog: WebGLProgram,
     private readonly buf: WebGLBuffer,
-    private readonly u: Record<"R" | "T" | "A" | "P" | "PAD" | "PO" | "BC" | "BP" | "BR" | "BA", Loc>,
+    private readonly u: Record<"R" | "T" | "A" | "P" | "PAD" | "PO" | "BC" | "BP" | "BR" | "BA" | "RW" | "RB", Loc>,
   ) {}
 
   /** null: no WebGL, or the shader doesn't build here (the page then reads as before; nothing in the console). */
@@ -238,6 +255,7 @@ export class TestimonialsLight {
     ctx.disable(ctx.BLEND); // (the triangle writes every pixel: no clear, no blend)
     return new TestimonialsLight(canvas, ctx, prog, buf, {
       R: U("R"), T: U("T"), A: U("A"), P: U("P"), PAD: U("PAD"), PO: U("PO"), BC: U("BC"), BP: U("BP"), BR: U("BR"), BA: U("BA"),
+      RW: U("RW"), RB: U("RB"),
     });
   }
 
@@ -266,6 +284,8 @@ export class TestimonialsLight {
     gl.uniform3f(u.BP, v.BP[0], v.BP[1], v.BP[2]);
     gl.uniform1f(u.BR, v.BR);
     gl.uniform1f(u.BA, v.BA);
+    gl.uniform4fv(u.RW, v.RW);
+    gl.uniform3f(u.RB, v.RB[0], v.RB[1], v.RB[2]);
     const timed = this.beginTimer(tag);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     if (timed) this.timer!.ext.endQueryEXT(this.timer!.ext.TIME_ELAPSED_EXT);

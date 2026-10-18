@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { glassOwner, setGlassLight, showGlassSlot, type GlassLight, type GlassOwner } from "@/lib/about-glass";
 import type { LightBall, LightFrame, TestimonialsLight } from "@/three/edge-light/testimonials-light";
 import { lensBand, lensDepth, lensMap, lensScale, lensStrips, lensSupported, type LensEdge, type LensLayout } from "./edge-lens";
+import { glassPointer } from "./glass-pointer";
 import { pulsePhase, stepArrival, testimonialsQ, type Arrival } from "./testimonials-q";
 import { dwellTravel, type Dwell } from "./track";
 import { resizeKind } from "./viewport";
@@ -229,6 +230,8 @@ export function AboutTestimonials() {
     const q2 = tr?.querySelector<HTMLElement>("[data-pendant='quote2']") ?? null;
     const slot = tr?.querySelector<HTMLElement>("[data-pendant='glass']") ?? null;
     if (!sec || !tr || !clip || !q1 || !q2 || !slot) return;
+    /** The water under the cursor on its own ball (glass-pointer.ts: the slot's listener, shared with the pendant's ball). */
+    const ripples = glassPointer(slot);
 
     const reducedQ = window.matchMedia("(prefers-reduced-motion: reduce)");
     let reduced = reducedQ.matches;
@@ -407,6 +410,7 @@ export function AboutTestimonials() {
         } else drawnStill = false;
         light.resize(bw, bh, dpr);
         frame.q = q; frame.t = t; frame.pulse = pulse; frame.pulseFrom = m.stack ? "bottom" : "right"; frame.ball = ball;
+        frame.ripple = ball ? ripples.read(now) : null;
         const tag = ++frameNo;
         if (gpuMs) perfFrames.set(tag, { q, ownBall: ball !== null, lens: lens > 0 });
         if (gpuMs) light.draw(frame, tag); else light.draw(frame);
@@ -525,6 +529,7 @@ export function AboutTestimonials() {
     return () => {
       canvas.removeEventListener("webglcontextrestored", onRestored);
       teardown();
+      ripples.release();
       if (window.__testimonials) delete window.__testimonials;
     };
   }, [gen]);

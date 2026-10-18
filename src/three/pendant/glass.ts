@@ -24,11 +24,15 @@
  * (GLASS_FINISH_FRAGMENT), after the tone mapping, on the colours the screen shows, because they are the light's colours as the
  * light's canvas draws them (display values, added): through the tone mapping they would come out pale and washed.
  *
+ * Under the cursor (round 3, Task 5) the ball is water: both passes take field.ts RIPPLE_GLSL, as the light's own ball does.
+ * The rings tilt the front surface's normal (so the pendant seen through it wobbles, and the glints on it), and the outline
+ * leans toward the cursor by growing the sphere for the pixels on that side (at most 3% of r). No pass of its own.
+ *
  * Pure: the shaders as text and the placement maths. The scene owns the passes.
  */
 import { Matrix4, ShaderMaterial, Vector2, Vector3 } from "three";
 import type { Texture } from "three";
-import { ballCone, EDGE_COLOURS, EDGE_GLSL, type Cone } from "@/three/edge-light/field";
+import { ballCone, EDGE_COLOURS, EDGE_GLSL, RIPPLE_GLSL, RIPPLE_MAX, RIPPLE_UNIFORMS, type Cone } from "@/three/edge-light/field";
 
 /** Glass. */
 export const GLASS_IOR = 1.5;
@@ -115,6 +119,10 @@ export interface GlassUniforms {
   C2: { value: Vector3 };
   C3: { value: Vector3 };
   BC: { value: Vector2 };
+  /** The water under the cursor (field.ts RIPPLE_GLSL; app/about/glass-pointer.ts keeps it): the rings (x, y, age,
+   *  strength each), and RB: the outline's lean (xy, disc units) and the ball's radius on this canvas (z, px). */
+  RW: { value: Float32Array };
+  RB: { value: Vector3 };
 }
 
 /** The edge light's inputs (field.ts EDGE_GLSL reads them; it declares none itself): one per line. */
@@ -151,8 +159,10 @@ export const GLASS_FRAGMENT = /* glsl */ `
   uniform vec3 lamp;         // camera space, toward the lamp
   uniform float see;         // how much of the pendant shows through (the shot's glass; 0: the empty room)
   ${EDGE_UNIFORMS}
+  ${RIPPLE_UNIFORMS}
   varying vec2 vUv;
   ${EDGE_GLSL}
+  ${RIPPLE_GLSL}
 
   const float IOR = ${GLASS_IOR.toFixed(2)};
   const float F0 = 0.04;     // ((n - 1) / (n + 1))^2 at n = 1.5
@@ -195,13 +205,20 @@ export const GLASS_FRAGMENT = /* glsl */ `
     float b = dot( oc, d );
     float miss2 = dot( oc, oc ) - b * b;                               // the ray's closest approach to the centre, squared
     float near = sqrt( max( miss2, 0.0 ) );
-    float cover = clamp( ( radius - near ) / max( fwidth( near ), 1e-6 ) + 0.5, 0.0, 1.0 );   // the silhouette, antialiased
+    // the water under the cursor (field.ts RIPPLE_GLSL): this pixel in disc units round the ball's centre on screen; the
+    // sphere grown here by the outline's lean toward the cursor (at most 3%), for this pixel only
+    vec2 q = ( vUv * R - BC ) / max( RB.z, 1.0 );
+    float rad = radius * ( 1.0 + rippleBulge( normalize( q + 1e-5 ) ) );
+    float cover = clamp( ( rad - near ) / max( fwidth( near ), 1e-6 ) + 0.5, 0.0, 1.0 );   // the silhouette, antialiased
     if ( cover <= 0.0 ) { gl_FragColor = frame; return; }
 
     // in at the front (clamped at the silhouette, where the antialiased edge pixels sit just outside)
-    float h = sqrt( max( radius * radius - miss2, 0.0 ) );
+    float h = sqrt( max( rad * rad - miss2, 0.0 ) );
     vec3 p1 = camPos + d * ( -b - h );
-    vec3 n1 = normalize( p1 - centre );
+    // the front's normal, tilted by the rings' slope (screen right and up are the camera's): the pendant seen through the
+    // ball and the glints on it wobble with the water
+    vec2 g = rippleSlope( q );
+    vec3 n1 = normalize( normalize( p1 - centre ) - mat3( camWorld ) * vec3( g, 0.0 ) );
     float c1 = max( dot( -d, n1 ), 0.0 );
     float f1 = schlick( c1 );
     vec3 r1 = reflect( d, n1 );
@@ -251,8 +268,10 @@ export const GLASS_FINISH_FRAGMENT = /* glsl */ `
   uniform vec3 centre;
   uniform float radius;
   ${EDGE_UNIFORMS}
+  ${RIPPLE_UNIFORMS}
   varying vec2 vUv;
   ${EDGE_GLSL}
+  ${RIPPLE_GLSL}
 
   void main() {
     vec4 c = texture2D( tDiffuse, vUv );
@@ -265,11 +284,14 @@ export const GLASS_FINISH_FRAGMENT = /* glsl */ `
       float b = dot( oc, d );
       float miss2 = dot( oc, oc ) - b * b;
       float near = sqrt( max( miss2, 0.0 ) );
-      cover = clamp( ( radius - near ) / max( fwidth( near ), 1e-6 ) + 0.5, 0.0, 1.0 );   // (the glass pass's silhouette)
+      vec2 q = ( vUv * R - BC ) / max( RB.z, 1.0 );                    // (the glass pass's water: its lean, its rings)
+      float rad = radius * ( 1.0 + rippleBulge( normalize( q + 1e-5 ) ) );
+      cover = clamp( ( rad - near ) / max( fwidth( near ), 1e-6 ) + 0.5, 0.0, 1.0 );   // (the glass pass's silhouette)
       if ( cover > 0.0 && A > 0.0 ) {
-        float h = sqrt( max( radius * radius - miss2, 0.0 ) );
-        // camera space (x right, y up, toward the eye), as the light's ray-traced ball has its normal and ray
-        vec3 n = normalize( mat3( view ) * normalize( camPos + d * ( -b - h ) - centre ) );
+        float h = sqrt( max( rad * rad - miss2, 0.0 ) );
+        // camera space (x right, y up, toward the eye), as the light's ray-traced ball has its normal and ray; tilted by the
+        // rings, as the glass pass tilts it
+        vec3 n = normalize( mat3( view ) * normalize( camPos + d * ( -b - h ) - centre ) - vec3( rippleSlope( q ), 0.0 ) );
         vec3 rd = normalize( mat3( view ) * d );
         rim = clamp( rimGlint( n, rd, normalize( n.xy + 1e-5 ), BC ), 0.0, 1.0 ) * cover;
       }
@@ -285,7 +307,7 @@ export const GLASS_FINISH_FRAGMENT = /* glsl */ `
   }`;
 
 /** The finish pass's uniforms: its own frame and dim, and (shared, the same objects) the glass pass's sphere and light. */
-export type GlassFinishUniforms = Pick<GlassUniforms, "camWorld" | "projInv" | "view" | "camPos" | "centre" | "radius" | "R" | "T" | "A" | "PAD" | "C0" | "C1" | "C2" | "C3" | "BC"> & {
+export type GlassFinishUniforms = Pick<GlassUniforms, "camWorld" | "projInv" | "view" | "camPos" | "centre" | "radius" | "R" | "T" | "A" | "PAD" | "C0" | "C1" | "C2" | "C3" | "BC" | "RW" | "RB"> & {
   [name: string]: { value: unknown };
   tDiffuse: { value: Texture | null };
   dim: { value: number };
@@ -295,10 +317,10 @@ export type GlassFinishUniforms = Pick<GlassUniforms, "camWorld" | "projInv" | "
 
 /** The finish pass's material, sharing the glass pass's uniform objects (so placing the ball places it for both). */
 export function glassFinishMaterial(glass: GlassUniforms): ShaderMaterial & { uniforms: GlassFinishUniforms } {
-  const { camWorld, projInv, view, camPos, centre, radius, R, T, A, PAD, C0, C1, C2, C3, BC } = glass;
+  const { camWorld, projInv, view, camPos, centre, radius, R, T, A, PAD, C0, C1, C2, C3, BC, RW, RB } = glass;
   const uniforms: GlassFinishUniforms = {
     tDiffuse: { value: null }, dim: { value: 1 }, ball: { value: 0 }, ballDim: { value: 0 },
-    camWorld, projInv, view, camPos, centre, radius, R, T, A, PAD, C0, C1, C2, C3, BC,
+    camWorld, projInv, view, camPos, centre, radius, R, T, A, PAD, C0, C1, C2, C3, BC, RW, RB,
   };
   return new ShaderMaterial({
     name: "PendantGlassFinish", uniforms, vertexShader: GLASS_VERTEX, fragmentShader: GLASS_FINISH_FRAGMENT, depthTest: false, depthWrite: false,
@@ -334,6 +356,8 @@ export function glassMaterial(): ShaderMaterial & { uniforms: GlassUniforms } {
     C2: { value: rgb(EDGE_COLOURS[2]) },
     C3: { value: rgb(EDGE_COLOURS[3]) },
     BC: { value: new Vector2() },
+    RW: { value: new Float32Array(RIPPLE_MAX * 4) },
+    RB: { value: new Vector3(0, 0, 1) },
   };
   return new ShaderMaterial({
     name: "PendantGlass", uniforms, vertexShader: GLASS_VERTEX, fragmentShader: GLASS_FRAGMENT, depthTest: false, depthWrite: false,
