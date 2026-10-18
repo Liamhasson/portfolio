@@ -121,9 +121,8 @@ const LOOK_EASE = 0.1;
  *  case the old quote-gap sizing covered, so that fallback is gone.) */
 const GLASS_SLOT_R = 0.44;
 const GLASS_MIN = 0.02;
-/** On the track the pendant follows the glass ball off the screen's left edge only this far (a share of the width): out of
- *  sight (through the glass the pendant is under 0.04 of the width either side of its centre), so it starts back to the hold the moment the ball has taken it out. */
-const GLASS_PARK = 0.05;
+/** The ball draws its view of the pendant while the pendant's box is within this many of the ball's radii of its centre. */
+const NEAR_BALL = 3;
 /** What is painted above the canvas and must keep its press (links, buttons, fields). */
 const CONTROL = "a, button, input, select, textarea, [role=button]";
 /** The outro, as the pull to Contact rises: it shrinks by this share, sinks this share of the screen, and fades out. */
@@ -688,25 +687,11 @@ export function AboutPendant() {
           if (fadeK === 0) hold(want);
         } else fadeK = Math.min(fadeK + dt / (CROSSFADE / 2), 1);
       } else { held = -1; fadeK = 1; }
-      let sAt = reduced ? L.keys[held] ?? 0 : sSm;
-      // Out of the glass (Liam, 2026-10-18: "bring it back sooner after the ball leaves"): the ball rides the page, the
-      // pendant the eased travel, a quarter second behind on a brisk scroll, so it would come back that long after the ball
-      // has taken it off the screen. From the glass to the hold it follows the riding travel instead (eased over RIDE_TAU,
-      // about a quarter of the lag): held in the ball all the way to glassEnd (the same pose, so the switch never shows),
-      // then handed back to the eased travel over the way to the hold. (Scrolling back, the riding travel trails: no change.)
-      if (!reduced && !stack) {
-        const gi = L.shots.findIndex((sh) => sh.id === "glass");
-        if (gi >= 0 && L.shots[gi + 1]?.id === "glassEnd" && sSm >= L.keys[gi] && sSm < L.keys[gi + 2]) {
-          const k = clamp01((sSm - L.keys[gi + 1]) / Math.max(L.keys[gi + 2] - L.keys[gi + 1], 1));
-          sAt = sSm + (1 - k * k * (3 - 2 * k)) * Math.max(sRide - sSm, 0);
-        }
-      }
+      const sAt = reduced ? L.keys[held] ?? 0 : sSm;
       // the glass rides with the page as the page shows it (not the smoothed travel): it is a place in the page. Held, it is
       // where the held shot has it.
       const gp = glassAt(reduced ? sAt : sTarget);
-      // (the pendant follows the ball only as far as just past the screen's left edge, GLASS_PARK: once the ball has carried
-      // it out of sight it comes back from there to the hold, rather than trailing the ball on off the screen)
-      const f = shotAt(sAt, L.keys, L.shots, { ...atFor(sAt), glass: stack ? gp : { x: Math.max(gp.x, -GLASS_PARK), y: gp.y } });
+      const f = shotAt(sAt, L.keys, L.shots, { ...atFor(sAt), glass: gp });
       sv?.applySpot(f, L.spots); // (this screen's rest spots)
       // a shot framed on a stage among the words (the build) rides with the page, as its stage does (eased over RIDE_TAU),
       // rather than trailing it by the follow's lag onto the words beside the stage (shots.ts `ride`). At rest the lag is 0:
@@ -792,6 +777,14 @@ export function AboutPendant() {
         : cm.screenBox(sc.bounds, sc.inner, sc.camera, L.vw, L.vh);
       // (the outline is the low-poly wire copy's: the brass drawn round it reaches a little further, DRAWN_SLACK of its size)
       const box = padBox(wireBox, DRAWN_SLACK * Math.max(wireBox.r - wireBox.l, wireBox.b - wireBox.t) + 1);
+      // The ball reflects the pendant as real glass would, whatever the shot (Liam, 2026-10-18: "no fades, only natural
+      // smooth movement and reflection"): its lens view is drawn whenever the pendant is within NEAR_BALL of the ball's
+      // radius of it, far enough out that nothing of the pendant reaches the ball's view at the switch.
+      if (glass) {
+        const R = glass.r * L.vh, cx = glass.x * L.vw, cy = glass.y * L.vh;
+        const dx = Math.max(box.l - cx, cx - box.r, 0), dy = Math.max(box.t - cy, cy - box.b, 0);
+        glass.near = Math.hypot(dx, dy) < NEAR_BALL * R;
+      }
       // The layer: the one solved for this screen at this travel, not the shot's own. Then the live guard: the live outline,
       // grown by half the solve's padding, against the words where the page shows them (they ride the real scroll, the
       // pendant the eased one, so after a jump they part for a moment) and the chrome where it is (the site's chrome holds to

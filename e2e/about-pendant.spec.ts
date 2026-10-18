@@ -41,7 +41,7 @@ test("the pendant draws on About with no console errors", async ({ page }) => {
   await page.mouse.move(1430, 890);
   const hook = await page.evaluate(() => window.__pendant!);
   expect(hook.keys.map((k) => k.id)).toEqual([
-    "opening", "letgo", "tumble", "worm", "above", "glass", "glassEnd", "hold", "holdEnd", "build", "buildEnd", "hero",
+    "opening", "letgo", "tumble", "worm", "above", "glass", "glassOut", "hold", "holdEnd", "build", "buildEnd", "hero",
   ]);
   for (let i = 1; i < hook.keys.length; i++) expect(hook.keys[i].y).toBeGreaterThan(hook.keys[i - 1].y);
   // the opening: small, above the first line, in front of the words

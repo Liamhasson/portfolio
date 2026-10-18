@@ -14,8 +14,8 @@
  *   - the testimonials' glass ball is a pass after the motion blur (glass.ts): a true sphere, ray-traced per pixel, that
  *     looks up the pendant behind it in a zoomed render of it, so the pendant reads sharp, magnified and upside down in it
  *     (after the blur, so neither the ball nor its lens view is ever smeared). The ball is drawn full size wherever the slot
- *     is on screen; only the pendant seen through it follows the shot (`f.glass`), and the zoomed lens view is drawn only
- *     while there is a pendant to see.
+ *     is on screen, and it shows the pendant whenever the pendant is near it (`GlassSlot.near`), as real glass would; the
+ *     zoomed lens view is drawn only then.
  * The mount (Task 7) poses the rig itself, `poseRig(f, motion, t, look, vw, vh, scene.camera, scene.outer, scene.inner)`,
  * then calls `draw`. `draw` never moves the camera: it draws from the camera as posed.
  */
@@ -50,12 +50,6 @@ export const PENDANT_VERSION = "2026-10-16.4";
 const BASE = "/about/pendant/";
 /** The depth-of-field blur's ceiling (a share of the screen). */
 const MAX_BLUR = 0.012;
-/** Below this the shot isn't through the glass: the ball shows the empty room, and the lens view isn't drawn. */
-const GLASS_MIN = 0.02;
-/** The pendant seen through the ball fades in from GLASS_MIN to here (smoothstep) as the shot turns to the glass, then is
- *  the plain refracted view: the room is empty while the shot is elsewhere, and there is no half-faded ghost of the pendant
- *  for most of the move in (where it isn't behind the ball the trace shows the empty room anyway). */
-const SEE_FULL = 0.35;
 /** Where a clip plane parks to clip nothing (keeps the program the same, so nothing recompiles mid-scroll). */
 const CLIP_OFF = 1e6;
 
@@ -86,6 +80,9 @@ export interface GlassSlot {
   /** Held still over the words (stacked under reduced motion, the held shot through the glass: the quotes scroll over it),
    *  so it dims with the pendant; otherwise it rides its slot and keeps its look whatever the dim. */
   dimmed?: boolean;
+  /** The pendant is near enough to be seen in the ball (the mount's): the ball then shows it as real glass would, turned
+   *  over and magnified, whatever the shot; else the empty room (and no lens view drawn). */
+  near?: boolean;
 }
 
 export class PendantScene {
@@ -551,7 +548,7 @@ export class PendantScene {
   }
 
   /** The glass passes' uniforms for this frame: the ball, the camera it is seen from, the plane through the pendant, the
-   *  light. The lens view is drawn only while the shot is through the glass. */
+   *  light. The lens view is drawn only while the pendant is near the ball. */
   private placeGlass(glass: GlassSlot, f: Frame, dist: number, light: GlassLight | null): void {
     const cam = this.camera;
     const u = this.glass.uniforms;
@@ -576,9 +573,8 @@ export class PendantScene {
     cam.getWorldDirection(this.fwd);
     u.planeNormal.value.copy(this.fwd);
     u.planePoint.value.set(0, 0, 0);
-    // the pendant through it as far as the shot is through the glass; under GLASS_MIN the empty room, and no lens view
-    const k = Math.min(1, Math.max(0, (f.glass - GLASS_MIN) / (SEE_FULL - GLASS_MIN)));
-    u.see.value = k * k * (3 - 2 * k);
+    // the pendant through it whenever it is near (natural glass: no fade, Liam 2026-10-18); else the empty room, no lens view
+    u.see.value = glass.near ? 1 : 0;
     if (u.see.value > 0) this.drawLens(glass);
     // the light, as the testimonials' canvas draws it (field.ts): this canvas's own pixels, y up, so the edge each point of
     // the rim faces is the screen's edge the light draws there; A 0 with no light (the ball as it was: no colour anywhere)
