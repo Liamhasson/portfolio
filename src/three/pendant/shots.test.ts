@@ -396,7 +396,6 @@ describe("shotAt", () => {
 // Task 2, Part B: the whirl hands its fast spin to the build's held face early in the move (`settle`), and the build rides
 // with the page (`ride`), so a brisk scroll finds it on its stage, face on.
 describe("settle and ride (the build under a fast scroll)", () => {
-  const D = Math.PI / 180;
   const by = (id: string) => SHOTS.find((s) => s.id === id)!;
   // (the shot before the build is the centre hold now; a fast-spinning stand-in keeps the settle's property under test)
   const whirl = { ...by("holdEnd"), spin: 1.3, ride: 0 }, build = by("build"), buildEnd = by("buildEnd");

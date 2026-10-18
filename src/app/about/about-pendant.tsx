@@ -7,7 +7,7 @@ import type { Box, Look } from "@/three/pendant/camera";
 import { clipBox, hits, padBox, type TextRect } from "@/three/pendant/layout";
 import { REST, stepMotion, type MotionState } from "@/three/pendant/motion";
 import { PendantGovernor } from "@/three/pendant/governor";
-import { AHEAD_T, behindAhead, lagAhead, stepPresence, type Presence } from "@/three/pendant/presence";
+import { AHEAD_T, behindAhead, stepPresence, type Presence } from "@/three/pendant/presence";
 import type { GlassSlot, PendantScene } from "@/three/pendant/scene";
 import { heldIndex, rideShift, SHOTS, SHOTS_STACK, shotAt, shotBright, solveKeys, type Layer, type Shot } from "@/three/pendant/shots";
 import type { Outline } from "@/three/pendant/solve";
@@ -101,8 +101,6 @@ declare global {
 /** The scroll follow: what is left of the gap after one second. 0.018 is a time constant of about 0.25 s (-1 / ln 0.018), so a
  *  flick glides rather than whips (Liam, 2026-10-18; pendant-film-v3 had 0.0008, about 0.14 s). Jumps keep their reset. */
 const FOLLOW = 0.018;
-/** Its time constant (s): a page scrolling steadily at v keeps the pendant about v x FOLLOW_TAU behind it. */
-const FOLLOW_TAU = -1 / Math.log(FOLLOW);
 /** The frames the page's pace is held over (the look ahead's guess at whether the page is still scrolling). */
 const PAGE_HOLD = 6;
 /** A frame never steps more than this (s): a tab coming back doesn't jump the motion. */
@@ -822,7 +820,7 @@ export function AboutPendant() {
       // (Held still under reduced motion, nothing travels: no look ahead.)
       const lag = sTarget - sSm, dir = Math.sign(vel) || Math.sign(lag);
       const lead = Math.min(Math.abs(lag) + Math.max(Math.abs(vel), Math.abs(pageVel)) * AHEAD_T, stack ? L.vh : L.vw);
-      const layerAt = L.layer, overAt = L.over, overLag = L.overLagging;
+      const layerAt = L.layer, overAt = L.over;
       // (a riding shot is drawn carried with the page: its rest box carried as far, so the carry isn't counted as reach)
       const restNow = L.rest?.(sAt), live = sv ? padBox(box, sv.PAD / 2) : null; // (both unclipped: see solve.ts `rest`)
       const carried = !stack && !reduced && f.ride > 0 ? rideShift(f.ride, sRide - sAt, L.vw) : 0;
