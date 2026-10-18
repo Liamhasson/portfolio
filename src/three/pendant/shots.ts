@@ -145,7 +145,7 @@ export const SHOTS: readonly Shot[] = fill([
   { id: "build", anchor: { pendant: "buildstage", fallback: "build" }, fx: 0.5, az: -35, el: 12, roll: 0, fov: 30, h: 0.64, ax: 0.5, ay: 0.47, aim: [0, 0, 0], spin: 0.06, lock: null, aperture: 0.0012, wire: 0, ride: 1, settle: 1, layer: "front", bright: true },
   { id: "buildEnd", anchor: { pendant: "buildstage", fallback: "build" }, fx: 0.5, wire: 1 },
   // 10 Hero: close and low, cut by the left edge, its face turned to the last line (the aim is the face)
-  { id: "hero", anchor: "end", fx: 0, az: -62, el: -12, roll: 6, fov: 24, h: 1.35, ax: 0.03, ay: 0.5, aim: [0, 0.02, -0.1], spin: 0, lock: -62, aperture: 0.0016, ride: 0, bright: false,
+  { id: "hero", anchor: "end", fx: 0, az: -62, el: -12, roll: 6, fov: 24, h: 0.97, ax: 0.03, ay: 0.7, aim: [0, 0.02, -0.1], spin: 0, lock: -62, aperture: 0.0016, ride: 0, bright: false,
     // while About's layout leaves words beside the left edge at the end: the same shot mirrored, close at the right, cut by
     // the right edge, its face turned to the closing line on its left (Liam's ruling, 2026-10-16). Its ay / h tuned from the
     // asked 0.3 / 1.0 (there it sits on the pill nav and the closing line on every screen) to the one free area big enough

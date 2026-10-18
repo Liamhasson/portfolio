@@ -5,10 +5,13 @@ import { expect, test, type Page } from "@playwright/test";
 
 type Stage = { cx: number; cy: number; w: number; h: number };
 
-/** To the build stage, fully on screen (the mockup's scroll at 1440 x 900), and its rect: the frame's place at size "i". */
-async function toStage(page: Page, y = 10200): Promise<Stage> {
+/** To the build stage, fully on screen just before the page's pause there (so the pendant doesn't write the frame's state
+ *  yet: these set it by hand), and its rect: the frame's place at size "i". */
+async function toStage(page: Page, before = 200): Promise<Stage> {
   await page.goto("/about?pendant-debug");
   await page.waitForFunction(() => !!window.__frame, null, { timeout: 15_000 });
+  await page.waitForTimeout(1500);
+  const y = await page.evaluate((b) => { const s = document.querySelector<HTMLElement>("section.ab")!; return s.offsetTop + Number(s.dataset.dwellAt) - b; }, before);
   await page.evaluate((v) => window.scrollTo(0, v), y);
   await page.waitForTimeout(400);
   return page.evaluate(() => {

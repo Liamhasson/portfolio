@@ -6,7 +6,7 @@ import { glassOwner, setGlassLight, showGlassSlot, type GlassLight, type GlassOw
 import type { LightBall, LightFrame, TestimonialsLight } from "@/three/edge-light/testimonials-light";
 import { lensBand, lensDepth, lensMap, lensScale, lensStrips, lensSupported, type LensEdge, type LensLayout } from "./edge-lens";
 import { pulsePhase, stepArrival, testimonialsQ, type Arrival } from "./testimonials-q";
-import { trackProgress, trackX } from "./track";
+import { dwellTravel, type Dwell } from "./track";
 import { resizeKind } from "./viewport";
 
 /** What the page tells the e2e tests, rewritten (frozen: read-only) every frame the light runs. */
@@ -340,7 +340,11 @@ export function AboutTestimonials() {
      *  run yet. */
     const measureTrack = () => {
       const vw = clip.clientWidth || window.innerWidth;
-      const x = trackX(trackProgress(window.scrollY, sec.offsetTop, sec.offsetHeight, window.innerHeight), tr.scrollWidth, vw);
+      // (the track's x as about-track.tsx draws it: one px of scroll per px, holding still across the build's pause)
+      const at = Number(sec.dataset.dwellAt), len = Number(sec.dataset.dwellLen);
+      const dwell: Dwell | null = Number.isFinite(at) && len > 0 ? { at, length: len } : null;
+      const into = Math.min(Math.max(window.scrollY - sec.offsetTop, 0), Math.max(sec.offsetHeight - window.innerHeight, 0));
+      const x = 0 - dwellTravel(into, Math.max(tr.scrollWidth - vw, 0), dwell).s;
       const trR = tr.getBoundingClientRect(), left = clip.getBoundingClientRect().left + x;
       const centre = (r: DOMRect) => left + (r.left - trR.left) + r.width / 2;
       const s = slot.getBoundingClientRect();
