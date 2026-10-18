@@ -145,8 +145,8 @@ const SOLVE_QUIET = 150;
 const GUARD_HOLD = 0.2;
 /** The build's pause: the first share of it for the snap and the frame's grow, the last for the frame's retract; the build
  *  (wire, clay, brass) runs over what is between. The frame's grow takes FRAME_GROW s once the pendant has snapped in. */
-const PAUSE_SNAP = 0.12;
-const PAUSE_RETRACT = 0.12;
+const PAUSE_SNAP = 0.08;
+const PAUSE_RETRACT = 0.08;
 const FRAME_GROW = 0.6;
 /** Stacked, the canvas fades in over this long once drawn (s), as the track's CSS fades it in. Under reduced motion a change
  *  of shot crossfades it: out over half of CROSSFADE, the new shot held, back in over the other half. */
@@ -633,7 +633,7 @@ export function AboutPendant() {
     /** The build's pause: the snap's springs (screen shares), whether it has arrived, the frame's grow (0..1, time based
      *  after the snap) and the last phase written (so leaving writes the empty state once). */
     const snapX = { x: 0.5, v: 0 }, snapY = { x: 0.5, v: 0 };
-    let wasPause = false, snapped = false, snappedOnce = false, grow = 0, framePhaseWas: FramePhase = null;
+    let wasPause = false, snapped = false, snappedOnce = false, buildFrom = PAUSE_SNAP, grow = 0, framePhaseWas: FramePhase = null;
     let pauseAim: { x: number; y: number; ph: number } | null = null;
 
     /** A governor level onto the scene: a resize only when the pixel ratio changes, the bokeh's scale only when its step
@@ -717,8 +717,12 @@ export function AboutPendant() {
         snapped = Math.abs(snapX.x - tx) < 0.003 && Math.abs(snapY.x - ty) < 0.003 && Math.abs(snapX.v) + Math.abs(snapY.v) < 0.05;
         // whole and brass while it flies in; the moment it has snapped in it is the wireframe (Liam, 2026-10-18: "cut on the
         // snap"), and the build runs once from there, wire to clay to brass, with the scroll
-        if (snapped) snappedOnce = true;
-        wire = snappedOnce ? clamp01((pause.k - PAUSE_SNAP) / (1 - PAUSE_SNAP - PAUSE_RETRACT)) : 1;
+        // (it starts from the bare wire where it snaps, even when a quick scroll is already past the snap's share: the
+        // whole build is seen, over what is left of the pause before the retract)
+        // (come in from the far end or by a jump deep into the pause, the build is simply where the scroll has it)
+        if (!wasPause) buildFrom = pause.k >= 0.5 ? PAUSE_SNAP : -1;
+        if (snapped && !snappedOnce) { snappedOnce = true; if (buildFrom < 0) buildFrom = Math.min(Math.max(pause.k, PAUSE_SNAP), 0.5); }
+        wire = snappedOnce ? clamp01((pause.k - buildFrom) / (1 - buildFrom - PAUSE_RETRACT)) : 1;
         pauseAim = { x: tx, y: ty, ph: b0.h * L.vh };
         // entered from after the pause (scrolling back up) or by a jump past the snap: the frame is simply there
         if (!wasPause && pause.k > PAUSE_SNAP) grow = 1;

@@ -296,7 +296,8 @@ for (const [w, h] of [[1440, 900], [1280, 800], [1920, 1080], [1024, 768]] as co
       await page.waitForTimeout(1500);
       await page.mouse.move(w - 2, h - 2);
       const pause = await page.evaluate(() => { const s = document.querySelector<HTMLElement>("section.ab")!; return { top: s.offsetTop, at: Number(s.dataset.dwellAt), len: Number(s.dataset.dwellLen) }; });
-      expect(pause.len).toBeGreaterThan(0.5 * h);
+      // long enough that a continuous scroll sees the build (Liam, 2026-10-18): over two screens
+      expect(pause.len).toBeGreaterThanOrEqual(2 * h);
       const trackX = () => page.evaluate(() => getComputedStyle(document.querySelector(".ab-track")!).transform);
       const seen: { k: number; wire: number }[] = [];
       for (const k of [0.3, 0.5, 0.8]) {
@@ -589,9 +590,8 @@ test.describe("the motion pass: brightness and layers", () => {
     expect(got.every((g) => g.bright <= 0.45)).toBe(true);
     expect(maxStep(got.map((g) => g.op))).toBeLessThanOrEqual(0.08);
     expect(maxStep(got.map((g) => g.bright))).toBeLessThanOrEqual(0.08);
-    // and every z change on the way happened clear of the words, or at the bottom of a fade dip
-    const flips = got.flatMap((g, i) => (i > 0 && g.z !== got[i - 1].z ? [{ i, ...g }] : []));
-    expect(flips.filter((f) => f.over && f.op >= 0.05)).toEqual([]);
+    // and it never fades out on the way, not for a frame: a dim pendant changes layer at once (Liam, 2026-10-18)
+    expect(got.filter((g) => g.op < 1)).toEqual([]);
     expect(errors).toEqual([]);
   });
 
@@ -626,27 +626,7 @@ test.describe("the motion pass: brightness and layers", () => {
 
   });
 
-  test("a dip during the canvas's 0.6 s fade-in starts from what shows: no jump", async ({ page }) => {
-    test.setTimeout(120_000);
-    const errors = collectErrors(page);
-    await page.addInitScript(manualFrames);
-    await page.goto("/about?pendant-debug");
-    // opened at the tumble (behind the words, over them), asked in front the moment it is drawn
-    const y = await page.evaluate(async () => {
-      const sec = document.querySelector<HTMLElement>(".ab")!;
-      return sec.offsetTop + 0.12 * (sec.offsetHeight - innerHeight);
-    });
-    await page.evaluate((y) => window.scrollTo(0, y), y);
-    await page.waitForFunction(() => window.__pendant?.ready === true, null, { timeout: 30_000, polling: 10 });
-    const got = await stepFrames(page, { n: 45, force: [{ at: 0, layer: "front" }] });
-    expect(got[0].op).toBeLessThan(0.9); // (caught inside the fade-in)
-    expect(got.some((g) => g.layer === "front")).toBe(true); // (and the dip ran)
-    expect(maxStep(got.map((g) => g.op))).toBeLessThan(0.15);
-    expect(got.at(-1)!.op).toBe(1);
-    expect(errors).toEqual([]);
-  });
-
-  test("over a line, a forced layer change fades out, flips z at fade 0, and fades back in", async ({ page }) => {
+  test("over a line, a forced layer change is instant: z flips, the pendant never fades out (Liam, 2026-10-18)", async ({ page }) => {
     test.setTimeout(120_000);
     const errors = collectErrors(page);
     await page.addInitScript(manualFrames);
@@ -657,25 +637,39 @@ test.describe("the motion pass: brightness and layers", () => {
     const y = await page.evaluate(() => window.__pendant!.keys.find((k) => k.id === "tumble")!.y);
     await page.evaluate((y) => window.scrollTo(0, y), y);
     await page.waitForTimeout(2500);
-    // asked in front, held there; then handed back to the solve and the guard (behind), each over a line throughout
+    // asked in front, held there; then handed back (behind), each over a line throughout
     const got = await stepFrames(page, { n: 150, force: [{ at: 5, layer: "front" }, { at: 75, layer: null }] });
     const flips = got.flatMap((g, i) => (i > 0 && g.z !== got[i - 1].z ? [{ i, ...g }] : []));
     expect(got[0]).toMatchObject({ layer: "back", fade: 1, over: true });
     expect(flips.map((f) => f.layer)).toEqual(["front", "back"]);
-    for (const f of flips) {
-      expect(f.over).toBe(true);
-      expect(f.fade).toBeLessThan(0.05);
-      expect(f.op).toBeLessThan(0.05);
-      // out before it (the fade only falls), in after it (only rises, back to whole)
-      const before = got.slice(Math.max(0, f.i - 6), f.i + 1).map((g) => g.op);
-      const after = got.slice(f.i, f.i + 7).map((g) => g.op);
-      for (let k = 1; k < before.length; k++) expect(before[k]).toBeLessThanOrEqual(before[k - 1]);
-      for (let k = 1; k < after.length; k++) expect(after[k]).toBeGreaterThanOrEqual(after[k - 1]);
+    for (const f of flips) expect(f.over).toBe(true);
+    for (const g of got) expect(g).toMatchObject({ fade: 1, op: 1 });
+    expect(errors).toEqual([]);
+  });
+
+  test("a continuous scroll from the top through the glass: the pendant never fades out, not for a frame (Liam, 2026-10-18)", async ({ page }) => {
+    test.setTimeout(120_000);
+    const errors = collectErrors(page);
+    await page.goto("/about?pendant-debug");
+    await ready(page, 30_000);
+    await page.mouse.move(1430, 890);
+    await page.waitForTimeout(1500);
+    const end = await page.evaluate(() => window.__pendant!.keys.find((k) => k.id === "hold")!.y);
+    await page.evaluate(() => {
+      const c = document.querySelector<HTMLElement>(".ab-pendant")!;
+      const log: { fade: number; op: number; y: number }[] = ((window as unknown as { __blink: unknown[] }).__blink = []) as never;
+      const tick = () => { log.push({ fade: window.__pendant!.fade, op: Number(getComputedStyle(c).opacity), y: scrollY }); requestAnimationFrame(tick); };
+      requestAnimationFrame(tick);
+    });
+    // a steady 1500 px/s wheel
+    while ((await page.evaluate(() => scrollY)) < end) {
+      await page.mouse.wheel(0, 25);
+      await page.waitForTimeout(16);
     }
-    expect(got[74]).toMatchObject({ layer: "front", fade: 1, op: 1 });
-    expect(got.at(-1)).toMatchObject({ layer: "back", fade: 1, op: 1 });
-    // no step of the dip is a cut: 0.15 s each way at 1/60 s is about 0.11 a frame
-    expect(maxStep(got.map((g) => g.op))).toBeLessThan(0.12);
+    const log = await page.evaluate(() => (window as unknown as { __blink: { fade: number; op: number; y: number }[] }).__blink);
+    expect(log.length).toBeGreaterThan(100);
+    const out = log.filter((r) => r.fade < 1 || r.op < 0.99);
+    expect(out, "frames where it faded").toEqual([]);
     expect(errors).toEqual([]);
   });
 });
@@ -726,7 +720,9 @@ test.describe("the motion pass: an even pace between sections", () => {
     await page.mouse.move(1430, 890);
     const keys = await page.evaluate(() => window.__pendant!.keys);
     const y0 = keys[0].y, y1 = keys[keys.length - 1].y;
-    expect(y1 - y0, "About's travel").toBeLessThanOrEqual(TRAVEL_MAX * TRAVEL_BEFORE);
+    // (less the build's pause: the track stands still through it while the build plays, Liam's added scroll, not travel)
+    const dwellLen = await page.evaluate(() => Number(document.querySelector<HTMLElement>("section.ab")!.dataset.dwellLen) || 0);
+    expect(y1 - y0 - dwellLen, "About's travel").toBeLessThanOrEqual(TRAVEL_MAX * TRAVEL_BEFORE);
     await page.evaluate((y) => window.scrollTo(0, y), y0);
     await page.waitForTimeout(3000); // (the arrival, the follow and the fade-in settle)
     // 25 px of page a frame (1500 px/s at 60 fps), one frame a step, then held at the end while the follow catches up
@@ -992,18 +988,11 @@ test.describe("under reduced motion", () => {
     expect(held.layer).toBe("front");
     expect(await brightPixels(page, held.box)).toBeGreaterThan(300);
     // just past the halfway point to the tumble's key: still held (no crossfade back and forth at the middle). The jump
-    // brings a line onto the held opening, so it goes behind it through a layer dip (motion pass, Task 1): the canvas's
-    // opacity is that dip's fade and nothing else (no crossfade: the crossfade's own factor stays 1)
-    // (watched until the dip is whole again: going behind, its fade-in waits for the dimming, about a second)
+    // brings a line onto the held opening, so it goes behind it: at once, with no dip (Liam, 2026-10-18), so the canvas
+    // stays whole throughout
     await page.evaluate((y) => window.scrollTo(0, y), keys[0].y + 0.53 * (keys[1].y - keys[0].y));
-    const middle = await watch(2000);
-    expect(middle.every((f) => f.shot === 0 && Math.abs(f.op - f.fade) < 0.002)).toBe(true);
-    // one dip: the opacity falls (to nothing, at the flip), then only rises, and is whole at the end
-    const low = middle.reduce((m, f, i) => (f.op < middle[m].op ? i : m), 0);
-    expect(middle[low].op).toBeLessThan(0.05);
-    for (let i = 1; i <= low; i++) expect(middle[i].op).toBeLessThanOrEqual(middle[i - 1].op);
-    for (let i = low + 1; i < middle.length; i++) expect(middle[i].op).toBeGreaterThanOrEqual(middle[i - 1].op);
-    expect(middle.at(-1)!.op).toBe(1);
+    const middle = await watch(1000);
+    expect(middle.every((f) => f.shot === 0 && f.fade === 1 && f.op === 1)).toBe(true);
     // well past it: out to nothing, the tumble put in place, back in, over about 0.6 s
     await page.evaluate((y) => window.scrollTo(0, y), keys[0].y + 0.7 * (keys[1].y - keys[0].y));
     const fade = await watch(1500);

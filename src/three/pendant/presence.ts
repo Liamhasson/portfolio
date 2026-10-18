@@ -3,9 +3,10 @@
  * The pendant's presence on About (plan 2026-10-17-about-pendant-motion-pass, Task 1): how bright it is, which layer it is on
  * (in front of the words or behind them) and the canvas's own fade, stepped once a frame. Pure: no DOM, no three.
  *   - Brightness eases toward the wanted dim with a time constant of BRIGHT_TAU, whatever the scroll speed: it never steps.
- *   - A layer change while the pendant's outline overlaps no line is instant: nothing is crossed, so nothing shows.
- *   - A layer change while it overlaps a line dips the fade: out over FADE_OUT, the z flip at fade 0, back in over FADE_IN.
- *     The pendant is never seen half through the words.
+ *   - A layer change is instant (Liam, 2026-10-18: the dip read as the pendant vanishing for a moment). It is dim all
+ *     through About, so a dim pendant flipping in front of or behind a line shows nothing worth hiding.
+ *   - The one exception: a lit pendant (the build, the glass) sent behind a line it overlaps dips the fade, out over
+ *     FADE_OUT, the z flip at fade 0, back in over FADE_IN, so it is never seen bright behind the words.
  *   - Going behind, the fade-in never runs ahead of the dimming: it is complete only once the brightness is within ARRIVE of
  *     the behind level, so the pendant never shows full-bright behind the words.
  *   - Hysteresis: a request to come in front is taken only once it has held for HOLD (on top of the mount's GUARD_HOLD). A
@@ -56,7 +57,9 @@ export function stepPresence(p: Presence, want: { layer: Layer; dim: number; ove
   }
   let layer = p.layer, fade = p.fade;
   if (goal !== layer) {
-    if (!want.overlapping) layer = goal; // (clear: an instant swap; a dip under way comes back in from where it got to)
+    // (instant, unless lit and going behind a line: then the dip. A dip under way comes back in from where it got to)
+    const lit = goal === "back" && bright - want.dim > ARRIVE;
+    if (!want.overlapping || !lit) layer = goal;
     else {
       fade = Math.max(fade - dt / FADE_OUT, 0);
       if (fade === 0) layer = goal; // (the z flip, unseen)

@@ -12,6 +12,10 @@ import { BuildFrame } from "./build-frame";
 import { watchLoops } from "./loops";
 import { pictureState } from "./picture-motion";
 import { dwellTravel, scrollForSlide, scrollForTravel, sectionHeight, trackLayout, trackProgress, type Dwell } from "./track";
+
+/** The build's pause, in screens of scroll (Liam, 2026-10-18: at 0.9 a continuous scroll passed the build too fast to see;
+ *  2.5 gives it about two screens, over a second even at a brisk 1500 px/s). */
+const DWELL_SCREENS = 2.5;
 import "./about.css";
 
 /** A line in two colours: its highlights in the near-white, the rest in the darker tone (Liam, 2026-10-12). `inLink`: set inside the line's link, right after its words (the band loops). */
@@ -123,12 +127,12 @@ export function AboutTrack() {
         const right = Math.max(r.right, ...[...el.children].map((c) => c.getBoundingClientRect().right));
         return { el, left: r.left - t0, width: right - r.left, radius: getComputedStyle(el.querySelector(".ab-pic-f") ?? el).borderTopLeftRadius || "10px", link: !!el.closest("a"), video: el.querySelector("video") };
       });
-      // the pause: where the build stage's middle is the screen's, for 0.9 of a screen's height of scroll
+      // the pause: where the build stage's middle is the screen's, for DWELL_SCREENS screens' height of scroll
       const stage = tr.querySelector<HTMLElement>('[data-pendant="buildstage"]');
       const travel = Math.max(tr.scrollWidth - viewW(), 0);
       if (stage && stage.offsetWidth > 0) {
         const stageLeft = stage.getBoundingClientRect().left - t0;
-        dwell = { at: Math.round(Math.min(Math.max(stageLeft + stage.offsetWidth / 2 - viewW() / 2, 0), travel)), length: Math.round(0.9 * window.innerHeight) };
+        dwell = { at: Math.round(Math.min(Math.max(stageLeft + stage.offsetWidth / 2 - viewW() / 2, 0), travel)), length: Math.round(DWELL_SCREENS * window.innerHeight) };
         sec.dataset.dwellAt = String(dwell.at);
         sec.dataset.dwellLen = String(dwell.length);
       } else { dwell = null; delete sec.dataset.dwellAt; delete sec.dataset.dwellLen; }

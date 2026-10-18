@@ -48,9 +48,18 @@ describe("stepPresence", () => {
     for (const p of steps) expect(p.fade).toBe(1);
   });
 
-  test("a swap while overlapping fades out, flips at 0, fades in", () => {
-    // in front over a line, sent behind it (its own dim already the behind level, so the fade-in runs at its own pace)
-    const steps = run({ layer: "front", bright: 0.4, fade: 1 }, { layer: "back", dim: 0.4, overlapping: true }, 40);
+  test("a dim swap over a line is instant: no dip (Liam, 2026-10-18: it read as the pendant vanishing)", () => {
+    const back = run({ layer: "front", bright: 0.4, fade: 1 }, { layer: "back", dim: 0.4, overlapping: true }, 10);
+    expect(back[0].layer).toBe("back");
+    for (const p of back) expect(p.fade).toBe(1);
+    // coming in front over a line: after the hold, at once, the opacity untouched
+    const fwd = run({ layer: "back", bright: 0.4, fade: 1 }, { layer: "front", dim: 0.4, overlapping: true }, 20);
+    expect(fwd.at(-1)!.layer).toBe("front");
+    for (const p of fwd) expect(p.fade).toBe(1);
+  });
+
+  test("a lit pendant sent behind a line fades out, flips at 0, fades in", () => {
+    const steps = run({ layer: "front", bright: 1, fade: 1 }, { layer: "back", dim: 0.4, overlapping: true }, 240);
     const flip = steps.findIndex((p) => p.layer === "back");
     expect(flip).toBeGreaterThan(0);
     // out: the fade only falls while it is still in front, reaching 0 on the step it flips
@@ -60,29 +69,15 @@ describe("stepPresence", () => {
     }
     expect(steps[flip].fade).toBe(0);
     expect((flip + 1) * DT).toBeCloseTo(FADE_OUT, 1);
-    // in: behind now, the fade only rises, back to 1 over FADE_IN
-    const done = steps.findIndex((p, i) => i > flip && p.fade === 1);
-    expect(done).toBeGreaterThan(flip);
-    for (let i = flip + 1; i <= done; i++) {
-      expect(steps[i].layer).toBe("back");
-      expect(steps[i].fade).toBeGreaterThan(steps[i - 1].fade);
-    }
-    expect((done - flip) * DT).toBeCloseTo(FADE_IN, 1);
-    for (const p of steps.slice(done)) { expect(p.layer).toBe("back"); expect(p.fade).toBe(1); }
-    // and the other way (behind a line, asked in front of it): after the hold, the same dip
-    const fwd = run({ layer: "back", bright: 1, fade: 1 }, { layer: "front", dim: 1, overlapping: true }, 40);
-    const f2 = fwd.findIndex((p) => p.layer === "front");
-    expect(fwd[f2].fade).toBe(0);
-    for (let i = 0; i < f2; i++) expect(fwd[i].layer).toBe("back");
-    expect(fwd.at(-1)).toMatchObject({ layer: "front", fade: 1 });
     // a dip whose line moves away mid-fade swaps there and then (nothing is crossed any more) and comes back in
-    let p: Presence = { layer: "front", bright: 0.4, fade: 1 };
+    let p: Presence = { layer: "front", bright: 1, fade: 1 };
     for (const q of run(p, { layer: "back", dim: 0.4, overlapping: true }, 3)) p = q;
     expect(p.layer).toBe("front");
     expect(p.fade).toBeLessThan(1);
     p = stepPresence(p, { layer: "back", dim: 0.4, overlapping: false }, DT);
     expect(p.layer).toBe("back");
-    expect(run(p, { layer: "back", dim: 0.4, overlapping: false }, 20).at(-1)!.fade).toBe(1);
+    expect(run(p, { layer: "back", dim: 0.4, overlapping: false }, 240).at(-1)!.fade).toBe(1);
+    expect(FADE_IN).toBeGreaterThan(0);
   });
 
   test("going behind arrives dimmed", () => {
@@ -101,9 +96,9 @@ describe("stepPresence", () => {
     }
     // the fade-in never falls: it waits, then rises
     for (let i = flip + 1; i < steps.length; i++) expect(steps[i].fade).toBeGreaterThanOrEqual(steps[i - 1].fade);
-    // while a dim already there (the tumble's own) comes back in at FADE_IN's pace
+    // while a dim already there goes behind at once
     const quick = run({ layer: "front", bright: 0.4, fade: 1 }, { layer: "back", dim: 0.4, overlapping: true }, 40);
-    expect(quick.findIndex((p) => p.layer === "back" && p.fade === 1)).toBeLessThan(Math.ceil((FADE_OUT + FADE_IN) / DT) + 2);
+    expect(quick[0]).toMatchObject({ layer: "back", fade: 1 });
   });
 
   test("back-and-forth requests within 0.1 s don't swap", () => {
