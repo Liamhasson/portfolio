@@ -5,7 +5,7 @@
  * line-height 1.15, the scroll cue ~1.75vw bottom right on desktop and centred ~4vw on phones, 4.9% side margins).
  * Ours in Geist. Lines rise in from a mask, staggered (approved). Copy from the production plan §5.1.
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { nameRoll } from "@/lib/name-roll";
 
 const RISE = "hero-rise";
@@ -38,13 +38,20 @@ function Still({ children }: { children: React.ReactNode }) {
   return <span className="block pb-[0.12em]">{children}</span>;
 }
 
+/** The scroll cue's place and type: bottom right on desktop, centred on phones (the hero's, and the desk's "Keep scrolling"). */
+const CUE = "absolute bottom-[clamp(20px,3vw,44px)] left-0 right-0 text-center text-[clamp(13px,4vw,16px)] uppercase md:left-auto md:right-[4.9vw] md:text-right md:text-[clamp(14px,1.75vw,25px)]";
+
 /**
  * `exit`: 0 holding .. 1 gone (staggered per line). `scrolled`: 0 at the top .. (the scroll cue fades once it moves).
+ * `keep`: the desk's "Keep scrolling" is on (desk-invite.ts; Liam, 2026-10-18): it rises in like the hero's cue, in its
+ * place, and fades out as soon as the visitor scrolls.
  */
-export function HeroOverlay({ exit, scrolled }: { exit: () => number; scrolled: () => number }) {
+export function HeroOverlay({ exit, scrolled, keep }: { exit: () => number; scrolled: () => number; keep?: () => boolean }) {
   const root = useRef<HTMLDivElement>(null);
+  // how many times "Keep scrolling" has come in (each time its line rises again)
+  const [keepShown, setKeepShown] = useState(0);
   useEffect(() => {
-    let raf = 0;
+    let raf = 0, keepOn = false;
     const tick = () => {
       const e = exit();
       // the name in the nav rolls over into LIAM HASSON as "Hi, I'm Liam." leaves (nav-name.tsx; Liam, 2026-10-12)
@@ -58,12 +65,19 @@ export function HeroOverlay({ exit, scrolled }: { exit: () => number; scrolled: 
         });
         const cue = el.querySelector<HTMLElement>("[data-cue]");
         if (cue) cue.style.opacity = String(1 - Math.min(scrolled() / 0.03, 1));   // its job is done once scrolling starts
+        const k = keep?.() ?? false;
+        if (k !== keepOn) {
+          keepOn = k;
+          const el2 = el.querySelector<HTMLElement>("[data-keep-cue]");
+          if (el2) { el2.style.opacity = k ? "1" : "0"; el2.setAttribute("aria-hidden", String(!k)); }
+          if (k) setKeepShown((n) => n + 1);
+        }
       }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [exit, scrolled]);
+  }, [exit, scrolled, keep]);
 
   return (
     <div ref={root} className="pointer-events-none fixed inset-0 z-10 text-[#f4efe9]" data-testid="hero-overlay">
@@ -95,9 +109,15 @@ export function HeroOverlay({ exit, scrolled }: { exit: () => number; scrolled: 
         </p>
       </div>
       {/* the scroll cue: bottom right on desktop, centred on phones */}
-      <div data-cue className="absolute bottom-[clamp(20px,3vw,44px)] left-0 right-0 text-center text-[clamp(13px,4vw,16px)] uppercase md:left-auto md:right-[4.9vw] md:text-right md:text-[clamp(14px,1.75vw,25px)]">
+      <div data-cue className={CUE}>
         <Line delay={800}>Scroll to explore</Line>
       </div>
+      {/* over the desk, after a pause: the same cue, saying there's more (a UI cue, not a headline; Liam, 2026-10-18) */}
+      {keep && (
+        <div data-keep-cue aria-hidden className={`${CUE} opacity-0 transition-opacity duration-500 ease-out`}>
+          {keepShown > 0 && <Line key={keepShown} delay={0}>Keep scrolling</Line>}
+        </div>
+      )}
     </div>
   );
 }
