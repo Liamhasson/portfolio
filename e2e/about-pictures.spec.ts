@@ -38,8 +38,11 @@ const settle = (page: Page) => page.evaluate(() => new Promise<void>((res) => re
 /** Scroll to `p` (0..1) of the pinned track. */
 async function scrollTrack(page: Page, p: number) {
   await page.evaluate((p) => {
+    // (p is a share of the track's travel: the build's pause, where the track stands still, is stepped over)
     const sec = document.querySelector<HTMLElement>("section.ab")!;
-    window.scrollTo(0, sec.offsetTop + p * (sec.offsetHeight - window.innerHeight));
+    const at = Number(sec.dataset.dwellAt) || 0, len = Number(sec.dataset.dwellLen) || 0;
+    const y = p * (sec.offsetHeight - window.innerHeight - len);
+    window.scrollTo(0, sec.offsetTop + (len > 0 && y > at ? y + len : y));
   }, p);
   await settle(page);
 }

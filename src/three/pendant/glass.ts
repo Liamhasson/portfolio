@@ -107,6 +107,8 @@ export interface GlassUniforms {
   lamp: { value: Vector3 };
   /** How much of the pendant shows through the ball, 0..1: the shot's `glass` (0: the clear, empty room). */
   see: { value: number };
+  /** How far the pendant is drawn over the ball instead of seen through it, 0..1 (the mount: off the ball's centre). */
+  front: { value: number };
   /** The edge light (field.ts EDGE_GLSL), as the testimonials' canvas has it: the canvas's size (px), the light's clock and
    *  strength (0: no light, the ball as Task 9 drew it), the band's padding (px), the four colours (sRGB 0..1, as the light's
    *  shader takes them), and the ball's centre on the canvas (px, y up, as gl_FragCoord). */
@@ -158,6 +160,7 @@ export const GLASS_FRAGMENT = /* glsl */ `
   uniform vec3 planeNormal;
   uniform vec3 lamp;         // camera space, toward the lamp
   uniform float see;         // how much of the pendant shows through (the shot's glass; 0: the empty room)
+  uniform float front;       // how far the pendant is drawn over the ball instead (off its centre: never hidden by it)
   ${EDGE_UNIFORMS}
   ${RIPPLE_UNIFORMS}
   varying vec2 vUv;
@@ -246,7 +249,9 @@ export const GLASS_FRAGMENT = /* glsl */ `
     float a = 1.0 - through + seen.a;
     float ga = clamp( max( glints.r, max( glints.g, glints.b ) ), 0.0, 1.0 );
     vec4 ball = vec4( seen.rgb + glints, a + ( 1.0 - a ) * ga );
-    gl_FragColor = mix( frame, ball, cover );
+    vec4 o = mix( frame, ball, cover );
+    // the pendant itself over the ball, as far as it is in front (premultiplied: the frame is the pendant alone)
+    gl_FragColor = frame * front + o * ( 1.0 - frame.a * front );
   }`;
 
 /**
@@ -347,6 +352,7 @@ export function glassMaterial(): ShaderMaterial & { uniforms: GlassUniforms } {
     planeNormal: { value: new Vector3(0, 0, -1) },
     lamp: { value: LAMP.clone() },
     see: { value: 0 },
+    front: { value: 0 },
     R: { value: new Vector2(1, 1) },
     T: { value: 0 },
     A: { value: 0 },

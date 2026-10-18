@@ -142,7 +142,7 @@ test("a change of layout films the other shots", async () => {
   await fontsDone();
   await runIdle();
   await waitFor(() => expect(window.__pendant?.ready).toBe(true));
-  expect(window.__pendant!.keys).toHaveLength(11);
+  expect(window.__pendant!.keys).toHaveLength(12);
   await act(async () => { container.querySelector<HTMLElement>(".ab")!.dataset.mode = "stack"; });
   await waitFor(() => expect(window.__pendant!.keys).toHaveLength(6));
   expect(window.__pendant!.mode).toBe("stack");

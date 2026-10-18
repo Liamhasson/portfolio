@@ -20,7 +20,7 @@ const without = (...names: string[]) => Object.fromEntries(Object.entries(ALL).f
 
 describe("the pendant's shots (spec 2026-10-16 §3)", () => {
   test("SHOTS, hand placed: the centre hold through Find and Check in place of the glide and the whirl, in order", () => {
-    expect(SHOTS.map((s) => s.id)).toEqual(["opening", "letgo", "tumble", "worm", "above", "glass", "hold", "holdEnd", "build", "buildEnd", "hero"]);
+    expect(SHOTS.map((s) => s.id)).toEqual(["opening", "letgo", "tumble", "worm", "above", "glass", "glassOut", "hold", "holdEnd", "build", "buildEnd", "hero"]);
   });
 
   test("an unspecified field inherits the previous shot's value; aims are relative to mid-height", () => {

@@ -134,6 +134,10 @@ export const SHOTS: readonly Shot[] = fill([
   { id: "above", anchor: { pendant: "strip", fallback: "e2e" }, fx: 0.49, az: 0, el: 89, roll: 0, fov: 30, h: 0.8, ax: 0.81, ay: 0.76, aim: [0, 0.28, 0], spin: 0.12, aperture: 0.0012 },
   // 06 Through the glass: magnified, bent, upside down
   { id: "glass", anchor: { pendant: "glass", fallback: ["quote1", "quote2"] }, fx: 0.5, az: 150, el: 8, roll: 0, fov: 30, h: 0.15, ax: "glass", ay: "glass", aim: [0, 0, 0], spin: 0.16, aperture: 0.0005, glass: 1, bright: true },
+  // 06b Out of the glass (Liam, 2026-10-18: it vanished as the ball reached the screen's edge, still inside it, where the glass
+  // edge pulls what passes under it off the screen): the pendant stays at the screen's middle and the ball slides on from
+  // under it, so it leaves the ball in full view while the ball is still well clear of the edge; then it grows into the hold.
+  { id: "glassOut", anchor: { pendant: "glass", fallback: ["quote1", "quote2"] }, fx: 0.22, h: 0.22, ax: 0.5, ay: 0.5, glass: 0, layer: "back", bright: false },
   // 07 The centre hold (Liam, 2026-10-18: "keep it centred"): at the screen's middle, dimmed behind the words, turning slowly
   // in place, while "Find the problem" and "Check I'm right" slide past over it. Nothing moves on screen between the two keys.
   { id: "hold", anchor: { pendant: "find" }, fx: 0.5, az: -20, el: 8, roll: 0, fov: 30, h: 0.42, ax: 0.5, ay: 0.5, aim: [0, 0, 0], spin: 0.06, tumble: 0, rz: 0, layer: "back", aperture: 0.0008, glass: 0, bright: false },

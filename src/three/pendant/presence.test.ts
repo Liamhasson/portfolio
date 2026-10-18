@@ -1,6 +1,6 @@
 // src/three/pendant/presence.test.ts
 import { describe, expect, test } from "vitest";
-import { AHEAD_STEP, ARRIVE, behindAhead, BRIGHT_TAU, FADE_IN, FADE_OUT, HOLD, lagAhead, MIN_BACK, stepPresence, type Presence } from "./presence";
+import { AHEAD_STEP, BACK_TAU, behindAhead, BRIGHT_TAU, HOLD, lagAhead, MIN_BACK, stepPresence, type Presence } from "./presence";
 import type { Layer } from "./shots";
 
 const DT = 1 / 60;
@@ -48,57 +48,26 @@ describe("stepPresence", () => {
     for (const p of steps) expect(p.fade).toBe(1);
   });
 
-  test("a dim swap over a line is instant: no dip (Liam, 2026-10-18: it read as the pendant vanishing)", () => {
-    const back = run({ layer: "front", bright: 0.4, fade: 1 }, { layer: "back", dim: 0.4, overlapping: true }, 10);
-    expect(back[0].layer).toBe("back");
-    for (const p of back) expect(p.fade).toBe(1);
-    // coming in front over a line: after the hold, at once, the opacity untouched
-    const fwd = run({ layer: "back", bright: 0.4, fade: 1 }, { layer: "front", dim: 0.4, overlapping: true }, 20);
-    expect(fwd.at(-1)!.layer).toBe("front");
-    for (const p of fwd) expect(p.fade).toBe(1);
+  test("every swap is instant, over a line or not: the canvas never fades (Liam, 2026-10-18: a dip read as the pendant vanishing)", () => {
+    for (const bright of [0.4, 1]) {
+      const back = run({ layer: "front", bright, fade: 1 }, { layer: "back", dim: 0.4, overlapping: true }, 10);
+      expect(back[0].layer).toBe("back");
+      for (const p of back) expect(p.fade).toBe(1);
+      const fwd = run({ layer: "back", bright: 0.4, fade: 1 }, { layer: "front", dim: bright, overlapping: true }, 20);
+      expect(fwd.at(-1)!.layer).toBe("front");
+      for (const p of fwd) expect(p.fade).toBe(1);
+    }
   });
 
-  test("a lit pendant sent behind a line fades out, flips at 0, fades in", () => {
-    const steps = run({ layer: "front", bright: 1, fade: 1 }, { layer: "back", dim: 0.4, overlapping: true }, 240);
-    const flip = steps.findIndex((p) => p.layer === "back");
-    expect(flip).toBeGreaterThan(0);
-    // out: the fade only falls while it is still in front, reaching 0 on the step it flips
-    for (let i = 0; i < flip; i++) {
-      expect(steps[i].layer).toBe("front");
-      expect(steps[i].fade).toBeLessThan(i === 0 ? 1 : steps[i - 1].fade);
-    }
-    expect(steps[flip].fade).toBe(0);
-    expect((flip + 1) * DT).toBeCloseTo(FADE_OUT, 1);
-    // a dip whose line moves away mid-fade swaps there and then (nothing is crossed any more) and comes back in
-    let p: Presence = { layer: "front", bright: 1, fade: 1 };
-    for (const q of run(p, { layer: "back", dim: 0.4, overlapping: true }, 3)) p = q;
-    expect(p.layer).toBe("front");
-    expect(p.fade).toBeLessThan(1);
-    p = stepPresence(p, { layer: "back", dim: 0.4, overlapping: false }, DT);
-    expect(p.layer).toBe("back");
-    expect(run(p, { layer: "back", dim: 0.4, overlapping: false }, 240).at(-1)!.fade).toBe(1);
-    expect(FADE_IN).toBeGreaterThan(0);
-  });
-
-  test("going behind arrives dimmed", () => {
-    // full bright in front over a line, sent behind it: the brightness has eased to the behind level before the fade-in ends
-    const steps = run({ layer: "front", bright: 1, fade: 1 }, { layer: "back", dim: 0.4, overlapping: true }, 240);
-    const flip = steps.findIndex((p) => p.layer === "back");
-    const done = steps.findIndex((p) => p.layer === "back" && p.fade === 1);
-    expect(flip).toBeGreaterThan(0);
-    expect(done).toBeGreaterThan(flip);
-    expect(steps[done].bright - 0.4).toBeLessThanOrEqual(ARRIVE + 1e-9);
-    // and on the way it never shows brighter than the behind level by more than it is hidden: behind, the fade holds back
-    // while the brightness is far from it (never full bright behind the words)
-    for (const p of steps.slice(flip)) {
-      if (p.bright - 0.4 > ARRIVE + 0.3) expect(p.fade).toBe(0);
-      expect(p.fade * (p.bright - 0.4)).toBeLessThan(0.2);
-    }
-    // the fade-in never falls: it waits, then rises
-    for (let i = flip + 1; i < steps.length; i++) expect(steps[i].fade).toBeGreaterThanOrEqual(steps[i - 1].fade);
-    // while a dim already there goes behind at once
-    const quick = run({ layer: "front", bright: 0.4, fade: 1 }, { layer: "back", dim: 0.4, overlapping: true }, 40);
-    expect(quick[0]).toMatchObject({ layer: "back", fade: 1 });
+  test("a lit pendant sent behind dims quickly there (BACK_TAU), never stepping", () => {
+    expect(BACK_TAU).toBeLessThan(BRIGHT_TAU);
+    const steps = run({ layer: "front", bright: 1, fade: 1 }, { layer: "back", dim: 0.4, overlapping: true }, 60);
+    // within 0.35 s it is within 0.05 of the behind level (0.6 x e^(-0.35 / 0.12) = 0.03)
+    expect(steps[Math.ceil(0.35 / DT)].bright - 0.4).toBeLessThan(0.05);
+    for (let i = 1; i < steps.length; i++) expect(steps[i].bright).toBeLessThanOrEqual(steps[i - 1].bright);
+    // in front, the same brightening keeps the slow BRIGHT_TAU
+    const up = run({ layer: "front", bright: 0.4, fade: 1 }, { layer: "front", dim: 1, overlapping: false }, 21);
+    expect(up[20].bright).toBeLessThan(0.75);
   });
 
   test("back-and-forth requests within 0.1 s don't swap", () => {
@@ -127,24 +96,14 @@ describe("stepPresence", () => {
     }
   });
 
-  test("going behind never waits for the hold (readability binds); a dip asked back to the layer it is on rises again unswapped", () => {
-    // sent behind while overlapping: the fade-out starts on that very step
+  test("going behind never waits for the hold (readability binds)", () => {
     const first = stepPresence({ layer: "front", bright: 1, fade: 1 }, { layer: "back", dim: 0.4, overlapping: true }, DT);
-    expect(first.fade).toBeLessThan(1);
-    // mid-dip, asked in front again (the layer it is still on: no new layer, so no hold): the fade rises at once, no swap
-    let p = first;
-    for (const q of run(p, { layer: "back", dim: 0.4, overlapping: true }, 3)) p = q;
-    const low = p.fade;
-    const back = run(p, { layer: "front", dim: 1, overlapping: true }, 40);
-    for (const q of back) expect(q.layer).toBe("front");
-    expect(Math.min(...back.map((q) => q.fade))).toBeGreaterThan(0);
-    expect(back.at(-1)!.fade).toBe(1);
-    expect(low).toBeLessThan(1);
+    expect(first).toMatchObject({ layer: "back", fade: 1 });
   });
 
-  test("a zero step changes nothing", () => {
-    const p: Presence = { layer: "front", bright: 0.7, fade: 0.5, goal: "back", pending: 0 };
-    expect(stepPresence(p, { layer: "back", dim: 0.4, overlapping: true }, 0)).toMatchObject({ layer: "front", bright: 0.7, fade: 0.5 });
+  test("a zero step changes nothing but the layer asked behind", () => {
+    const p: Presence = { layer: "back", bright: 0.7, fade: 1, goal: "back", pending: 0 };
+    expect(stepPresence(p, { layer: "back", dim: 0.4, overlapping: true }, 0)).toMatchObject({ layer: "back", bright: 0.7, fade: 1 });
   });
 });
 

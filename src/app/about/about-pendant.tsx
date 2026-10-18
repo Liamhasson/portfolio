@@ -143,6 +143,10 @@ const CHROME_PIN = ".ab-resume";
 const SOLVE_QUIET = 150;
 /** The live guard hands the front back only after the pendant has been clear for this long (s): no pumping at an edge. */
 const GUARD_HOLD = 0.2;
+/** Off the ball's centre by this share of its radius the pendant starts to come out in front of it, and by this it is all
+ *  in front (its image in the ball gone): see the step. Through the glass shot itself it sits at the centre. */
+const FRONT_FROM = 0.12;
+const FRONT_TO = 0.4;
 /** The build's pause: the first share of it for the snap and the frame's grow, the last for the frame's retract; the build
  *  (wire, clay, brass) runs over what is between. The frame's grow takes FRAME_GROW s once the pendant has snapped in. */
 const PAUSE_SNAP = 0.08;
@@ -775,6 +779,15 @@ export function AboutPendant() {
         : cm.screenBox(sc.bounds, sc.inner, sc.camera, L.vw, L.vh);
       // (the outline is the low-poly wire copy's: the brass drawn round it reaches a little further, DRAWN_SLACK of its size)
       const box = padBox(wireBox, DRAWN_SLACK * Math.max(wireBox.r - wireBox.l, wireBox.b - wireBox.t) + 1);
+      // The ball never hides the pendant (Liam, 2026-10-18: it vanished leaving the glass). A ball turns what is behind it
+      // upside down and magnifies it, so a pendant a little off its centre is seen out past its rim, while the ball still
+      // covers the pendant itself: for a moment neither shows. So off centre it comes out in front of the ball: its image in
+      // the ball gives way to the pendant drawn over it, between FRONT_FROM and FRONT_TO of the ball's radius off centre.
+      if (glass) {
+        const off = Math.hypot((box.l + box.r) / 2 - glass.x * L.vw, (box.t + box.b) / 2 - glass.y * L.vh) / Math.max(glass.r * L.vh, 1);
+        const k = clamp01((off - FRONT_FROM) / (FRONT_TO - FRONT_FROM));
+        glass.front = k * k * (3 - 2 * k);
+      }
       // The layer: the one solved for this screen at this travel, not the shot's own. Then the live guard: the live outline,
       // grown by half the solve's padding, against the words where the page shows them (they ride the real scroll, the
       // pendant the eased one, so after a jump they part for a moment) and the chrome where it is (the site's chrome holds to
