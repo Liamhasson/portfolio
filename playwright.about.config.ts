@@ -3,7 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 // About's specs (the pictures, the pendant) on their own port: 3100 and 3101 are other chats' servers. Turbopack's build is broken site-wide by Google Fonts' Inter (tracked separately), so build with webpack.
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: ["about-pictures.spec.ts", "about-pendant.spec.ts", "about-testimonials.spec.ts"],
+  testMatch: ["about-pictures.spec.ts", "about-pendant.spec.ts", "about-testimonials.spec.ts", "about-frame.spec.ts"],
   timeout: 60_000,
   use: { baseURL: "http://localhost:3102" },
   projects: [

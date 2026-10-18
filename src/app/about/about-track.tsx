@@ -8,6 +8,7 @@ import { NextPagePull } from "@/components/shell/next-page-pull";
 import { ABOUT, type Line, type Picture } from "@/content/about";
 import { AboutPendant } from "./about-pendant";
 import { AboutTestimonials } from "./about-testimonials";
+import { BuildFrame } from "./build-frame";
 import { watchLoops } from "./loops";
 import { pictureState } from "./picture-motion";
 import { scrollForSlide, sectionHeight, trackLayout, trackProgress, trackX } from "./track";
@@ -218,6 +219,7 @@ export function AboutTrack() {
               <p className="ab-slide ab-big"><Words line={ABOUT.closing} /></p>
             </div>
           </div>
+          <BuildFrame />
           <AboutPendant />
           <AboutTestimonials />
           <span className="ab-bar" aria-hidden><span ref={bar} /></span>
