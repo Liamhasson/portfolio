@@ -4,6 +4,8 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { glassOwner, setGlassLight, showGlassSlot, type GlassLight, type GlassOwner } from "@/lib/about-glass";
 import type { LightBall, LightFrame, TestimonialsLight } from "@/three/edge-light/testimonials-light";
+import { bendPull } from "./edge-bend";
+import { createEdgeBend, type BendFrame, type EdgeBend } from "./edge-bend-dom";
 import { lensBand, lensDepth, lensMap, lensScale, lensStrips, lensSupported, type LensEdge, type LensLayout } from "./edge-lens";
 import { glassPointer } from "./glass-pointer";
 import { pulsePhase, stepArrival, testimonialsQ, type Arrival } from "./testimonials-q";
@@ -23,6 +25,9 @@ export interface TestimonialsHook {
   /** The glass edges (edge-lens.ts): the displacement's scale as set on the filter while the lens shows, 0 while it's hidden
    *  (and always where there's no lens: not Chromium). */
   lens: number;
+  /** The glass edges where there's no lens (WebKit, Firefox: edge-bend.ts): how many letters of the quotes bend this frame,
+   *  0 while none does (and always in Chromium, which has the lens). */
+  bend: number;
   /** Diagnostics, only with ?pendant-debug and `window.__pendantPerf` set before load (scripts/about/pendant-perf.cjs): each
    *  drawn frame's GPU time (ms) on the light's own context, with the frame's q, whether it drew its own ball and whether the
    *  lens showed. Absent otherwise, and where the GPU can't time (no EXT_disjoint_timer_query). */
@@ -332,7 +337,7 @@ export function AboutTestimonials() {
     /** Where the quotes and the slot are this frame (screen px): `size` the axis q is scrubbed along (the screen's width on
      *  the track, the large viewport's height stacked), `c0` Yoav's centre along it. Null in any other layout. */
     /** This frame's places, rewritten in place each frame (no object per frame; read within the frame only). */
-    const placed = { size: 0, c0: 0, stack: false, q: 0, slot: { x: 0, y: 0, w: 0 }, near: false };
+    const placed = { size: 0, c0: 0, stack: false, q: 0, slot: { x: 0, y: 0, w: 0 }, near: false, dx: 0 };
     const measure = (): typeof placed | null => {
       if (sec.dataset.mode === "stack") return measureStack();
       if (sec.dataset.mode !== "track") return null;
@@ -352,7 +357,7 @@ export function AboutTestimonials() {
       const centre = (r: DOMRect) => left + (r.left - trR.left) + r.width / 2;
       const s = slot.getBoundingClientRect();
       const c0 = centre(q1.getBoundingClientRect()), c1 = centre(q2.getBoundingClientRect()), sx = centre(s);
-      placed.size = vw; placed.c0 = c0; placed.stack = false;
+      placed.size = vw; placed.c0 = c0; placed.stack = false; placed.dx = left - trR.left;
       placed.q = vw > 0 ? testimonialsQ(c0, c1, vw) : 0;
       placed.slot.x = sx; placed.slot.y = s.top + s.height / 2; placed.slot.w = s.width;
       placed.near = s.width > 0 && sx > -s.width && sx < vw + s.width;
@@ -365,11 +370,31 @@ export function AboutTestimonials() {
       const middle = (el: HTMLElement, r: DOMRect) => r.top - rising(el) + r.height / 2;
       const sr = slot.getBoundingClientRect();
       const a = middle(q1, q1.getBoundingClientRect()), b = middle(q2, q2.getBoundingClientRect()), sy = middle(slot, sr);
-      placed.size = vh; placed.c0 = a; placed.stack = true;
+      placed.size = vh; placed.c0 = a; placed.stack = true; placed.dx = 0;
       placed.q = vh > 0 ? testimonialsQ(a, b, vh) : 0;
       placed.slot.x = sr.left + sr.width / 2; placed.slot.y = sy; placed.slot.w = sr.width;
       placed.near = sr.width > 0 && sy > -sr.width && sy < vh + sr.width;
       return placed;
+    };
+
+    /** The glass edges without the lens (edge-bend.ts: WebKit, Firefox): the quotes' own words bend in the bands, made once
+     *  the light has loaded (the text painted: edge-bend-dom.ts reads its layout), shown under the lens's own rule (q > 0.01
+     *  while the light draws) at the lens's own strength (lensScale: breathing, or the fixed gentle half under reduced
+     *  motion). Stacked, all four bands bend (the strips it has there); on the track the left and right ones only, their
+     *  corners included. */
+    let bend: EdgeBend | null = null;
+    const bendAt: BendFrame = { screen: { w: 0, h: 0, band: 0, pull: 0, sides: false, depth: 0 }, dx: 0 };
+    const bendFrame = (m: typeof placed | null, q: number, t: number): number => {
+      if (!bend) return 0;
+      if (!m || !(q > 0.01)) return bend.frame(null);
+      const sc = bendAt.screen;
+      if (m.stack) { const sb = screenBox(); sc.w = sb.w; sc.h = sb.h; } else { sc.w = canvas.clientWidth || window.innerWidth; sc.h = canvas.clientHeight || window.innerHeight; }
+      sc.band = lensBand(sc.w, sc.h);
+      sc.pull = bendPull(lensScale(q, t, reduced), sc.band);
+      sc.sides = !m.stack;
+      sc.depth = Math.min(lensDepth(sc.band), sc.w / 2, sc.h / 2);
+      bendAt.dx = m.dx;
+      return bend.frame(bendAt);
     };
 
     const tick = (now: number) => {
@@ -380,16 +405,18 @@ export function AboutTestimonials() {
       const m = measure();
       const q = m ? m.q : 0;
       if (m) arrival = stepArrival(arrival, q, m.c0, m.size, now, reduced);
-      setMood(q);
       const drawing = !!m && (q > 0 || m.near);
+      const t = reduced ? 0 : (now - t0) / 1000;
+      // (straight after the reads of measure(), before anything this frame writes: its one rect per quote reads clean)
+      const bent = bendFrame(m, drawing ? q : 0, t);
+      setMood(q);
       const pulse = reduced ? -1 : pulsePhase(arrival, now);
       const a = m && drawing && m.near ? ballOpacity() : 0;
       ballA = a;
       let ball: LightBall | null = null;
       if (m && a > 0) { lightBall.x = m.slot.x; lightBall.y = m.slot.y; lightBall.r = 0.44 * m.slot.w; lightBall.a = a; ball = lightBall; }
-      const t = reduced ? 0 : (now - t0) / 1000;
       const lens = lensFrame(drawing ? q : 0, t);
-      publish({ q, pulse, drawing, ownBall: ball !== null, lens });
+      publish({ q, pulse, drawing, ownBall: ball !== null, lens, bend: bent });
       if (!drawing) { setGlassLight(null); show(false); drawnStill = false; return; } // (shown again: drawn afresh)
       // (the pendant's ball reads this on its own frame: the same q, the same clock, so its rim shows the edges as drawn here;
       // one object, rewritten each frame: the store copies it)
@@ -439,7 +466,7 @@ export function AboutTestimonials() {
       e.preventDefault(); // (lets the browser restore it)
       if (off) return;
       teardown(false);
-      publish({ q: 0, pulse: -1, drawing: false, ownBall: false, lens: 0 });
+      publish({ q: 0, pulse: -1, drawing: false, ownBall: false, lens: 0, bend: 0 });
       canvas.addEventListener("webglcontextrestored", onRestored);
     };
     const onRestored = () => { canvas.removeEventListener("webglcontextrestored", onRestored); setGen((n) => n + 1); };
@@ -482,6 +509,8 @@ export function AboutTestimonials() {
       canvas.removeEventListener("webglcontextlost", onLost);
       setMood(0);
       lensFrame(0, 0);
+      bend?.dispose();
+      bend = null;
       setGlassLight(null);
       slotShown(false);
       show(false);
@@ -495,7 +524,7 @@ export function AboutTestimonials() {
     const fail = () => {
       if (off) return;
       teardown();
-      publish({ q: 0, pulse: -1, drawing: false, ownBall: false, lens: 0 });
+      publish({ q: 0, pulse: -1, drawing: false, ownBall: false, lens: 0, bend: 0 });
       setGone(true);
     };
 
@@ -515,7 +544,15 @@ export function AboutTestimonials() {
           light = made;
           if (debug && window.__pendantPerf) gpuMs = made.enableGpuTiming() ? [] : null;
           slotShown(true);
-          publish({ q: 0, pulse: -1, drawing: false, ownBall: false, lens: 0 });
+          // (no lens here: the words bend themselves; a layout it can't read leaves the quotes as they are)
+          if (!lensSupported(navigator)) {
+            try {
+              bend = createEdgeBend([q1, q2].flatMap((f) => Array.from(f.querySelectorAll<HTMLElement>("blockquote, figcaption"))));
+            } catch {
+              bend = null;
+            }
+          }
+          publish({ q: 0, pulse: -1, drawing: false, ownBall: false, lens: 0, bend: 0 });
           wake();
         } catch {
           fail();

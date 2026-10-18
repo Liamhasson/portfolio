@@ -1285,6 +1285,16 @@ test.describe("stacked on a phone without scroll anchoring (as iOS Safari)", () 
 // leaves these out, as the webkit project leaves out everything else: the lens, its seams, the anchoring stub and the GPU
 // timers are Chromium's). Playwright's WebKit runs WebGL and WebGL2 headless, so the light and the pendant both draw. ----------
 
+test("Chromium keeps its lens: the quotes are never split into a bending copy (edge-bend.ts is WebKit's and Firefox's)", async ({ page }) => {
+  await page.goto("/about");
+  await lightLoaded(page);
+  await page.mouse.move(1430, 890);
+  await scrollTo(page, "slot");
+  await expect.poll(async () => (await hook(page)).lens).toBeGreaterThan(0);
+  expect((await hook(page)).bend).toBe(0);
+  await expect(page.locator(".ab-bend, .ab-bendable")).toHaveCount(0);
+});
+
 test.describe("Safari (WebKit) @webkit", () => {
   test("no lens; at q 1 the light warms the far edges and the pendant's ball sits in the slot at its size; no console errors", async ({ page }) => {
     const errors = collectErrors(page);
@@ -1369,6 +1379,104 @@ test.describe("Safari (WebKit) @webkit", () => {
       expect(await page.locator("canvas.ab-light").evaluate((c) => [getComputedStyle(c).position, getComputedStyle(c).pointerEvents])).toEqual(["fixed", "none"]);
       expect(errors).toEqual([]);
     });
+  });
+
+  // ---------- the glass edges without the lens (edge-bend.ts; Liam, 2026-10-19): the words bend themselves ----------
+
+  /** The quotes' bending letters (the aria-hidden copy's): each one's place on screen, as laid out (its line's box, its
+   *  own advance: the transform left out) and whether it carries a transform, with the matrix's scale and shift. */
+  const bendGlyphs = (page: Page) => page.evaluate(() => [...document.querySelectorAll<HTMLElement>(".ab-bend-c")].map((g) => {
+    const tf = g.style.transform;
+    g.style.transform = "";
+    const r = g.getBoundingClientRect(), row = g.parentElement!.getBoundingClientRect();
+    g.style.transform = tf;
+    const m = tf ? new DOMMatrixReadOnly(tf) : null;
+    return { ch: g.textContent, x0: r.left, x1: r.right, y0: row.top, y1: row.bottom, bent: !!m && !m.isIdentity, a: m?.a ?? 1, d: m?.d ?? 1, e: m?.e ?? 0, f: m?.f ?? 0 };
+  }));
+
+  test.describe("stacked on a 428 x 926 phone, the glass edges", () => {
+    test.use({ viewport: { width: 428, height: 926 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+    test("the lines passing the top band bend (pulled up, stretched tall), the lines mid-screen don't; the copy is aria-hidden and the quote still reads", async ({ page }) => {
+      test.setTimeout(90_000);
+      const errors = collectErrors(page);
+      await page.goto("/about");
+      await lightLoaded(page);
+      await expect(page.locator("section.ab")).toHaveAttribute("data-mode", "stack");
+      await expect(page.locator(".ab-lens")).toHaveCount(0);
+      // far from the quotes: nothing bends, the originals show
+      expect((await hook(page)).bend).toBe(0);
+      await expect(page.locator(".ab-bendable[data-bend]")).toHaveCount(0);
+      // Yoav's third line at the very top (its foot inside the band), q full
+      await expect.poll(() => page.locator("[data-pendant='quote1'] blockquote .ab-bend-l").count(), { timeout: 15_000 }).toBeGreaterThan(2);
+      for (let i = 0; i < 3; i++) {
+        await page.evaluate(() => {
+          const row = document.querySelectorAll<HTMLElement>("[data-pendant='quote1'] blockquote .ab-bend-l")[2].getBoundingClientRect();
+          window.scrollBy(0, Math.round(row.top - 4));
+        });
+        await page.waitForTimeout(500);
+      }
+      await expect.poll(async () => (await hook(page)).q).toBeGreaterThan(0.5);
+      await expect.poll(async () => (await hook(page)).bend).toBeGreaterThan(0);
+      await expect(page.locator("[data-pendant='quote1'] blockquote")).toHaveAttribute("data-bend", "");
+      const band = lensBand(428, await page.evaluate(() => document.querySelector<HTMLElement>("canvas.ab-light")!.clientHeight));
+      const gs = await bendGlyphs(page);
+      const top = gs.filter((g) => g.y0 >= 0 && g.y0 < band - 4 && g.x0 > band + 2 && g.x1 < 428 - band - 2);
+      const mid = gs.filter((g) => g.y0 > 300 && g.y1 < 600);
+      expect(top.length, "letters of the line in the top band").toBeGreaterThan(5);
+      for (const g of top) {
+        expect(g.bent, `"${g.ch}" in the band`).toBe(true);
+        expect(g.d, `"${g.ch}" stretched tall`).toBeGreaterThan(1.02);
+        expect(g.f, `"${g.ch}" pulled up`).toBeLessThan(0);
+        expect(Math.abs(g.a - 1), `"${g.ch}" not stretched wide`).toBeLessThan(1e-6);
+      }
+      for (const g of mid) expect(g.bent, `"${g.ch}" mid-screen`).toBe(false);
+      // the original stays, its text whole and readable; the copy is hidden from assistive tech and takes no pointer
+      await expect(page.locator("[data-pendant='quote1'] blockquote")).toContainText("We weren't looking for a designer.");
+      await expect(page.locator("[data-pendant='quote1'] blockquote .ab-bend")).toHaveAttribute("aria-hidden", "true");
+      expect(await page.locator("[data-pendant='quote1'] blockquote .ab-bend").evaluate((c) => getComputedStyle(c).pointerEvents)).toBe("none");
+      // back up, out of the testimonials: everything put back
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await expect.poll(async () => (await hook(page)).bend).toBe(0);
+      await expect(page.locator(".ab-bendable[data-bend]")).toHaveCount(0);
+      expect(await page.locator(".ab-bend-c").evaluateAll((els) => els.filter((e) => (e as HTMLElement).style.transform).length)).toBe(0);
+      expect(errors).toEqual([]);
+    });
+  });
+
+  test("on the desktop track the letters passing the left band bend (pulled out, stretched wide), the letters mid-screen don't", async ({ page }) => {
+    test.setTimeout(90_000);
+    const errors = collectErrors(page);
+    await page.goto("/about");
+    await lightLoaded(page);
+    await expect(page.locator("section.ab")).toHaveAttribute("data-mode", "track");
+    await page.mouse.move(1430, 890);
+    // Yoav's quote with its left edge 30 px in from the screen's left: its first letters inside the left band
+    await expect.poll(() => page.locator("[data-pendant='quote1'] blockquote .ab-bend-c").count(), { timeout: 15_000 }).toBeGreaterThan(20);
+    for (let i = 0; i < 3; i++) {
+      await page.evaluate(() => {
+        const r = document.querySelector("[data-pendant='quote1'] blockquote")!.getBoundingClientRect();
+        window.scrollBy(0, Math.round(r.left - 30));
+      });
+      await page.waitForTimeout(500);
+    }
+    await expect.poll(async () => (await hook(page)).q).toBeGreaterThan(0.5);
+    await expect.poll(async () => (await hook(page)).bend).toBeGreaterThan(0);
+    expect((await hook(page)).lens).toBe(0);
+    const band = lensBand(1440, 900);
+    const gs = await bendGlyphs(page);
+    // (past the pull's reach, ≈ 26 px at full strength: closer to the rim a letter shows off the screen, only shifted)
+    const left = gs.filter((g) => g.x0 >= 27 && g.x1 < band - 2 && g.y0 > 200 && g.y1 < 700);
+    const mid = gs.filter((g) => g.x0 > 300 && g.x1 < 1100);
+    expect(left.length, "letters in the left band").toBeGreaterThan(1);
+    for (const g of left) {
+      expect(g.bent, `"${g.ch}" in the band`).toBe(true);
+      expect(g.a, `"${g.ch}" stretched wide`).toBeGreaterThan(1.02);
+      expect(g.e, `"${g.ch}" pulled out`).toBeLessThan(0);
+      expect(Math.abs(g.d - 1), `"${g.ch}" its height kept`).toBeLessThan(1e-6);
+    }
+    expect(mid.length).toBeGreaterThan(20);
+    for (const g of mid) expect(g.bent, `"${g.ch}" mid-screen`).toBe(false);
+    expect(errors).toEqual([]);
   });
 });
 
