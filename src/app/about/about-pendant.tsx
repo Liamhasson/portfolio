@@ -178,7 +178,10 @@ const clamp01 = (v: number) => Math.min(Math.max(v, 0), 1);
  */
 function lineBoxes(el: Element): Box[] {
   const frags: Box[] = [];
-  const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  // (the quotes' bent copies on Safari, edge-bend-dom.ts .ab-bend, lie over their own words: skipped, never counted twice)
+  const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+    acceptNode: (n) => (n.parentElement?.closest(".ab-bend") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+  });
   const range = document.createRange();
   for (let n = walk.nextNode(); n; n = walk.nextNode()) {
     if (!n.textContent?.trim()) continue;
