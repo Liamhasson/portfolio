@@ -189,7 +189,7 @@ test("through the glass: the pendant inside, clear glass round it, no milk", asy
  *  holds still on screen over the track: the wordmark, the pill nav, the burger (phones) and the resume pill (the 1 px
  *  progress bar is not avoided: Liam's ruling), and the pictures (coveredNow: each frame whole and its caption's lines,
  *  where the track draws them). */
-const TEXT = ".ab-big, .ab-quote blockquote, .ab-quote figcaption, .ab-verb .ab-mono:not(.ab-pic-cap), .ab-verb-title, .ab-skills li, .cap";
+const TEXT = ".ab-big, .ab-quote blockquote, .ab-quote figcaption, .ab-verb .ab-mono, .ab-verb-title, .ab-skills li, .cap";
 const CHROME = ".sh-name, .sh-nav, .sh-burger, .ab-resume";
 
 /** What the pendant covers right now while in front of the words: each line of text (one box per line, as the mount
@@ -285,7 +285,7 @@ for (const [w, h] of [[1440, 900], [1280, 800], [1920, 1080], [1024, 768]] as co
       expect(bad).toEqual([]);
       expect(errors).toEqual([]);
     });
-    test("the build passes play big and in front on the stage right of \"Build it.\", over no line, wire to brass", async ({ page }) => {
+    test("the build sweep (its key, its middle, its brass end): in front, bright, at least half the screen's height, over no line, across a quarter of the width", async ({ page }) => {
       test.setTimeout(90_000);
       await page.goto("/about");
       await ready(page, 30_000);
@@ -307,7 +307,7 @@ for (const [w, h] of [[1440, 900], [1280, 800], [1920, 1080], [1024, 768]] as co
         expect(at.layer, name).toBe("front");
         expect(at.bright, name).toBeGreaterThan(0.95);
         const tall = Math.min(at.box.b, h) - Math.max(at.box.t, 0);
-        expect(tall / h, `${name}: its box's share of the screen's height`).toBeGreaterThanOrEqual(0.3);
+        expect(tall / h, `${name}: its box's share of the screen's height`).toBeGreaterThanOrEqual(0.5);
         expect(await frontOverlaps(page), name).toEqual([]);
       }
     });
@@ -494,7 +494,7 @@ function manualFrames() {
  *  over a line of the words right now. `stepAt(i)` returns the page y for step i (null to stop) or undefined to stay put;
  *  `then(i)` may change the asked layer. Runs in the page; each step yields one real frame (the scroll events fire, the
  *  track's own frame is queued) and then ticks exactly one frame. */
-type Sample = { op: number; z: string; bright: number; fade: number; layer: string; s: number; over: boolean };
+type Sample = { op: number; z: string; bright: number; fade: number; layer: string; s: number; over: boolean; face: number | null };
 const stepFrames = (page: Page, args: { ys?: number[]; n?: number; force?: { at: number; layer: "front" | "back" | null }[] }) =>
   page.evaluate(async ({ ys, n, force, TEXT }) => {
     const w = window as unknown as { __manual: boolean; __tick: () => void; __pendantLayer?: string };
@@ -524,7 +524,9 @@ const stepFrames = (page: Page, args: { ys?: number[]; n?: number; force?: { at:
       const h = window.__pendant!, cs = getComputedStyle(c), cr = c.getBoundingClientRect();
       const b = { l: h.box.l + cr.left, r: h.box.r + cr.left, t: h.box.t + cr.top, b: h.box.b + cr.top };
       const over = lines().some((r) => Math.min(b.r, r.right) - Math.max(b.l, r.left) > 1 && Math.min(b.b, r.bottom) - Math.max(b.t, r.top) > 1);
-      out.push({ op: Number(cs.opacity), z: cs.zIndex, bright: h.bright, fade: h.fade, layer: h.layer, s: h.s, over });
+      // (how far the face drawn is from the one its lock asks, degrees: with ?pendant-debug, where a lock holds at least half)
+      const p = h.pose, face = p && p.lock !== null && p.lockMix >= 0.5 ? ((((p.yaw * 180) / Math.PI - p.lock) % 360) + 540) % 360 - 180 : null;
+      out.push({ op: Number(cs.opacity), z: cs.zIndex, bright: h.bright, fade: h.fade, layer: h.layer, s: h.s, over, face });
     }
     delete w.__pendantLayer;
     w.__manual = false;
@@ -580,6 +582,7 @@ test.describe("the motion pass: brightness and layers", () => {
     const FORCED_DIM = 0.4;
     const checked: { dir: string; s: number; bright: number; most: number }[] = [];
     const bad: string[] = [];
+    let sweepMid: Sample | null = null;
     for (const dir of ["down", "up"] as const) {
       const ys: number[] = [];
       if (dir === "down") for (let y = top; y <= end; y += 16) ys.push(y);
@@ -587,9 +590,16 @@ test.describe("the motion pass: brightness and layers", () => {
       await page.evaluate((y) => window.scrollTo(0, y), ys[0]);
       await page.waitForTimeout(2500);
       const got = await stepFrames(page, { ys });
+      // the build sweep under the brisk scroll, going down: its middle (the pendant drawn halfway from build to buildEnd) is
+      // in front of the words, over no line, its face held to the camera (within about 20 degrees of its lock)
+      if (dir === "down") {
+        const mid = (at("build") + at("buildEnd")) / 2; // (travel px, as the samples' s)
+        const g = got.reduce((m, x) => (Math.abs(x.s - mid) < Math.abs(m.s - mid) ? x : m), got[0]);
+        sweepMid = g;
+      }
       // the first frame of each spell behind the words and over a line: at most FORCED_DIM + 0.05, plus what the eased
-      // brightness (0.35 s) can't have shed since the scroll began (from full bright): that only counts for the tumble's
-      // entry going down, 0.8 s from the top of the track
+      // brightness (0.35 s) can't have shed since the scroll began (from full bright): that only counts for the first spell
+      // of each pass, which the scroll's cold start reaches within about half a second
       got.forEach((g, i) => {
         const p = got[i - 1];
         if (!(g.layer === "back" && g.over) || (p && p.layer === "back" && p.over)) return;
@@ -599,17 +609,23 @@ test.describe("the motion pass: brightness and layers", () => {
       });
     }
     expect(bad).toEqual([]);
+    expect(sweepMid, "a sample in the build sweep's middle").not.toBeNull();
+    expect(sweepMid!.layer, `the build sweep's middle, s ${Math.round(sweepMid!.s)}`).toBe("front");
+    expect(sweepMid!.over).toBe(false);
+    expect(Math.abs(sweepMid!.face ?? Infinity)).toBeLessThanOrEqual(20);
     // the tumble's entry both ways, and others besides
     const inTumble = (s: number) => s > at("letgo") && s < at("worm");
     expect(checked.some((c) => c.dir === "down" && inTumble(c.s))).toBe(true);
     expect(checked.some((c) => c.dir === "up" && inTumble(c.s))).toBe(true);
     expect(checked.filter((c) => !inTumble(c.s)).length).toBeGreaterThan(0);
-    // and every one meets the plain bound but the two the scroll's cold start bounds (0.35 s of easing from full bright since
-    // the scroll began): the tumble's entry going down from the track's top, and, going up from its end, the whirl-to-build
-    // approach behind "Build it." (since the desk film left About, 2026-10-18, it is ~50 frames from the end: the dim starts
-    // with the scroll, and the brightness can't shed more in that time). Counted by what each needed, not where it fell.
+    // and every one meets the plain bound but the first spell of each pass, which the scroll's cold start bounds (0.35 s of
+    // easing from full bright since the scroll began: the dim starts with the scroll, and the brightness can't shed more in
+    // that time). Going down that is the lead-in to the tumble, about 15 frames from the track's top (since the motion
+    // pass's spacing, 2026-10-18, the let-go key is nearer the top); going up, the first spell from the track's end.
+    // Counted by what each needed, not where it fell.
     const leaning = checked.filter((c) => c.bright > FORCED_DIM + 0.06);
-    const coldStart = (c: (typeof checked)[number]) => (c.dir === "down" && inTumble(c.s)) || (c.dir === "up" && c.s > at("whirl") && c.s < at("build"));
+    const first = (dir: string) => checked.find((c) => c.dir === dir);
+    const coldStart = (c: (typeof checked)[number]) => c === first("down") || c === first("up");
     expect(leaning.filter((c) => !coldStart(c))).toEqual([]);
     expect(leaning.length).toBeLessThanOrEqual(2);
     expect(errors).toEqual([]);
@@ -665,6 +681,77 @@ test.describe("the motion pass: brightness and layers", () => {
     expect(got.at(-1)).toMatchObject({ layer: "back", fade: 1, op: 1 });
     // no step of the dip is a cut: 0.15 s each way at 1/60 s is about 0.11 a frame
     expect(maxStep(got.map((g) => g.op))).toBeLessThan(0.12);
+    expect(errors).toEqual([]);
+  });
+});
+
+// ---------- the motion pass, Task 2: an even pace between sections ----------
+
+/** The controller's ruling (2026-10-18) for a steady 1500 px/s at 1440 x 900, in place of the brief's absolute 1.2 vw a
+ *  frame (which would have needed about double the travel): no transition's peak speed (the pendant's middle on screen, vw
+ *  a 1/60 s frame) over EVEN x the median transition's; that median at most MEDIAN_MAX (the pre-motion-pass median); and no
+ *  transition's height changing more than MAX_DH % a frame. scripts/about/pendant-motion.cjs measures the same with real
+ *  frames (and reports the table). */
+const EVEN = 1.6, MEDIAN_MAX = 1.86, MAX_DH = 6;
+
+test.describe("the motion pass: an even pace between sections", () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+
+  test("at a steady 1500 px/s every section change glides at an even pace, and buildEnd to the hero covers no line", async ({ page }) => {
+    test.setTimeout(240_000);
+    const errors = collectErrors(page);
+    await page.addInitScript(manualFrames);
+    await page.goto("/about?pendant-debug&governor=0");
+    await ready(page, 30_000);
+    await page.mouse.move(1430, 890);
+    const keys = await page.evaluate(() => window.__pendant!.keys);
+    const y0 = keys[0].y, y1 = keys[keys.length - 1].y;
+    await page.evaluate((y) => window.scrollTo(0, y), y0);
+    await page.waitForTimeout(3000); // (the arrival, the follow and the fade-in settle)
+    // 25 px of page a frame (1500 px/s at 60 fps), one frame a step, then held at the end while the follow catches up
+    const ys: number[] = [];
+    for (let y = y0; y < y1; y += 25) ys.push(y);
+    for (let i = 0; i < 60; i++) ys.push(y1);
+    const got = await page.evaluate(async ({ ys, TEXT, CHROME, fn }) => {
+      const covered = new Function(`return (${fn});`)() as (a: { TEXT: string; CHROME: string }) => string[];
+      const w = window as unknown as { __manual: boolean; __tick: () => void };
+      const out: { index: number; s: number; cx: number; cy: number; h: number; face: number | null; bad: string[] }[] = [];
+      w.__manual = true;
+      for (const y of ys) {
+        window.scrollTo(0, y);
+        await new Promise<void>((r) => setTimeout(r, 16));
+        w.__tick();
+        const p = window.__pendant!.pose!;
+        const face = p.lock !== null && p.lockMix >= 0.5 ? ((((p.yaw * 180) / Math.PI - p.lock) % 360) + 540) % 360 - 180 : null;
+        out.push({ index: p.index, s: p.s, cx: p.cx, cy: p.cy, h: p.h, face, bad: covered({ TEXT, CHROME }) });
+      }
+      w.__manual = false;
+      w.__tick();
+      return out;
+    }, { ys, TEXT, CHROME, fn: coveredNow.toString() });
+    // per transition (shot i to i + 1, by the later frame's blend): the peak speed of the middle and the peak height change
+    const n = keys.length - 1;
+    const peakV = new Array<number>(n).fill(0), peakDh = new Array<number>(n).fill(0);
+    for (let k = 1; k < got.length; k++) {
+      const a = got[k - 1], b = got[k], i = Math.min(b.index, n - 1);
+      peakV[i] = Math.max(peakV[i], Math.hypot((b.cx - a.cx) * 1440, (b.cy - a.cy) * 900) / 14.4);
+      peakDh[i] = Math.max(peakDh[i], Math.abs(b.h / a.h - 1) * 100);
+    }
+    const sorted = [...peakV].sort((a, b) => a - b);
+    const median = sorted.length % 2 ? sorted[(sorted.length - 1) / 2] : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2;
+    const table = keys.slice(0, n).map((k, i) => `${k.id} -> ${keys[i + 1].id}: ${peakV[i].toFixed(2)} vw/f, ${peakDh[i].toFixed(2)} %/f`);
+    expect(median, table.join("\n")).toBeLessThanOrEqual(MEDIAN_MAX);
+    for (let i = 0; i < n; i++) {
+      expect(peakV[i], `${table[i]} (median ${median.toFixed(2)})`).toBeLessThanOrEqual(EVEN * median);
+      expect(peakDh[i], table[i]).toBeLessThanOrEqual(MAX_DH);
+    }
+    // buildEnd to the hero, both locked (0 to -62 degrees): the lock turns faster than its pull follows, so the face drawn
+    // trails it mid-blend; the solve takes every yaw there, so the pendant drawn never covers a line in front
+    const be = keys.findIndex((k) => k.id === "buildEnd");
+    const sweep = got.filter((g) => g.index === be);
+    expect(sweep.length).toBeGreaterThan(5);
+    expect(sweep.some((g) => Math.abs(g.face ?? 0) > 10), "the face really trails its turning lock").toBe(true);
+    expect(sweep.flatMap((g) => g.bad)).toEqual([]);
     expect(errors).toEqual([]);
   });
 });

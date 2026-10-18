@@ -71,10 +71,16 @@ function expectRule(pics: Seen[], where: string) {
 
 /** Every .mp4 requested since the page began to load (the listener is set before the first request, so a regression to preload="auto" shows). */
 let mp4s: string[] = [];
+/** Every request for the desk film's files (its video or poster) since the page began to load: set before the first request too. */
+let deskReqs: string[] = [];
 
 test.beforeEach(async ({ page }) => {
   mp4s = [];
-  page.on("request", (r) => { if (new URL(r.url()).pathname.endsWith(".mp4")) mp4s.push(new URL(r.url()).pathname); });
+  deskReqs = [];
+  page.on("request", (r) => {
+    if (new URL(r.url()).pathname.endsWith(".mp4")) mp4s.push(new URL(r.url()).pathname);
+    if (/desk-build/.test(r.url())) deskReqs.push(r.url());
+  });
   await page.goto("/about");
   await expect(page.locator("section.ab")).toHaveAttribute("data-mode", "track");
   await page.evaluate(() => document.fonts.ready);
@@ -83,8 +89,6 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("the desk film has left About (Liam, 2026-10-18): not in the DOM, never requested, an empty stage in its place", async ({ page }) => {
-  const imgs: string[] = [];
-  page.on("request", (r) => { if (/desk-build/.test(r.url())) imgs.push(r.url()); });
   for (let i = 0; i <= 10; i++) await scrollTrack(page, i / 10);
   const dom = await page.evaluate(() => ({
     film: document.querySelectorAll('[data-pic="desk"], [data-pendant="deskfilm"], .ab-deskvid, [src*="desk-build"], [poster*="desk-build"], [srcset*="desk-build"]').length,
@@ -95,7 +99,7 @@ test("the desk film has left About (Liam, 2026-10-18): not in the DOM, never req
   expect(dom.caption).toBe(false);
   expect(dom.stage).toEqual({ kids: 0, w: expect.any(Number), inBuild: true });
   expect(dom.stage!.w).toBeGreaterThan(0);
-  expect([...mp4s, ...imgs].filter((u) => /desk-build/.test(u))).toEqual([]);
+  expect([...mp4s, ...deskReqs].filter((u) => /desk-build/.test(u))).toEqual([]);
 });
 
 test("pictures rise and are cut as About scrolls, with no console errors", async ({ page }) => {

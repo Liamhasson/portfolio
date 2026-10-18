@@ -81,6 +81,64 @@ describe("solve", () => {
     expect(solve(input([])).overLagging(500, 300)).toBe(false);
   });
 
+  it("a shot riding with the page (ride 1) is carried with the words: their lag doesn't bring a line onto it", () => {
+    const line: TextRect = { l: 1400, t: 440, w: 40, h: 20 }; // (as above: 150 px of lag brings it over the trailing pendant)
+    const riding = shots.map((x) => ({ ...x, ride: 1 }));
+    const r = solve(input([line], [], { shots: riding }));
+    expect(r.overLagging(500, 150)).toBe(false); // (a quarter of it, about 38 px, still trails: not enough to reach the line)
+    // only RIDE_MAX of the width is carried: a lag far past it (a jump's) trails by the rest
+    expect(r.overLagging(500, 0.35 * 1440 + 150)).toBe(true);
+  });
+
+  it("grown by what the live pendant reaches past its rest box (a scroll's lean), it counts the lines and the chrome that reach meets", () => {
+    const r = solve(input([], [{ l: 0, t: 0, r: 1440, b: 150 }])); // (a bar along the top: the rest outline starts at 270)
+    const rest = r.rest(500);
+    expect(rest.t).toBeGreaterThan(200);
+    expect(r.over(500)).toBe(false);
+    expect(r.overLagging(500, 0)).toBe(false);
+    expect(r.overLagging(500, 0, { l: 0, t: 40, r: 0, b: 0 })).toBe(false); // (not far enough up)
+    expect(r.overLagging(500, 0, { l: 0, t: rest.t - 140, r: 0, b: 0 })).toBe(true);
+    expect(r.overLagging(500, 0, { l: 0, t: 0, r: 0, b: rest.t })).toBe(false); // (the other way: nothing there)
+    // a line beside it, met only once the box is grown toward it
+    const line: TextRect = { l: 500 + 900, t: 440, w: 40, h: 20 }; // (at 900..940 on screen at travel 500)
+    const q = solve(input([line]));
+    expect(q.overLagging(500, 0, { l: 0, t: 0, r: 40, b: 0 })).toBe(false);
+    expect(q.overLagging(500, 0, { l: 0, t: 0, r: 900 - q.rest(500).r + 5, b: 0 })).toBe(true);
+  });
+
+  it("between two different locks, mid-blend, it takes every face from the one left to the one asked (a face drawn trails a turning lock); at rest and between equal locks, the locked face's", () => {
+    // a plank, wide one way and thin the other: its box depends on the face shown
+    const plank = (() => {
+      const p: number[] = [];
+      for (let j = 0; j <= 10; j++) for (const x of [-0.4, 0.4]) for (const z of [-0.02, 0.02]) p.push(x, -0.5 + j / 10, z);
+      return new Float32Array(p);
+    })();
+    const o = outlineOf(plank);
+    const two = (a: number, b: number): Shot[] => [{ ...base, id: "a", anchor: "start", lock: a }, { ...base, id: "b", anchor: "end", lock: b }];
+    // the box's width at rest with each face: the narrow face is the one turned edge-on
+    const width = (lock: number) => { const r = solve(input([], [], { shots: two(lock, lock), outline: o })).rest(0); return r.r - r.l; };
+    const [w0, w90] = [width(0), width(90)];
+    const edge = w0 < w90 ? 0 : 90, broad = edge === 0 ? 90 : 0;
+    expect(Math.abs(w0 - w90)).toBeGreaterThan(100);
+    // a bar right of the narrow box, inside the broad one
+    const narrow = solve(input([], [], { shots: two(edge, edge), outline: o })).rest(500);
+    const bar = [{ l: narrow.r + 40, t: 0, r: 1440, b: 900 }];
+    // equal locks, edge-on all the way: clear, in front throughout
+    const held = solve(input([], bar, { shots: two(edge, edge), outline: o }));
+    expect([0, 500, 1000].map(held.layer)).toEqual(["front", "front", "front"]);
+    // from edge-on to a face 20 degrees off it: mid-blend the face drawn may still be anywhere between the two, so the box is
+    // as wide as the widest of them, but not the broad face's (which it never shows)
+    const turn = solve(input([], [], { shots: two(edge, edge + 20), outline: o }));
+    const mid = turn.rest(500), atRest = turn.rest(0);
+    expect(mid.r - mid.l).toBeGreaterThan(atRest.r - atRest.l);
+    expect(mid.r - mid.l).toBeLessThan(Math.max(w0, w90) - 50);
+    // from edge-on to the broad face: mid-blend it takes the faces in between, which reach the bar (behind there), and at
+    // its rest windows only its own face
+    const wide = solve(input([], bar, { shots: two(edge, broad), outline: o }));
+    expect(wide.layer(0)).toBe("front");
+    expect(wide.layer(500)).toBe("back");
+  });
+
   it("puts a shot behind the words when nothing within the limits clears it", () => {
     // a bar across the whole middle of the screen that holds still (chrome): no move or shrink gets clear of it
     const r = solve(input([], [{ l: 0, t: 400, r: 1440, b: 500 }]));

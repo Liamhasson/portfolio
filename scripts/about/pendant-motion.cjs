@@ -7,7 +7,8 @@
 // Per transition (shot i to shot i + 1) it reports the peak screen speed of the middle (vw per 1/60 s frame), its peak
 // acceleration (the change of that velocity from one frame to the next, vw per frame per frame: the kick leaving and reaching
 // a shot), the peak height change per frame (%) and the peak roll change per frame (degrees), and flags any transition whose
-// peak speed is more than 2x the median transition's. Bounds (the brief's): peak speed <= 1.2 vw a frame, height change <= 4% a frame.
+// peak speed is more than 1.6x the median transition's; and how far a locked face trails its lock (degrees). Bounds (the
+// controller's ruling, 2026-10-18): busiest <= 1.6x the median, median <= 1.86 vw a frame, height change <= 6% a frame.
 //   node scripts/about/pendant-motion.cjs
 //   OUT=test-results/pendant-motion.json node scripts/about/pendant-motion.cjs
 // It builds and starts its own server (port PORT, 3320 by default) and stops it, by its own process group, when done. BASE:
@@ -51,9 +52,12 @@ const PAGE_MS = Number(process.env.PAGE_MS) || 1000;
 const LEAD_F = Number(process.env.LEAD_F) || 75;
 const BACK_F = Number(process.env.BACK_F) || 60;
 const FRAME_MS = 1000 / 60;
-/** The brief's bounds, per 1/60 s frame. */
-const MAX_VW = 1.2;
-const MAX_H_PCT = 4;
+/** The bounds, per 1/60 s frame (the controller's ruling of 2026-10-18, in place of the brief's absolute 1.2 vw): an even
+ *  pace. No transition's peak speed over EVEN x the median transition's; the median at most MEDIAN_MAX (the pre-motion-pass
+ *  median); no transition's height changing more than MAX_H_PCT a frame. */
+const EVEN = 1.6;
+const MEDIAN_MAX = 1.86;
+const MAX_H_PCT = 6;
 
 /** Next servers listening from this worktree: [{ pid, cmd }] (pendant-perf.cjs's check). Throws if that can't be told. */
 function serversHere() {
@@ -152,6 +156,8 @@ function steps(poses, w, h, per) {
       acc: last ? Math.hypot(vx - last.vx, vy - last.vy) / n : 0,
       dh: (Math.abs(b.h / a.h - 1) * 100) / n,
       droll: Math.abs(b.roll - a.roll) / n,
+      // (how far the face is from the one its lock asks, degrees: only where a lock holds at least half)
+      face: b.lock !== undefined && b.lock !== null && b.lockMix >= 0.5 ? Math.abs(((((b.yaw * 180) / Math.PI - b.lock) % 360) + 540) % 360 - 180) : 0,
     });
     last = { vx, vy };
   }
@@ -289,23 +295,25 @@ function report({ keys, poses, mode = "steady" }, w = W, h = H, dpr = DPR, speed
       peakAcc: xs.length ? Math.max(...xs.map((x) => x.acc)) : NaN,
       peakDh: xs.length ? Math.max(...xs.map((x) => x.dh)) : NaN,
       peakRoll: xs.length ? Math.max(...xs.map((x) => x.droll)) : NaN,
+      peakFace: xs.length ? Math.max(...xs.map((x) => x.face ?? 0)) : NaN,
       meanV: xs.length ? xs.reduce((a, x) => a + x.v, 0) / xs.length : NaN,
     });
   }
   const med = pct(rows.map((r) => r.peakV).filter(Number.isFinite), 50);
-  for (const r of rows) r.busy = r.peakV > 2 * med;
+  for (const r of rows) r.busy = r.peakV > EVEN * med;
   console.log(`\npendant motion between shots, ${w}x${h} at DPR ${dpr}, headless, ${speed} px/s (${fmt((speed * FRAME_MS) / 1000, 1)} px a 1/60 s frame), ${poses.length} frames`);
-  console.log("\n  transition               travel  frames   peak vw/f  (at t)   mean vw/f   peak acc vw/f2   peak dh %/f   peak droll deg/f");
+  console.log("\n  transition               travel  frames   peak vw/f  (at t)   mean vw/f   peak acc vw/f2   peak dh %/f   peak droll deg/f   face off lock deg");
   for (const r of rows) {
     const name = `${r.from} -> ${r.to}`;
-    console.log(`  ${name.padEnd(24)} ${String(r.travel).padStart(6)}  ${String(r.frames).padStart(6)}   ${fmt(r.peakV).padStart(9)}  (${fmt(r.peakVT)})   ${fmt(r.meanV).padStart(9)}   ${fmt(r.peakAcc, 3).padStart(14)}   ${fmt(r.peakDh).padStart(11)}   ${fmt(r.peakRoll).padStart(16)}${r.busy ? "   > 2x median" : ""}`);
+    console.log(`  ${name.padEnd(24)} ${String(r.travel).padStart(6)}  ${String(r.frames).padStart(6)}   ${fmt(r.peakV).padStart(9)}  (${fmt(r.peakVT)})   ${fmt(r.meanV).padStart(9)}   ${fmt(r.peakAcc, 3).padStart(14)}   ${fmt(r.peakDh).padStart(11)}   ${fmt(r.peakRoll).padStart(16)}   ${fmt(r.peakFace, 1).padStart(17)}${r.busy ? `   > ${EVEN}x median` : ""}`);
   }
   const allV = Math.max(...rows.map((r) => r.peakV).filter(Number.isFinite));
   const allH = Math.max(...rows.map((r) => r.peakDh).filter(Number.isFinite));
   console.log(`\n  median transition peak ${fmt(med)} vw/f; busiest ${fmt(allV)} vw/f; height ${fmt(allH)} %/f`);
-  console.log(`  bound: peak speed <= ${MAX_VW} vw a frame: ${allV <= MAX_VW ? "PASS" : "OVER"} (${fmt(allV)}); height <= ${MAX_H_PCT}% a frame: ${allH <= MAX_H_PCT ? "PASS" : "OVER"} (${fmt(allH)})`);
+  console.log(`  bounds: busiest <= ${EVEN}x the median (${fmt(EVEN * med)}): ${allV <= EVEN * med ? "PASS" : "OVER"} (${fmt(allV / med)}x); median <= ${MEDIAN_MAX}: ${med <= MEDIAN_MAX ? "PASS" : "OVER"}; height <= ${MAX_H_PCT}% a frame: ${allH <= MAX_H_PCT ? "PASS" : "OVER"} (${fmt(allH)})`);
   const busy = rows.filter((r) => r.busy).map((r) => `${r.from} -> ${r.to}`);
-  console.log(`  more than 2x the median: ${busy.length ? busy.join(", ") : "none"}`);
+  console.log(`  more than ${EVEN}x the median: ${busy.length ? busy.join(", ") : "none"}`);
+  console.log(`  track: ${Math.round(keys[keys.length - 1].y - top)} px of travel`);
   console.log(`  scroll steps checked: ${all.length - irregular} of ${all.length} at ${fmt(per, 1)} px a frame (or held)${irregular ? `; ${irregular} irregular, left out` : ""}`);
   reportDimming(dim);
   if (process.env.OUT) {

@@ -20,7 +20,7 @@ import { Object3D, PerspectiveCamera } from "three";
 import { motionMargin, outlineBox, poseRig, reachOf, type Box } from "./camera";
 import { clipBox, findSpot, hits, layerTimeline, padBox, SAME, type Probe, type Sample, type Spot, type TextRect } from "./layout";
 import { REST } from "./motion";
-import { shotAt, shotLayer, smootherstep, variants, type Frame, type Layer, type Shot } from "./shots";
+import { RIDE_STEADY, rideShift, shotAt, shotLayer, smootherstep, variants, type Frame, type Layer, type Shot } from "./shots";
 
 /** Px of travel between samples. */
 export const STEP = 8;
@@ -46,6 +46,10 @@ const PROBES = 9;
 export const FORCED_DIM = 0.4;
 
 const D = Math.PI / 180;
+/** Faces posed between the one a turning lock left and the one it asks now (see `sample`). */
+const TURN_STEPS = 4;
+/** The shortest way round from angle `a` to `b` (degrees), in [-180, 180). */
+const arcDeg = (a: number, b: number) => ((((b - a) % 360) + 540) % 360) - 180;
 const PITCHES = [0, 45, 90, 135].map((d) => d * D);
 /** Below this many turns per second the motion rights the pendant (motion.ts TUMBLE_OFF). */
 const TUMBLE_OFF = 0.02;
@@ -146,8 +150,14 @@ export interface Solved {
    *  anywhere between where they are at `s` and where they are `lag` further along. The live pendant is drawn at the eased
    *  travel while the words ride the page, so during a scroll it meets lines the rest pairing never does, and the live guard
    *  sends it behind them there; the look ahead counts those too (in a front stretch as well), so the pendant is already
-   *  dimmed when it gets there. (A pendant aimed at the glass rides partly with the page: its shift is inside that range.) */
-  overLagging: (s: number, lag: number) => boolean;
+   *  dimmed when it gets there. (A pendant aimed at the glass rides partly with the page: its shift is inside that range.)
+   *  `grow` (px a side, each at most half the box's longer side): the box grown first by what the live pendant reaches past
+   *  its rest outline (`rest`), which the rest pairing leaves out: chiefly the lean into a scroll (motion.ts LEAN: a pendant
+   *  lying along the top, the glide, tilted reaches tens of px further up and down); the chrome counts then as well. */
+  overLagging: (s: number, lag: number, grow?: Box) => boolean;
+  /** The pendant at rest at travel `s` as `over` takes it: its outline grown by PAD / 2 (not clipped to the screen: a part
+   *  past the edge now may come on screen further along, and what reaches past it with it). */
+  rest: (s: number) => Box;
   /** The front shots whose rest was changed: the alternate used (0 = as written) and the spot. */
   moved: { id: string; alt: number; dx: number; dy: number; k: number }[];
   /** The front shots that rest behind the words on this screen (nothing within the limits clears them). */
@@ -192,13 +202,20 @@ export function solve(input: SolveInput): Solved {
     applySpot(f, spots);
     // (a face turning toward its lock or letting go of it may face any way: every yaw (`ring`) while the lock is easing in
     // or out; the locked face's own outline only where it holds, which is the locked shot's rest window, the stretch the
-    // solve takes as that shot at rest: there the lock has settled the face)
+    // solve takes as that shot at rest: there the lock has settled the face. Between two different locks (buildEnd to the
+    // hero, 0 to -62) the lock itself turns, faster than its pull can follow on a quick scroll, so the face drawn trails it
+    // mid-blend (by about 30 degrees at 1500 px/s): there, outside the two rest windows, every face from the one the
+    // blend left to the one it asks now (TURN_STEPS of them), so a trailing face is inside the outline.)
+    const A = shots[f.index], B = shots[Math.min(f.index + 1, shots.length - 1)];
+    const turning = A !== B && A.lock !== null && B.lock !== null && A.lock !== B.lock && f.t > REST_T && f.t < 1 - REST_T;
     const locked = f.lock !== null && f.lockMix >= 1 - REST_T;
     const pts = locked ? outline.all : outline.ring;
+    const yaws = !locked ? [0] : !turning ? [(f.lock as number) * D]
+      : Array.from({ length: TURN_STEPS + 1 }, (_, k) => ((A.lock as number) + (k / TURN_STEPS) * arcDeg(A.lock as number, f.lock as number)) * D);
     const pitches = f.tumble > TUMBLE_OFF ? PITCHES : [0];
     let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
-    for (const pitch of pitches) {
-      poseRig(f, { ...REST, yaw: locked ? (f.lock as number) * D : 0, pitch }, 0, NO_LOOK, vw, vh, camera, outer, inner, { still: true });
+    for (const yaw of yaws) for (const pitch of pitches) {
+      poseRig(f, { ...REST, yaw, pitch }, 0, NO_LOOK, vw, vh, camera, outer, inner, { still: true });
       const x = outlineBox(pts, inner, camera, vw, vh);
       if (x.l < l) l = x.l;
       if (x.t < t) t = x.t;
@@ -256,7 +273,8 @@ export function solve(input: SolveInput): Solved {
   const samples: Sample[] = final.map((a) => ({ s: a.s, wanted: shotLayer(a.f, shots), box: clipBox(padBox(a.box, a.pad), vw, vh) }));
   const layer = layerTimeline(samples, texts, fixed);
   const xs2 = final.map((a) => a.s);
-  const tightBox = final.map((a) => clipBox(padBox(a.box, PAD / 2), vw, vh));
+  const restBox = final.map((a) => padBox(a.box, PAD / 2)); // (unclipped: `rest`, and what a reach past it grows)
+  const tightBox = restBox.map((b) => clipBox(b, vw, vh));
   const tight = final.map((a, j) => hits(tightBox[j], texts, a.s, fixed) > 0);
   /** The sample holding at `s` (each holds until the next; before the first, the first). */
   const sampleAt = (s: number): number => {
@@ -267,12 +285,14 @@ export function solve(input: SolveInput): Solved {
   };
   const over = (s: number): boolean => xs2.length > 0 && tight[sampleAt(s)];
   /** Per sample, the lines `overLagging` can meet there, as plain numbers (l, t, r, b, and 1 for a line riding the y axis):
-   *  those across the box's other axis (a sweep along the way a line rides never changes that), worked out once each. */
+   *  those across the box's other axis, the box grown by the most a lean can add (a sweep along the way a line rides never
+   *  changes that), worked out once each. */
   const reach: (Float64Array | undefined)[] = [];
   const reachOf = (j: number): Float64Array => {
     const had = reach[j];
     if (had) return had;
-    const b = tightBox[j], at = xs2[j], out: number[] = [];
+    const r0 = restBox[j], g = Math.max(r0.r - r0.l, r0.b - r0.t) / 2;
+    const b = { l: r0.l - g, t: r0.t - g, r: r0.r + g, b: r0.b + g }, at = xs2[j], out: number[] = [];
     for (const x of texts) {
       const alongY = x.axis === "y";
       let l = x.l - (alongY ? 0 : at), t = x.t - (alongY ? at : 0);
@@ -288,23 +308,34 @@ export function solve(input: SolveInput): Solved {
     }
     return (reach[j] = Float64Array.from(out));
   };
-  const overLagging = (s: number, lag: number): boolean => {
+  const overLagging = (s: number, lag: number, grow?: Box): boolean => {
     if (xs2.length === 0) return false;
-    const j = sampleAt(s), b = tightBox[j];
-    if (tight[j] || lag === 0) return tight[j];
+    const j = sampleAt(s), t0 = tightBox[j], r0 = restBox[j];
+    // (a shot riding with the page, shots.ts `ride`, is carried that much of the lag with the words, at a steady scroll
+    // RIDE_STEADY of it: only the rest trails)
+    lag -= rideShift(final[j].f.ride * RIDE_STEADY, lag, vw);
+    const cap = Math.max(r0.r - r0.l, r0.b - r0.t) / 2, g = (v: number) => Math.min(Math.max(v, 0), cap);
+    const gl = g(grow?.l ?? 0), gt = g(grow?.t ?? 0), gr = g(grow?.r ?? 0), gb = g(grow?.b ?? 0);
+    const grown = gl + gt + gr + gb >= 0.5;
+    if (tight[j] || (Math.abs(lag) < 0.5 && !grown)) return tight[j];
+    const b = grown ? clipBox({ l: r0.l - gl, t: r0.t - gt, r: r0.r + gr, b: r0.b + gb }, vw, vh) : t0;
     if (b.r <= b.l || b.b <= b.t) return false; // (off screen)
+    if (grown && hits(b, [], 0, fixed) > 0) return true; // (grown onto the chrome, which holds still)
     // lines `lag` further along sit `lag` back on screen: the box swept `lag` forward (along the way each line rides) meets
-    // every one in between. (layout.ts `hits` with plain numbers, and only the lines across the box: the look ahead asks
-    // this many times a frame.)
+    // every one in between. (layout.ts `hits` with plain numbers, and only the lines across the box at its most grown: the
+    // look ahead asks this many times a frame.)
     const lo = Math.min(0, lag), hi = Math.max(0, lag), xs = reachOf(j);
     for (let k = 0; k < xs.length; k += 5) {
       const y = xs[k + 4] === 1;
-      if (y ? b.t + lo < xs[k + 3] && b.b + hi > xs[k + 1] : b.l + lo < xs[k + 2] && b.r + hi > xs[k]) return true;
+      if (y
+        ? b.l < xs[k + 2] && b.r > xs[k] && b.t + lo < xs[k + 3] && b.b + hi > xs[k + 1]
+        : b.t < xs[k + 3] && b.b > xs[k + 1] && b.l + lo < xs[k + 2] && b.r + hi > xs[k]) return true;
     }
     return false;
   };
   const behind = input.shots
     .filter((sh, i) => sh.layer === "front" && keys[i] >= 0 && keys[i] <= travel && (unsolved.includes(i) || layer(keys[i]) === "back"))
     .map((sh) => sh.id);
-  return { shots, spots, layer, over, overLagging, moved, behind };
+  const rest = (s: number): Box => (xs2.length > 0 ? restBox[sampleAt(s)] : { l: 0, t: 0, r: 0, b: 0 });
+  return { shots, spots, layer, over, overLagging, rest, moved, behind };
 }

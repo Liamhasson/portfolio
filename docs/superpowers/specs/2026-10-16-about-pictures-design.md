@@ -34,9 +34,9 @@ The track, left to right (text unchanged; `docs/copy/about.md`):
 | Right of paragraph 2, bottom on its last line | **Studio from above** (`/playground/studio-overhead.jpg`) | 12vw wide, 3:4 | Caption (mono): "Producing · Marni Came". 3.2vw from the paragraph. |
 | Under "End to end, from the problem to the shipped product." | **Strip of three loops**: Cyvore, Eventread, Nordic Logic (`/work/*.mp4`, posters `/work/*.jpg`) | 9vw each, 16:10, 1.6vw apart | Each captioned with its name and linking to its case study. |
 | Between Yoav's and Andrada's quotes | **The glass ball** (§4.2) | ~15vw across | Not a picture: drawn in the testimonials' canvas. |
-| Right of "Build it." | **The desk build-up video** (§5) | 34vw wide, 16:10 | 7vw before it, 5vw after it (more room than a slide gap: Liam, "it deserves space"). Caption: "This desk · wire to final". |
+| Right of "Build it." | **An empty stage** for the pendant's build shot (not a picture: drawn in the pendant's canvas) | 36vw wide, the row's height | 3.2vw from the skills. Its width is set by the hero: at the track's end it carries the skills off the left edge. Hidden when stacked (no build shot on phones). |
 
-**Removed from About by Liam on 2026-10-18** ("Remove the desk. Let's focus on the pendant."): the desk build-up video is no longer on the track; an empty stage right of "Build it." holds the pendant's build shot instead. Its files (`public/about/desk-build.{mp4,jpg}`, `blender/lookdev/desk_passes*.py`) stay in the repo, unreferenced, for a one-line restore.
+**The desk build-up video (§5) was removed from About by Liam on 2026-10-18** ("Remove the desk. Let's focus on the pendant."): the stage above stands in its place. Its files (`public/about/desk-build.{mp4,jpg}`, `blender/lookdev/desk_passes*.py`) stay in the repo, unreferenced, for a one-line restore.
 
 Nothing on "That's still how I work", Find the problem, Check I'm right, Andrada's quote, or the closing line.
 

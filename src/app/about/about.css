@@ -95,7 +95,15 @@ a.ab-proof:hover, a.ab-proof:focus-visible { color: #f4efe9; }
 /* between the two quotes, where the glass pendant passes (empty: the shader draws it) */
 .ab-glass { width: 17vw; height: 17vw; }
 /* Build it. and, right of its skills, the empty stage the pendant builds itself up on (Liam, 2026-10-18: in the desk film's
-   place). As wide as the pendant's close-up needs: its size is a share of the screen's height, so is the stage's. */
+   place). Its 36vw is pinned by the hero, not by the build shot: at the track's end the stage must carry "Build it."'s
+   skills off the screen's left edge, where the hero plays its written framing (cut by that edge); narrower, the skills
+   are still there and the hero falls to its bottom-right alternate. */
+/* "Find the real problem" on the track: room before it and after it, where the pendant glides along the top of the screen
+   from right to left (Liam, 2026-10-18: "some motions between sections are a bit hectic and not smooth"; motion pass Task
+   2). The glide crosses the whole width; with only the 7vw slide gap it did so in 0.4 of a screen of scroll, four times as
+   fast as the median move. The extra 96vw (the track about 13% longer, its scroll about 15%) is shared with the moves into it from the glass and out
+   of it to the whirl (shots.ts, the glide's and the whirl's fx). */
+.ab[data-mode="track"] .ab-verb[data-pendant="find"] { margin: 0 35.3vw 0 60.3vw; }
 .ab-verbrow { display: flex; align-items: flex-start; gap: 3.2vw; max-width: none; }
 .ab-buildstage { flex: 0 0 auto; width: 36vw; align-self: stretch; }
 /* stacked (phones, reduced motion): the pictures simply flow under their text */

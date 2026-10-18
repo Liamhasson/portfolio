@@ -1,7 +1,7 @@
 // src/three/pendant/shots.test.ts
 import { describe, expect, it, test } from "vitest";
 import { REST, stepMotion, type MotionState } from "./motion";
-import { heldIndex, HOLD_PAST, SHOTS, SHOTS_STACK, shotAt, shotLayer, smootherstep, solveKeys, variants, type Anchor, type Shot } from "./shots";
+import { heldIndex, HOLD_PAST, RIDE_MAX, rideShift, SHOTS, SHOTS_STACK, shotAt, shotLayer, smootherstep, solveKeys, variants, type Anchor, type Shot } from "./shots";
 
 const VW = 1440;
 const TRAVEL = 9000;
@@ -132,8 +132,8 @@ describe("solveKeys", () => {
 
   test("a shot is fully on when its anchor's centre is at fx of the screen: key = centre - fx x vw", () => {
     const keys = solveKeys(SHOTS, centres(ALL), VW, TRAVEL);
-    expect(keys[1]).toBeCloseTo(1700 - 0.92 * VW, 9); // letgo
-    expect(keys[2]).toBeCloseTo(1700 - 0.42 * VW, 9); // tumble
+    expect(keys[1]).toBeCloseTo(1700 - SHOTS[1].fx * VW, 9); // letgo
+    expect(keys[2]).toBeCloseTo(1700 - SHOTS[2].fx * VW, 9); // tumble
   });
 
   test("anchors crowded at the end of the track keep every key inside 0..travel and the hero reachable", () => {
@@ -150,7 +150,7 @@ describe("solveKeys", () => {
   test("uses the fallback when an anchor is missing", () => {
     const k = solveKeys(SHOTS, centres(without("strip")), VW, TRAVEL);
     const above = SHOTS.findIndex((s) => s.id === "above");
-    expect(k[above]).toBeCloseTo(ALL.e2e - 0.5 * VW, 9);
+    expect(k[above]).toBeCloseTo(ALL.e2e - SHOTS[above].fx * VW, 9);
 
     const k2 = solveKeys(SHOTS, centres(without("glass")), VW, TRAVEL);
     const glass = SHOTS.findIndex((s) => s.id === "glass");
@@ -166,7 +166,7 @@ describe("solveKeys", () => {
   test("a primary that exists wins over its fallback", () => {
     const k = solveKeys(SHOTS, centres(ALL), VW, TRAVEL);
     const above = SHOTS.findIndex((s) => s.id === "above");
-    expect(k[above]).toBeCloseTo(ALL.strip - 0.5 * VW, 9);
+    expect(k[above]).toBeCloseTo(ALL.strip - SHOTS[above].fx * VW, 9);
   });
 
   test("with neither the anchor nor its fallback, the key sits just after the previous one", () => {
@@ -388,6 +388,83 @@ describe("shotAt", () => {
       const yaws = ride(free, locked, 0.6, REST, scrollVel);
       expect(maxJerk(yaws)).toBeLessThan(0.5 * D);
     }
+  });
+});
+
+// Task 2, Part B: the whirl hands its fast spin to the build's held face early in the move (`settle`), and the build rides
+// with the page (`ride`), so a brisk scroll finds it on its stage, face on.
+describe("settle and ride (the build under a fast scroll)", () => {
+  const D = Math.PI / 180;
+  const by = (id: string) => SHOTS.find((s) => s.id === id)!;
+  const whirl = by("whirl"), build = by("build"), buildEnd = by("buildEnd");
+
+  test("the build settles over the first half of the move into it: spin and lock there, the framing over the whole move", () => {
+    expect(build.settle).toBe(0.5);
+    expect(buildEnd.settle).toBe(1);
+    expect(by("hero").settle).toBe(1);
+    const keys = [0, 1000];
+    const at = (s: number) => shotAt(s, keys, [whirl, build], AT);
+    // halfway: the spin is gone and the face is held, while the framing is only halfway there
+    expect(at(500).spin).toBe(0);
+    expect(at(500).lockMix).toBe(1);
+    expect(at(500).lock).toBe(-10);
+    expect(at(500).t).toBeCloseTo(0.5, 12);
+    expect(at(500).h).toBeLessThan(build.h);
+    // a quarter of the way: the spin and the lock's strength halfway (smootherstep over the first half)
+    expect(at(250).spin).toBeCloseTo(whirl.spin / 2, 9);
+    expect(at(250).lockMix).toBeCloseTo(0.5, 9);
+    // eased at both ends of the settle: no step in the lock's strength anywhere
+    let prev = 0;
+    for (let s = 0; s <= 1000; s++) {
+      const m = at(s).lockMix;
+      expect(m - prev).toBeLessThanOrEqual((15 / 8) * (2 / 1000) + 1e-9);
+      prev = m;
+    }
+  });
+
+  test("at a brisk scroll (960 px/s) the build sweep's middle has its face held: within 20 degrees for nine entry faces in ten, where without the settle only seven in ten", () => {
+    // the live spacing at 1440 x 900: whirl to build about 960 px, the sweep about 374 px; the scroll follow as the mount's
+    const keys = [0, 960, 960 + 374], FOLLOW = 0.018, v = 960, dt = 1 / 60;
+    const run = (shots: Shot[]) => {
+      const offs: number[] = [];
+      let jerk = 0;
+      for (let j = 0; j < 72; j++) {
+        let m: MotionState = { ...REST, yaw: (j * 5) * D };
+        let page = 0, sm = 0, prev = 0;
+        const yaws: number[] = [];
+        while (sm < (keys[1] + keys[2]) / 2) {
+          page += v * dt;
+          sm += (page - sm) * (1 - FOLLOW ** dt);
+          const f = shotAt(sm, keys, shots, AT);
+          m = stepMotion(m, { dt, spin: f.spin, tumble: f.tumble, lock: f.lock, lockMix: f.lockMix, scrollVel: (sm - prev) / dt, dragging: false, dragDX: 0, dragDY: 0, reduced: false });
+          prev = sm;
+          yaws.push(m.yaw);
+        }
+        for (let k = 2; k < yaws.length; k++) jerk = Math.max(jerk, Math.abs(yaws[k] - 2 * yaws[k - 1] + yaws[k - 2]));
+        const f = shotAt(sm, keys, shots, AT);
+        offs.push(Math.abs(((((m.yaw / D - (f.lock as number)) % 360) + 540) % 360) - 180));
+      }
+      offs.sort((a, b) => a - b);
+      return { median: offs[36], held: offs.filter((o) => o <= 20).length / offs.length, jerk: jerk / D };
+    };
+    const settled = run([whirl, build, buildEnd]);
+    const plain = run([whirl, { ...build, settle: 1 }, buildEnd]);
+    expect(settled.held).toBeGreaterThanOrEqual(0.9);
+    expect(settled.median).toBeLessThanOrEqual(5);
+    expect(plain.held).toBeLessThan(0.75);
+    // (the spin is shed over half the move, not all of it: a quicker slowing, still eased, never a kick)
+    expect(settled.jerk).toBeLessThan(1);
+  });
+
+  test("the build rides with the page; the whirl before it and the hero after it don't; rideShift carries at most RIDE_MAX of the width", () => {
+    expect([whirl.ride, build.ride, buildEnd.ride, by("hero").ride]).toEqual([0, 1, 1, 0]);
+    for (const sh of SHOTS) if (!["build", "buildEnd"].includes(sh.id)) expect(sh.ride, sh.id).toBe(0);
+    const keys = [0, 1000];
+    expect(shotAt(500, keys, [whirl, build], AT).ride).toBeCloseTo(0.5, 12);
+    expect(rideShift(1, 200, 1440)).toBe(200);
+    expect(rideShift(0.5, -200, 1440)).toBe(-100);
+    expect(rideShift(1, 5000, 1440)).toBeCloseTo(RIDE_MAX * 1440, 9);
+    expect(rideShift(0, 300, 1440)).toBe(0);
   });
 });
 

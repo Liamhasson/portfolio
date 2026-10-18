@@ -25,18 +25,20 @@ Each shot is fully on when its anchor's centre reaches `fx` of the screen width 
 | # | Anchor (`fx`) | Shot | Camera | Pendant | Layer |
 |---|---|---|---|---|---|
 | 01 | top of About | Small, centred above the first line, spinning in place | az 0°, el 8°, fov 30°, h 0.20, at (line 1 centre, 0.21) | spin 0.22 turns/s | front |
-| 02 | band line (0.92) | It lets go: drifts up and right, still turning | az −50°, el 14°, roll 7°, fov 38°, h 0.25, at (0.64, 0.13) | spin 0.09 | front |
-| 03 | band line (0.42) | Tumble: end over end, sinking behind "eight years managing two rock bands" | az −70°, el 0°, fov 32°, h 0.5, at (0.46, 0.56) | tumble 0.32 turns/s | back, dimmed to 0.4 |
+| 02 | band line (1.04) | It lets go: drifts up and right, still turning | az −50°, el 14°, roll 7°, fov 38°, h 0.25, at (0.64, 0.13) | spin 0.09 | front |
+| 03 | band line (0.438) | Tumble: end over end, sinking behind "eight years managing two rock bands" | az −70°, el 0°, fov 32°, h 0.5, at (0.46, 0.56) | tumble 0.32 turns/s | back, dimmed to 0.4 |
 | 04 | "That's still how I work" (0.5) | Worm's eye, cropped by the bottom edge | az 30°, el −62°, roll −8°, fov 62°, h 1.15, at (0.84, 1.08) | spin 0.1 | front |
-| 05 | work strip (0.5) | From above: the four faces like a compass, turning like a record | az 0°, el 89°, fov 30°, h 0.8, aim the crown, at (0.81, 0.76) | spin 0.12 | front |
+| 05 | work strip (0.49) | From above: the four faces like a compass, turning like a record | az 0°, el 89°, fov 30°, h 0.8, aim the crown, at (0.81, 0.76) | spin 0.12 | front |
 | 06 | glass ball (0.5) | Through the glass: magnified, bent, upside down | az 150°, el 8°, fov 30°, h 0.15, at the ball's centre | spin 0.16 | front, behind the glass |
-| 07 | "Find the problem" (0.68 to 0.28) | Glide: lying down, rolling along the top, the full width of the screen | el 6°, fov 28°, h 0.5, from (1.08, 0.13) to (−0.08, 0.13) | laid 90°, roll 0.45 turns/s | front |
-| 08 | "Check I'm right" (0.5) | Whirl: stands up spinning fast, slows to a new face | az 20°, el 10°, fov 34°, h 0.3, at (0.13, 0.17) | spin 1.3 turns/s easing down, motion blur | front |
-| 09 | desk film (0.62 to 0.36) | Build passes: wire, then clay, then brass, swept left to right | az −25° to 10°, el 12°, fov 32°, h 0.28, at (0.5, 0.15) | spin 0.08 | front |
+| 07 | "Find the problem" (0.75 to −0.52) | Glide: lying down, rolling along the top, the full width of the screen | el 6°, fov 28°, h 0.5, from (1.08, 0.13) to (−0.08, 0.13) | laid 90°, roll 0.45 turns/s | front |
+| 08 | "Check I'm right" (0.015) | Whirl: stands up spinning fast, slows to a new face | az 20°, el 10°, fov 34°, h 0.3, at (0.13, 0.17) | spin 1.3 turns/s easing down (over the first half of the move to 09), motion blur | front |
+| 09 | the stage right of "Build it." (0.53 to 0.27) | Build passes: wire, then clay, then brass, swept across the faces and crown; a big three-quarter close-up riding with the stage | az −35° to −25°, el 12°, fov 30°, h 0.64 to 0.53, at (0.54, 0.43) to (0.32, 0.475) | spin 0, face −10° to 0°; rides with the page under a scroll | front |
 | 10 | end of the track | Hero: close and low, cut by the left edge, its face turned to "I'd like to hear about it" | az −62°, el −12°, roll 6°, fov 24°, h 1.35, aim the face, at (0.03, 0.5) | settles face −62° | front |
 | out | the pull to Contact | It falls away into the dark as Contact rises | | | |
 
-Shot 09 since 2026-10-18 (Liam: the desk film left About; build shot = candidate (b)): anchored on an empty stage right of "Build it." (`data-pendant="buildstage"`, 36vw), a big three-quarter close-up in front riding with it, 0.53 to 0.25: az −35° to −25°, el 12°, fov 30°, h 0.64 to 0.53, at (0.54, 0.43) to (0.32, 0.475), spin 0, lock −10° to 0°. Values in `src/three/pendant/shots.ts`.
+Shot 09 since 2026-10-18 (Liam: the desk film left About; build shot = candidate (b)): anchored on an empty stage right of "Build it." (`data-pendant="buildstage"`, 36vw), a big three-quarter close-up in front. Values in `src/three/pendant/shots.ts`.
+
+The anchors' `fx` since 2026-10-18 (motion pass, Task 2: "some motions between sections are a bit hectic and not smooth"): spread for an even pace at a steady scroll (no move's peak screen speed over 1.6× the median move's at 1500 px/s on 1440×900; the median at most 1.86 vw a frame; no size change over 6% a frame). The framings at the keys are unchanged. The track gives "Find the problem" 60.3vw before it and 35.3vw after it, where the glide plays (the track 96vw longer). Under a scroll, shot 09 rides with the page rather than trailing it by the follow's lag, and the whirl's spin hands over to 09's face over the first half of the move.
 
 Key to the columns:
 - **h:** the pendant's height as a share of the screen's height.

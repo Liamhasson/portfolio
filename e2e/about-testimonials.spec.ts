@@ -492,11 +492,14 @@ const slotNow = (page: Page) => page.evaluate(() => {
  *  along the slot's centre row from the side facing the screen's middle (the far side can sit in the edge light, or off the
  *  screen) and down its centre column from above (the pendant can pass below the ball). `edge` says which pixels are the
  *  ball's: the first one met is its outline. Returns the half-width and half-height from the slot's centre (px). */
-async function drawnOutline(page: Page, canvas: string, ground: string, edge: "dark" | "bright", slot: { x: number; y: number; w: number }) {
+async function drawnOutline(page: Page, canvas: string, ground: string, edge: "dark" | "bright", slot: { x: number; y: number; w: number }, from?: "left" | "right") {
   await page.addStyleTag({ content: `html, body { background: ${ground} !important; } body * { visibility: hidden !important; } ${canvas} { visibility: visible !important; }` });
   await page.waitForTimeout(150);
   const vp = page.viewportSize()!, R = 0.44 * slot.w, S = Math.ceil(1.4 * R);
-  const toMiddle = slot.x < vp.width / 2 ? 1 : -1; // (+1: the middle is to the right, scan from the right)
+  // (+1: scan from the right. By default from the screen's middle; `from` when the pendant is beside the ball on one side,
+  // as it leaves the ball for the glide (since the motion pass's spacing, 2026-10-18, still close by with the slot at 0.1):
+  // then from the other side, so the side scanned is the ball's own rim, not the pendant)
+  const toMiddle = from ? (from === "right" ? 1 : -1) : slot.x < vp.width / 2 ? 1 : -1;
   const clip = { x: Math.max(0, Math.round(slot.x - S)), y: Math.max(0, Math.round(slot.y - S)), width: 0, height: 0 };
   clip.width = Math.min(vp.width, Math.round(slot.x + S)) - clip.x;
   clip.height = Math.round(slot.y) + 1 - clip.y;
@@ -543,12 +546,15 @@ async function pendantOutlineAt(page: Page, at: number) {
   await page.waitForTimeout(1500);
   expect(await pendantBall(page)).not.toBeNull();
   const slot = await slotNow(page);
-  return { slot, o: await drawnOutline(page, "canvas.ab-pendant", "#fff", "dark", slot) };
+  // (scanned from the side away from the pendant itself: from the left when it is right of the ball's middle)
+  const box = await page.evaluate(() => window.__pendant!.box);
+  const from: "left" | "right" = (box.l + box.r) / 2 > slot.x ? "left" : "right";
+  return { slot, from, o: await drawnOutline(page, "canvas.ab-pendant", "#fff", "dark", slot, from) };
 }
 
 /** The light's own ball (the pendant's model blocked) with the slot at `at` of the screen's width: the slot and the drawn
  *  outline. */
-async function lightOutlineAt(page: Page, at: number) {
+async function lightOutlineAt(page: Page, at: number, from?: "left" | "right") {
   await page.route(PENDANT_GLB, (r) => r.abort());
   await page.goto("/about");
   await lightLoaded(page);
@@ -558,7 +564,7 @@ async function lightOutlineAt(page: Page, at: number) {
   await page.waitForTimeout(600);
   await expect.poll(async () => (await hook(page)).ownBall).toBe(true);
   const slot = await slotNow(page);
-  return { slot, o: await drawnOutline(page, "canvas.ab-light", "#000", "bright", slot) };
+  return { slot, o: await drawnOutline(page, "canvas.ab-light", "#000", "bright", slot, from) };
 }
 
 test.describe("both balls keep the slot's size across the screen", () => {
@@ -590,7 +596,7 @@ test.describe("both balls keep the slot's size across the screen", () => {
       const bare = await context.newPage();
       try {
         const p = await pendantOutlineAt(page, at);
-        const l = await lightOutlineAt(bare, at);
+        const l = await lightOutlineAt(bare, at, p.from); // (the same side scanned)
         // (the same place: the two pages scrolled alike)
         expect(Math.abs(p.slot.x - l.slot.x), `slot ${p.slot.x} against ${l.slot.x}`).toBeLessThan(0.5);
         expect(Math.abs(p.slot.y - l.slot.y)).toBeLessThan(0.5);

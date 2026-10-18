@@ -56,6 +56,15 @@ export interface Shot {
   glass: number;
   /** 0..1: the build passes (wire, clay, brass). */
   wire: number;
+  /** 0..1: how far the pendant rides with the page while the scroll follow trails it (1 = with the page, as its stage does;
+   *  0 = where the eased travel puts it). At rest the two are the same place, so it changes nothing where the solve looks;
+   *  during a scroll the words lead the eased travel by the follow's lag (about 0.25 s of scroll), and a shot framed on a
+   *  stage among the words (the build) would otherwise trail onto the words beside it. The mount applies it (track only). */
+  ride: number;
+  /** 0..1: the share of the move into this shot over which the spin and the lock reach it (1: the whole move, as everything
+   *  else). Under 1, the pendant slows to its new face early in the move and carries it the rest of the way, so a fast
+   *  spin handing over to a held face has settled by the time the shot is on, whatever face it was showing when the move began. */
+  settle: number;
   /** Other framings of this shot, tried in order by the readability solve (solve.ts) when the shot as written can't be
    *  cleared of the words on a screen; each is laid over the shot. Never filled forward to the next shot. */
   alt?: readonly ShotChange[];
@@ -65,7 +74,7 @@ export interface Shot {
 export type ShotChange = Partial<Omit<Shot, "id" | "anchor" | "alt">>;
 
 /** What the camera and the pendant do at one scroll position: the blend of the two shots around it. */
-export interface Frame extends Omit<Shot, "id" | "anchor" | "fx" | "ax" | "ay" | "alt" | "layer"> {
+export interface Frame extends Omit<Shot, "id" | "anchor" | "fx" | "ax" | "ay" | "alt" | "layer" | "settle"> {
   /** The earlier of the two shots (the last shot's own index once past the end). The shot currently showing is
    *  `t >= 0.5 ? index + 1 : index`. (No layer: the mount takes it from the readability solve's timeline plus its live
    *  guard, presence.ts; the solve reads the shots' own with `shotLayer`.) */
@@ -84,7 +93,7 @@ export interface Frame extends Omit<Shot, "id" | "anchor" | "fx" | "ax" | "ay" |
 type ShotBody = Omit<Shot, "id" | "anchor" | "alt">;
 const DEF: ShotBody = {
   fx: 0.5, az: 0, el: 0, roll: 0, fov: 30, h: 0.4, ax: 0.5, ay: 0.5, aim: [0, 0, 0],
-  spin: 0.05, tumble: 0, rz: 0, lock: null, layer: "front", dim: 1, aperture: 0.001, glass: 0, wire: 1,
+  spin: 0.05, tumble: 0, rz: 0, lock: null, layer: "front", dim: 1, aperture: 0.001, glass: 0, wire: 1, ride: 0, settle: 1,
 };
 
 /** A shot as written below: its name and anchor, plus only the fields that change. */
@@ -100,37 +109,48 @@ const fill = (inputs: readonly ShotInput[]): readonly Shot[] => {
   return out;
 };
 
-/** The desktop track. The two "End" keys carry the glide's far end and the build passes' brass end. */
+/** The desktop track. The two "End" keys carry the glide's far end and the build passes' brass end.
+ *  The spacing (each `fx`, with the room about.css gives the "Find" slide) is set for an even pace between shots (Liam,
+ *  2026-10-18: "some motions between sections are a bit hectic and not smooth"; plan 2026-10-17-about-pendant-motion-pass,
+ *  Task 2): at a steady 1500 px/s on 1440 x 900, no move's peak screen speed over 1.6x the median move's, that median at
+ *  most 1.86 vw a frame, and no move's size changing more than 6% a frame (scripts/about/pendant-motion.cjs measures it;
+ *  e2e "an even pace"). Every shot's framing at its key is as Liam approved it; only where along the scroll the keys fall
+ *  changed: the glide's long sweep got about three times the scroll (and the move into it, from the glass that rides the
+ *  page, a third more), taken from the long, slow climb from the whirl to the build and from a longer track (96vw more: its scroll about 15% longer). */
 export const SHOTS: readonly Shot[] = fill([
   // 01 Small, centred above the first line, spinning in place
   { id: "opening", anchor: "start", az: 0, el: 8, roll: 0, fov: 30, h: 0.2, ax: "line1", ay: 0.21, spin: 0.22, layer: "front", dim: 1, aperture: 0.0006 },
   // 02 It lets go: drifts up and right, still turning
-  { id: "letgo", anchor: { pendant: "band" }, fx: 0.92, az: -50, el: 14, roll: 7, fov: 38, h: 0.25, ax: 0.64, ay: 0.13, spin: 0.09, aperture: 0.0008 },
+  { id: "letgo", anchor: { pendant: "band" }, fx: 1.04, az: -50, el: 14, roll: 7, fov: 38, h: 0.25, ax: 0.64, ay: 0.13, spin: 0.09, aperture: 0.0008 },
   // 03 Tumble: end over end, sinking behind "eight years managing two rock bands"
-  { id: "tumble", anchor: { pendant: "band" }, fx: 0.42, az: -70, el: 0, roll: 0, fov: 32, h: 0.5, ax: 0.46, ay: 0.56, spin: 0.05, tumble: 0.32, layer: "back", dim: 0.4, aperture: 0.001 },
+  { id: "tumble", anchor: { pendant: "band" }, fx: 0.438, az: -70, el: 0, roll: 0, fov: 32, h: 0.5, ax: 0.46, ay: 0.56, spin: 0.05, tumble: 0.32, layer: "back", dim: 0.4, aperture: 0.001 },
   // 04 Worm's eye, cropped by the bottom edge (ay 1.10, not the prototype's 1.08: its head then tops out at 0.83 of the
   // screen as in the storyboard, clear of the work strip's captions above it; at 1.08 it rose to 0.81: the pictures merge, 2026-10-16)
   { id: "worm", anchor: { pendant: "how" }, fx: 0.5, az: 30, el: -62, roll: -8, fov: 62, h: 1.15, ax: 0.84, ay: 1.1, aim: [0, -0.08, 0], spin: 0.1, tumble: 0, layer: "front", dim: 1, aperture: 0.0012 },
   // 05 From above: the four faces like a compass, turning like a record (the aim is the crown)
-  { id: "above", anchor: { pendant: "strip", fallback: "e2e" }, fx: 0.5, az: 0, el: 89, roll: 0, fov: 30, h: 0.8, ax: 0.81, ay: 0.76, aim: [0, 0.28, 0], spin: 0.12, aperture: 0.0012 },
+  { id: "above", anchor: { pendant: "strip", fallback: "e2e" }, fx: 0.49, az: 0, el: 89, roll: 0, fov: 30, h: 0.8, ax: 0.81, ay: 0.76, aim: [0, 0.28, 0], spin: 0.12, aperture: 0.0012 },
   // 06 Through the glass: magnified, bent, upside down
   { id: "glass", anchor: { pendant: "glass", fallback: ["quote1", "quote2"] }, fx: 0.5, az: 150, el: 8, roll: 0, fov: 30, h: 0.15, ax: "glass", ay: "glass", aim: [0, 0, 0], spin: 0.16, aperture: 0.0005, glass: 1 },
-  // 07 Glide: lying down, rolling along the top of the screen, the full width of it (from 1.08 to -0.08)
-  { id: "glide", anchor: { pendant: "find" }, fx: 0.68, az: 0, el: 6, roll: 0, fov: 28, h: 0.5, ax: 1.08, ay: 0.13, spin: 0.45, rz: 90, aperture: 0.0008, glass: 0 },
-  { id: "glideEnd", anchor: { pendant: "find" }, fx: 0.28, ax: -0.08 },
-  // 08 Whirl: stands up spinning fast, slows to a new face
-  { id: "whirl", anchor: { pendant: "check" }, fx: 0.5, az: 20, el: 10, roll: 0, fov: 34, h: 0.3, ax: 0.13, ay: 0.17, spin: 1.3, rz: 0, aperture: 0.0008 },
+  // 07 Glide: lying down, rolling along the top of the screen, the full width of it (from 1.08 to -0.08), over 1.27 of the
+  // screen's width of scroll (it was 0.4: 9 vw a frame at 1500 px/s, four times the median move)
+  { id: "glide", anchor: { pendant: "find" }, fx: 0.75, az: 0, el: 6, roll: 0, fov: 28, h: 0.5, ax: 1.08, ay: 0.13, spin: 0.45, rz: 90, aperture: 0.0008, glass: 0 },
+  { id: "glideEnd", anchor: { pendant: "find" }, fx: -0.52, ax: -0.08 },
+  // 08 Whirl: stands up spinning fast, slows to a new face (the build's: it slows over the first half of the move to the
+  // build, `settle`)
+  { id: "whirl", anchor: { pendant: "check" }, fx: 0.015, az: 20, el: 10, roll: 0, fov: 34, h: 0.3, ax: 0.13, ay: 0.17, spin: 1.3, rz: 0, aperture: 0.0008 },
   // 09 Build passes: wire, clay, brass, swept across the faces and the crown, big and in front on the empty stage right of
   // "Build it." (Liam, 2026-10-18: candidate (b), the big three-quarter close-up, in the desk film's place). It rides with the
-  // stage, right to left, across 0.28 of the screen's width of scroll. Its size is the most the screen's middle holds with the
+  // stage, right to left, across 0.26 of the screen's width of scroll, and rides with the page under a scroll (`ride`), so
+  // the follow's lag never carries the words beside the stage onto it. The whirl's spin hands over to its held face over the
+  // first half of the move into it (`settle`), so the face is on by the time the sweep begins. Its size is the most the screen's middle holds with the
   // motion's clearance: the crown under the top edge, the foot clear above the resume pill it passes over (h 0.64, its box
   // about 0.68 of the screen's height; at the asked 0.8 the foot sits on the pill and the solve puts it behind mid-sweep).
   // It settles a little smaller and lower as the brass arrives (h 0.53), left of the pill, so that from there to the hero its
   // crown passes under the site's name, not over it: in front all the way to the hero.
-  { id: "build", anchor: { pendant: "buildstage", fallback: "build" }, fx: 0.53, az: -35, el: 12, roll: 0, fov: 30, h: 0.64, ax: 0.54, ay: 0.43, aim: [0, 0, 0], spin: 0, lock: -10, aperture: 0.0012, wire: 0 },
-  { id: "buildEnd", anchor: { pendant: "buildstage", fallback: "build" }, fx: 0.25, az: -25, h: 0.53, ax: 0.32, ay: 0.475, lock: 0, wire: 1 },
+  { id: "build", anchor: { pendant: "buildstage", fallback: "build" }, fx: 0.53, az: -35, el: 12, roll: 0, fov: 30, h: 0.64, ax: 0.54, ay: 0.43, aim: [0, 0, 0], spin: 0, lock: -10, aperture: 0.0012, wire: 0, ride: 1, settle: 0.5 },
+  { id: "buildEnd", anchor: { pendant: "buildstage", fallback: "build" }, fx: 0.27, az: -25, h: 0.53, ax: 0.32, ay: 0.475, lock: 0, wire: 1, settle: 1 },
   // 10 Hero: close and low, cut by the left edge, its face turned to the last line (the aim is the face)
-  { id: "hero", anchor: "end", fx: 0, az: -62, el: -12, roll: 6, fov: 24, h: 1.35, ax: 0.03, ay: 0.5, aim: [0, 0.02, -0.1], spin: 0, lock: -62, aperture: 0.0016,
+  { id: "hero", anchor: "end", fx: 0, az: -62, el: -12, roll: 6, fov: 24, h: 1.35, ax: 0.03, ay: 0.5, aim: [0, 0.02, -0.1], spin: 0, lock: -62, aperture: 0.0016, ride: 0,
     // while About's layout leaves words beside the left edge at the end: the same shot mirrored, close at the right, cut by
     // the right edge, its face turned to the closing line on its left (Liam's ruling, 2026-10-16). Its ay / h tuned from the
     // asked 0.3 / 1.0 (there it sits on the pill nav and the closing line on every screen) to the one free area big enough
@@ -163,6 +183,19 @@ export const SHOTS_STACK: readonly Shot[] = fill([
   // the band below it on the way in, so the corner left of the pill is the one free place; the solve fits it there.)
   { id: "hero", anchor: "end", az: -62, el: -12, roll: 6, fov: 24, h: 0.32, ax: 0.08, ay: 0.9, aim: [0, 0.02, -0.1], spin: 0, lock: -30, aperture: 0.0016 },
 ]);
+
+/** The most of the follow's lag a riding shot (`ride`) is carried with the page, as a share of the width: more than a steady
+ *  scroll's lag (about 0.26 of the width at 1500 px/s on a 1440 px screen), less than a jump's (a screen or more), so a jump
+ *  never flings it off. */
+export const RIDE_MAX = 0.35;
+/** The share of a steady scroll's lag a riding shot is actually carried by: the mount eases its ride over RIDE_TAU (0.06 s)
+ *  against the follow's 0.25 s, so about 0.06 / 0.25 of the lag still trails (the readability look ahead counts that). */
+export const RIDE_STEADY = 0.75;
+/** How far (px, along the track) a frame riding `ride` with the page is carried when the page leads the eased travel by
+ *  `lag` px: the screen x moves back by this much. */
+export function rideShift(ride: number, lag: number, vw: number): number {
+  return ride * Math.min(Math.max(lag, -RIDE_MAX * vw), RIDE_MAX * vw);
+}
 
 /** A shot and its alternates, in the order the solve tries them: the shot as written, then each alternate laid over it. */
 export function variants(shot: Shot): Shot[] {
@@ -250,11 +283,14 @@ export function shotAt(
   const A = shots[i];
   const B = shots[Math.min(i + 1, last)];
   const span = i >= last ? 0 : keys[i + 1] - keys[i];
-  const t = i >= last ? 1 : smootherstep(span > 0 ? clamp((s - keys[i]) / span, 0, 1) : 1);
+  const u = i >= last ? 1 : span > 0 ? clamp((s - keys[i]) / span, 0, 1) : 1;
+  const t = smootherstep(u);
+  // (the spin and the lock: over the first `settle` of the move, the rest of it holding the next shot's)
+  const ts = B.settle < 1 ? smootherstep(Math.min(u / Math.max(B.settle, 1e-6), 1)) : t;
   const x = (v: ScreenX) => (v === "line1" ? at.line1 : v === "glass" ? at.glass.x : v);
   const y = (v: ScreenY) => (v === "glass" ? at.glass.y : v === "line1" ? at.line1Y ?? 0.5 : v);
-  const lock = A.lock !== null && B.lock !== null ? lerpAngle(A.lock, B.lock, t) : B.lock ?? A.lock;
-  const lockMix = A.lock !== null && B.lock !== null ? 1 : B.lock !== null ? t : A.lock !== null ? 1 - t : 0;
+  const lock = A.lock !== null && B.lock !== null ? lerpAngle(A.lock, B.lock, ts) : B.lock ?? A.lock;
+  const lockMix = A.lock !== null && B.lock !== null ? 1 : B.lock !== null ? ts : A.lock !== null ? 1 - ts : 0;
   return {
     index: i,
     t,
@@ -267,7 +303,7 @@ export function shotAt(
     ax: lerp(x(A.ax), x(B.ax), t),
     ay: lerp(y(A.ay), y(B.ay), t),
     aim: [lerp(A.aim[0], B.aim[0], t), lerp(A.aim[1], B.aim[1], t), lerp(A.aim[2], B.aim[2], t)],
-    spin: lerp(A.spin, B.spin, t),
+    spin: lerp(A.spin, B.spin, ts),
     tumble: lerp(A.tumble, B.tumble, t),
     rz: lerp(A.rz, B.rz, t),
     lock,
@@ -275,6 +311,7 @@ export function shotAt(
     aperture: lerp(A.aperture, B.aperture, t),
     glass: lerp(A.glass, B.glass, t),
     wire: lerp(A.wire, B.wire, t),
+    ride: lerp(A.ride, B.ride, t),
   };
 }
 
