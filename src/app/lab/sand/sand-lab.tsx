@@ -642,7 +642,10 @@ export function SandLab({ hero }: { hero: boolean }) {
       on("touchstart", nudge);
       on("touchmove", nudge);
       on("keydown", ((e: KeyboardEvent) => { if ([" ", "ArrowDown", "ArrowUp", "PageDown", "PageUp", "Home", "End"].includes(e.key)) invite.poke(); }) as EventListener);
-      const inviteDebug = { window: deskSpan, tease: 0, cue: false, lid: 0, lean: 0, camera: [0, 0, 0] as number[] };
+      const leanBase = new THREE.Vector3();   // the shot's camera a frame ago, before the lean (how far the path moved on)
+      let leanBaseSet = false;
+      let veilA = 0;   // the veil's black this frame (the text stays off under the reduced-motion crossfade)
+      const inviteDebug = { window: deskSpan, tease: 0, cue: false, lid: 0, lean: 0, camera: [0, 0, 0], toScreen: 0 };
       (window as unknown as { __deskInvite?: unknown }).__deskInvite = inviteDebug;   // (the e2e and lab debugging)
       const ndc = new THREE.Vector3();
       const cursorWorld = new THREE.Vector3();
@@ -680,7 +683,8 @@ export function SandLab({ hero }: { hero: boolean }) {
         if (fadeClock !== null && !reduced) {
           fadeClock += dt;
           const k = Math.min(fadeClock / LOADER.fadeIn, 1);
-          if (veilRef.current) veilRef.current.style.opacity = String(1 - k * k * (3 - 2 * k));
+          veilA = 1 - k * k * (3 - 2 * k);
+          if (veilRef.current) veilRef.current.style.opacity = String(veilA);
           if (k >= 1) fadeClock = null;
         }
         // (the story's own length: past it, the page runs on through the index's projects)
@@ -725,6 +729,7 @@ export function SandLab({ hero }: { hero: boolean }) {
           // reduced motion (spec §8): held states joined by crossfades through black, no shot
           const r = reducedStory(rawP);
           progressRef.current = r.p;
+          veilA = r.veil;
           if (veilRef.current) veilRef.current.style.opacity = String(r.veil);
         } else progressRef.current = damp(progressRef.current, rawP, 6, dt);
         if (Number.isFinite(holdFrame) && shotMeta) progressRef.current = pAtFrame(holdFrame - 1, shotMeta.beats);
@@ -732,11 +737,13 @@ export function SandLab({ hero }: { hero: boolean }) {
         // the desk's invitation: idle on the desk (settled over it, the lid still shut), nothing else going on
         if (Math.abs(window.scrollY - inviteY) > 0.5) invite.poke();
         inviteY = window.scrollY;
-        const inv = invite.step(dt, {
-          live: hero && !!deskSpan && deskLoaded !== null && inWindow(p, deskSpan) && loaderClock === null && !waitingForBrief
+        // (a note or the drive under the pointer, last frame: activity, so it doesn't slide under the cursor)
+        if (fadeClock === null && !reduced) veilA = 0;
+        invite.step(dt,
+          hero && !!deskSpan && deskLoaded !== null && inWindow(p, deskSpan) && loaderClock === null && !waitingForBrief
             && !storyOpen && !driveMounted && !snapping && !deskWaiting && !calibrating,
-          reduced,
-        });
+          reduced, !!hovered || driveOver, veilA);
+        const inv = invite;
         keepRef.current = inv.cue;
         inviteDebug.tease = inv.tease; inviteDebug.cue = inv.cue;
         state.compact = shot
@@ -783,15 +790,20 @@ export function SandLab({ hero }: { hero: boolean }) {
           }
           const v = shot.view(f);
           // the invitation's lean: a small step on along the shot's own way, toward the screen (scrolling on continues it)
+          // (scrolling down, the lean gives way only as fast as the path moves past it: never a step back)
           inviteDebug.lean = 0;
-          if (inv.tease > 0 && leanTo) {
+          if (leanTo) {
             leanDir.subVectors(leanTo, v.position);
             const room = leanDir.length();
-            if (room > 1e-6) { inviteDebug.lean = Math.min(inv.tease * leanUnits, room); v.position.addScaledVector(leanDir, inviteDebug.lean / room); }
+            const forward = leanBaseSet && room > 1e-6 && leanUnits > 0 ? leanDir.dot(leanBase.subVectors(v.position, leanBase)) / room / leanUnits : 0;
+            leanBase.copy(v.position); leanBaseSet = true;
+            inv.leanStep(dt, forward);
+            if (inv.lean > 0 && room > 1e-6) { inviteDebug.lean = Math.min(inv.lean * leanUnits, room); v.position.addScaledVector(leanDir, inviteDebug.lean / room); }
+            inviteDebug.toScreen = leanDir.subVectors(leanTo, v.position).length();
           }
           stage!.setView(v.position, v.quaternion, v.lens);
           const cam = stage!.camera;
-          inviteDebug.camera = [v.position.x, v.position.y, v.position.z];
+          inviteDebug.camera[0] = v.position.x; inviteDebug.camera[1] = v.position.y; inviteDebug.camera[2] = v.position.z;
           const W = canvas.clientWidth || 1, H = canvas.clientHeight || 1;
           // portrait phones see far more height: the tilt goes further there so the ball leaves the frame (spec §10)
           {

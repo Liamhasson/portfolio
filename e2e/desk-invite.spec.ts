@@ -6,7 +6,7 @@ import { expect, test, type Page } from "@playwright/test";
 test.use({ viewport: { width: 1440, height: 900 }, launchOptions: { args: ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"] } });
 test.setTimeout(240_000);
 
-interface Invite { window: [number, number]; tease: number; cue: boolean; lid: number; lean: number; camera: number[] }
+interface Invite { window: [number, number]; tease: number; cue: boolean; lid: number; lean: number; camera: number[]; toScreen: number }
 const invite = (page: Page) => page.evaluate(() => (window as unknown as { __deskInvite: Invite }).__deskInvite);
 
 test("stopped on the desk: the tease after 1.5 s, the text after 3 s; a scroll lets both go with no jump", async ({ page }) => {
@@ -46,37 +46,55 @@ test("stopped on the desk: the tease after 1.5 s, the text after 3 s; a scroll l
   expect(before.lid).toBeGreaterThan(0);
   expect(before.lean).toBeGreaterThan(0);
 
-  // record every frame while the visitor scrolls on
-  await page.evaluate(() => {
-    const w = window as unknown as { __deskInvite: Invite; __frames: { tease: number; lid: number; lean: number; camera: number[] }[] };
+  // a small scroll on (60 px, less than the lean): every frame recorded
+  type Frame = { tease: number; lid: number; lean: number; camera: number[]; toScreen: number; y: number };
+  const record = (n: number) => page.evaluate((n) => {
+    const w = window as unknown as { __deskInvite: Invite; __frames: Frame[] };
     w.__frames = [];
     const rec = () => {
       const d = w.__deskInvite;
-      w.__frames.push({ tease: d.tease, lid: d.lid, lean: d.lean, camera: [...d.camera] });
-      if (w.__frames.length < 150) requestAnimationFrame(rec);
+      w.__frames.push({ tease: d.tease, lid: d.lid, lean: d.lean, camera: [...d.camera], toScreen: d.toScreen, y: window.scrollY });
+      if (w.__frames.length < n) requestAnimationFrame(rec);
     };
     requestAnimationFrame(rec);
-  });
+  }, n);
+  const recorded = async (n: number) => {
+    await page.waitForFunction((n) => (window as unknown as { __frames: unknown[] }).__frames.length >= n, n, { timeout: 15_000 });
+    return page.evaluate(() => (window as unknown as { __frames: Frame[] }).__frames);
+  };
+  /** The camera never goes back along the path: its distance to the screen never grows, in any frame. */
+  const neverBack = (frames: Frame[]) => {
+    for (let i = 1; i < frames.length; i++) expect(frames[i].toScreen, `frame ${i}`).toBeLessThanOrEqual(frames[i - 1].toScreen + 1e-6);
+  };
   await page.mouse.move(720, 450);
+  await record(70);   // (~1.2 s: under the 1.5 s after which the tease would return)
   await page.mouse.wheel(0, 60);
   await expect(cue).toHaveCSS("opacity", "0", { timeout: 2000 });
-  await page.waitForFunction(() => (window as unknown as { __frames: unknown[] }).__frames.length >= 150, null, { timeout: 15_000 });
-  const frames = await page.evaluate(() => (window as unknown as { __frames: { tease: number; lid: number; lean: number; camera: number[] }[] }).__frames);
-  // both go back to 0 (the clock then starts again: still on the desk, the tease may return 1.5 s later)
-  const zero = frames.findIndex((f) => f.tease === 0);
-  expect(zero).toBeGreaterThan(5);                                  // eased back, not cut
-  expect(frames[zero].lid).toBe(0);
-  expect(frames[zero].lean).toBe(0);
-  // (the frames before the wheel reaches the page: the tease still settling at its peak)
-  const crest = frames.slice(0, zero).reduce((m, f, i) => (f.tease > frames[m].tease ? i : m), 0);
-  for (let i = crest + 1; i <= zero; i++) expect(frames[i].tease).toBeLessThanOrEqual(frames[i - 1].tease + 1e-6);
-  // no pop: the tease eases back over many frames, and the camera never steps by anything like the lean in one frame
-  let maxTease = 0, maxStep = 0;
-  for (let i = 1; i < frames.length; i++) {
-    maxTease = Math.max(maxTease, Math.abs(frames[i].tease - frames[i - 1].tease));
-    const [a, b] = [frames[i].camera, frames[i - 1].camera];
-    maxStep = Math.max(maxStep, Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]));
+  const small = await recorded(70);
+  expect(small.at(-1)!.y).toBeGreaterThan(small[0].y);              // it did scroll
+  neverBack(small);
+  // the lid eases shut (no jump), the lean holds whatever the scroll hasn't used up
+  const crest = small.reduce((m, f, i) => (f.tease > small[m].tease ? i : m), 0);
+  for (let i = crest + 1; i < small.length; i++) {
+    expect(small[i].tease).toBeLessThanOrEqual(small[i - 1].tease + 1e-6);
+    expect(small[i - 1].tease - small[i].tease).toBeLessThan(0.2);
   }
-  expect(maxTease).toBeLessThan(0.2);
-  expect(maxStep).toBeLessThan(before.lean * 0.5);
+  expect(small.at(-1)!.lid).toBeLessThan(0.5);
+
+  // a longer scroll on: the lean is used up, the lid shut, both back to 0, never a step back
+  await record(120);
+  await page.mouse.wheel(0, 300);
+  const long = await recorded(120);
+  neverBack(long);
+  const after = await invite(page);
+  expect(after.lid).toBe(0);
+  expect(after.lean).toBe(0);
+  expect(after.cue).toBe(false);
+  // no pop either way: the camera only ever goes forward (above), and never ahead of the path's own move (the lean, along
+  // the way to the screen, only shrinks while scrolling)
+  // (from the lean's crest: the frames before the wheel reaches the page can still be settling at its peak)
+  for (const fr of [small, long]) {
+    const top = fr.reduce((m, f, i) => (f.lean > fr[m].lean ? i : m), 0);
+    for (let i = top + 1; i < fr.length; i++) expect(fr[i].lean).toBeLessThanOrEqual(fr[i - 1].lean + 1e-6);
+  }
 });

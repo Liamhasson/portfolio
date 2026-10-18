@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 // E2E_PORT: another port (3100 is the default); E2E_REUSE=1: test a server already running there (its own build)
-const port = Number(process.env.E2E_PORT ?? 3100);
+const port = Number(process.env.E2E_PORT || 3100);
 
 export default defineConfig({
   testDir: "./e2e",
