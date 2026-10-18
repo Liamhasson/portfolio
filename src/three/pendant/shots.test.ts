@@ -49,7 +49,7 @@ describe("the pendant's shots (spec 2026-10-16 §3)", () => {
       expect(by(id).layer).toBe("front");
       expect(by(id).bright).toBe(true);
       expect(by(id).h).toBeGreaterThanOrEqual(0.6);
-      expect([by(id).ax, by(id).ay]).toEqual([0.5, 0.47]);
+      expect([by(id).ax, by(id).ay]).toEqual([0.5, 0.45]);
       expect(by(id).lock).toBeNull(); // (still turning in place while it builds)
     }
     expect([by("build").wire, by("buildEnd").wire]).toEqual([0, 1]);

@@ -223,9 +223,13 @@ function coveredNow({ TEXT, CHROME, STILLS = "" }: { TEXT: string; CHROME: strin
       for (const r of range.getClientRects()) if (r.width > 0 && r.height > 0) boxes.push({ r, what: `"${n.textContent.trim().slice(0, 28)}"` });
     }
   }
+  // (chrome painted above the pendant's canvas can't be hidden by it: the resume pill, z 3 in the pinned frame over the
+  // canvas's 2. Only chrome under it counts.)
+  const canvasZ = Number(getComputedStyle(document.querySelector("canvas.ab-pendant") ?? document.body).zIndex) || 0;
   for (const el of document.querySelectorAll<HTMLElement>(CHROME)) {
     const r = el.getBoundingClientRect();
-    if (r.width > 0 && r.height > 0) boxes.push({ r, what: `.${el.className.split(" ")[0]}` });
+    const above = el.closest(".ab-pin") !== null && (Number(getComputedStyle(el).zIndex) || 0) > canvasZ;
+    if (r.width > 0 && r.height > 0 && !above) boxes.push({ r, what: `.${el.className.split(" ")[0]}` });
   }
   // the pictures, where the track draws them: not when hidden or emptied (inset(50%)), else from its clip's top and left in
   // (about-track.tsx writes `inset(T% -100vw 0 Lpx round R)`: T% of the picture's height, L px from its left). A frame whose

@@ -129,7 +129,7 @@ export const SHOTS: readonly Shot[] = fill([
   { id: "tumble", anchor: { pendant: "band" }, fx: 0.438, az: -70, el: 0, roll: 0, fov: 32, h: 0.5, ax: 0.46, ay: 0.56, spin: 0.05, tumble: 0.32, layer: "back", dim: 0.4, aperture: 0.001 },
   // 04 Worm's eye, cropped by the bottom edge (ay 1.10, not the prototype's 1.08: its head then tops out at 0.83 of the
   // screen as in the storyboard, clear of the work strip's captions above it; at 1.08 it rose to 0.81: the pictures merge, 2026-10-16)
-  { id: "worm", anchor: { pendant: "how" }, fx: 0.5, az: 30, el: -62, roll: -8, fov: 62, h: 1.15, ax: 0.84, ay: 1.1, aim: [0, -0.08, 0], spin: 0.1, tumble: 0, layer: "front", dim: 1, aperture: 0.0012 },
+  { id: "worm", anchor: { pendant: "how" }, fx: 0.5, az: 30, el: -62, roll: -8, fov: 62, h: 1.15, ax: 0.92, ay: 1.1, aim: [0, -0.08, 0], spin: 0.1, tumble: 0, layer: "front", dim: 1, aperture: 0.0012 },
   // 05 From above: the four faces like a compass, turning like a record (the aim is the crown)
   { id: "above", anchor: { pendant: "strip", fallback: "e2e" }, fx: 0.49, az: 0, el: 89, roll: 0, fov: 30, h: 0.8, ax: 0.81, ay: 0.76, aim: [0, 0.28, 0], spin: 0.12, aperture: 0.0012 },
   // 06 Through the glass: magnified, bent, upside down
@@ -142,7 +142,7 @@ export const SHOTS: readonly Shot[] = fill([
   // screen when the track pauses there), snaps to the frame's centre, and builds itself, wire to clay to brass, while the
   // page holds and the scroll runs on (about-pendant.tsx: the pause; build-frame.tsx: the frame). Both keys sit where the
   // stage is centred; the pause between them drives the build. Big, in front, lit; still turning slowly in place.
-  { id: "build", anchor: { pendant: "buildstage", fallback: "build" }, fx: 0.5, az: -35, el: 12, roll: 0, fov: 30, h: 0.64, ax: 0.5, ay: 0.47, aim: [0, 0, 0], spin: 0.06, lock: null, aperture: 0.0012, wire: 0, ride: 1, settle: 1, layer: "front", bright: true },
+  { id: "build", anchor: { pendant: "buildstage", fallback: "build" }, fx: 0.5, az: -35, el: 12, roll: 0, fov: 30, h: 0.64, ax: 0.5, ay: 0.45, aim: [0, 0, 0], spin: 0.06, lock: null, aperture: 0.0012, wire: 0, ride: 1, settle: 1, layer: "front", bright: true },
   { id: "buildEnd", anchor: { pendant: "buildstage", fallback: "build" }, fx: 0.5, wire: 1 },
   // 10 Hero: close and low, cut by the left edge, its face turned to the last line (the aim is the face)
   { id: "hero", anchor: "end", fx: 0, az: -62, el: -12, roll: 6, fov: 24, h: 0.97, ax: 0.03, ay: 0.7, aim: [0, 0.02, -0.1], spin: 0, lock: -62, aperture: 0.0016, ride: 0, bright: false,
