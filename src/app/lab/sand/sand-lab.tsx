@@ -6,6 +6,7 @@ import { loadSandMeta, loadSandParts, SAND_BASE } from "@/three/sand/data";
 import { CURSOR_WARM, SAND_LOOK, SandField, type SandState } from "@/three/sand/sand-field";
 import { PaintField } from "@/three/sand/paint";
 import { HeroOverlay } from "./hero-overlay";
+import { DeskInvite, INVITE, deskWindow, inWindow } from "./desk-invite";
 import { WorkIndex, WorkList, type WorkIndexHandle } from "./work-index";
 import { BakedDesk, releaseDesk, type DeskDownload } from "@/three/sand/baked-desk";
 import { revealAt } from "@/three/sand/screen-reveal";
@@ -107,6 +108,9 @@ export function SandLab({ hero }: { hero: boolean }) {
     [hero],
   );
   const readScrolled = useCallback(() => progressRef.current, []);
+  // the desk's "Keep scrolling" (desk-invite.ts), set by the scene each frame
+  const keepRef = useRef(false);
+  const readKeep = useCallback(() => keepRef.current, []);
   const indexRef = useRef<WorkIndexHandle | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const veilRef = useRef<HTMLDivElement>(null);
@@ -624,6 +628,25 @@ export function SandLab({ hero }: { hero: boolean }) {
       on("keydown", ((e: KeyboardEvent) => { if (storyOpen && ["Escape", " ", "ArrowDown", "ArrowUp", "PageDown", "PageUp", "Home", "End"].includes(e.key)) putBack(); }) as EventListener);
       on("wheel", putBack as EventListener);
       on("touchmove", putBack as EventListener);
+      // the desk's invitation (desk-invite.ts; Liam, 2026-10-18): any scrolling starts its clock again (the wheel, a finger,
+      // the keys; the page moving, below, catches the rest). A mouse moving alone isn't scrolling
+      const invite = new DeskInvite();
+      const deskSpan = shot && shotMeta ? deskWindow((shot.data.path as unknown as { lid_open_deg: number }[]).map((x) => x.lid_open_deg), shotMeta.beats) : null;
+      // the lean, in the scene's units, and where it leans: on along the shot, toward the glide's end over the laptop
+      const leanUnits = shot ? shot.toHero([0, 0, 0]).distanceTo(shot.toHero([0, 0, INVITE.leanM])) : 0;
+      const leanTo = shot && shotMeta ? shot.view(shotMeta.beats.glide[1]).position : null;
+      const leanDir = new THREE.Vector3();
+      let inviteY = window.scrollY;
+      const nudge = () => invite.poke();
+      on("wheel", nudge);
+      on("touchstart", nudge);
+      on("touchmove", nudge);
+      on("keydown", ((e: KeyboardEvent) => { if ([" ", "ArrowDown", "ArrowUp", "PageDown", "PageUp", "Home", "End"].includes(e.key)) invite.poke(); }) as EventListener);
+      const leanBase = new THREE.Vector3();   // the shot's camera a frame ago, before the lean (how far the path moved on)
+      let leanBaseSet = false;
+      let veilA = 0;   // the veil's black this frame (the text stays off under the reduced-motion crossfade)
+      const inviteDebug = { window: deskSpan, tease: 0, cue: false, lid: 0, lean: 0, camera: [0, 0, 0], toScreen: 0 };
+      (window as unknown as { __deskInvite?: unknown }).__deskInvite = inviteDebug;   // (the e2e and lab debugging)
       const ndc = new THREE.Vector3();
       const cursorWorld = new THREE.Vector3();
       const focus = new THREE.Vector3();
@@ -660,7 +683,8 @@ export function SandLab({ hero }: { hero: boolean }) {
         if (fadeClock !== null && !reduced) {
           fadeClock += dt;
           const k = Math.min(fadeClock / LOADER.fadeIn, 1);
-          if (veilRef.current) veilRef.current.style.opacity = String(1 - k * k * (3 - 2 * k));
+          veilA = 1 - k * k * (3 - 2 * k);
+          if (veilRef.current) veilRef.current.style.opacity = String(veilA);
           if (k >= 1) fadeClock = null;
         }
         // (the story's own length: past it, the page runs on through the index's projects)
@@ -705,10 +729,23 @@ export function SandLab({ hero }: { hero: boolean }) {
           // reduced motion (spec §8): held states joined by crossfades through black, no shot
           const r = reducedStory(rawP);
           progressRef.current = r.p;
+          veilA = r.veil;
           if (veilRef.current) veilRef.current.style.opacity = String(r.veil);
         } else progressRef.current = damp(progressRef.current, rawP, 6, dt);
         if (Number.isFinite(holdFrame) && shotMeta) progressRef.current = pAtFrame(holdFrame - 1, shotMeta.beats);
         const p = progressRef.current;
+        // the desk's invitation: idle on the desk (settled over it, the lid still shut), nothing else going on
+        if (Math.abs(window.scrollY - inviteY) > 0.5) invite.poke();
+        inviteY = window.scrollY;
+        // (a note or the drive under the pointer, last frame: activity, so it doesn't slide under the cursor)
+        if (fadeClock === null && !reduced) veilA = 0;
+        invite.step(dt,
+          hero && !!deskSpan && deskLoaded !== null && inWindow(p, deskSpan) && loaderClock === null && !waitingForBrief
+            && !storyOpen && !driveMounted && !snapping && !deskWaiting && !calibrating,
+          reduced, !!hovered || driveOver, veilA);
+        const inv = invite;
+        keepRef.current = inv.cue;
+        inviteDebug.tease = inv.tease; inviteDebug.cue = inv.cue;
         state.compact = shot
           ? (() => { const x = span(p, BEATS.compact); return x * x * (3 - 2 * x); })()
           : damp(state.compact, compactFor(progress), 6, dt);
@@ -738,7 +775,9 @@ export function SandLab({ hero }: { hero: boolean }) {
             const fi = Math.min(Math.floor(f), shotMeta.frames - 2), fr = f - fi;
             const lidDeg = P[fi].lid_open_deg + (P[fi + 1].lid_open_deg - P[fi].lid_open_deg) * fr;
             openF = lidDeg / 108;
-            desk3d.setLid(Number.isFinite(lidHold) ? lidHold : lidDeg);
+            // (the invitation lifts the same lid a few degrees, on top of the scroll's own angle)
+            inviteDebug.lid = inv.tease * INVITE.lidDeg;
+            desk3d.setLid(Number.isFinite(lidHold) ? lidHold : lidDeg + inviteDebug.lid);
             const awake = f >= WAKE_FRAME;
             if (Number.isFinite(revealHold)) { revealT = revealHold; sleep = 0; }
             else if (awake) { sleep = Math.max(sleep - dt / 0.35, 0); if (sleep === 0 || revealT > 0) revealT += dt; }
@@ -750,8 +789,21 @@ export function SandLab({ hero }: { hero: boolean }) {
             desk3d.setState(openF, rf.light);
           }
           const v = shot.view(f);
+          // the invitation's lean: a small step on along the shot's own way, toward the screen (scrolling on continues it)
+          // (scrolling down, the lean gives way only as fast as the path moves past it: never a step back)
+          inviteDebug.lean = 0;
+          if (leanTo) {
+            leanDir.subVectors(leanTo, v.position);
+            const room = leanDir.length();
+            const onward = leanBaseSet && room > 1e-6 && leanUnits > 0 ? leanDir.dot(leanBase.subVectors(v.position, leanBase)) / room / leanUnits : 0;
+            leanBase.copy(v.position); leanBaseSet = true;
+            inv.leanStep(dt, onward);
+            if (inv.lean > 0 && room > 1e-6) { inviteDebug.lean = Math.min(inv.lean * leanUnits, room); v.position.addScaledVector(leanDir, inviteDebug.lean / room); }
+            inviteDebug.toScreen = leanDir.subVectors(leanTo, v.position).length();
+          }
           stage!.setView(v.position, v.quaternion, v.lens);
           const cam = stage!.camera;
+          inviteDebug.camera[0] = v.position.x; inviteDebug.camera[1] = v.position.y; inviteDebug.camera[2] = v.position.z;
           const W = canvas.clientWidth || 1, H = canvas.clientHeight || 1;
           // portrait phones see far more height: the tilt goes further there so the ball leaves the frame (spec §10)
           {
@@ -1198,7 +1250,7 @@ export function SandLab({ hero }: { hero: boolean }) {
       {/* (the sketches' handwriting, loaded with the story: desk-sketches.ts draws it into the scene) */}
       {hero && <span aria-hidden className={sketchFont.className} style={{ position: "absolute", opacity: 0, pointerEvents: "none" }}>a</span>}
       {hero ? (
-        <HeroOverlay exit={readExit} scrolled={readScrolled} />
+        <HeroOverlay exit={readExit} scrolled={readScrolled} keep={readKeep} />
       ) : (
         <div className="pointer-events-none fixed left-3 top-3 font-mono text-[11px] uppercase tracking-wider text-white/60">
           sand lab · {status}
