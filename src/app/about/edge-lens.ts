@@ -18,6 +18,12 @@ export const LENS_SLOPE = 1.5;
 /** The most the displacement may change per px along the normal (the map is scaled down to hold it on a narrow band). */
 const MAX_DERIV = 0.7;
 
+/** The share of the full pull the map keeps on a band `band` px deep (screen px): 1 on a band deep enough, less on a
+ *  narrow one, so the displacement's slope never passes MAX_DERIV (lensMap's own scaling, shared with edge-bend.ts). */
+export function lensAmp(band: number): number {
+  return Math.min(1, (MAX_DERIV * band) / (LENS_MAX * LENS_SLOPE));
+}
+
 /** The band's width (px) for a screen: min(56 px, 6.5% of the shorter side). */
 export function lensBand(w: number, h: number): number {
   return Math.min(56, Math.min(w, h) * 0.065);
@@ -44,7 +50,7 @@ export function lensProfile(t: number): number {
 export function lensMap(w: number, h: number, band: number, k = 0.5): Uint8ClampedArray {
   const d = new Uint8ClampedArray(w * h * 4);
   const rad = band * 1.4, hw = w / 2, hh = h / 2;
-  const amp = Math.min(1, (MAX_DERIV * (band / k)) / (LENS_MAX * LENS_SLOPE));
+  const amp = lensAmp(band / k);
   /** The rounded screen's signed distance: < 0 inside. */
   const sd = (x: number, y: number) => {
     const qx = Math.abs(x - hw) - (hw - rad), qy = Math.abs(y - hh) - (hh - rad);

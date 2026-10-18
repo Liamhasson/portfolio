@@ -173,3 +173,12 @@ a.ab-proof:hover, a.ab-proof:focus-visible { color: #f4efe9; }
 .ab[data-mode="stack"] .ab-lens-strip[data-edge="bottom"] { bottom: auto; top: calc(100vh - var(--d)); top: calc(100lvh - var(--d)); }
 .ab[data-mode="stack"] .ab-lens-strip[data-edge="left"], .ab[data-mode="stack"] .ab-lens-strip[data-edge="right"] { bottom: auto; height: calc(100vh - 2 * var(--d)); height: calc(100lvh - 2 * var(--d)); }
 .ab-lens-defs { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }
+/* the glass edges where the lens can't run (WebKit, Firefox; edge-bend-dom.ts, Liam 2026-10-19): an aria-hidden copy of each
+   quote's letters laid exactly over its own, shown only while some of it bends; the original then see-through (its fill
+   only: its colour, its selection and its reading stay). Only edge-bend-dom.ts adds these classes, never in Chromium. */
+.ab-bendable { position: relative; }
+.ab-bendable[data-bend] { -webkit-text-fill-color: transparent; }
+.ab-bend { position: absolute; inset: 0; visibility: hidden; pointer-events: none; user-select: none; -webkit-user-select: none; -webkit-text-fill-color: currentcolor; }
+.ab-bendable[data-bend] > .ab-bend { visibility: visible; }
+.ab-bend-l { position: absolute; left: 0; right: 0; transform-origin: 0 0; }
+.ab-bend-c { position: absolute; top: 0; white-space: pre; transform-origin: 0 0; -webkit-text-fill-color: currentcolor; }
