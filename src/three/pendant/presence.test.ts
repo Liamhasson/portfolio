@@ -13,8 +13,8 @@ function run(p: Presence, want: { layer: Layer; dim: number; overlapping: boolea
 }
 
 describe("stepPresence", () => {
-  test("bright never changes by more than 1 − e^(−dt/0.35) of the gap per step", () => {
-    expect(BRIGHT_TAU).toBe(0.35);
+  test("bright never changes by more than 1 − e^(−dt/0.6) of the gap per step", () => {
+    expect(BRIGHT_TAU).toBe(0.6);
     // any dt (a 120 Hz frame, a 60 Hz one, a long one a tab coming back caps), any target, a target that jumps every step
     const targets = [0.4, 1, 0.1, 0.9, 0.4, 0.4, 1, 0, 0.6];
     for (const dt of [1 / 120, 1 / 60, 1 / 30, 0.05]) {
@@ -23,15 +23,15 @@ describe("stepPresence", () => {
         const dim = targets[i % targets.length];
         const next = stepPresence(p, { layer: "front", dim, overlapping: false }, dt);
         const gap = Math.abs(dim - p.bright);
-        expect(Math.abs(next.bright - p.bright)).toBeLessThanOrEqual(gap * (1 - Math.exp(-dt / 0.35)) + 1e-12);
+        expect(Math.abs(next.bright - p.bright)).toBeLessThanOrEqual(gap * (1 - Math.exp(-dt / 0.6)) + 1e-12);
         // (toward the target, never past it)
         expect(Math.abs(dim - next.bright)).toBeLessThanOrEqual(gap + 1e-12);
         p = next;
       }
     }
-    // and it does move: an eased approach, not a hold (0.35 s takes it 1 − 1/e of the way)
+    // and it does move: an eased approach, not a hold (0.6 s takes it 1 − 1/e of the way)
     const after = run({ layer: "front", bright: 1, fade: 1 }, { layer: "front", dim: 0.4, overlapping: false }, 21)[20];
-    expect(after.bright).toBeCloseTo(0.4 + 0.6 * Math.exp(-21 / 60 / 0.35), 9);
+    expect(after.bright).toBeCloseTo(0.4 + 0.6 * Math.exp(-21 / 60 / 0.6), 9);
   });
 
   test("a swap while clear is instant", () => {

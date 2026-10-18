@@ -9,7 +9,7 @@ import { REST, stepMotion, type MotionState } from "@/three/pendant/motion";
 import { PendantGovernor } from "@/three/pendant/governor";
 import { AHEAD_T, behindAhead, lagAhead, stepPresence, type Presence } from "@/three/pendant/presence";
 import type { GlassSlot, PendantScene } from "@/three/pendant/scene";
-import { heldIndex, rideShift, SHOTS, SHOTS_STACK, shotAt, solveKeys, type Layer, type Shot } from "@/three/pendant/shots";
+import { heldIndex, rideShift, SHOTS, SHOTS_STACK, shotAt, shotBright, solveKeys, type Layer, type Shot } from "@/three/pendant/shots";
 import type { Outline } from "@/three/pendant/solve";
 import type { Spot } from "@/three/pendant/layout";
 import { leanFor } from "./glass-lean";
@@ -530,20 +530,27 @@ export function AboutPendant() {
     /** This screen's spots and layers, from the words and chrome as last measured (the pinned frame at the screen's top;
      *  stacked, the page at each point of its scroll). No cursor on a phone: the stack's lean is off, so it isn't kept clear. */
     const solveNow = () => {
-      if (!scene || !sv || !outline) return;
-      const solved = sv.solve({
-        shots: baseShots(), keys: L.keys, travel: L.travel, vw: L.vw, vh: L.vh, texts: L.texts, fixed: [...L.site, ...L.own], outline,
-        lookMax: L.mode === "stack" ? 0 : LOOK,
-        at: atFor,
-      });
-      L.shots = solved.shots;
-      L.spots = solved.spots;
-      L.layer = solved.layer;
-      L.over = solved.over;
-      L.overLagging = solved.overLagging;
-      L.rest = solved.rest;
-      jumped = true; // (new rest spots: the pose may step)
-      hook.solve = { moved: solved.moved, behind: solved.behind };
+      // Hand placed (Liam, 2026-10-18: the automatic placement "isn't approved to be used any more"): every shot plays as
+      // written, at its own place, size and layer; nothing is nudged, shrunk or sent behind by a solve. The layer changes
+      // halfway between two shots, as the shots say. The live guard below stays as the one quiet fail-safe: on a screen
+      // size no one has checked, a front pendant that would cover a line slips behind through the quick fade.
+      const shots = baseShots(), keys = L.keys;
+      L.shots = shots;
+      L.spots = [];
+      L.layer = (s: number) => {
+        const last = shots.length - 1;
+        let i = 0;
+        while (i < last && s > keys[i + 1]) i++;
+        if (i >= last) return shots[last].layer;
+        const span = keys[i + 1] - keys[i];
+        const t = span > 0 ? (s - keys[i]) / span : 1;
+        return (t < 0.5 ? shots[i] : shots[i + 1]).layer;
+      };
+      L.over = null;
+      L.overLagging = null;
+      L.rest = null;
+      jumped = true;
+      hook.solve = { moved: [], behind: [] };
     };
     /** Measure and solve again once the arrival animation and the nav's entrance have finished (if either is running). */
     let settling = false;
@@ -768,13 +775,14 @@ export function AboutPendant() {
       const reach = restNow && live
         ? { l: restNow.l - carried - live.l, t: restNow.t - live.t, r: live.r - (restNow.r - carried), b: live.b - restNow.b }
         : undefined;
-      const ahead = !reduced && forcedLayer === undefined && layerAt !== null && overLag !== null
-        && behindAhead((x) => overLag(x, lagAhead(x, sAt, lag, pageVel, FOLLOW_TAU), reach) && (layerAt(x) === "back" || lag !== 0), sAt, lead, dir);
+      const ahead = false; // (no look ahead: the pendant is dim everywhere but the lit shots, so nothing needs dimming early)
       // (stacked, the opening coming in is unseen until the layers have it in front, then fades in: it arrives at full
       // brightness, never dimmed for the moment it was behind unseen)
       const opening = stack && (reduced ? held === 0 : f.index === 0 && f.t < 0.5);
-      const behind = (asked === "back" || presence?.layer === "back" || ahead) && !(opening && clearK < 1);
-      const shotDim = behind ? Math.min(f.dim, sv?.FORCED_DIM ?? f.dim) : f.dim;
+      // The brightness (Liam, 2026-10-18): softly dimmed all through About; the lit shots (the build, the pendant seen
+      // through the glass) come up once, slowly, and go down once. Behind the words it is the dim whatever the shot says.
+      const lit = shotBright(f, L.shots) && asked === "front" && presence?.layer !== "back";
+      const shotDim = lit ? 1 : (sv?.FORCED_DIM ?? 0.4);
       const wantDim = stack ? shotDim : shotDim * (1 - o);
       presence = presence
         ? stepPresence(presence, { layer: asked, dim: wantDim, overlapping }, dt)

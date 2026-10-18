@@ -19,8 +19,8 @@ const ALL = { band: 1700, how: 2900, strip: 4300, e2e: 4000, glass: 5200, quote1
 const without = (...names: string[]) => Object.fromEntries(Object.entries(ALL).filter(([k]) => !names.includes(k)));
 
 describe("the pendant's shots (spec 2026-10-16 §3)", () => {
-  test("SHOTS has the spec's ten shots plus the glide's and the build passes' end keys, in order", () => {
-    expect(SHOTS.map((s) => s.id)).toEqual(["opening", "letgo", "tumble", "worm", "above", "glass", "glide", "glideEnd", "whirl", "build", "buildEnd", "hero"]);
+  test("SHOTS, hand placed: the centre hold through Find and Check in place of the glide and the whirl, in order", () => {
+    expect(SHOTS.map((s) => s.id)).toEqual(["opening", "letgo", "tumble", "worm", "above", "glass", "hold", "holdEnd", "build", "buildEnd", "hero"]);
   });
 
   test("an unspecified field inherits the previous shot's value; aims are relative to mid-height", () => {
@@ -28,7 +28,9 @@ describe("the pendant's shots (spec 2026-10-16 §3)", () => {
     expect(by("worm").tumble).toBe(0);
     expect(by("above").tumble).toBe(0);
     expect(by("glass").glass).toBe(1);
-    expect(by("glide").glass).toBe(0);
+    expect(by("hold").glass).toBe(0);
+    expect(by("holdEnd").layer).toBe("back");
+    expect([by("glass").bright, by("build").bright, by("buildEnd").bright, by("hold").bright, by("hero").bright, by("tumble").bright]).toEqual([true, true, true, false, false, false]);
     expect(by("build").wire).toBe(0);
     expect(by("buildEnd").wire).toBe(1);
     expect(by("hero").lock).toBe(-62);
@@ -278,11 +280,11 @@ describe("shotAt", () => {
 
   test('a "glass" aim blends toward a plain number as the shots change', () => {
     const gi = SHOTS.findIndex((s) => s.id === "glass");
-    const mid = (keys[gi] + keys[gi + 1]) / 2; // the glide: ax 1.08, ay 0.13
+    const mid = (keys[gi] + keys[gi + 1]) / 2; // the centre hold: ax 0.5, ay 0.5
     const f = shotAt(mid, keys, SHOTS, AT);
     expect(f.t).toBeCloseTo(0.5, 9);
-    expect(f.ax).toBeCloseTo((AT.glass.x + 1.08) / 2, 9);
-    expect(f.ay).toBeCloseTo((AT.glass.y + 0.13) / 2, 9);
+    expect(f.ax).toBeCloseTo((AT.glass.x + 0.5) / 2, 9);
+    expect(f.ay).toBeCloseTo((AT.glass.y + 0.5) / 2, 9);
   });
 
   test("the shots' own layer (shotLayer, what the solve starts from) switches at the halfway point; the lock eases in with t", () => {
@@ -396,7 +398,8 @@ describe("shotAt", () => {
 describe("settle and ride (the build under a fast scroll)", () => {
   const D = Math.PI / 180;
   const by = (id: string) => SHOTS.find((s) => s.id === id)!;
-  const whirl = by("whirl"), build = by("build"), buildEnd = by("buildEnd");
+  // (the shot before the build is the centre hold now; a fast-spinning stand-in keeps the settle's property under test)
+  const whirl = { ...by("holdEnd"), spin: 1.3, ride: 0 }, build = by("build"), buildEnd = by("buildEnd");
 
   test("the build settles over the first half of the move into it: spin and lock there, the framing over the whole move", () => {
     expect(build.settle).toBe(0.5);

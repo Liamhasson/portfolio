@@ -16,7 +16,7 @@
 import type { Layer } from "./shots";
 
 /** The brightness's time constant (s): each step closes 1 − e^(−dt/BRIGHT_TAU) of the gap. */
-export const BRIGHT_TAU = 0.35;
+export const BRIGHT_TAU = 0.6;
 /** The dip at an overlapping swap: out, then in (s). */
 export const FADE_OUT = 0.15;
 export const FADE_IN = 0.15;

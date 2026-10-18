@@ -65,6 +65,9 @@ export interface Shot {
    *  else). Under 1, the pendant slows to its new face early in the move and carries it the rest of the way, so a fast
    *  spin handing over to a held face has settled by the time the shot is on, whatever face it was showing when the move began. */
   settle: number;
+  /** Full brightness (Liam, 2026-10-18: the pendant stays softly dimmed all through About; only the build and the pendant
+   *  seen through the glass are lit). Every other shot is drawn at the dim. */
+  bright: boolean;
   /** Other framings of this shot, tried in order by the readability solve (solve.ts) when the shot as written can't be
    *  cleared of the words on a screen; each is laid over the shot. Never filled forward to the next shot. */
   alt?: readonly ShotChange[];
@@ -74,7 +77,7 @@ export interface Shot {
 export type ShotChange = Partial<Omit<Shot, "id" | "anchor" | "alt">>;
 
 /** What the camera and the pendant do at one scroll position: the blend of the two shots around it. */
-export interface Frame extends Omit<Shot, "id" | "anchor" | "fx" | "ax" | "ay" | "alt" | "layer" | "settle"> {
+export interface Frame extends Omit<Shot, "id" | "anchor" | "fx" | "ax" | "ay" | "alt" | "layer" | "settle" | "bright"> {
   /** The earlier of the two shots (the last shot's own index once past the end). The shot currently showing is
    *  `t >= 0.5 ? index + 1 : index`. (No layer: the mount takes it from the readability solve's timeline plus its live
    *  guard, presence.ts; the solve reads the shots' own with `shotLayer`.) */
@@ -93,7 +96,7 @@ export interface Frame extends Omit<Shot, "id" | "anchor" | "fx" | "ax" | "ay" |
 type ShotBody = Omit<Shot, "id" | "anchor" | "alt">;
 const DEF: ShotBody = {
   fx: 0.5, az: 0, el: 0, roll: 0, fov: 30, h: 0.4, ax: 0.5, ay: 0.5, aim: [0, 0, 0],
-  spin: 0.05, tumble: 0, rz: 0, lock: null, layer: "front", dim: 1, aperture: 0.001, glass: 0, wire: 1, ride: 0, settle: 1,
+  spin: 0.05, tumble: 0, rz: 0, lock: null, layer: "front", dim: 1, aperture: 0.001, glass: 0, wire: 1, ride: 0, settle: 1, bright: false,
 };
 
 /** A shot as written below: its name and anchor, plus only the fields that change. */
@@ -130,14 +133,11 @@ export const SHOTS: readonly Shot[] = fill([
   // 05 From above: the four faces like a compass, turning like a record (the aim is the crown)
   { id: "above", anchor: { pendant: "strip", fallback: "e2e" }, fx: 0.49, az: 0, el: 89, roll: 0, fov: 30, h: 0.8, ax: 0.81, ay: 0.76, aim: [0, 0.28, 0], spin: 0.12, aperture: 0.0012 },
   // 06 Through the glass: magnified, bent, upside down
-  { id: "glass", anchor: { pendant: "glass", fallback: ["quote1", "quote2"] }, fx: 0.5, az: 150, el: 8, roll: 0, fov: 30, h: 0.15, ax: "glass", ay: "glass", aim: [0, 0, 0], spin: 0.16, aperture: 0.0005, glass: 1 },
-  // 07 Glide: lying down, rolling along the top of the screen, the full width of it (from 1.08 to -0.08), over 1.27 of the
-  // screen's width of scroll (it was 0.4: 9 vw a frame at 1500 px/s, four times the median move)
-  { id: "glide", anchor: { pendant: "find" }, fx: 0.75, az: 0, el: 6, roll: 0, fov: 28, h: 0.5, ax: 1.08, ay: 0.13, spin: 0.45, rz: 90, aperture: 0.0008, glass: 0 },
-  { id: "glideEnd", anchor: { pendant: "find" }, fx: -0.52, ax: -0.08 },
-  // 08 Whirl: stands up spinning fast, slows to a new face (the build's: it slows over the first half of the move to the
-  // build, `settle`)
-  { id: "whirl", anchor: { pendant: "check" }, fx: 0.015, az: 20, el: 10, roll: 0, fov: 34, h: 0.3, ax: 0.13, ay: 0.17, spin: 1.3, rz: 0, aperture: 0.0008 },
+  { id: "glass", anchor: { pendant: "glass", fallback: ["quote1", "quote2"] }, fx: 0.5, az: 150, el: 8, roll: 0, fov: 30, h: 0.15, ax: "glass", ay: "glass", aim: [0, 0, 0], spin: 0.16, aperture: 0.0005, glass: 1, bright: true },
+  // 07 The centre hold (Liam, 2026-10-18: "keep it centred"): at the screen's middle, dimmed behind the words, turning slowly
+  // in place, while "Find the problem" and "Check I'm right" slide past over it. Nothing moves on screen between the two keys.
+  { id: "hold", anchor: { pendant: "find" }, fx: 0.5, az: -20, el: 8, roll: 0, fov: 30, h: 0.42, ax: 0.5, ay: 0.5, aim: [0, 0, 0], spin: 0.06, tumble: 0, rz: 0, layer: "back", aperture: 0.0008, glass: 0, bright: false },
+  { id: "holdEnd", anchor: { pendant: "check" }, fx: 0.5 },
   // 09 Build passes: wire, clay, brass, swept across the faces and the crown, big and in front on the empty stage right of
   // "Build it." (Liam, 2026-10-18: candidate (b), the big three-quarter close-up, in the desk film's place). It rides with the
   // stage, right to left, across 0.26 of the screen's width of scroll, and rides with the page under a scroll (`ride`), so
@@ -147,10 +147,10 @@ export const SHOTS: readonly Shot[] = fill([
   // about 0.68 of the screen's height; at the asked 0.8 the foot sits on the pill and the solve puts it behind mid-sweep).
   // It settles a little smaller and lower as the brass arrives (h 0.53), left of the pill, so that from there to the hero its
   // crown passes under the site's name, not over it: in front all the way to the hero.
-  { id: "build", anchor: { pendant: "buildstage", fallback: "build" }, fx: 0.53, az: -35, el: 12, roll: 0, fov: 30, h: 0.64, ax: 0.54, ay: 0.43, aim: [0, 0, 0], spin: 0, lock: -10, aperture: 0.0012, wire: 0, ride: 1, settle: 0.5 },
+  { id: "build", anchor: { pendant: "buildstage", fallback: "build" }, fx: 0.53, az: -35, el: 12, roll: 0, fov: 30, h: 0.64, ax: 0.54, ay: 0.43, aim: [0, 0, 0], spin: 0, lock: -10, aperture: 0.0012, wire: 0, ride: 1, settle: 0.5, layer: "front", bright: true },
   { id: "buildEnd", anchor: { pendant: "buildstage", fallback: "build" }, fx: 0.27, az: -25, h: 0.53, ax: 0.32, ay: 0.475, lock: 0, wire: 1, settle: 1 },
   // 10 Hero: close and low, cut by the left edge, its face turned to the last line (the aim is the face)
-  { id: "hero", anchor: "end", fx: 0, az: -62, el: -12, roll: 6, fov: 24, h: 1.35, ax: 0.03, ay: 0.5, aim: [0, 0.02, -0.1], spin: 0, lock: -62, aperture: 0.0016, ride: 0,
+  { id: "hero", anchor: "end", fx: 0, az: -62, el: -12, roll: 6, fov: 24, h: 1.35, ax: 0.03, ay: 0.5, aim: [0, 0.02, -0.1], spin: 0, lock: -62, aperture: 0.0016, ride: 0, bright: false,
     // while About's layout leaves words beside the left edge at the end: the same shot mirrored, close at the right, cut by
     // the right edge, its face turned to the closing line on its left (Liam's ruling, 2026-10-16). Its ay / h tuned from the
     // asked 0.3 / 1.0 (there it sits on the pill nav and the closing line on every screen) to the one free area big enough
@@ -175,9 +175,9 @@ export const SHOTS_STACK: readonly Shot[] = fill([
   // 05 From above: the four faces like a compass, in the band between the work strip and the first quote
   { id: "above", anchor: { pendant: "strip", fallback: "e2e" }, fx: 0.3, az: 0, el: 89, roll: 0, fov: 30, h: 0.6, ax: 0.5, ay: 0.6, aim: [0, 0.28, 0], spin: 0.12, tumble: 0, layer: "front", dim: 1, aperture: 0.0012 },
   // 06 Through the glass: small, between the two quotes (the ball drawn round it once the stack shows the slot)
-  { id: "glass", anchor: { pendant: "glass", fallback: ["quote1", "quote2"] }, fx: 0.5, az: 150, el: 8, roll: 0, fov: 30, h: 0.15, ax: "glass", ay: "glass", aim: [0, 0, 0], spin: 0.16, aperture: 0.0005, glass: 1 },
+  { id: "glass", anchor: { pendant: "glass", fallback: ["quote1", "quote2"] }, fx: 0.5, az: 150, el: 8, roll: 0, fov: 30, h: 0.15, ax: "glass", ay: "glass", aim: [0, 0, 0], spin: 0.16, aperture: 0.0005, glass: 1, bright: true },
   // 08 Whirl: stands up spinning fast in the band above "Check I'm right", slows to a new face
-  { id: "whirl", anchor: { pendant: "check" }, fx: 0.68, az: 20, el: 10, roll: 0, fov: 34, h: 0.21, ax: 0.5, ay: 0.3, aim: [0, 0, 0], spin: 1.3, aperture: 0.0008, glass: 0 },
+  { id: "whirl", anchor: { pendant: "check" }, fx: 0.68, az: 20, el: 10, roll: 0, fov: 34, h: 0.21, ax: 0.5, ay: 0.3, aim: [0, 0, 0], spin: 1.3, aperture: 0.0008, glass: 0, bright: false },
   // 10 Hero: rising from the bottom left corner under the last line, cut by the left and bottom edges, a face turned toward the
   // line. (Smaller than the track's close-up: the fixed resume pill holds the bottom's middle, and the last line rises through
   // the band below it on the way in, so the corner left of the pill is the one free place; the solve fits it there.)
@@ -317,6 +317,12 @@ export function shotAt(
 
 /** The layer the shots themselves want at a frame (what the readability solve starts from): the nearer shot's, switching at
  *  the blend's halfway point. Never the layer drawn: that is the solve's timeline plus the mount's live guard. */
+/** Whether the shot showing at a frame is a lit one (`bright`): the earlier shot until halfway, then the later, as the layer. */
+export function shotBright(f: Pick<Frame, "index" | "t">, shots: readonly Shot[]): boolean {
+  const s = shots[f.t >= 0.5 ? Math.min(f.index + 1, shots.length - 1) : f.index];
+  return s?.bright ?? false;
+}
+
 export function shotLayer(f: Pick<Frame, "index" | "t">, shots: readonly Shot[]): Layer {
   const i = Math.min(f.t < 0.5 ? f.index : f.index + 1, shots.length - 1);
   return shots[Math.max(i, 0)]?.layer ?? "back";
