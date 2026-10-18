@@ -16,7 +16,7 @@ import { leanFor } from "./glass-lean";
 import { glassPointerIn } from "./glass-pointer";
 import { pictureShown } from "./pendant-pictures";
 import { dwellTravel, scrollForTravel, type Dwell } from "./track";
-import { setFrameState, type FramePhase } from "./build-frame-state";
+import { clearFrame, setFrameState, type FramePhase } from "./build-frame-state";
 import { stepSnap } from "@/three/pendant/snap";
 import { resizeKind } from "./viewport";
 
@@ -48,7 +48,7 @@ export interface PendantHook {
   yaw: number;
   dragging: boolean;
   /** The build's pause: how far through it (0..1), the frame's phase, its grow, whether the pendant has snapped in. */
-  pause?: { k: number; phase: string | null; grow: number; snapped: boolean };
+  pause?: { k: number; phase: string | null; grow: number; snapped: boolean; wire: number };
   /** The motion blur this frame: the longest smear (CSS px, scaled to a 1/60 s shutter), whether the pass drew, and whether
    *  the frame counted as a jump (nothing smeared). */
   blur: { smear: number; on: boolean; jump: boolean };
@@ -339,6 +339,8 @@ export function AboutPendant() {
       rest: null as ((s: number) => Box) | null,
       /** The build's pause (about-track.tsx: data-dwell-at / data-dwell-len; null stacked or without a stage). */
       dwell: null as Dwell | null,
+      /** The build stage's width (px): the frame is never wider. */
+      stageW: 0,
     };
     /** The shots for the layout: the track's, or the stack's. */
     const baseShots = () => (L.mode === "stack" ? SHOTS_STACK : SHOTS);
@@ -473,6 +475,7 @@ export function AboutPendant() {
       L.keys = solveKeys(L.shots, (a) => (typeof a === "object" ? centre(a.pendant) : null), viewW, L.travel);
       const at = Number(sec.dataset.dwellAt), len = Number(sec.dataset.dwellLen);
       L.dwell = Number.isFinite(at) && len > 0 ? { at, length: len } : null;
+      L.stageW = anchor("buildstage")?.offsetWidth ?? 0;
       // The words and the chrome, as boxes. Rects relative to the track are proof against the track's own transform; the
       // arrival animation (the first slides slide in for 1.1 s) and the nav's entrance move them too, so while either runs
       // these boxes are provisional and everything is measured and solved again the moment they have finished.
@@ -698,36 +701,41 @@ export function AboutPendant() {
       // builds itself (wire, clay, brass) as the scroll runs on, locked there: still turning in place, the cursor's lean and
       // a drag turn it, nothing moves it. At the end the frame pulls back into its corners and the page carries on.
       const inPause = !stack && L.dwell !== null && pause.k > 0 && pause.k < 1;
-      if (inPause) {
-        const bi = L.shots.findIndex((sh) => sh.id === "build");
-        const b0 = L.shots[bi], b1 = L.shots[bi + 1];
-        if (b0 && b1) {
-          const buildK = clamp01((pause.k - PAUSE_SNAP) / (1 - PAUSE_SNAP - PAUSE_RETRACT));
-          const g = shotAt(buildK * 1000, [0, 1000], [b0, b1], atFor(sAt));
-          const from = { x: f.ax, y: f.ay };
-          Object.assign(f, g);
-          const tx = typeof b0.ax === "number" ? b0.ax : 0.5, ty = typeof b0.ay === "number" ? b0.ay : 0.5;
-          if (!wasPause || reduced) { snapX.x = reduced ? tx : from.x; snapY.x = reduced ? ty : from.y; snapX.v = snapY.v = 0; }
-          stepSnap(snapX, tx, dt);
-          stepSnap(snapY, ty, dt);
-          f.ax = snapX.x;
-          f.ay = snapY.x;
-          snapped = reduced || (Math.abs(snapX.x - tx) < 0.003 && Math.abs(snapY.x - ty) < 0.003 && Math.abs(snapX.v) + Math.abs(snapY.v) < 0.05);
-          pauseAim = { x: tx, y: ty, ph: g.h * L.vh };
-        }
+      const pastPause = !stack && L.dwell !== null && pause.k >= 1;
+      const bi = L.shots.findIndex((sh) => sh.id === "build");
+      const b0 = L.shots[bi];
+      let wire = f.wire;
+      if (inPause && b0) {
+        // (the shot itself keeps blending from where the follow has it toward the build, which it reaches as the follow
+        // catches the paused page: only the build's progress and the pendant's place are the pause's)
+        wire = clamp01((pause.k - PAUSE_SNAP) / (1 - PAUSE_SNAP - PAUSE_RETRACT));
+        const tx = typeof b0.ax === "number" ? b0.ax : 0.5, ty = typeof b0.ay === "number" ? b0.ay : 0.5;
+        if (!wasPause) { snapX.x = f.ax; snapY.x = f.ay; snapX.v = snapY.v = 0; }
+        stepSnap(snapX, tx, dt);
+        stepSnap(snapY, ty, dt);
+        f.ax = snapX.x;
+        f.ay = snapY.x;
+        snapped = Math.abs(snapX.x - tx) < 0.003 && Math.abs(snapY.x - ty) < 0.003 && Math.abs(snapX.v) + Math.abs(snapY.v) < 0.05;
+        pauseAim = { x: tx, y: ty, ph: b0.h * L.vh };
+        // entered from after the pause (scrolling back up) or by a jump past the snap: the frame is simply there
+        if (!wasPause && pause.k > PAUSE_SNAP) grow = 1;
       } else snapped = false;
-      grow = reduced ? (inPause ? 1 : 0) : clamp01(grow + (inPause && snapped ? dt : -dt) / FRAME_GROW);
+      // (just past the pause the follow still has the pendant a few px short of the build's end key: it stays brass)
+      if (pastPause && bi >= 0 && f.index <= bi + 1 && f.t < 1) wire = 1;
+      f.wire = wire;
+      // the frame grows over FRAME_GROW once the pendant has snapped in; outside the pause there is no frame at all
+      grow = inPause ? clamp01(grow + (snapped ? dt / FRAME_GROW : 0)) : 0;
       wasPause = inPause;
       const retract = inPause ? clamp01((pause.k - (1 - PAUSE_RETRACT)) / PAUSE_RETRACT) : 0;
-      const framePhase: FramePhase = !stack && pauseAim && (inPause || grow > 0)
-        ? (retract > 0 ? "retract" : grow < 1 ? "grow" : "build") : null;
+      const framePhase: FramePhase = inPause && pauseAim ? (retract > 0 ? "retract" : grow < 1 ? "grow" : "build") : null;
       if (framePhase && pauseAim) {
-        // (the frame's centre is the pendant's locked pivot, a little below its middle: the crown and loop break out of the
-        // top edge, the base sits inside the bottom one; build-frame-state.ts)
-        setFrameState({ phase: framePhase, cx: pauseAim.x * L.vw, cy: pauseAim.y * L.vh + 0.13 * pauseAim.ph, w: 0.9 * pauseAim.ph, h: 0.8 * pauseAim.ph, grow, retract });
-      } else if (framePhaseWas !== null) setFrameState({ phase: null, cx: 0, cy: 0, w: 0, h: 0, grow: 0, retract: 0 });
+        // (the frame's centre is a little below the pendant's middle: the crown and loop break out of the top edge, the base
+        // sits inside the bottom one; never wider than the stage, so its guides stay clear of the skills beside it)
+        const w = Math.min(0.9 * pauseAim.ph, L.stageW > 0 ? L.stageW : Infinity);
+        setFrameState({ phase: framePhase, cx: pauseAim.x * L.vw, cy: pauseAim.y * L.vh + 0.13 * pauseAim.ph, w, h: 0.8 * pauseAim.ph, grow, retract });
+      } else if (framePhaseWas !== null) clearFrame();
       framePhaseWas = framePhase;
-      hook.pause = { k: pause.k, phase: framePhase, grow, snapped };
+      hook.pause = { k: pause.k, phase: framePhase, grow, snapped, wire };
       // the pull to Contact: it falls away into the dark as the section scrolls off (held still: only the fade)
       const o = clamp01((y - (L.top + L.H - vh)) / vh);
       if (!reduced) {
@@ -986,6 +994,7 @@ export function AboutPendant() {
       lost = true;
       drag = null;
       giveGlassBack(); // (the testimonials draw the ball until the pendant is back)
+      clearFrame(); framePhaseWas = null; // (no frame without its pendant)
       canvas.hidden = true;
       hook.ready = false;
       cancelAnimationFrame(raf);
@@ -1061,6 +1070,7 @@ export function AboutPendant() {
     /** Anything wrong: no pendant, About as it was, nothing in the console. */
     const fail = () => {
       if (off) return;
+      clearFrame();
       teardown();
       setGone(true);
     };

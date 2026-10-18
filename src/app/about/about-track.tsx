@@ -128,8 +128,8 @@ export function AboutTrack() {
       const travel = Math.max(tr.scrollWidth - viewW(), 0);
       if (stage && stage.offsetWidth > 0) {
         const stageLeft = stage.getBoundingClientRect().left - t0;
-        dwell = { at: Math.min(Math.max(stageLeft + stage.offsetWidth / 2 - viewW() / 2, 0), travel), length: Math.round(0.9 * window.innerHeight) };
-        sec.dataset.dwellAt = String(Math.round(dwell.at));
+        dwell = { at: Math.round(Math.min(Math.max(stageLeft + stage.offsetWidth / 2 - viewW() / 2, 0), travel)), length: Math.round(0.9 * window.innerHeight) };
+        sec.dataset.dwellAt = String(dwell.at);
         sec.dataset.dwellLen = String(dwell.length);
       } else { dwell = null; delete sec.dataset.dwellAt; delete sec.dataset.dwellLen; }
       height = sectionHeight(tr.scrollWidth, viewW(), window.innerHeight) + (dwell?.length ?? 0);

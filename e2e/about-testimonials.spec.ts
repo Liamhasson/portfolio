@@ -1477,7 +1477,7 @@ test.describe("the glass ball under the cursor", () => {
     // (reduced motion stacks the page: the glass shot's place, the ball held there)
     const y = await page.evaluate(() => window.__pendant!.keys.find((k) => k.id === "glass")!.y);
     await page.evaluate((y) => window.scrollTo(0, y), y);
-    await page.waitForTimeout(2500);
+    await page.waitForTimeout(4500); // (the brightness eases over 0.6 s: fully settled before the before/after shots)
     const ball = await pendantBall(page);
     expect(ball, "the pendant's ball").not.toBeNull();
     const S = Math.ceil(1.35 * ball!.r);

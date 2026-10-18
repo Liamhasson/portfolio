@@ -299,15 +299,19 @@ for (const [w, h] of [[1440, 900], [1280, 800], [1920, 1080], [1024, 768]] as co
         await page.evaluate((y) => window.scrollTo(0, y), Math.round(pause.top + pause.at + k * pause.len));
         await page.waitForTimeout(2500);
         const at = await page.evaluate(() => ({ layer: window.__pendant!.layer, bright: window.__pendant!.bright, box: window.__pendant!.box, pause: window.__pendant!.pause! }));
-        const frame = await page.evaluate(() => { const r = document.querySelector("svg.ab-frame, .ab-frame")?.getBoundingClientRect(); return r ? { cx: r.left + r.width / 2, w: r.width } : null; });
+        const frame = await page.evaluate(() => { const r = document.querySelector("svg.ab-frame [data-frame='box']")?.getBoundingClientRect(); return r && r.width > 0 ? { cx: r.left + r.width / 2, w: r.width, l: r.left, r: r.right } : null; });
         expect(at.pause.phase, `k ${k}`).toBe("build");
         expect(at.layer, `k ${k}`).toBe("front");
         expect(at.bright, `k ${k}`).toBeGreaterThan(0.95);
         const tall = Math.min(at.box.b, h) - Math.max(at.box.t, 0);
         expect(tall / h, `k ${k}: its box's share of the screen's height`).toBeGreaterThanOrEqual(0.5);
-        if (frame && frame.w > 0) expect(Math.abs((at.box.l + at.box.r) / 2 - frame.cx), `k ${k}: centred in its frame`).toBeLessThanOrEqual(0.06 * w);
+        expect(frame, `k ${k}: the frame is drawn`).not.toBeNull();
+        expect(Math.abs((at.box.l + at.box.r) / 2 - frame!.cx), `k ${k}: centred in its frame`).toBeLessThanOrEqual(0.06 * w);
+        // never wider than the stage it stands on (its guides clear of the skills beside it)
+        const stageW = await page.evaluate(() => document.querySelector<HTMLElement>("[data-pendant='buildstage']")!.offsetWidth);
+        expect(frame!.w, `k ${k}: no wider than the stage`).toBeLessThanOrEqual(stageW + 1);
         expect(await frontOverlaps(page), `k ${k}`).toEqual([]);
-        seen.push({ k, wire: at.pause.k });
+        seen.push({ k, wire: at.pause.wire });
       }
       // the track held still across the pause
       await page.evaluate((y) => window.scrollTo(0, y), Math.round(pause.top + pause.at + 0.2 * pause.len));
@@ -317,6 +321,21 @@ for (const [w, h] of [[1440, 900], [1280, 800], [1920, 1080], [1024, 768]] as co
       await page.waitForTimeout(300);
       expect(await trackX()).toBe(a);
       expect(seen.map((x) => x.wire)).toEqual([...seen.map((x) => x.wire)].sort((p, q) => p - q));
+      expect(seen[0].wire).toBeLessThan(seen[seen.length - 1].wire);
+      // out the far end: no frame comes back, the pendant stays brass; and back in: the frame is simply there, building
+      await page.evaluate((y) => window.scrollTo(0, y), Math.round(pause.top + pause.at + pause.len + 40));
+      const after: { phase: string | null; wire: number; drawn: boolean }[] = [];
+      for (let i = 0; i < 20; i++) {
+        after.push(await page.evaluate(() => ({ phase: window.__pendant!.pause!.phase, wire: window.__pendant!.pause!.wire, drawn: getComputedStyle(document.querySelector("svg.ab-frame")!).display !== "none" && document.querySelector("svg.ab-frame")!.getAttribute("data-phase") !== null && document.querySelector("svg.ab-frame")!.getAttribute("data-phase") !== "" })));
+        await page.waitForTimeout(50);
+      }
+      expect(after.slice(3).every((a) => a.phase === null), "no frame past the pause").toBe(true);
+      expect(after.slice(3).every((a) => a.wire === 1), "brass past the pause").toBe(true);
+      await page.evaluate((y) => window.scrollTo(0, y), Math.round(pause.top + pause.at + 0.5 * pause.len));
+      await page.waitForTimeout(300);
+      const back = await page.evaluate(() => window.__pendant!.pause!);
+      expect(back.phase).toBe("build");
+      expect(back.grow).toBe(1);
 
     });
     test("the hero plays its storyboard framing: in front, at the left edge", async ({ page }) => {
@@ -588,11 +607,16 @@ test.describe("the motion pass: brightness and layers", () => {
     for (let y = from; y <= to; y += 16) down.push(y);
     const up = [...down].reverse();
     const got = [...(await stepFrames(page, { ys: down })), ...(await stepFrames(page, { ys: up }))];
-    // away from the glass (its shot and the moves either side are lit), the brightness is the dim and never moves
+    // away from the glass (its shot and the moves either side are lit), the brightness never rises: it is the dim, or still
+    // easing back down to it after the glass (one slow change, Liam), never above it on the way in
     const glass = key("glass"), far = (y: number) => Math.abs(y - glass) > 1.2 * 1440;
     const ys = [...down, ...up];
-    const off = got.filter((g, i) => far(ys[i]) && (g.bright < 0.37 || g.bright > 0.43)).map((g, i) => `${Math.round(ys[i])}: ${g.bright.toFixed(2)}`);
-    expect(off).toEqual([]);
+    const rises = got.flatMap((g, i) => (i > 0 && far(ys[i]) && far(ys[i - 1]) && g.bright > got[i - 1].bright + 0.005 ? [`${Math.round(ys[i])}: ${got[i - 1].bright.toFixed(2)} -> ${g.bright.toFixed(2)}`] : []));
+    expect(rises).toEqual([]);
+    // and before the glass, on the way down, it is the dim itself
+    const before = got.filter((g, i) => i < down.length && ys[i] < glass - 1.2 * 1440).map((g) => g.bright);
+    expect(before.length).toBeGreaterThan(20);
+    expect(before.every((b) => b >= 0.37 && b <= 0.43)).toBe(true);
     expect(maxStep(got.map((g) => g.bright))).toBeLessThanOrEqual(0.08);
     expect(errors).toEqual([]);
 
@@ -1167,7 +1191,7 @@ test("the pendant's box holds what is drawn: no brass outside it at the worm, th
   // not a covered line; the old, ungrown box leaked 39 px at the glide and 78 at the hero, so a share of the inside would
   // have let the hero's leak through)
   for (const r of out) {
-    expect(r.inside, r.id).toBeGreaterThan(5000);
+    expect(r.inside, r.id).toBeGreaterThan(2000); // (softly dimmed now: fewer bright pixels, still a real pendant)
     expect(r.outside, `${r.id}: ${r.outside} bright px outside the box, e.g. ${JSON.stringify(r.at)}`).toBeLessThanOrEqual(5);
   }
 });

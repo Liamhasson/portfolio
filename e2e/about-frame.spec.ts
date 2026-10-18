@@ -80,19 +80,17 @@ test("the frame draws round the stage, fixed, behind the pendant's canvas and ab
   expect(errors).toEqual([]);
 });
 
-/** The frame placed by the store's documented relation (build-frame-state.ts, still i-2) on the pendant's box as it stands:
- *  centred across on it, top 0.22 of its height below its top, bottom 0.045 of it below its base, the stage's width. (The
- *  hook's box is the projected bounds, a little loose: the frame comes out a little larger, the safe side here.) */
-async function byPendant(page: Page, stage: Stage): Promise<Stage> {
-  await page.waitForFunction(() => window.__pendant?.ready === true, null, { timeout: 15_000 });
-  const b = await page.evaluate(() => window.__pendant!.box);
-  const ph = b.b - b.t, top = b.t + 0.22 * ph, bottom = b.b + 0.045 * ph;
-  return { cx: (b.l + b.r) / 2, cy: (top + bottom) / 2, w: stage.w, h: bottom - top };
-}
 
-for (const place of ["the stage", "the pendant's pivot"] as const) test(`no line of text crosses the frame or its guides while it holds (on ${place})`, async ({ page }) => {
+for (const place of ["the stage", "the pendant's own, mid-build, 1440", "the pendant's own, mid-build, 1024"] as const) test(`no line of text crosses the frame or its guides while it holds (${place})`, async ({ page }) => {
+  if (place.endsWith("1024")) await page.setViewportSize({ width: 1024, height: 768 });
   const stage = await toStage(page);
-  await setFrame(page, { ...(place === "the stage" ? stage : await byPendant(page, stage)), phase: "build" });
+  if (place === "the stage") await setFrame(page, { ...stage, phase: "build" });
+  else {
+    // the frame the pendant itself writes, halfway through the page's pause
+    await page.evaluate(() => { const s = document.querySelector<HTMLElement>("section.ab")!; window.scrollTo(0, s.offsetTop + Number(s.dataset.dwellAt) + 0.5 * Number(s.dataset.dwellLen)); });
+    await page.waitForTimeout(2500);
+    expect(await page.evaluate(() => window.__pendant!.pause!.phase)).toBe("build");
+  }
   const hits = await page.evaluate(() => {
     // the frame's whole drawing: the box, and the guides' 16 px past it
     const f = document.querySelector("svg.ab-frame")!;
