@@ -633,7 +633,7 @@ export function AboutPendant() {
     /** The build's pause: the snap's springs (screen shares), whether it has arrived, the frame's grow (0..1, time based
      *  after the snap) and the last phase written (so leaving writes the empty state once). */
     const snapX = { x: 0.5, v: 0 }, snapY = { x: 0.5, v: 0 };
-    let wasPause = false, snapped = false, grow = 0, framePhaseWas: FramePhase = null;
+    let wasPause = false, snapped = false, snappedOnce = false, grow = 0, framePhaseWas: FramePhase = null;
     let pauseAim: { x: number; y: number; ph: number } | null = null;
 
     /** A governor level onto the scene: a resize only when the pixel ratio changes, the bokeh's scale only when its step
@@ -708,7 +708,6 @@ export function AboutPendant() {
       if (inPause && b0) {
         // (the shot itself keeps blending from where the follow has it toward the build, which it reaches as the follow
         // catches the paused page: only the build's progress and the pendant's place are the pause's)
-        wire = clamp01((pause.k - PAUSE_SNAP) / (1 - PAUSE_SNAP - PAUSE_RETRACT));
         const tx = typeof b0.ax === "number" ? b0.ax : 0.5, ty = typeof b0.ay === "number" ? b0.ay : 0.5;
         if (!wasPause) { snapX.x = f.ax; snapY.x = f.ay; snapX.v = snapY.v = 0; }
         stepSnap(snapX, tx, dt);
@@ -716,10 +715,14 @@ export function AboutPendant() {
         f.ax = snapX.x;
         f.ay = snapY.x;
         snapped = Math.abs(snapX.x - tx) < 0.003 && Math.abs(snapY.x - ty) < 0.003 && Math.abs(snapX.v) + Math.abs(snapY.v) < 0.05;
+        // whole and brass while it flies in; the moment it has snapped in it is the wireframe (Liam, 2026-10-18: "cut on the
+        // snap"), and the build runs once from there, wire to clay to brass, with the scroll
+        if (snapped) snappedOnce = true;
+        wire = snappedOnce ? clamp01((pause.k - PAUSE_SNAP) / (1 - PAUSE_SNAP - PAUSE_RETRACT)) : 1;
         pauseAim = { x: tx, y: ty, ph: b0.h * L.vh };
         // entered from after the pause (scrolling back up) or by a jump past the snap: the frame is simply there
         if (!wasPause && pause.k > PAUSE_SNAP) grow = 1;
-      } else snapped = false;
+      } else { snapped = false; snappedOnce = false; }
       // (just past the pause the follow still has the pendant a few px short of the build's end key: it stays brass)
       if (pastPause && bi >= 0 && f.index <= bi + 1 && f.t < 1) wire = 1;
       f.wire = wire;

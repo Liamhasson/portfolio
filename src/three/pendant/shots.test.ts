@@ -31,7 +31,7 @@ describe("the pendant's shots (spec 2026-10-16 §3)", () => {
     expect(by("hold").glass).toBe(0);
     expect(by("holdEnd").layer).toBe("back");
     expect([by("glass").bright, by("build").bright, by("buildEnd").bright, by("hold").bright, by("hero").bright, by("tumble").bright]).toEqual([true, true, true, false, false, false]);
-    expect(by("build").wire).toBe(0);
+    expect(by("build").wire).toBe(1);
     expect(by("buildEnd").wire).toBe(1);
     expect(by("hero").lock).toBe(-62);
     expect(by("hero").aim).toEqual([0, 0.02, -0.1]);
@@ -52,7 +52,7 @@ describe("the pendant's shots (spec 2026-10-16 §3)", () => {
       expect([by(id).ax, by(id).ay]).toEqual([0.5, 0.45]);
       expect(by(id).lock).toBeNull(); // (still turning in place while it builds)
     }
-    expect([by("build").wire, by("buildEnd").wire]).toEqual([0, 1]);
+    expect([by("build").wire, by("buildEnd").wire]).toEqual([1, 1]); // (brass on the way in and out: the build is the pause's)
     expect(Math.abs(by("build").az)).toBeGreaterThanOrEqual(20); // (a three-quarter view)
   });
 

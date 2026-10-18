@@ -139,10 +139,11 @@ export const SHOTS: readonly Shot[] = fill([
   { id: "hold", anchor: { pendant: "find" }, fx: 0.5, az: -20, el: 8, roll: 0, fov: 30, h: 0.42, ax: 0.5, ay: 0.5, aim: [0, 0, 0], spin: 0.06, tumble: 0, rz: 0, layer: "back", aperture: 0.0008, glass: 0, bright: false },
   { id: "holdEnd", anchor: { pendant: "check" }, fx: 0.5 },
   // 09 The build, in its frame (Liam, 2026-10-18): the pendant flies from the centre hold to the build stage (centred on the
-  // screen when the track pauses there), snaps to the frame's centre, and builds itself, wire to clay to brass, while the
-  // page holds and the scroll runs on (about-pendant.tsx: the pause; build-frame.tsx: the frame). Both keys sit where the
-  // stage is centred; the pause between them drives the build. Big, in front, lit; still turning slowly in place.
-  { id: "build", anchor: { pendant: "buildstage", fallback: "build" }, fx: 0.5, az: -35, el: 12, roll: 0, fov: 30, h: 0.64, ax: 0.5, ay: 0.45, aim: [0, 0, 0], spin: 0.06, lock: null, aperture: 0.0012, wire: 0, ride: 1, settle: 1, layer: "front", bright: true },
+  // screen when the track pauses there) whole, in brass; the moment it snaps to the frame's centre it is the wireframe (the
+  // drawing opens), and it builds itself once, wire to clay to brass, while the page holds and the scroll runs on
+  // (about-pendant.tsx: the pause; build-frame.tsx: the frame). Both keys sit where the stage is centred and are brass:
+  // the build is the pause's alone. Big, in front, lit; still turning slowly in place.
+  { id: "build", anchor: { pendant: "buildstage", fallback: "build" }, fx: 0.5, az: -35, el: 12, roll: 0, fov: 30, h: 0.64, ax: 0.5, ay: 0.45, aim: [0, 0, 0], spin: 0.06, lock: null, aperture: 0.0012, wire: 1, ride: 1, settle: 1, layer: "front", bright: true },
   { id: "buildEnd", anchor: { pendant: "buildstage", fallback: "build" }, fx: 0.5, wire: 1 },
   // 10 Hero: close and low, cut by the left edge, its face turned to the last line (the aim is the face)
   { id: "hero", anchor: "end", fx: 0, az: -62, el: -12, roll: 6, fov: 24, h: 0.97, ax: 0.03, ay: 0.7, aim: [0, 0.02, -0.1], spin: 0, lock: -62, aperture: 0.0016, ride: 0, bright: false,
