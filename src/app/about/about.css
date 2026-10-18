@@ -71,6 +71,13 @@ a.ab-proof:hover, a.ab-proof:focus-visible { color: #f4efe9; }
 .ab[data-mode="stack"] .ab-pendant { position: fixed; top: 0; left: 0; right: auto; bottom: auto; width: 100%; height: 100vh; height: 100lvh; }   /* (the large viewport: a phone's toolbar never resizes it) */
 .ab[data-mode="stack"] .ab-pendant[data-layer="back"] { z-index: -1; }
 
+/* the construction frame round the build (build-frame.tsx, plan 2026-10-18-about-round3 Task 4): hairlines fixed on the
+   screen, above the track's words (1) and behind the pendant's canvas: the same 2 as the canvas in front, and before it in
+   the pin, so the pendant draws over its lines. Never takes the pointer or the focus. The track only: no build shot when
+   stacked. */
+.ab-frame { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; overflow: visible; }
+.ab[data-mode="stack"] .ab-frame { display: none; }
+
 /* the pictures along the track (spec 2026-10-16-about-pictures-design.md §2; the v26 mockup): every one is an .ab-pic, a frame
    (.ab-pic-f) with an optional caption under it. Corners 10px. */
 .ab-pic { display: inline-block; position: relative; vertical-align: top; }
