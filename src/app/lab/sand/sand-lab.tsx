@@ -7,6 +7,7 @@ import { CURSOR_WARM, SAND_LOOK, SandField, type SandState } from "@/three/sand/
 import { PaintField } from "@/three/sand/paint";
 import { HeroOverlay } from "./hero-overlay";
 import { DeskInvite, INVITE, deskWindow, inWindow } from "./desk-invite";
+import { DESK_IN_VIEW, DeskLaptop, goToWork, laptopLive } from "./desk-laptop";
 import { WorkIndex, WorkList, type WorkIndexHandle } from "./work-index";
 import { BakedDesk, releaseDesk, type DeskDownload } from "@/three/sand/baked-desk";
 import { revealAt } from "@/three/sand/screen-reveal";
@@ -72,7 +73,7 @@ const LEAN_DAMP = -Math.log(1 - 0.1) * 60;   // their per-frame 0.1 at 60 fps, a
  * the lens racks focus onto it (the desk through the lens at RACK.fstop); a click brings it to the camera with its story
  * (note-story/), the desk behind it softening (STORY.blur device px) and dimming.
  */
-const NOTES_FROM = BEATS.tilt[0] + 0.3, NOTES_TO = BEATS.tail[0] + 0.5;
+const [NOTES_FROM, NOTES_TO] = DESK_IN_VIEW;
 const RACK = { fstop: 1.4, rate: 7 } as const;
 const STORY = { blur: 14, dim: 0.45, rate: 5 } as const;
 /** The drive's way in (seconds): the glide into the laptop, whose screen shows the playground itself (Liam, 2026-10-15:
@@ -311,6 +312,10 @@ export function SandLab({ hero }: { hero: boolean }) {
       let driveOver = false, driveMounted = false, driveLeft = false;
       let driveArrived = 0;   // (performance.now() when the glide reached the screen)
       let driveScreen: THREE.Texture | null = null;
+      // the laptop: under the pointer while the desk is in view, a click goes to the work as the nav's Projects does
+      // (desk-laptop.ts; Liam, 2026-10-18)
+      let laptop: DeskLaptop | null = null;
+      let laptopOver = false;
       let lastStoryEnd = 0;
       const noteFx = { rack: 0, focus: 1, blur: 0 };
       // the sketches of the work behind the desk, seen through the tilt (desk-sketches.ts; Liam, 2026-10-12)
@@ -376,6 +381,7 @@ export function SandLab({ hero }: { hero: boolean }) {
         notes = deskNotes;
         drive = new DeskDrive(d.group);
         (window as unknown as { __drive?: unknown }).__drive = drive;   // lab debugging
+        laptop = new DeskLaptop(d.group);
         new THREE.TextureLoader().loadAsync("/playground/playground-screen.jpg").then((t) => {
           // (the desk's convention: the screen's uv from the glTF, no flip)
           t.colorSpace = THREE.SRGBColorSpace; t.flipY = false; t.anisotropy = 8; driveScreen = t; st.renderer.initTexture(t);
@@ -609,11 +615,29 @@ export function SandLab({ hero }: { hero: boolean }) {
           holdScroll(false);
         });
       };
+      // the laptop (desk-laptop.ts): the desk in view and nothing else going on; motion reduced too (it only scrolls)
+      const laptopOn = () => laptopLive({
+        hero, ready: !!laptop?.ready, p: progressRef.current,
+        loader: loaderClock !== null || waitingForBrief, brief: deskWaiting || briefReturnA > 0,
+        storyOpen, driveMounted, snapping,
+        gliding: jumpingSince >= 0 && performance.now() - jumpingSince < 1700,   // (the anchor's 1.5 s glide)
+        veiled: veilA > 0.05,
+      });
+      const laptopAt = (x: number, y: number) => !!laptop && laptop.hit(new THREE.Vector2((x / (canvas.clientWidth || 1)) * 2 - 1, 1 - (y / (canvas.clientHeight || 1)) * 2), stage!.camera);
+      (window as unknown as { __laptop?: unknown }).__laptop = { live: laptopOn, at: laptopAt, over: () => laptopOver };   // (the e2e and lab debugging)
       on("click", ((e: MouseEvent) => {
-        if (!notesLive() || (e.target as Element | null)?.closest?.("a, button, input, textarea, select, [role=dialog]")) return;
-        const name = pickAt(e.clientX, e.clientY);
-        if (name) openStory(name);
-        else if (driveAt(e.clientX, e.clientY)) mountDrive();
+        if ((e.target as Element | null)?.closest?.("a, button, input, textarea, select, [role=dialog]")) return;
+        // a note first, then the drive (each in front of the laptop where they overlap), then the laptop
+        if (notesLive()) {
+          const name = pickAt(e.clientX, e.clientY);
+          if (name) { openStory(name); return; }
+          if (driveAt(e.clientX, e.clientY)) { mountDrive(); return; }
+        }
+        if (laptopOn() && laptopAt(e.clientX, e.clientY)) {
+          laptopOver = false;
+          document.documentElement.style.cursor = "";
+          goToWork();   // (the nav's own anchor: its click sets jumpingSince above, Lenis glides)
+        }
       }) as EventListener);
       const driveAt = (x: number, y: number) => !!drive?.ready && drive.hit(new THREE.Vector2((x / (canvas.clientWidth || 1)) * 2 - 1, 1 - (y / (canvas.clientHeight || 1)) * 2), stage!.camera) !== null;
       const mountDrive = () => {
@@ -737,7 +761,9 @@ export function SandLab({ hero }: { hero: boolean }) {
         // the desk's invitation: idle on the desk (settled over it, the lid still shut), nothing else going on
         if (Math.abs(window.scrollY - inviteY) > 0.5) invite.poke();
         inviteY = window.scrollY;
-        // (a note or the drive under the pointer, last frame: activity, so it doesn't slide under the cursor)
+        // (a note or the drive under the pointer, last frame: activity, so it doesn't slide under the cursor. The laptop
+        // isn't: it fills the middle of the view, where a resting pointer often lies, and counting it would keep the cue
+        // from the very visitors it's for; the tease's few degrees and centimetres never take it from under the pointer)
         if (fadeClock === null && !reduced) veilA = 0;
         invite.step(dt,
           hero && !!deskSpan && deskLoaded !== null && inWindow(p, deskSpan) && loaderClock === null && !waitingForBrief
@@ -1061,9 +1087,11 @@ export function SandLab({ hero }: { hero: boolean }) {
           const live = notesLive() && pointer.active && !pointer.touch;
           const over = live ? pickAt(pointer.x, pointer.y) : null;
           const overDrive = !over && live && !driveMounted && driveAt(pointer.x, pointer.y);
-          if (over !== hovered || overDrive !== driveOver) {
-            hovered = over; driveOver = overDrive;
-            document.documentElement.style.cursor = over || overDrive ? "pointer" : "";
+          // the laptop: a hand over it, nothing more (no lift, no rack: the click is the nav's)
+          const overLaptop = !over && !overDrive && pointer.active && !pointer.touch && laptopOn() && laptopAt(pointer.x, pointer.y);
+          if (over !== hovered || overDrive !== driveOver || overLaptop !== laptopOver) {
+            hovered = over; driveOver = overDrive; laptopOver = overLaptop;
+            document.documentElement.style.cursor = over || overDrive || overLaptop ? "pointer" : "";
           }
           notes.update(storyOpen ? null : hovered, dt);
           if (hovered) noteFx.focus = notes.depth(hovered, stage!.camera) ?? noteFx.focus;
