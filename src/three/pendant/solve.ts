@@ -20,7 +20,7 @@ import { Object3D, PerspectiveCamera } from "three";
 import { motionMargin, outlineBox, poseRig, reachOf, type Box } from "./camera";
 import { clipBox, findSpot, hits, layerTimeline, padBox, SAME, type Probe, type Sample, type Spot, type TextRect } from "./layout";
 import { REST } from "./motion";
-import { shotAt, shotLayer, variants, type Frame, type Layer, type Shot } from "./shots";
+import { shotAt, shotLayer, smootherstep, variants, type Frame, type Layer, type Shot } from "./shots";
 
 /** Px of travel between samples. */
 export const STEP = 8;
@@ -34,8 +34,12 @@ export const MIN_K = 0.7;
 export const EDGE_LOSS = 0.25;
 /** ...and must leave at least this much of it on screen (else the shot goes behind the words instead). */
 export const MIN_SHOWN = 0.35;
-/** A shot is at rest where its blend is this close to it (smoothstep t at or below this, or at or above 1 minus it). */
-export const REST_T = 0.02;
+/** A shot is at rest within this share of the travel from its key (on either side): about 8.4% of the gap to the next. */
+export const REST_U = 0.084;
+/** ...which is where the blend (smootherstep t) is this close to it: at or below this, or at or above 1 minus it. (The
+ *  window kept where smoothstep's t 0.02 had it, 2026-10-18: a gentler curve leaves the pose closer to the shot for longer,
+ *  but the stretch the solve clears as the shot at rest stays the same, so no shot's rest gets harder to clear.) */
+export const REST_T = smootherstep(REST_U);
 /** At most this many samples of a rest window are tested (evenly spread, the key always among them). */
 const PROBES = 9;
 /** Brightness of a shot that wanted to be in front but rests behind the words (the tumble's own dim, Liam 2026-10-16). */
@@ -138,6 +142,12 @@ export interface Solved {
    *  line or the chrome: where being behind the words shows, so where the mount's brightness looks ahead to (presence.ts
    *  behindAhead). Each sample's answer holds until the next. */
   over: (s: number) => boolean;
+  /** The same with `lag` (track px: the page's travel minus the pendant's, the follow trailing a scroll): the lines taken
+   *  anywhere between where they are at `s` and where they are `lag` further along. The live pendant is drawn at the eased
+   *  travel while the words ride the page, so during a scroll it meets lines the rest pairing never does, and the live guard
+   *  sends it behind them there; the look ahead counts those too (in a front stretch as well), so the pendant is already
+   *  dimmed when it gets there. (A pendant aimed at the glass rides partly with the page: its shift is inside that range.) */
+  overLagging: (s: number, lag: number) => boolean;
   /** The front shots whose rest was changed: the alternate used (0 = as written) and the spot. */
   moved: { id: string; alt: number; dx: number; dy: number; k: number }[];
   /** The front shots that rest behind the words on this screen (nothing within the limits clears them). */
@@ -180,7 +190,8 @@ export function solve(input: SolveInput): Solved {
   const sample = (s: number, shots: readonly Shot[], spots: readonly Spot[]): At => {
     const f = shotAt(s, keys, shots, at(s));
     applySpot(f, spots);
-    const locked = f.lock !== null;
+    // (a lock easing in or out counts once it holds at least half: where the old switch at the blend's halfway point had it)
+    const locked = f.lock !== null && f.lockMix >= 0.5;
     const pts = locked ? outline.all : outline.ring;
     const pitches = f.tumble > TUMBLE_OFF ? PITCHES : [0];
     let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
@@ -243,16 +254,29 @@ export function solve(input: SolveInput): Solved {
   const samples: Sample[] = final.map((a) => ({ s: a.s, wanted: shotLayer(a.f, shots), box: clipBox(padBox(a.box, a.pad), vw, vh) }));
   const layer = layerTimeline(samples, texts, fixed);
   const xs2 = final.map((a) => a.s);
-  const tight = final.map((a) => hits(clipBox(padBox(a.box, PAD / 2), vw, vh), texts, a.s, fixed) > 0);
-  const over = (s: number): boolean => {
-    if (xs2.length === 0) return false;
+  const tightBox = final.map((a) => clipBox(padBox(a.box, PAD / 2), vw, vh));
+  const tight = final.map((a, j) => hits(tightBox[j], texts, a.s, fixed) > 0);
+  /** The sample holding at `s` (each holds until the next; before the first, the first). */
+  const sampleAt = (s: number): number => {
     let lo = 0, hi = xs2.length - 1;
-    if (s <= xs2[0]) return tight[0];
+    if (s <= xs2[0]) return 0;
     while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (xs2[mid] <= s) lo = mid; else hi = mid - 1; }
-    return tight[lo];
+    return lo;
+  };
+  const over = (s: number): boolean => xs2.length > 0 && tight[sampleAt(s)];
+  const textsX = texts.filter((x) => x.axis !== "y"), textsY = texts.filter((x) => x.axis === "y");
+  const overLagging = (s: number, lag: number): boolean => {
+    if (xs2.length === 0) return false;
+    const j = sampleAt(s), b = tightBox[j];
+    if (tight[j] || lag === 0) return tight[j];
+    if (b.r <= b.l || b.b <= b.t) return false; // (off screen)
+    // lines `lag` further along sit `lag` back on screen: the box swept `lag` forward meets every one in between
+    const alongX = { ...b, l: Math.min(b.l, b.l + lag), r: Math.max(b.r, b.r + lag) };
+    const alongY = { ...b, t: Math.min(b.t, b.t + lag), b: Math.max(b.b, b.b + lag) };
+    return hits(alongX, textsX, xs2[j]) > 0 || hits(alongY, textsY, xs2[j]) > 0;
   };
   const behind = input.shots
     .filter((sh, i) => sh.layer === "front" && keys[i] >= 0 && keys[i] <= travel && (unsolved.includes(i) || layer(keys[i]) === "back"))
     .map((sh) => sh.id);
-  return { shots, spots, layer, over, moved, behind };
+  return { shots, spots, layer, over, overLagging, moved, behind };
 }

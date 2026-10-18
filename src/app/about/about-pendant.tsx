@@ -63,6 +63,10 @@ export interface PendantHook {
   opacity: number;
   /** Whether FXAA runs (the pixel ratio drawn is under the screen's own). */
   fxaa: boolean;
+  /** Diagnostics, only with ?pendant-debug (the motion meter, scripts/about/pendant-motion.cjs): the frame's number, the
+   *  travel and blend it was drawn at, the pendant's middle on screen (shares of the width and height), its height (share
+   *  of the screen's) and its roll on screen (degrees clockwise: the camera's roll, the shot's lay and the lean). */
+  pose?: { n: number; s: number; index: number; t: number; cx: number; cy: number; h: number; roll: number };
 }
 
 declare global {
@@ -78,8 +82,9 @@ declare global {
   }
 }
 
-/** The scroll follow: what is left of the gap after one second (pendant-film-v3: a soft follow, like Lenis). */
-const FOLLOW = 0.0008;
+/** The scroll follow: what is left of the gap after one second. 0.018 is a time constant of about 0.25 s (-1 / ln 0.018), so a
+ *  flick glides rather than whips (Liam, 2026-10-18; pendant-film-v3 had 0.0008, about 0.14 s). Jumps keep their reset. */
+const FOLLOW = 0.018;
 /** A frame never steps more than this (s): a tab coming back doesn't jump the motion. */
 const DT_MAX = 0.05;
 /** The cursor's lean (radians at the screen's edge) and its ease per frame (Lusion's values). */
@@ -298,6 +303,8 @@ export function AboutPendant() {
       layer: null as ((s: number) => Layer) | null,
       /** ...and where the pendant at rest is over a line (solve.ts `over`: what the brightness looks ahead to). */
       over: null as ((s: number) => boolean) | null,
+      /** ...and the same with the words a scroll's lag further along (solve.ts `overLagging`). */
+      overLagging: null as ((s: number, lag: number) => boolean) | null,
     };
     /** The shots for the layout: the track's, or the stack's. */
     const baseShots = () => (L.mode === "stack" ? SHOTS_STACK : SHOTS);
@@ -364,6 +371,7 @@ export function AboutPendant() {
         L.spots = [];
         L.layer = null;
         L.over = null;
+        L.overLagging = null;
         first = true;
         jumped = true;
         held = -1;
@@ -509,6 +517,7 @@ export function AboutPendant() {
       L.spots = solved.spots;
       L.layer = solved.layer;
       L.over = solved.over;
+      L.overLagging = solved.overLagging;
       jumped = true; // (new rest spots: the pose may step)
       hook.solve = { moved: solved.moved, behind: solved.behind };
     };
@@ -623,7 +632,7 @@ export function AboutPendant() {
         f.ay += OUT_SINK * o;
       }
       motion = stepMotion(motion, {
-        dt, spin: f.spin, tumble: f.tumble, lock: f.lock, scrollVel: vel, dragging: drag !== null, dragDX, dragDY, reduced,
+        dt, spin: f.spin, tumble: f.tumble, lock: f.lock, lockMix: f.lockMix, scrollVel: vel, dragging: drag !== null, dragDX, dragDY, reduced,
       });
       dragDX = dragDY = 0;
       // the cursor's lean (stacked there is no cursor to follow: it rests)
@@ -642,6 +651,7 @@ export function AboutPendant() {
       // (through a drawn ball the lean is eased down: the ball magnifies it and turns it over, see PendantScene.glassLook)
       leanFor(look, glass !== null, f.glass, sc.glassLook, leaned);
       cm.poseRig(f, motion, time, leaned, L.vw, L.vh, sc.camera, sc.outer, sc.inner, { still: reduced });
+      const mid = debug ? cm.screenCentre(sc.inner, sc.camera) : null; // (diagnostics: the motion meter's, below)
       const wireBox = outline?.hull.length
         ? cm.outlineBox(outline.hull, sc.inner, sc.camera, L.vw, L.vh)
         : cm.screenBox(sc.bounds, sc.inner, sc.camera, L.vw, L.vh);
@@ -698,9 +708,12 @@ export function AboutPendant() {
       // (Held still under reduced motion, nothing travels: no look ahead.)
       const lag = sTarget - sSm, dir = Math.sign(vel) || Math.sign(lag);
       const lead = Math.min(Math.abs(lag) + Math.abs(vel) * AHEAD_T, stack ? L.vh : L.vw);
-      const layerAt = L.layer, overAt = L.over;
+      // (and during a scroll the words ride the page while the pendant trails it by the lag: where that brings it onto a line
+      // the live guard sends it behind, so those count wherever the solve has it. At rest there is no lag, and the front is
+      // clear of every line, so only the solve's own spells behind over a line count.)
+      const layerAt = L.layer, overAt = L.over, overLag = L.overLagging;
       const ahead = !reduced && forcedLayer === undefined && layerAt !== null && overAt !== null
-        && behindAhead((x) => layerAt(x) === "back" && overAt(x), sAt, lead, dir);
+        && behindAhead((x) => (layerAt(x) === "back" && overAt(x)) || (lag !== 0 && overLag !== null && overLag(x, lag)), sAt, lead, dir);
       // (stacked, the opening coming in is unseen until the layers have it in front, then fades in: it arrives at full
       // brightness, never dimmed for the moment it was behind unseen)
       const opening = stack && (reduced ? held === 0 : f.index === 0 && f.t < 0.5);
@@ -757,6 +770,7 @@ export function AboutPendant() {
       hook.goal = presence.goal ?? layer;
       hook.box = drawnBox;
       hook.yaw = motion.yaw;
+      if (mid) hook.pose = { n: tag, s: sAt, index: f.index, t: f.t, cx: mid.x, cy: mid.y, h: f.h, roll: f.roll + f.rz - motion.tilt / (Math.PI / 180) };
       hook.dragging = drag !== null;
       hook.glass = glass && { x: glass.x, y: glass.y, r: glass.r };
       if (!hook.ready) { hook.ready = true; canvas.dataset.ready = ""; }

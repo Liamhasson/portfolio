@@ -24,6 +24,8 @@ export interface MotionInput {
   spin: number;
   tumble: number;
   lock: number | null;
+  /** How strongly the lock holds, 0..1 (shots.ts Frame `lockMix`: it eases in and out with the blend); 1 when left out. */
+  lockMix?: number;
   /** Scroll speed in track px per second. */
   scrollVel: number;
   dragging: boolean;
@@ -72,11 +74,13 @@ export function stepMotion(s: MotionState, i: MotionInput): MotionState {
   let handVel = s.handVel * HAND_DECAY ** dt;
   let handPitch = s.handPitch * HAND_PITCH_DECAY ** dt;
 
-  // a lock pulls the nearest equivalent angle of that face to the camera, unless a hand is on it
-  if (i.lock !== null && !dragging) {
-    const target = i.lock * D;
-    const k = Math.round((yaw - target) / TAU);
-    yaw += (target + k * TAU - yaw) * (1 - LOCK_EASE ** dt);
+  // a lock pulls the nearest equivalent angle of that face to the camera, unless a hand is on it. The pull goes as the sine
+  // of the gap: the same as the gap itself near the face, and smooth all the way round, so a pendant still spinning past
+  // the face (a lock easing in under a fast scroll's push) is slowed and sped evenly, never kicked where the nearest
+  // equivalent flips over at half a turn. Scaled by the lock's strength, which eases in and out with the blend.
+  const mix = i.lockMix === undefined ? 1 : clamp(i.lockMix, 0, 1);
+  if (i.lock !== null && !dragging && mix > 0) {
+    yaw += Math.sin(i.lock * D - yaw) * (1 - LOCK_EASE ** dt) * mix;
   }
 
   // end over end, and righting itself to the nearest whole turn once it stops

@@ -2,8 +2,9 @@
 /**
  * The pendant's shots (spec 2026-10-16-about-pendant-design.md §3): a camera filming the brass pendant through About's
  * sideways track. A shot is fully on when its anchor's centre reaches `fx` of the screen's width; between two shots every
- * value blends (smoothstep; size in log space) so the camera is always moving. Pure data and maths: no DOM, no three.js,
- * so the camera, the motion and the mount can all lean on it and the numbers can be tuned on Liam's screens in one place.
+ * value blends (smootherstep; size in log space; a locked face on the circle) so the camera is always moving. Pure data and
+ * maths: no DOM, no three.js, so the camera, the motion and the mount can all lean on it and the numbers can be tuned on
+ * Liam's screens in one place.
  * The values are the working prototype's (pendant-film-v3), with its "ball" renamed "glass" and its aims moved to mid-height.
  */
 export type Layer = "front" | "back";
@@ -66,11 +67,15 @@ export type ShotChange = Partial<Omit<Shot, "id" | "anchor" | "alt">>;
 /** What the camera and the pendant do at one scroll position: the blend of the two shots around it. */
 export interface Frame extends Omit<Shot, "id" | "anchor" | "fx" | "ax" | "ay" | "alt" | "layer"> {
   /** The earlier of the two shots (the last shot's own index once past the end). The shot currently showing is
-   *  `t >= 0.5 ? index + 1 : index`, the same halfway point where `lock` switches. (No layer: the mount takes it from the
-   *  readability solve's timeline plus its live guard, presence.ts; the solve reads the shots' own with `shotLayer`.) */
+   *  `t >= 0.5 ? index + 1 : index`. (No layer: the mount takes it from the readability solve's timeline plus its live
+   *  guard, presence.ts; the solve reads the shots' own with `shotLayer`.) */
   index: number;
   /** 0..1 eased progress from that shot to the next. */
   t: number;
+  /** How strongly `lock` holds, 0..1 (motion.ts scales its pull by it): 1 where both shots lock (the angle then blends on the
+   *  shortest arc), easing with `t` from 0 to 1 into a locked shot and from 1 to 0 out of one, 0 where neither locks (`lock`
+   *  null). So the face settles to the camera, or lets go into a spin, gradually: it never snaps. */
+  lockMix: number;
   ax: number;
   ay: number;
 }
@@ -174,9 +179,15 @@ export function heldIndex(held: number, s: number, keys: readonly number[], past
 }
 
 const clamp = (v: number, a: number, b: number) => Math.min(Math.max(v, a), b);
-const smoothstep = (t: number) => t * t * (3 - 2 * t);
+/** 6t^5 - 15t^4 + 10t^3: zero speed and zero acceleration at both keys, so a shot is left and reached without a kick (Liam,
+ *  2026-10-18: "some motions between sections are a bit hectic and not smooth"). */
+export const smootherstep = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
 /** Exact at both ends, so a frame at a key is that shot to the last digit. */
 const lerp = (a: number, b: number, t: number) => (t <= 0 ? a : t >= 1 ? b : a + (b - a) * t);
+/** The shortest way round from angle `a` to `b` (degrees), in [-180, 180). */
+const arc = (a: number, b: number) => ((((b - a) % 360) + 540) % 360) - 180;
+/** An angle (degrees) blended on the shortest arc, exact at both ends. */
+const lerpAngle = (a: number, b: number, t: number) => (t <= 0 ? a : t >= 1 ? b : a + arc(a, b) * t);
 
 /**
  * The scroll position (track px) at which each shot is fully on: key = anchor centre - fx x screen width, clamped to the
@@ -219,9 +230,10 @@ export function solveKeys(shots: readonly Shot[], centreX: (a: Anchor) => number
 }
 
 /**
- * The frame at scroll `s`: the two shots around it, blended by smoothstep (size in log space, so a dolly from macro to wide
- * reads evenly). `lock` can't blend, so it switches at the halfway point. `at` supplies the live screen spots
- * for the "line1" and "glass" aims. Before the first key it is the first shot; past the last it is the last.
+ * The frame at scroll `s`: the two shots around it, blended by smootherstep (size in log space, so a dolly from macro to wide
+ * reads evenly). A face locked in both turns on the shortest arc; into or out of a lock, the lock's strength (`lockMix`)
+ * eases with the blend, so the spin hands over to the held face (and back) without a snap. `at` supplies the live screen
+ * spots for the "line1" and "glass" aims. Before the first key it is the first shot; past the last it is the last.
  */
 export function shotAt(
   s: number, keys: readonly number[], shots: readonly Shot[], at: { line1: number; glass: { x: number; y: number }; line1Y?: number },
@@ -232,13 +244,15 @@ export function shotAt(
   const A = shots[i];
   const B = shots[Math.min(i + 1, last)];
   const span = i >= last ? 0 : keys[i + 1] - keys[i];
-  const t = i >= last ? 1 : smoothstep(span > 0 ? clamp((s - keys[i]) / span, 0, 1) : 1);
+  const t = i >= last ? 1 : smootherstep(span > 0 ? clamp((s - keys[i]) / span, 0, 1) : 1);
   const x = (v: ScreenX) => (v === "line1" ? at.line1 : v === "glass" ? at.glass.x : v);
   const y = (v: ScreenY) => (v === "glass" ? at.glass.y : v === "line1" ? at.line1Y ?? 0.5 : v);
-  const pick = <T,>(a: T, b: T) => (t < 0.5 ? a : b);
+  const lock = A.lock !== null && B.lock !== null ? lerpAngle(A.lock, B.lock, t) : B.lock ?? A.lock;
+  const lockMix = A.lock !== null && B.lock !== null ? 1 : B.lock !== null ? t : A.lock !== null ? 1 - t : 0;
   return {
     index: i,
     t,
+    lockMix,
     az: lerp(A.az, B.az, t),
     el: lerp(A.el, B.el, t),
     roll: lerp(A.roll, B.roll, t),
@@ -250,7 +264,7 @@ export function shotAt(
     spin: lerp(A.spin, B.spin, t),
     tumble: lerp(A.tumble, B.tumble, t),
     rz: lerp(A.rz, B.rz, t),
-    lock: pick(A.lock, B.lock),
+    lock,
     dim: lerp(A.dim, B.dim, t),
     aperture: lerp(A.aperture, B.aperture, t),
     glass: lerp(A.glass, B.glass, t),

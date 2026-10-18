@@ -166,3 +166,13 @@ export function motionMargin(fov: number, reach: number, vh: number, lookMax: nu
 export function reachOf(box: Box, cx: number, cy: number): number {
   return Math.hypot(Math.max(Math.abs(box.l - cx), Math.abs(box.r - cx)), Math.max(Math.abs(box.t - cy), Math.abs(box.b - cy)));
 }
+
+const mid = new Vector3();
+/** The pendant's own middle (its origin, at mid-height: what spins and tumbles about it stays put) on screen, as shares of
+ *  the width and height. Call after `poseRig`. Diagnostics: the motion meter (scripts/about/pendant-motion.cjs) reads it. */
+export function screenCentre(inner: Object3D, camera: PerspectiveCamera): { x: number; y: number } {
+  mid.set(0, 0, 0);
+  inner.localToWorld(mid);
+  mid.project(camera);
+  return { x: (mid.x + 1) / 2, y: (1 - mid.y) / 2 };
+}

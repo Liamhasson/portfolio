@@ -1,6 +1,7 @@
 // src/three/pendant/shots.test.ts
 import { describe, expect, it, test } from "vitest";
-import { heldIndex, HOLD_PAST, SHOTS, SHOTS_STACK, shotAt, shotLayer, solveKeys, variants, type Anchor, type Shot } from "./shots";
+import { REST, stepMotion, type MotionState } from "./motion";
+import { heldIndex, HOLD_PAST, SHOTS, SHOTS_STACK, shotAt, shotLayer, smootherstep, solveKeys, variants, type Anchor, type Shot } from "./shots";
 
 const VW = 1440;
 const TRAVEL = 9000;
@@ -193,17 +194,44 @@ describe("shotAt", () => {
   test("blends size in log space", () => {
     const a = { ...SHOTS[0], h: 0.2 };
     const b = { ...SHOTS[1], h: 0.25 };
-    const f = shotAt(50, [0, 100], [a, b], AT); // t = 0.5, smoothstep 0.5
+    const f = shotAt(50, [0, 100], [a, b], AT); // t = 0.5, smootherstep 0.5
     expect(f.t).toBeCloseTo(0.5, 9);
     expect(f.h).toBeCloseTo(Math.sqrt(0.2 * 0.25), 9);
   });
 
-  test("eases with smoothstep: a quarter of the way is less than a quarter of the blend", () => {
+  test("eases with smootherstep: a quarter of the way is about a tenth of the blend", () => {
     const a: Shot = { ...SHOTS[0], az: 0 };
     const b: Shot = { ...SHOTS[1], az: 100 };
     const f = shotAt(25, [0, 100], [a, b], AT);
-    expect(f.t).toBeCloseTo(0.15625, 9);
-    expect(f.az).toBeCloseTo(15.625, 9);
+    expect(f.t).toBeCloseTo(0.103515625, 9);
+    expect(f.az).toBeCloseTo(10.3515625, 9);
+  });
+
+  test("smootherstep blend has zero slope at both keys", () => {
+    const a: Shot = { ...SHOTS[0], az: 0, h: 0.2 };
+    const b: Shot = { ...SHOTS[1], az: 100, h: 0.8 };
+    const keys = [0, 1000];
+    const at = (s: number) => shotAt(s, keys, [a, b], AT);
+    // the blend's speed (per px of travel) a hair from each key is nothing, and so is its acceleration: 10u^3 near 0
+    const e = 1;
+    expect(at(e).t / e).toBeLessThan(1e-7);
+    expect((1 - at(1000 - e).t) / e).toBeLessThan(1e-7);
+    expect(at(e).az).toBeLessThan(1e-6);
+    expect(100 - at(1000 - e).az).toBeLessThan(1e-6);
+    expect(Math.abs(Math.log(at(e).h / 0.2))).toBeLessThan(1e-7);
+    // the slope builds smoothly from zero: no step at either key, and at most 15/8 of the even pace in the middle
+    let prev = at(0).t, maxStep = 0, first = Infinity;
+    for (let s = 1; s <= 1000; s++) {
+      const t = at(s).t;
+      maxStep = Math.max(maxStep, t - prev);
+      if (s === 1) first = t - prev;
+      prev = t;
+    }
+    expect(first).toBeLessThan(1e-8);
+    expect(maxStep).toBeLessThanOrEqual((15 / 8) / 1000 + 1e-9);
+    expect(smootherstep(0)).toBe(0);
+    expect(smootherstep(1)).toBe(1);
+    expect(smootherstep(0.5)).toBe(0.5);
   });
 
   test("blends the aim component by component", () => {
@@ -241,17 +269,109 @@ describe("shotAt", () => {
     expect(f.ay).toBeCloseTo((AT.glass.y + 0.13) / 2, 9);
   });
 
-  test("lock switches at the halfway point, and so does the shots' own layer (shotLayer, what the solve starts from)", () => {
+  test("the shots' own layer (shotLayer, what the solve starts from) switches at the halfway point; the lock eases in with t", () => {
     const a: Shot = { ...SHOTS[0], layer: "front", lock: null };
     const b: Shot = { ...SHOTS[1], layer: "back", lock: -62 };
     const before = shotAt(49, [0, 100], [a, b], AT);
     expect(shotLayer(before, [a, b])).toBe("front");
-    expect(before.lock).toBeNull();
+    expect(before.lock).toBe(-62);
+    expect(before.lockMix).toBeCloseTo(before.t, 12);
     const after = shotAt(51, [0, 100], [a, b], AT);
     expect(shotLayer(after, [a, b])).toBe("back");
     expect(after.lock).toBe(-62);
+    expect(after.lockMix).toBeCloseTo(after.t, 12);
+    expect(shotAt(0, [0, 100], [a, b], AT).lockMix).toBe(0);
+    expect(shotAt(100, [0, 100], [a, b], AT).lockMix).toBe(1);
+    // neither locked: no lock at all
+    expect(shotAt(50, [0, 100], [a, { ...b, lock: null }], AT)).toMatchObject({ lock: null, lockMix: 0 });
     // past the last key: the last shot's
     expect(shotLayer(shotAt(500, [0, 100], [a, b], AT), [a, b])).toBe("back");
+    expect(shotAt(500, [0, 100], [a, b], AT)).toMatchObject({ lock: -62, lockMix: 1 });
+  });
+
+  /** Steps the motion through a blend from shot a to shot b over `seconds` of 1/60 s frames at an even pace, and returns the
+   *  yaw (radians) of every frame. */
+  const ride = (a: Shot, b: Shot, seconds: number, from: MotionState = REST, scrollVel = 0) => {
+    const n = Math.round(seconds * 60), keys = [0, n];
+    let m = from;
+    const yaws: number[] = [m.yaw];
+    for (let k = 0; k <= n + 60; k++) {
+      const f = shotAt(k, keys, [a, b], AT);
+      m = stepMotion(m, { dt: 1 / 60, spin: f.spin, tumble: f.tumble, lock: f.lock, lockMix: f.lockMix, scrollVel, dragging: false, dragDX: 0, dragDY: 0, reduced: false });
+      yaws.push(m.yaw);
+    }
+    return yaws;
+  };
+  const maxJerk = (yaws: number[]) => {
+    let worst = 0;
+    for (let k = 2; k < yaws.length; k++) worst = Math.max(worst, Math.abs(yaws[k] - 2 * yaws[k - 1] + yaws[k - 2]));
+    return worst;
+  };
+
+  test("lock blends on the shortest arc and never jumps between two frames", () => {
+    const D = Math.PI / 180;
+    const a: Shot = { ...SHOTS[0], lock: 170, spin: 0 };
+    const b: Shot = { ...SHOTS[1], lock: -170, spin: 0 };
+    // the frame's angle: through 180 (20 degrees round), never back through 0 (340 degrees), exact at both keys. (An angle:
+    // compared on the circle, where 190 is -170.)
+    const round = (d: number) => ((((d % 360) + 540) % 360) - 180);
+    const keys = [0, 10_000];
+    let prev = shotAt(0, keys, [a, b], AT).lock as number, maxStep = 0, far = 0;
+    expect(prev).toBe(170);
+    for (let s = 1; s <= 10_000; s++) {
+      const f = shotAt(s, keys, [a, b], AT);
+      expect(f.lockMix).toBe(1);
+      const lock = f.lock as number;
+      maxStep = Math.max(maxStep, Math.abs(round(lock - prev)));
+      far = Math.max(far, Math.abs(round(lock - 170)));
+      prev = lock;
+    }
+    expect(prev).toBe(-170);
+    expect(far).toBeLessThanOrEqual(20 + 1e-9);
+    expect(maxStep).toBeLessThanOrEqual((20 * 15) / 8 / 10_000 + 1e-9); // (smootherstep's steepest: 15/8 of the even pace)
+    // the hero's own pair (its mirror): -62 to 62 the short way, through 0
+    expect(shotAt(5000, keys, [{ ...a, lock: -62 }, { ...b, lock: 62 }], AT).lock).toBeCloseTo(0, 9);
+    // the rendered yaw, settled on the first face and turned to the second over one second: it follows the arc, every frame
+    // a small step from the last (no frame more than 0.5 degrees from where the last one's pace would put it)
+    const yaws = ride(a, b, 1, { ...REST, yaw: 170 * D });
+    let worstStep = 0;
+    for (let k = 1; k < yaws.length; k++) worstStep = Math.max(worstStep, Math.abs(yaws[k] - yaws[k - 1]));
+    expect(worstStep).toBeLessThan(1 * D);
+    expect(maxJerk(yaws)).toBeLessThan(0.5 * D);
+    const end = yaws[yaws.length - 1];
+    expect(Math.abs(Math.atan2(Math.sin(end - -170 * D), Math.cos(end - -170 * D)))).toBeLessThan(3 * D);
+    expect(Math.abs(end - 190 * D)).toBeLessThan(3 * D); // (it went the short way: on past 180, not back round through 0)
+  });
+
+  test("a shot with no lock eases out of a locked one", () => {
+    const D = Math.PI / 180;
+    const locked: Shot = { ...SHOTS[0], lock: -62, spin: 0 };
+    const free: Shot = { ...SHOTS[1], lock: null, spin: 0.3 };
+    // the lock's strength falls from 1 to 0 with the blend, smoothly, never at a step
+    const keys = [0, 1000];
+    let prev = 1;
+    for (let s = 0; s <= 1000; s++) {
+      const f = shotAt(s, keys, [locked, free], AT);
+      expect(f.lock).toBe(-62);
+      expect(f.lockMix).toBeCloseTo(1 - f.t, 12);
+      expect(prev - f.lockMix).toBeLessThanOrEqual((15 / 8) / 1000 + 1e-9);
+      prev = f.lockMix;
+    }
+    expect(shotAt(1000, keys, [locked, free], AT).lockMix).toBe(0);
+    // ridden at a brisk scroll (its push turning it too), held at the face then let go into the spin: the yaw's pace changes
+    // a little each frame, never kicked (the old switch at the halfway point dropped the hold in one frame)
+    for (const scrollVel of [0, 1500]) {
+      const yaws = ride(locked, free, 0.6, { ...REST, yaw: -62 * D }, scrollVel);
+      expect(maxJerk(yaws)).toBeLessThan(0.5 * D);
+      // and it ends turning at the free shot's own pace (plus the push)
+      const pace = (yaws[yaws.length - 1] - yaws[yaws.length - 2]) * 60;
+      expect(pace).toBeCloseTo(0.3 * 2 * Math.PI + scrollVel * 0.0016, 6);
+    }
+    // the way in, too: a spinning pendant settles to the face without a kick, even while a fast scroll still pushes it round
+    for (const scrollVel of [0, 1500]) {
+      const yaws = ride(free, locked, 0.6, REST, scrollVel);
+      expect(maxJerk(yaws)).toBeLessThan(0.5 * D);
+    }
   });
 });
 
