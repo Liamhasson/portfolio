@@ -66,7 +66,8 @@ test("stopped on the desk: the tease after 1.5 s, the text after 3 s; a scroll l
   const neverBack = (frames: Frame[]) => {
     for (let i = 1; i < frames.length; i++) expect(frames[i].toScreen, `frame ${i}`).toBeLessThanOrEqual(frames[i - 1].toScreen + 1e-6);
   };
-  await page.mouse.move(720, 450);
+  // (the pointer on bare wood, bottom left: over a note or the drive, the hover would ease the lean back by design)
+  await page.mouse.move(60, 860);
   await record(70);   // (~1.2 s: under the 1.5 s after which the tease would return)
   await page.mouse.wheel(0, 60);
   await expect(cue).toHaveCSS("opacity", "0", { timeout: 2000 });

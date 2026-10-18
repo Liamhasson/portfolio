@@ -72,12 +72,15 @@ export class DeskInvite {
   private reduced = false;
   /** scrolling down, the lean is held: it gives way only as fast as the path moves past it, never below the spring */
   private holding = false;
+  /** Poked since the last lean step: a frame where the page hasn't moved yet holds the lean instead of easing it back. */
+  private armed = false;
   /** a note was hovered this frame: a held lean eases back */
   private hovered = false;
 
   /** The visitor scrolled: the clock starts again, the tease eases back, the text goes. */
   poke(): void {
     this.idle = 0;
+    this.armed = true;   // (a wheel can poke a frame before the page moves: see leanStep)
   }
 
   /**
@@ -104,7 +107,9 @@ export class DeskInvite {
    * or a hovered note lets it ease back.
    */
   leanStep(dt: number, forward: number): void {
-    if (this.reduced) { this.cam.x = this.cam.v = 0; this.lean = 0; this.holding = false; return; }
+    if (this.reduced) { this.cam.x = this.cam.v = 0; this.lean = 0; this.holding = false; this.armed = false; return; }
+    // a scroll whose first frame hasn't moved the page yet: hold, so that frame can't step the camera back
+    if (this.armed) { this.armed = false; if (forward === 0 && this.lean > 0 && !this.hovered) this.holding = true; }
     // let go of a held lean: its spring takes over from there, at rest (eased, never cut)
     if (this.holding && (forward < 0 || this.hovered || this.want === 1)) {
       this.holding = false;

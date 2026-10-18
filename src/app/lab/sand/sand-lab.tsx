@@ -795,9 +795,9 @@ export function SandLab({ hero }: { hero: boolean }) {
           if (leanTo) {
             leanDir.subVectors(leanTo, v.position);
             const room = leanDir.length();
-            const forward = leanBaseSet && room > 1e-6 && leanUnits > 0 ? leanDir.dot(leanBase.subVectors(v.position, leanBase)) / room / leanUnits : 0;
+            const onward = leanBaseSet && room > 1e-6 && leanUnits > 0 ? leanDir.dot(leanBase.subVectors(v.position, leanBase)) / room / leanUnits : 0;
             leanBase.copy(v.position); leanBaseSet = true;
-            inv.leanStep(dt, forward);
+            inv.leanStep(dt, onward);
             if (inv.lean > 0 && room > 1e-6) { inviteDebug.lean = Math.min(inv.lean * leanUnits, room); v.position.addScaledVector(leanDir, inviteDebug.lean / room); }
             inviteDebug.toScreen = leanDir.subVectors(leanTo, v.position).length();
           }

@@ -206,4 +206,15 @@ describe("the idle tease and the cue", () => {
     expect(frame(inv, { reduced: true, veil: 0.3 }).cue).toBe(false);
     expect(frame(inv, { reduced: true, veil: 0.04 }).cue).toBe(true);
   });
+
+  test("a poke whose frame hasn't moved the page yet holds the lean (no step back on a wheel's lead frame)", () => {
+    const inv = new DeskInvite();
+    run(inv, 3, {});                       // idle on the desk: the tease and the lean at their peak
+    const before = inv.lean;
+    expect(before).toBeGreaterThan(0.9);
+    inv.poke();
+    inv.step(1 / 60, true, false, false, 0);
+    inv.leanStep(1 / 60, 0);               // the wheel's lead frame: the page hasn't moved
+    expect(inv.lean).toBe(before);
+  });
 });
