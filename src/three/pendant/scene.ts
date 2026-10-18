@@ -26,6 +26,7 @@ import {
 } from "three";
 import type { BufferGeometry, Material, Texture } from "three";
 import type { GlassLight } from "@/lib/about-glass";
+import type { GlassRipple } from "@/three/edge-light/field";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
@@ -103,6 +104,9 @@ export class PendantScene {
    *  down and GLASS_MAG times larger, so at 1 / GLASS_MAG its image swings as far as the pendant leans anywhere else (the
    *  full lean would swing it into the ball's rim). The mount blends to this by the shot's `glass`. */
   readonly glassLook = 1 / GLASS_MAG;
+  /** The water under the cursor (field.ts RIPPLE_GLSL), read each frame the ball is drawn: the mount hands its source
+   *  (app/about/glass-pointer.ts); null for none. */
+  ripple: (() => Readonly<GlassRipple>) | null = null;
 
   private readonly renderer: WebGLRenderer;
   private readonly composer: EffectComposer;
@@ -584,6 +588,11 @@ export class PendantScene {
     u.A.value = light ? Math.min(1, Math.max(0, light.q)) : 0;
     u.T.value = light ? light.t : 0;
     u.PAD.value = Math.min(50, Math.min(this.vw, this.vh) * 0.1) * this.dpr;
+    // the water under the cursor, as the light's own ball has it (the same rings, the same lean): disc units, so only the
+    // ball's radius on this canvas is ours
+    const w = this.ripple?.();
+    if (w) { u.RW.value.set(w.waves); u.RB.value.set(w.lean[0], w.lean[1], glass.r * H); }
+    else { u.RW.value.fill(0); u.RB.value.set(0, 0, glass.r * H); }
   }
 
   /**

@@ -1,7 +1,7 @@
 // src/three/pendant/glass.test.ts
 import { describe, expect, it } from "vitest";
 import { distanceFor } from "./camera";
-import { EDGE_COLOURS } from "@/three/edge-light/field";
+import { EDGE_COLOURS, RIPPLE_GLSL, RIPPLE_MAX, RIPPLE_UNIFORMS } from "@/three/edge-light/field";
 import { GLASS_FINISH_FRAGMENT, GLASS_FRAGMENT, GLASS_IOR, GLASS_MAG, glassAt, glassCone, glassFinishMaterial, glassMaterial } from "./glass";
 
 const D2R = Math.PI / 180;
@@ -162,4 +162,24 @@ it("glassCone writes into `out` when given and returns it: the same cone as a fr
     expect(out.dir).toBe(dir);
     expect(out).toEqual(glassCone(x, y, r));
   }
+});
+
+describe("the water under the cursor (round 3, Task 5)", () => {
+  it("both glass passes take the shared water (field.ts RIPPLE_GLSL): the same rings and lean objects, the sphere grown by the lean, the normal tilted by the rings", () => {
+    const glass = glassMaterial();
+    const fin = glassFinishMaterial(glass.uniforms);
+    for (const src of [GLASS_FRAGMENT, GLASS_FINISH_FRAGMENT]) {
+      expect(src).toContain(RIPPLE_UNIFORMS);
+      expect(src).toContain(RIPPLE_GLSL);
+      expect(src).toContain("float rad = radius * ( 1.0 + rippleBulge( normalize( q + 1e-5 ) ) );");
+      expect(src).toMatch(/clamp\( \( rad - near \)/);
+      expect(src).toContain("rippleSlope( q )");
+    }
+    expect(GLASS_FRAGMENT).toContain("vec3 n1 = normalize( normalize( p1 - centre ) - mat3( camWorld ) * vec3( g, 0.0 ) );");
+    expect(glass.uniforms.RW.value).toHaveLength(RIPPLE_MAX * 4);
+    expect(fin.uniforms.RW).toBe(glass.uniforms.RW);
+    expect(fin.uniforms.RB).toBe(glass.uniforms.RB);
+    fin.dispose();
+    glass.dispose();
+  });
 });

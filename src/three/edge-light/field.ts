@@ -115,3 +115,130 @@ vec3 lampTint(vec3 glass, vec2 fd, vec2 BC) {
   return mix(vec3(1.), ec * .6 + .4, .35 * A * smoothstep(.15, .6, lamp));
 }
 `;
+
+// ---------- the glass ball under the cursor (About round 3, Task 5; Liam 2026-10-18 item 6) ----------
+// Water rings spread across the glass from the cursor (or a tap), and the outline leans a little toward the cursor, settling
+// back like liquid when it leaves. Both balls (the pendant's, pendant/glass.ts; the light's own, testimonials-light.ts) take
+// RIPPLE_GLSL and these numbers, so they ripple alike. Everything is in disc units: a point's offset from the ball's centre
+// on screen over its radius on screen, y up (as gl_FragCoord). app/about/glass-pointer.ts keeps the rings and the lean.
+
+/** At most this many rings at once (the shader's array). */
+export const RIPPLE_MAX = 4;
+/** A ring is gone this long after it starts (s). */
+export const RIPPLE_LIFE = 1.5;
+/** How fast a ring's crest travels outward (disc radii per second): across the whole ball in about its life. */
+export const RIPPLE_SPEED = 1.3;
+/** The wave number of a ring's crests (radians per disc radius): a wavelength of 0.3 r. */
+export const RIPPLE_K = (2 * Math.PI) / 0.3;
+/** A ring's width: its crests sit under a gaussian this wide (disc radii) round the travelling front. */
+export const RIPPLE_W = 0.2;
+/** A ring's height at its start (disc radii): small, it shows through the slope it gives the surface. */
+export const RIPPLE_AMP = 0.007;
+/** Toward the rim the glass bends hardest, so a tilt there pulls in what lies far off (bits of the pendant torn loose):
+ *  from RIPPLE_RIM0 of the radius out to the rim the slope eases down to RIPPLE_RIM_KEEP of itself. */
+export const RIPPLE_RIM0 = 0.7;
+export const RIPPLE_RIM_KEEP = 0.5;
+/** The most the rings together tilt the surface (slope): where rings cross, or several start close together while the cursor
+ *  moves, their slopes add, and past about this the pendant seen through them breaks up instead of wobbling. A soft cap:
+ *  one ring alone loses little, a pile of them never goes past it (slopeCap). */
+export const RIPPLE_SLOPE_MAX = 0.1;
+/** How fast a ring dies away (per second, exponential), before it fades out to nothing at RIPPLE_LIFE. */
+export const RIPPLE_DAMP = 1.8;
+/** The outline's most lean toward the cursor, as a share of the radius (Liam: at most 3%). */
+export const RIPPLE_BULGE = 0.03;
+
+const smooth = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+
+/** A ring's strength at `age` seconds (its height is RIPPLE_AMP times this): a quick rise over its first 0.08 s (no pop),
+ *  damped, and faded out to exactly 0 from 1.1 s to RIPPLE_LIFE. 0 before it starts and once it is gone. */
+export function rippleStrength(age: number): number {
+  if (!(age >= 0) || age >= RIPPLE_LIFE) return 0;
+  return smooth(0, 0.08, age) * Math.exp(-RIPPLE_DAMP * age) * (1 - smooth(1.1, RIPPLE_LIFE, age));
+}
+
+/** A ring's height at distance `d` (disc radii) from where it started, for a ring of strength `s` that has travelled
+ *  `age` seconds (mirrors rippleSlope's wave in RIPPLE_GLSL). */
+export function rippleHeight(d: number, age: number, s = rippleStrength(age)): number {
+  const x = d - RIPPLE_SPEED * age;
+  return RIPPLE_AMP * s * Math.exp(-(x * x) / (RIPPLE_W * RIPPLE_W)) * Math.sin(RIPPLE_K * x) * smooth(0, 0.05, d);
+}
+
+/** rippleHeight's slope along the radius (its derivative in d, the origin's softening left out as the shader leaves it
+ *  out): what tilts the surface's normal. Mirrors RIPPLE_GLSL. */
+export function rippleSlope(d: number, age: number, s = rippleStrength(age)): number {
+  const x = d - RIPPLE_SPEED * age, w2 = RIPPLE_W * RIPPLE_W;
+  return RIPPLE_AMP * s * Math.exp(-(x * x) / w2) * (RIPPLE_K * Math.cos(RIPPLE_K * x) - ((2 * x) / w2) * Math.sin(RIPPLE_K * x)) * smooth(0, 0.05, d);
+}
+
+/** The share of the slope kept at `r` (disc radii from the ball's centre): 1 inside RIPPLE_RIM0, down to RIPPLE_RIM_KEEP at
+ *  the rim (smoothstep). Mirrors the end of rippleSlope in RIPPLE_GLSL. */
+export function rimKeep(r: number): number {
+  return 1 - (1 - RIPPLE_RIM_KEEP) * smooth(RIPPLE_RIM0, 1, r);
+}
+
+/** The rings' summed slope `m` (its length), softly capped at RIPPLE_SLOPE_MAX: m / sqrt(1 + (m / max)²). Mirrors the end
+ *  of rippleSlope in RIPPLE_GLSL. */
+export function slopeCap(m: number): number {
+  const u = m / RIPPLE_SLOPE_MAX;
+  return m / Math.sqrt(1 + u * u);
+}
+
+/** The outline's lean at a point of the rim: `c` the cosine between the rim's direction and the lean's, `m` the lean's
+ *  length (0..1). As a share of the radius: RIPPLE_BULGE m c³ on the side facing the cursor, nothing on the far half.
+ *  Mirrors rippleBulge in RIPPLE_GLSL. */
+export function rimBulge(c: number, m: number): number {
+  const k = Math.max(c, 0);
+  return RIPPLE_BULGE * Math.min(Math.max(m, 0), 1) * k * k * k;
+}
+
+/** What both shaders are told each frame: per ring (x, y origin in disc units, age s, strength 0..1; strength 0 is no ring)
+ *  and the lean (x, y in disc units, length at most 1). Rewritten in place by its owner (glass-pointer.ts). */
+export type GlassRipple = { waves: Float32Array; lean: Float32Array };
+
+/** No rings and no lean (reduced motion, nobody near the ball). */
+export const NO_RIPPLE: Readonly<GlassRipple> = { waves: new Float32Array(RIPPLE_MAX * 4), lean: new Float32Array(2) };
+
+const glf = (n: number) => n.toFixed(6);
+
+/** The includer's declarations for RIPPLE_GLSL: the rings (RW, as GlassRipple.waves) and RB: the lean (xy, as
+ *  GlassRipple.lean) and the ball's radius on screen (z, in the includer's own px). */
+export const RIPPLE_UNIFORMS = /* glsl */ `uniform vec4 RW[${RIPPLE_MAX}];
+  uniform vec3 RB;`;
+
+/**
+ * Needs RIPPLE_UNIFORMS. rippleSlope(q): the water's slope at disc point q, summed over the rings (each a travelling packet
+ * of crests round its front, damped; the height's gradient, in disc units; softly capped, slopeCap; eased toward the rim,
+ * rimKeep). The includer tilts the glass's normal by it
+ * (n - (right, up) . slope), so what is seen through the ball and the glints on it wobble with the rings. rippleBulge(u):
+ * the outline's lean at rim direction u (unit), as a share of the radius: the includer grows the sphere by it for that
+ * pixel, so the outline bulges toward the cursor, at most RIPPLE_BULGE.
+ */
+export const RIPPLE_GLSL = /* glsl */ `
+const float RIP_SPEED = ${glf(RIPPLE_SPEED)};
+const float RIP_K = ${glf(RIPPLE_K)};
+const float RIP_W2 = ${glf(RIPPLE_W * RIPPLE_W)};
+const float RIP_AMP = ${glf(RIPPLE_AMP)};
+const float RIP_BULGE = ${glf(RIPPLE_BULGE)};
+const float RIP_RIM0 = ${glf(RIPPLE_RIM0)};
+const float RIP_RIM_KEEP = ${glf(RIPPLE_RIM_KEEP)};
+const float RIP_SLOPE_MAX = ${glf(RIPPLE_SLOPE_MAX)};
+vec2 rippleSlope(vec2 q) {
+  vec2 g = vec2(0.);
+  for (int i = 0; i < ${RIPPLE_MAX}; i++) {
+    vec4 w = RW[i];                       // origin (xy), age (z), strength (w; 0: no ring)
+    if (w.w <= 0.) continue;
+    vec2 dq = q - w.xy;
+    float d = length(dq), x = d - RIP_SPEED * w.z;
+    float s = RIP_AMP * w.w * exp(-x * x / RIP_W2) * (RIP_K * cos(RIP_K * x) - 2. * x / RIP_W2 * sin(RIP_K * x));
+    g += s * smoothstep(0., .05, d) * dq / max(d, 1e-4);
+  }
+  g /= sqrt(1. + dot(g, g) / (RIP_SLOPE_MAX * RIP_SLOPE_MAX));   // (slopeCap: rings piled up never tear the image)
+  return g * (1. - (1. - RIP_RIM_KEEP) * smoothstep(RIP_RIM0, 1., length(q)));
+}
+float rippleBulge(vec2 u) {
+  float m = length(RB.xy);
+  if (m < 1e-4) return 0.;
+  float c = max(dot(u, RB.xy / m), 0.);
+  return RIP_BULGE * min(m, 1.) * c * c * c;
+}
+`;
