@@ -3,7 +3,7 @@
 
 import { useEffect, useRef } from "react";
 import { BRIEF } from "@/app/lab/sand/brief-geometry";
-import { getFrameState, setFrameState, subscribeFrame, type FrameState } from "./build-frame-state";
+import { clearFrame, getFrameState, setFrameState, subscribeFrame, type FrameState } from "./build-frame-state";
 
 /**
  * The construction frame (plan 2026-10-18-about-round3, Task 4; Liam's decisions 3–5): the loader's construction drawing
@@ -91,7 +91,7 @@ const n = (x: number) => Math.round(x * 100) / 100;
 const fromEnds = (d: number, len: number) => `${n(d)} ${n(Math.max(len - 2 * d, 0))} ${n(d)}`;
 
 /** The frame at its state: pure, screen px. */
-export function frameGeometry(s: FrameState, reduced: boolean): FrameGeometry {
+export function frameGeometry(s: Readonly<FrameState>, reduced: boolean): FrameGeometry {
   const parts = frameParts(s, reduced);
   const { cx, cy } = s;
   const bw = s.w * (FRAME.tight.w + (1 - FRAME.tight.w) * parts.size), bh = s.h * (FRAME.tight.h + (1 - FRAME.tight.h) * parts.size);
@@ -146,10 +146,12 @@ export function BuildFrame() {
     const reducedQ = typeof window.matchMedia === "function" ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
     const at = (node: Element, a: Record<string, string | number>) => { for (const key in a) node.setAttribute(key, String(a[key])); };
     const seg = (node: Element, [x1, y1, x2, y2]: Seg) => at(node, { x1: n(x1), y1: n(y1), x2: n(x2), y2: n(y2) });
-    let shown = false;
+    let shown = false, phase = el.dataset.phase;
     const draw = () => {
-      const f = frameGeometry(getFrameState() as FrameState, !!reducedQ?.matches);
-      el.dataset.phase = getFrameState().phase ?? "none";
+      const state = getFrameState();
+      const f = frameGeometry(state, !!reducedQ?.matches);
+      const p = state.phase ?? "none";
+      if (p !== phase) { el.dataset.phase = p; phase = p; }
       if (!f.visible) {
         if (shown) { el.style.visibility = "hidden"; shown = false; }
         return;
@@ -175,6 +177,8 @@ export function BuildFrame() {
     return () => {
       off();
       reducedQ?.removeEventListener?.("change", draw);
+      // (the store outlives the page: a visit back must not open on this visit's last frame)
+      clearFrame();
       if (window.__frame === hook) delete window.__frame;
     };
   }, []);

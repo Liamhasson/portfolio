@@ -77,9 +77,19 @@ test("the frame draws round the stage, fixed, behind the pendant's canvas and ab
   expect(errors).toEqual([]);
 });
 
-test("no line of text crosses the frame or its guides while it holds", async ({ page }) => {
+/** The frame placed by the store's documented relation (build-frame-state.ts, still i-2) on the pendant's box as it stands:
+ *  centred across on it, top 0.22 of its height below its top, bottom 0.045 of it below its base, the stage's width. (The
+ *  hook's box is the projected bounds, a little loose: the frame comes out a little larger, the safe side here.) */
+async function byPendant(page: Page, stage: Stage): Promise<Stage> {
+  await page.waitForFunction(() => window.__pendant?.ready === true, null, { timeout: 15_000 });
+  const b = await page.evaluate(() => window.__pendant!.box);
+  const ph = b.b - b.t, top = b.t + 0.22 * ph, bottom = b.b + 0.045 * ph;
+  return { cx: (b.l + b.r) / 2, cy: (top + bottom) / 2, w: stage.w, h: bottom - top };
+}
+
+for (const place of ["the stage", "the pendant's pivot"] as const) test(`no line of text crosses the frame or its guides while it holds (on ${place})`, async ({ page }) => {
   const stage = await toStage(page);
-  await setFrame(page, { ...stage, phase: "build" });
+  await setFrame(page, { ...(place === "the stage" ? stage : await byPendant(page, stage)), phase: "build" });
   const hits = await page.evaluate(() => {
     // the frame's whole drawing: the box, and the guides' 16 px past it
     const f = document.querySelector("svg.ab-frame")!;

@@ -2,7 +2,7 @@ import { act, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { BRIEF } from "@/app/lab/sand/brief-geometry";
 import { BuildFrame, FRAME, frameGeometry, frameParts } from "./build-frame";
-import { resetFrameForTests, setFrameState, type FrameState } from "./build-frame-state";
+import { getFrameState, resetFrameForTests, setFrameState, type FrameState } from "./build-frame-state";
 
 // the build stage at 1440 x 900 (mockup i): 518 x 445, centred on the locked pendant
 const CX = 980, CY = 452, W = 518, H = 445;
@@ -259,9 +259,34 @@ describe("the SVG", () => {
     expect(window.__frame).toBeUndefined();
   });
 
-  test("unmounted, it stops listening", () => {
-    const { unmount } = render(<BuildFrame />);
-    unmount();
-    expect(() => setFrameState(st({}))).not.toThrow();
+  test("unmounted mid-build, it clears the store: a visit back opens with no frame until the pendant writes again", () => {
+    const first = render(<BuildFrame />);
+    act(() => setFrameState(st({ phase: "build" })));
+    expect(frame().style.visibility).toBe("");
+    first.unmount();
+    expect(getFrameState().phase).toBeNull();
+    expect(getFrameState().w).toBe(0);
+    // back on About: the frame stays hidden over the opening
+    render(<BuildFrame />);
+    expect(frame().style.visibility).toBe("hidden");
+    expect(frame().dataset.phase).toBe("none");
+    // and the next write draws it again
+    act(() => setFrameState(st({ phase: "build" })));
+    expect(frame().style.visibility).toBe("");
+  });
+
+  test("the phase attribute is written only when it changes", () => {
+    render(<BuildFrame />);
+    const el = frame();
+    act(() => setFrameState(st({ phase: "grow", grow: 0.3 })));
+    const mo = new MutationObserver(() => {});
+    mo.observe(el, { attributes: true, attributeFilter: ["data-phase"] });
+    act(() => setFrameState(st({ phase: "grow", grow: 0.4 })));
+    act(() => setFrameState(st({ phase: "grow", grow: 0.5 })));
+    expect(mo.takeRecords()).toHaveLength(0);
+    act(() => setFrameState(st({ phase: "build" })));
+    expect(mo.takeRecords()).toHaveLength(1);
+    expect(el.dataset.phase).toBe("build");
+    mo.disconnect();
   });
 });

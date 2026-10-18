@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { getFrameState, resetFrameForTests, setFrameState, subscribeFrame, type FrameState } from "./build-frame-state";
+import { clearFrame, getFrameState, resetFrameForTests, setFrameState, subscribeFrame, type FrameState } from "./build-frame-state";
 
 afterEach(() => resetFrameForTests());
 
@@ -56,4 +56,31 @@ test("reset drops the state and the listeners", () => {
   resetFrameForTests();
   setFrameState(at({}));
   expect(fn).toHaveBeenCalledTimes(1);
+});
+
+test("sub-pixel jitter is no change: px rounded to 0.01, grow and retract to 0.001", () => {
+  const fn = vi.fn();
+  subscribeFrame(fn);
+  setFrameState(at({ cx: 700.123, cy: 450.004, w: 518.391, h: 445.0049, grow: 0.5004, retract: 0 }));
+  expect(getFrameState()).toMatchObject({ cx: 700.12, cy: 450, w: 518.39, h: 445, grow: 0.5, retract: 0 });
+  // (jitter under the rounding, frame after frame: nobody is told)
+  setFrameState(at({ cx: 700.1249, cy: 449.996, w: 518.389, h: 444.996, grow: 0.4996, retract: 0.0004 }));
+  expect(fn).toHaveBeenCalledTimes(1);
+  setFrameState(at({ cx: 700.13, cy: 450, w: 518.39, h: 445, grow: 0.5, retract: 0 }));
+  expect(fn).toHaveBeenCalledTimes(2);
+  setFrameState(at({ cx: 700.13, cy: 450, w: 518.39, h: 445, grow: 0.501, retract: 0 }));
+  expect(fn).toHaveBeenCalledTimes(3);
+});
+
+test("clearFrame: back to no frame, the listeners kept and told", () => {
+  const fn = vi.fn();
+  subscribeFrame(fn);
+  setFrameState(at({ phase: "build" }));
+  clearFrame();
+  expect(getFrameState()).toEqual({ phase: null, cx: 0, cy: 0, w: 0, h: 0, grow: 0, retract: 0 });
+  expect(fn).toHaveBeenCalledTimes(2);
+  clearFrame();   // (already clear: nobody told again)
+  expect(fn).toHaveBeenCalledTimes(2);
+  setFrameState(at({ phase: "grow", grow: 0.2 }));
+  expect(fn).toHaveBeenCalledTimes(3);   // (still listening)
 });
