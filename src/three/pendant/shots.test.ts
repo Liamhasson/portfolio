@@ -20,7 +20,7 @@ const without = (...names: string[]) => Object.fromEntries(Object.entries(ALL).f
 
 describe("the pendant's shots (spec 2026-10-16 §3)", () => {
   test("SHOTS, hand placed: the centre hold through Find and Check in place of the glide and the whirl, in order", () => {
-    expect(SHOTS.map((s) => s.id)).toEqual(["opening", "letgo", "tumble", "worm", "above", "glass", "glassOut", "hold", "holdEnd", "build", "buildEnd", "hero"]);
+    expect(SHOTS.map((s) => s.id)).toEqual(["opening", "letgo", "tumble", "worm", "above", "glass", "glassEnd", "hold", "holdEnd", "build", "buildEnd", "hero"]);
   });
 
   test("an unspecified field inherits the previous shot's value; aims are relative to mid-height", () => {
@@ -278,9 +278,22 @@ describe("shotAt", () => {
     expect(glass.glass).toBe(1);
   });
 
-  test('a "glass" aim blends toward a plain number as the shots change', () => {
+  test("through the glass the pendant stays at the ball until the ball has left (glassEnd: the glass shot held)", () => {
     const gi = SHOTS.findIndex((s) => s.id === "glass");
-    const mid = (keys[gi] + keys[gi + 1]) / 2; // the centre hold: ax 0.5, ay 0.5
+    expect(SHOTS[gi + 1].id).toBe("glassEnd");
+    const { id: _a, anchor: _b, fx: _c, ...glass } = SHOTS[gi];
+    const { id: _d, anchor: _e, fx: fxEnd, ...end } = SHOTS[gi + 1];
+    void _a; void _b; void _c; void _d; void _e;
+    expect(end).toEqual(glass);
+    expect(fxEnd).toBe(0); // (the slot's centre at the screen's left edge)
+    const f = shotAt((keys[gi] + keys[gi + 1]) / 2, keys, SHOTS, AT);
+    expect([f.ax, f.ay, f.glass]).toEqual([AT.glass.x, AT.glass.y, 1]);
+  });
+
+  test('a "glass" aim blends toward a plain number as the shots change', () => {
+    // (from the glass held as the ball leaves, glassEnd, to the centre hold: ax 0.5, ay 0.5)
+    const gi = SHOTS.findIndex((s) => s.id === "glassEnd");
+    const mid = (keys[gi] + keys[gi + 1]) / 2;
     const f = shotAt(mid, keys, SHOTS, AT);
     expect(f.t).toBeCloseTo(0.5, 9);
     expect(f.ax).toBeCloseTo((AT.glass.x + 0.5) / 2, 9);

@@ -86,9 +86,6 @@ export interface GlassSlot {
   /** Held still over the words (stacked under reduced motion, the held shot through the glass: the quotes scroll over it),
    *  so it dims with the pendant; otherwise it rides its slot and keeps its look whatever the dim. */
   dimmed?: boolean;
-  /** How far the pendant is in front of the ball rather than seen through it (0..1, the mount's: off the ball's centre the
-   *  image the ball turns over would leave the ball while the ball still hides the pendant, Liam 2026-10-18). */
-  front?: number;
 }
 
 export class PendantScene {
@@ -581,9 +578,7 @@ export class PendantScene {
     u.planePoint.value.set(0, 0, 0);
     // the pendant through it as far as the shot is through the glass; under GLASS_MIN the empty room, and no lens view
     const k = Math.min(1, Math.max(0, (f.glass - GLASS_MIN) / (SEE_FULL - GLASS_MIN)));
-    const front = Math.min(1, Math.max(0, glass.front ?? 0));
-    u.front.value = front;
-    u.see.value = k * k * (3 - 2 * k) * (1 - front);
+    u.see.value = k * k * (3 - 2 * k);
     if (u.see.value > 0) this.drawLens(glass);
     // the light, as the testimonials' canvas draws it (field.ts): this canvas's own pixels, y up, so the edge each point of
     // the rim faces is the screen's edge the light draws there; A 0 with no light (the ball as it was: no colour anywhere)

@@ -121,6 +121,9 @@ const LOOK_EASE = 0.1;
  *  case the old quote-gap sizing covered, so that fallback is gone.) */
 const GLASS_SLOT_R = 0.44;
 const GLASS_MIN = 0.02;
+/** On the track the pendant follows the glass ball off the screen's left edge only this far (a share of the width): out of
+ *  sight (through the glass the pendant is under 0.04 of the width either side of its centre), so it starts back to the hold the moment the ball has taken it out. */
+const GLASS_PARK = 0.05;
 /** What is painted above the canvas and must keep its press (links, buttons, fields). */
 const CONTROL = "a, button, input, select, textarea, [role=button]";
 /** The outro, as the pull to Contact rises: it shrinks by this share, sinks this share of the screen, and fades out. */
@@ -143,10 +146,6 @@ const CHROME_PIN = ".ab-resume";
 const SOLVE_QUIET = 150;
 /** The live guard hands the front back only after the pendant has been clear for this long (s): no pumping at an edge. */
 const GUARD_HOLD = 0.2;
-/** Off the ball's centre by this share of its radius the pendant starts to come out in front of it, and by this it is all
- *  in front (its image in the ball gone): see the step. Through the glass shot itself it sits at the centre. */
-const FRONT_FROM = 0.12;
-const FRONT_TO = 0.4;
 /** The build's pause: the first share of it for the snap and the frame's grow, the last for the frame's retract; the build
  *  (wire, clay, brass) runs over what is between. The frame's grow takes FRAME_GROW s once the pendant has snapped in. */
 const PAUSE_SNAP = 0.08;
@@ -693,7 +692,9 @@ export function AboutPendant() {
       // the glass rides with the page as the page shows it (not the smoothed travel): it is a place in the page. Held, it is
       // where the held shot has it.
       const gp = glassAt(reduced ? sAt : sTarget);
-      const f = shotAt(sAt, L.keys, L.shots, { ...atFor(sAt), glass: gp });
+      // (the pendant follows the ball only as far as just past the screen's left edge, GLASS_PARK: once the ball has carried
+      // it out of sight it comes back from there to the hold, rather than trailing the ball on off the screen)
+      const f = shotAt(sAt, L.keys, L.shots, { ...atFor(sAt), glass: stack ? gp : { x: Math.max(gp.x, -GLASS_PARK), y: gp.y } });
       sv?.applySpot(f, L.spots); // (this screen's rest spots)
       // a shot framed on a stage among the words (the build) rides with the page, as its stage does (eased over RIDE_TAU),
       // rather than trailing it by the follow's lag onto the words beside the stage (shots.ts `ride`). At rest the lag is 0:
@@ -779,15 +780,6 @@ export function AboutPendant() {
         : cm.screenBox(sc.bounds, sc.inner, sc.camera, L.vw, L.vh);
       // (the outline is the low-poly wire copy's: the brass drawn round it reaches a little further, DRAWN_SLACK of its size)
       const box = padBox(wireBox, DRAWN_SLACK * Math.max(wireBox.r - wireBox.l, wireBox.b - wireBox.t) + 1);
-      // The ball never hides the pendant (Liam, 2026-10-18: it vanished leaving the glass). A ball turns what is behind it
-      // upside down and magnifies it, so a pendant a little off its centre is seen out past its rim, while the ball still
-      // covers the pendant itself: for a moment neither shows. So off centre it comes out in front of the ball: its image in
-      // the ball gives way to the pendant drawn over it, between FRONT_FROM and FRONT_TO of the ball's radius off centre.
-      if (glass) {
-        const off = Math.hypot((box.l + box.r) / 2 - glass.x * L.vw, (box.t + box.b) / 2 - glass.y * L.vh) / Math.max(glass.r * L.vh, 1);
-        const k = clamp01((off - FRONT_FROM) / (FRONT_TO - FRONT_FROM));
-        glass.front = k * k * (3 - 2 * k);
-      }
       // The layer: the one solved for this screen at this travel, not the shot's own. Then the live guard: the live outline,
       // grown by half the solve's padding, against the words where the page shows them (they ride the real scroll, the
       // pendant the eased one, so after a jump they part for a moment) and the chrome where it is (the site's chrome holds to
