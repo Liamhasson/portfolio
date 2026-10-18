@@ -69,3 +69,32 @@ export function stepPresence(p: Presence, want: { layer: Layer; dim: number; ove
   }
   return { layer, bright, fade, goal, pending };
 }
+
+/** The brightness looks ahead along the travel for this long (s) at the pendant's own speed: about the time it takes to
+ *  ease from full bright to within 0.05 of solve.ts FORCED_DIM (0.35 x ln(0.6 / 0.05) = 0.87 s). */
+export const AHEAD_T = 0.9;
+/** A stretch behind the words ahead counts only if it is at least this long (travel px): a blip of a sample or two (the
+ *  solve's STEP is 8 px) is passed through in a frame or two, and dimming for it would dim a pendant that stays in front. */
+export const MIN_BACK = 48;
+/** The scan's step (travel px): the solve's own sample spacing. */
+export const AHEAD_STEP = 8;
+
+/**
+ * Whether the pendant will be behind the words over them (`dimAt`: the mount asks the solve's timeline for behind, and its
+ * rest outline for over a line), for a sustained stretch (MIN_BACK), within `lead` travel px of `s` in direction `dir` (+1
+ * forward, -1 back, 0 at rest: never). The mount dims toward the behind level from then on, so a quick scroll reaches the
+ * words already dimmed instead of slipping behind them bright. Behind but clear of the words, nothing shows, so it doesn't
+ * count. `lead` shrinks to the follow's own lag as the scroll stops, so a pendant that comes to rest in front brightens again.
+ */
+export function behindAhead(dimAt: (s: number) => boolean, s: number, lead: number, dir: number): boolean {
+  if (!(lead > 0) || dir === 0) return false;
+  const d = Math.sign(dir);
+  for (let x = AHEAD_STEP; x <= lead; x += AHEAD_STEP) {
+    if (!dimAt(s + d * x)) continue;
+    let run = AHEAD_STEP;
+    while (run < MIN_BACK && dimAt(s + d * (x + run))) run += AHEAD_STEP;
+    if (run >= MIN_BACK) return true;
+    x += run; // (a blip: on past it)
+  }
+  return false;
+}

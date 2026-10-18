@@ -199,8 +199,15 @@ const CHROME = ".sh-name, .sh-nav, .sh-burger, .ab-resume";
 function coveredNow({ TEXT, CHROME, STILLS = "" }: { TEXT: string; CHROME: string; STILLS?: string }): string[] {
   const h = window.__pendant;
   // (mid-dip it is fading out of the front to go behind a line it has come onto (a jump, a hand): 0.15 s, the z flip at 0,
-  // pinned by the motion pass's tests below. Whole, in front over a line, it always counts.)
-  if (!h?.ready || h.layer !== "front" || (h.fade < 1 && h.goal === "back")) return [];
+  // pinned by the motion pass's tests below. Whole, in front over a line, it always counts; and a dip-out that holds for
+  // more than 10 calls in a row (frames, when watched every frame: 0.15 s is 9 at 60 fps) counts as well.)
+  const run = window as unknown as { __dipRun?: number };
+  if (h?.ready && h.layer === "front" && h.fade < 1 && h.goal === "back") {
+    run.__dipRun = (run.__dipRun ?? 0) + 1;
+    return run.__dipRun > 10 ? [`s ${Math.round(h.s)}: fading out in front for ${run.__dipRun} frames in a row`] : [];
+  }
+  run.__dipRun = 0;
+  if (!h?.ready || h.layer !== "front") return [];
   const c = document.querySelector("canvas.ab-pendant")!.getBoundingClientRect();
   const b = {
     l: Math.max(h.box.l + c.left, 0), r: Math.min(h.box.r + c.left, innerWidth),
@@ -530,7 +537,69 @@ test.describe("the motion pass: brightness and layers", () => {
     // and every z change on the way happened clear of the words, or at the bottom of a fade dip
     const flips = got.flatMap((g, i) => (i > 0 && g.z !== got[i - 1].z ? [{ i, ...g }] : []));
     expect(flips.length).toBeGreaterThan(0);
-    expect(flips.filter((f) => f.over && f.fade >= 0.05)).toEqual([]);
+    expect(flips.filter((f) => f.over && f.op >= 0.05)).toEqual([]);
+    expect(errors).toEqual([]);
+  });
+
+  test("a brisk scroll (16 px a frame) reaches the words behind them already dimmed, down the track and back up it", async ({ page }) => {
+    test.setTimeout(240_000);
+    const errors = collectErrors(page);
+    await page.addInitScript(manualFrames);
+    await page.goto("/about?pendant-debug");
+    await ready(page, 30_000);
+    await page.mouse.move(1430, 890);
+    const keys = await page.evaluate(() => window.__pendant!.keys);
+    const at = (id: string) => keys.find((k) => k.id === id)!.y - keys[0].y; // (travel px)
+    const { top, end } = await trackRange(page);
+    const FORCED_DIM = 0.4;
+    const checked: { dir: string; s: number; bright: number; most: number }[] = [];
+    const bad: string[] = [];
+    for (const dir of ["down", "up"] as const) {
+      const ys: number[] = [];
+      if (dir === "down") for (let y = top; y <= end; y += 16) ys.push(y);
+      else for (let y = end; y >= top; y -= 16) ys.push(y);
+      await page.evaluate((y) => window.scrollTo(0, y), ys[0]);
+      await page.waitForTimeout(2500);
+      const got = await stepFrames(page, { ys });
+      // the first frame of each spell behind the words and over a line: at most FORCED_DIM + 0.05, plus what the eased
+      // brightness (0.35 s) can't have shed since the scroll began (from full bright): that only counts for the tumble's
+      // entry going down, 0.8 s from the top of the track
+      got.forEach((g, i) => {
+        const p = got[i - 1];
+        if (!(g.layer === "back" && g.over) || (p && p.layer === "back" && p.over)) return;
+        const most = FORCED_DIM + 0.05 + (1 - FORCED_DIM) * Math.exp(-(i + 1) / 60 / 0.35);
+        checked.push({ dir, s: g.s, bright: g.bright, most });
+        if (g.bright > most) bad.push(`${dir}, step ${i}, s ${Math.round(g.s)}: bright ${g.bright.toFixed(3)} behind the words (at most ${most.toFixed(3)})`);
+      });
+    }
+    expect(bad).toEqual([]);
+    // the tumble's entry both ways, and others besides
+    const inTumble = (s: number) => s > at("letgo") && s < at("worm");
+    expect(checked.some((c) => c.dir === "down" && inTumble(c.s))).toBe(true);
+    expect(checked.some((c) => c.dir === "up" && inTumble(c.s))).toBe(true);
+    expect(checked.filter((c) => !inTumble(c.s)).length).toBeGreaterThan(0);
+    // and away from the track's start every one meets the plain bound (the start's allowance is more than 0.01 for one only)
+    expect(checked.filter((c) => c.most > FORCED_DIM + 0.06).length).toBeLessThanOrEqual(1);
+    expect(errors).toEqual([]);
+  });
+
+  test("a dip during the canvas's 0.6 s fade-in starts from what shows: no jump", async ({ page }) => {
+    test.setTimeout(120_000);
+    const errors = collectErrors(page);
+    await page.addInitScript(manualFrames);
+    await page.goto("/about?pendant-debug");
+    // opened at the tumble (behind the words, over them), asked in front the moment it is drawn
+    const y = await page.evaluate(async () => {
+      const sec = document.querySelector<HTMLElement>(".ab")!;
+      return sec.offsetTop + 0.12 * (sec.offsetHeight - innerHeight);
+    });
+    await page.evaluate((y) => window.scrollTo(0, y), y);
+    await page.waitForFunction(() => window.__pendant?.ready === true, null, { timeout: 30_000, polling: 10 });
+    const got = await stepFrames(page, { n: 45, force: [{ at: 0, layer: "front" }] });
+    expect(got[0].op).toBeLessThan(0.9); // (caught inside the fade-in)
+    expect(got.some((g) => g.layer === "front")).toBe(true); // (and the dip ran)
+    expect(maxStep(got.map((g) => g.op))).toBeLessThan(0.15);
+    expect(got.at(-1)!.op).toBe(1);
     expect(errors).toEqual([]);
   });
 
@@ -794,9 +863,16 @@ test.describe("under reduced motion", () => {
     // just past the halfway point to the tumble's key: still held (no crossfade back and forth at the middle). The jump
     // brings a line onto the held opening, so it goes behind it through a layer dip (motion pass, Task 1): the canvas's
     // opacity is that dip's fade and nothing else (no crossfade: the crossfade's own factor stays 1)
+    // (watched until the dip is whole again: going behind, its fade-in waits for the dimming, about a second)
     await page.evaluate((y) => window.scrollTo(0, y), keys[0].y + 0.53 * (keys[1].y - keys[0].y));
-    const middle = await watch(800);
+    const middle = await watch(2000);
     expect(middle.every((f) => f.shot === 0 && Math.abs(f.op - f.fade) < 0.002)).toBe(true);
+    // one dip: the opacity falls (to nothing, at the flip), then only rises, and is whole at the end
+    const low = middle.reduce((m, f, i) => (f.op < middle[m].op ? i : m), 0);
+    expect(middle[low].op).toBeLessThan(0.05);
+    for (let i = 1; i <= low; i++) expect(middle[i].op).toBeLessThanOrEqual(middle[i - 1].op);
+    for (let i = low + 1; i < middle.length; i++) expect(middle[i].op).toBeGreaterThanOrEqual(middle[i - 1].op);
+    expect(middle.at(-1)!.op).toBe(1);
     // well past it: out to nothing, the tumble put in place, back in, over about 0.6 s
     await page.evaluate((y) => window.scrollTo(0, y), keys[0].y + 0.7 * (keys[1].y - keys[0].y));
     const fade = await watch(1500);

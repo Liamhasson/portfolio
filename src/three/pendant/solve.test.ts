@@ -45,6 +45,22 @@ describe("solve", () => {
     expect(r.behind).toEqual([]);
   });
 
+  it("tells where the pendant at rest is over a line (by the guard's PAD / 2, not the motion's reach): what the dim looks ahead to", () => {
+    expect([0, 500, 1000].map(solve(input([])).over)).toEqual([false, false, false]);
+    // a bar that holds still across the middle: over it all along the track
+    const bar = solve(input([], [{ l: 0, t: 400, r: 1440, b: 500 }]));
+    expect([0, 500, 1000].map(bar.over)).toEqual([true, true, true]);
+    // shots that rest behind the words (the tumble's way): a line just clear of the rest outline is behind but not over it;
+    // one into it is over it
+    const back = shots.map((x) => ({ ...x, layer: "back" as const }));
+    const top = 0.5 * 900 - 0.2 * 900; // (the outline's top: h 0.4 about the middle)
+    const clear = solve(input([], [{ l: 0, t: 0, r: 1440, b: top - PAD }], { shots: back }));
+    expect(clear.layer(500)).toBe("back");
+    expect(clear.over(500)).toBe(false);
+    const into = solve(input([], [{ l: 0, t: 0, r: 1440, b: top + 20 }], { shots: back }));
+    expect(into.over(500)).toBe(true);
+  });
+
   it("puts a shot behind the words when nothing within the limits clears it", () => {
     // a bar across the whole middle of the screen that holds still (chrome): no move or shrink gets clear of it
     const r = solve(input([], [{ l: 0, t: 400, r: 1440, b: 500 }]));

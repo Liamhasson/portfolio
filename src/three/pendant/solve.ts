@@ -134,6 +134,10 @@ export interface Solved {
   spots: Spot[];
   /** The layer at travel `s`. */
   layer: (s: number) => Layer;
+  /** Whether the pendant at rest at travel `s`, grown only by the live guard's PAD / 2 (not the motion's reach), is over a
+   *  line or the chrome: where being behind the words shows, so where the mount's brightness looks ahead to (presence.ts
+   *  behindAhead). Each sample's answer holds until the next. */
+  over: (s: number) => boolean;
   /** The front shots whose rest was changed: the alternate used (0 = as written) and the spot. */
   moved: { id: string; alt: number; dx: number; dy: number; k: number }[];
   /** The front shots that rest behind the words on this screen (nothing within the limits clears them). */
@@ -238,8 +242,17 @@ export function solve(input: SolveInput): Solved {
   const final = first.map((a) => (touches(a.f) ? sample(a.s, shots, spots) : a));
   const samples: Sample[] = final.map((a) => ({ s: a.s, wanted: shotLayer(a.f, shots), box: clipBox(padBox(a.box, a.pad), vw, vh) }));
   const layer = layerTimeline(samples, texts, fixed);
+  const xs2 = final.map((a) => a.s);
+  const tight = final.map((a) => hits(clipBox(padBox(a.box, PAD / 2), vw, vh), texts, a.s, fixed) > 0);
+  const over = (s: number): boolean => {
+    if (xs2.length === 0) return false;
+    let lo = 0, hi = xs2.length - 1;
+    if (s <= xs2[0]) return tight[0];
+    while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (xs2[mid] <= s) lo = mid; else hi = mid - 1; }
+    return tight[lo];
+  };
   const behind = input.shots
     .filter((sh, i) => sh.layer === "front" && keys[i] >= 0 && keys[i] <= travel && (unsolved.includes(i) || layer(keys[i]) === "back"))
     .map((sh) => sh.id);
-  return { shots, spots, layer, moved, behind };
+  return { shots, spots, layer, over, moved, behind };
 }

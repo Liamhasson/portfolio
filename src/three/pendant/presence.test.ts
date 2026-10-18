@@ -1,6 +1,6 @@
 // src/three/pendant/presence.test.ts
 import { describe, expect, test } from "vitest";
-import { ARRIVE, BRIGHT_TAU, FADE_IN, FADE_OUT, HOLD, stepPresence, type Presence } from "./presence";
+import { AHEAD_STEP, ARRIVE, behindAhead, BRIGHT_TAU, FADE_IN, FADE_OUT, HOLD, MIN_BACK, stepPresence, type Presence } from "./presence";
 import type { Layer } from "./shots";
 
 const DT = 1 / 60;
@@ -150,5 +150,32 @@ describe("stepPresence", () => {
   test("a zero step changes nothing", () => {
     const p: Presence = { layer: "front", bright: 0.7, fade: 0.5, goal: "back", pending: 0 };
     expect(stepPresence(p, { layer: "back", dim: 0.4, overlapping: true }, 0)).toMatchObject({ layer: "front", bright: 0.7, fade: 0.5 });
+  });
+});
+
+describe("behindAhead", () => {
+  /** Behind the words and over them on [a, b), not elsewhere. */
+  const back = (...spans: [number, number][]) => (s: number) => spans.some(([a, b]) => s >= a && s < b);
+
+  test("a sustained stretch behind within the lead, in the direction of travel, counts", () => {
+    const at = back([1000, 2000]);
+    expect(behindAhead(at, 500, 600, 1)).toBe(true);
+    expect(behindAhead(at, 500, 400, 1)).toBe(false); // (beyond the lead)
+    expect(behindAhead(at, 2500, 600, -1)).toBe(true); // (scrolling back into it)
+    expect(behindAhead(at, 2500, 600, 1)).toBe(false); // (it is behind, moving away)
+  });
+
+  test("at rest it never looks ahead: a pendant that stays in front is never dimmed for what it doesn't reach", () => {
+    const at = back([520, 2000]);
+    expect(behindAhead(at, 500, 0, 1)).toBe(false);
+    expect(behindAhead(at, 500, 600, 0)).toBe(false);
+  });
+
+  test("a brief blip behind (shorter than MIN_BACK) is passed over; a real stretch past it still counts", () => {
+    const blip = back([600, 600 + MIN_BACK - AHEAD_STEP]);
+    expect(behindAhead(blip, 500, 800, 1)).toBe(false);
+    expect(behindAhead(back([600, 600 + MIN_BACK - AHEAD_STEP], [900, 1500]), 500, 800, 1)).toBe(true);
+    // (a stretch that starts inside the lead and runs on past it counts)
+    expect(behindAhead(back([590, 5000]), 500, 100, 1)).toBe(true);
   });
 });
