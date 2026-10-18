@@ -11,7 +11,7 @@ import { AboutTestimonials } from "./about-testimonials";
 import { BuildFrame } from "./build-frame";
 import { watchLoops } from "./loops";
 import { pictureState } from "./picture-motion";
-import { scrollForSlide, sectionHeight, trackLayout, trackProgress, trackX } from "./track";
+import { dwellTravel, scrollForSlide, scrollForTravel, sectionHeight, trackLayout, trackProgress, type Dwell } from "./track";
 import "./about.css";
 
 /** A line in two colours: its highlights in the near-white, the rest in the darker tone (Liam, 2026-10-12). `inLink`: set inside the line's link, right after its words (the band loops). */
@@ -56,6 +56,9 @@ export function AboutTrack() {
     const sec = section.current, tr = track.current, clip = tr?.parentElement;
     if (!sec || !tr || !clip) return;
     let raf = 0, height = 0, photoDist = 0;
+    /** The build's pause (Liam, 2026-10-18): the track holds still with the build stage centred while the scroll drives the
+     *  pendant's build in its frame (about-pendant.tsx reads it from the section's data-dwell-at / data-dwell-len). */
+    let dwell: Dwell | null = null;
     const photo = tr.querySelector<HTMLElement>(".ab-portrait");
     // the pictures along the track: each one's left on the track, its width (picture + caption), its corner radius (measured in layout)
     // (clip/vis: the last strings written, so a frame that changes nothing writes nothing)
@@ -72,7 +75,8 @@ export function AboutTrack() {
       if (sec.dataset.mode !== "track") return;
       const p = trackProgress(window.scrollY, sec.offsetTop, height, window.innerHeight);
       const vw = viewW();
-      const x = trackX(p, tr.scrollWidth, vw);
+      const travel = Math.max(tr.scrollWidth - vw, 0);
+      const x = 0 - dwellTravel(p * (travel + (dwell?.length ?? 0)), travel, dwell).s;
       tr.style.transform = `translate3d(${x}px, 0, 0)`;
       // the photo stays where it is and is cropped away from its left edge, over the gap to the first line
       if (photo) {
@@ -98,6 +102,7 @@ export function AboutTrack() {
       const mode = trackLayout({ w: window.innerWidth, h: window.innerHeight, reduced: window.matchMedia("(prefers-reduced-motion: reduce)").matches });
       sec.dataset.mode = mode;
       if (mode === "stack") {
+        dwell = null; delete sec.dataset.dwellAt; delete sec.dataset.dwellLen;
         sec.style.height = ""; tr.style.transform = ""; tr.style.removeProperty("--ab-photo-h");
         if (photo) { photo.style.transform = ""; photo.style.clipPath = ""; }
         pics = []; clearPics();
@@ -118,7 +123,16 @@ export function AboutTrack() {
         const right = Math.max(r.right, ...[...el.children].map((c) => c.getBoundingClientRect().right));
         return { el, left: r.left - t0, width: right - r.left, radius: getComputedStyle(el.querySelector(".ab-pic-f") ?? el).borderTopLeftRadius || "10px", link: !!el.closest("a"), video: el.querySelector("video") };
       });
-      height = sectionHeight(tr.scrollWidth, viewW(), window.innerHeight);
+      // the pause: where the build stage's middle is the screen's, for 0.9 of a screen's height of scroll
+      const stage = tr.querySelector<HTMLElement>('[data-pendant="buildstage"]');
+      const travel = Math.max(tr.scrollWidth - viewW(), 0);
+      if (stage && stage.offsetWidth > 0) {
+        const stageLeft = stage.getBoundingClientRect().left - t0;
+        dwell = { at: Math.min(Math.max(stageLeft + stage.offsetWidth / 2 - viewW() / 2, 0), travel), length: Math.round(0.9 * window.innerHeight) };
+        sec.dataset.dwellAt = String(Math.round(dwell.at));
+        sec.dataset.dwellLen = String(dwell.length);
+      } else { dwell = null; delete sec.dataset.dwellAt; delete sec.dataset.dwellLen; }
+      height = sectionHeight(tr.scrollWidth, viewW(), window.innerHeight) + (dwell?.length ?? 0);
       sec.style.height = `${height}px`;
       frame();
     };
@@ -128,7 +142,8 @@ export function AboutTrack() {
       if (sec.dataset.mode !== "track") return;
       const slide = (e.target as HTMLElement).closest<HTMLElement>(".ab-slide");
       if (!slide) return;
-      window.scrollTo(0, scrollForSlide(sec.offsetTop, slide.offsetLeft, window.innerWidth * 0.06, Math.max(tr.scrollWidth - viewW(), 0)));
+      const into = scrollForSlide(0, slide.offsetLeft, window.innerWidth * 0.06, Math.max(tr.scrollWidth - viewW(), 0));
+      window.scrollTo(0, sec.offsetTop + scrollForTravel(into, dwell));
     };
     sec.addEventListener("focusin", onFocus);
     // stacked: each slide rises in as it comes into view (about.css; only the stack shows it)

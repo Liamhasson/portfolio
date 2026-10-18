@@ -138,17 +138,12 @@ export const SHOTS: readonly Shot[] = fill([
   // in place, while "Find the problem" and "Check I'm right" slide past over it. Nothing moves on screen between the two keys.
   { id: "hold", anchor: { pendant: "find" }, fx: 0.5, az: -20, el: 8, roll: 0, fov: 30, h: 0.42, ax: 0.5, ay: 0.5, aim: [0, 0, 0], spin: 0.06, tumble: 0, rz: 0, layer: "back", aperture: 0.0008, glass: 0, bright: false },
   { id: "holdEnd", anchor: { pendant: "check" }, fx: 0.5 },
-  // 09 Build passes: wire, clay, brass, swept across the faces and the crown, big and in front on the empty stage right of
-  // "Build it." (Liam, 2026-10-18: candidate (b), the big three-quarter close-up, in the desk film's place). It rides with the
-  // stage, right to left, across 0.26 of the screen's width of scroll, and rides with the page under a scroll (`ride`), so
-  // the follow's lag never carries the words beside the stage onto it. The whirl's spin hands over to its held face over the
-  // first half of the move into it (`settle`), so the face is on by the time the sweep begins. Its size is the most the screen's middle holds with the
-  // motion's clearance: the crown under the top edge, the foot clear above the resume pill it passes over (h 0.64, its box
-  // about 0.68 of the screen's height; at the asked 0.8 the foot sits on the pill and the solve puts it behind mid-sweep).
-  // It settles a little smaller and lower as the brass arrives (h 0.53), left of the pill, so that from there to the hero its
-  // crown passes under the site's name, not over it: in front all the way to the hero.
-  { id: "build", anchor: { pendant: "buildstage", fallback: "build" }, fx: 0.53, az: -35, el: 12, roll: 0, fov: 30, h: 0.64, ax: 0.54, ay: 0.43, aim: [0, 0, 0], spin: 0, lock: -10, aperture: 0.0012, wire: 0, ride: 1, settle: 0.5, layer: "front", bright: true },
-  { id: "buildEnd", anchor: { pendant: "buildstage", fallback: "build" }, fx: 0.27, az: -25, h: 0.53, ax: 0.32, ay: 0.475, lock: 0, wire: 1, settle: 1 },
+  // 09 The build, in its frame (Liam, 2026-10-18): the pendant flies from the centre hold to the build stage (centred on the
+  // screen when the track pauses there), snaps to the frame's centre, and builds itself, wire to clay to brass, while the
+  // page holds and the scroll runs on (about-pendant.tsx: the pause; build-frame.tsx: the frame). Both keys sit where the
+  // stage is centred; the pause between them drives the build. Big, in front, lit; still turning slowly in place.
+  { id: "build", anchor: { pendant: "buildstage", fallback: "build" }, fx: 0.5, az: -35, el: 12, roll: 0, fov: 30, h: 0.64, ax: 0.5, ay: 0.47, aim: [0, 0, 0], spin: 0.06, lock: null, aperture: 0.0012, wire: 0, ride: 1, settle: 1, layer: "front", bright: true },
+  { id: "buildEnd", anchor: { pendant: "buildstage", fallback: "build" }, fx: 0.5, wire: 1 },
   // 10 Hero: close and low, cut by the left edge, its face turned to the last line (the aim is the face)
   { id: "hero", anchor: "end", fx: 0, az: -62, el: -12, roll: 6, fov: 24, h: 1.35, ax: 0.03, ay: 0.5, aim: [0, 0.02, -0.1], spin: 0, lock: -62, aperture: 0.0016, ride: 0, bright: false,
     // while About's layout leaves words beside the left edge at the end: the same shot mirrored, close at the right, cut by

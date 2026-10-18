@@ -14,7 +14,9 @@ import type { Outline } from "@/three/pendant/solve";
 import type { Spot } from "@/three/pendant/layout";
 import { leanFor } from "./glass-lean";
 import { pictureShown } from "./pendant-pictures";
-import { trackProgress } from "./track";
+import { dwellTravel, scrollForTravel, type Dwell } from "./track";
+import { setFrameState, type FramePhase } from "./build-frame-state";
+import { stepSnap } from "@/three/pendant/snap";
 import { resizeKind } from "./viewport";
 
 /** What the page tells the e2e tests and the frame script (scripts/about/pendant-frames.cjs), rewritten every frame. */
@@ -44,6 +46,8 @@ export interface PendantHook {
   /** The pendant's turn about its own axis (radians), and whether a hand is on it. */
   yaw: number;
   dragging: boolean;
+  /** The build's pause: how far through it (0..1), the frame's phase, its grow, whether the pendant has snapped in. */
+  pause?: { k: number; phase: string | null; grow: number; snapped: boolean };
   /** The motion blur this frame: the longest smear (CSS px, scaled to a 1/60 s shutter), whether the pass drew, and whether
    *  the frame counted as a jump (nothing smeared). */
   blur: { smear: number; on: boolean; jump: boolean };
@@ -140,6 +144,11 @@ const CHROME_PIN = ".ab-resume";
 const SOLVE_QUIET = 150;
 /** The live guard hands the front back only after the pendant has been clear for this long (s): no pumping at an edge. */
 const GUARD_HOLD = 0.2;
+/** The build's pause: the first share of it for the snap and the frame's grow, the last for the frame's retract; the build
+ *  (wire, clay, brass) runs over what is between. The frame's grow takes FRAME_GROW s once the pendant has snapped in. */
+const PAUSE_SNAP = 0.12;
+const PAUSE_RETRACT = 0.12;
+const FRAME_GROW = 0.6;
 /** Stacked, the canvas fades in over this long once drawn (s), as the track's CSS fades it in. Under reduced motion a change
  *  of shot crossfades it: out over half of CROSSFADE, the new shot held, back in over the other half. */
 const APPEAR = 0.6;
@@ -327,6 +336,8 @@ export function AboutPendant() {
       overLagging: null as ((s: number, lag: number, grow?: Box) => boolean) | null,
       /** ...and the pendant at rest as those take it (solve.ts `rest`). */
       rest: null as ((s: number) => Box) | null,
+      /** The build's pause (about-track.tsx: data-dwell-at / data-dwell-len; null stacked or without a stage). */
+      dwell: null as Dwell | null,
     };
     /** The shots for the layout: the track's, or the stack's. */
     const baseShots = () => (L.mode === "stack" ? SHOTS_STACK : SHOTS);
@@ -427,10 +438,10 @@ export function AboutPendant() {
       if (scene && half !== L.half) { scene.setBokehScale(half ? 0.5 : 1); L.half = half; }
       L.top = sec.offsetTop;
       L.H = sec.offsetHeight;
-      if (stack) measureStack(vw, vh);
+      if (stack) { L.dwell = null; measureStack(vw, vh); }
       else measureTrack(vw, vh);
       // (the section is a screen plus the travel, so travel px and scroll px are one to one; stacked, travel is the scroll)
-      hook.keys = L.shots.map((s, i) => ({ id: s.id, y: L.top + L.keys[i] }));
+      hook.keys = L.shots.map((s, i) => ({ id: s.id, y: L.top + (stack ? L.keys[i] : scrollForTravel(L.keys[i], L.dwell)) }));
       const seen = (el: HTMLElement) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 ? r : null; };
       // the chrome: stacked, all of it is fixed to the viewport (the canvas's own px)
       const org = (stack ? canvas : pin).getBoundingClientRect();
@@ -459,6 +470,8 @@ export function AboutPendant() {
         L.glassR = 0;
       }
       L.keys = solveKeys(L.shots, (a) => (typeof a === "object" ? centre(a.pendant) : null), viewW, L.travel);
+      const at = Number(sec.dataset.dwellAt), len = Number(sec.dataset.dwellLen);
+      L.dwell = Number.isFinite(at) && len > 0 ? { at, length: len } : null;
       // The words and the chrome, as boxes. Rects relative to the track are proof against the track's own transform; the
       // arrival animation (the first slides slide in for 1.1 s) and the nav's entrance move them too, so while either runs
       // these boxes are provisional and everything is measured and solved again the moment they have finished.
@@ -613,6 +626,11 @@ export function AboutPendant() {
     const nearestShot = (s: number) => L.shots[nearestIndex(s)]?.id ?? "";
     /** The live guard: behind since it last saw the pendant near a line, until it has been clear for GUARD_HOLD. */
     let guardBack = false, clearFor = 0;
+    /** The build's pause: the snap's springs (screen shares), whether it has arrived, the frame's grow (0..1, time based
+     *  after the snap) and the last phase written (so leaving writes the empty state once). */
+    const snapX = { x: 0.5, v: 0 }, snapY = { x: 0.5, v: 0 };
+    let wasPause = false, snapped = false, grow = 0, framePhaseWas: FramePhase = null;
+    let pauseAim: { x: number; y: number; ph: number } | null = null;
 
     /** A governor level onto the scene: a resize only when the pixel ratio changes, the bokeh's scale only when its step
      *  does (that never resizes). Before the first measure there is nothing to apply: measure reads the governor itself. */
@@ -635,7 +653,8 @@ export function AboutPendant() {
       const stack = L.mode === "stack";
       // the travel: the track's progress across its overflow, or (stacked) the page's scroll through the section
       const vh = stack ? L.vh : window.innerHeight, y = window.scrollY;
-      const sTarget = stack ? Math.min(Math.max(y - L.top, 0), L.travel) : trackProgress(y, L.top, L.H, vh) * L.travel;
+      const pause = stack ? { s: Math.min(Math.max(y - L.top, 0), L.travel), k: 0 } : dwellTravel(Math.min(Math.max(y - L.top, 0), Math.max(L.H - vh, 0)), L.travel, L.dwell);
+      const sTarget = pause.s;
       if (first) { sSm = sPrev = sTargetPrev = sRide = sTarget; first = false; } // (a page opened mid-track starts where it is, no fly-in)
       if (Math.abs(sTarget - sTargetPrev) > vh) { jumped = true; sRide = sTarget; } // (a jump, not a scroll: an anchor, a key, a restore)
       // the page's own pace, for the look ahead below: the fastest step of the last PAGE_HOLD frames (a wheel's notches
@@ -673,6 +692,41 @@ export function AboutPendant() {
       // nothing moves. A jump's lag is a screen or more: only RIDE_MAX of it is carried, so a jump never flings it off.
       // (On the track only: the stacked shots don't ride.)
       if (!stack && !reduced && f.ride > 0) f.ax -= rideShift(f.ride, sRide - sAt, L.vw) / L.vw;
+      // The build's pause (Liam, 2026-10-18): the track holds still with the build stage centred; the pendant flies there
+      // (the move from the centre hold, as the shots blend), snaps to the frame's centre, the frame grows behind it, and it
+      // builds itself (wire, clay, brass) as the scroll runs on, locked there: still turning in place, the cursor's lean and
+      // a drag turn it, nothing moves it. At the end the frame pulls back into its corners and the page carries on.
+      const inPause = !stack && L.dwell !== null && pause.k > 0 && pause.k < 1;
+      if (inPause) {
+        const bi = L.shots.findIndex((sh) => sh.id === "build");
+        const b0 = L.shots[bi], b1 = L.shots[bi + 1];
+        if (b0 && b1) {
+          const buildK = clamp01((pause.k - PAUSE_SNAP) / (1 - PAUSE_SNAP - PAUSE_RETRACT));
+          const g = shotAt(buildK * 1000, [0, 1000], [b0, b1], atFor(sAt));
+          const from = { x: f.ax, y: f.ay };
+          Object.assign(f, g);
+          const tx = typeof b0.ax === "number" ? b0.ax : 0.5, ty = typeof b0.ay === "number" ? b0.ay : 0.5;
+          if (!wasPause || reduced) { snapX.x = reduced ? tx : from.x; snapY.x = reduced ? ty : from.y; snapX.v = snapY.v = 0; }
+          stepSnap(snapX, tx, dt);
+          stepSnap(snapY, ty, dt);
+          f.ax = snapX.x;
+          f.ay = snapY.x;
+          snapped = reduced || (Math.abs(snapX.x - tx) < 0.003 && Math.abs(snapY.x - ty) < 0.003 && Math.abs(snapX.v) + Math.abs(snapY.v) < 0.05);
+          pauseAim = { x: tx, y: ty, ph: g.h * L.vh };
+        }
+      } else snapped = false;
+      grow = reduced ? (inPause ? 1 : 0) : clamp01(grow + (inPause && snapped ? dt : -dt) / FRAME_GROW);
+      wasPause = inPause;
+      const retract = inPause ? clamp01((pause.k - (1 - PAUSE_RETRACT)) / PAUSE_RETRACT) : 0;
+      const framePhase: FramePhase = !stack && pauseAim && (inPause || grow > 0)
+        ? (retract > 0 ? "retract" : grow < 1 ? "grow" : "build") : null;
+      if (framePhase && pauseAim) {
+        // (the frame's centre is the pendant's locked pivot, a little below its middle: the crown and loop break out of the
+        // top edge, the base sits inside the bottom one; build-frame-state.ts)
+        setFrameState({ phase: framePhase, cx: pauseAim.x * L.vw, cy: pauseAim.y * L.vh + 0.13 * pauseAim.ph, w: 0.9 * pauseAim.ph, h: 0.8 * pauseAim.ph, grow, retract });
+      } else if (framePhaseWas !== null) setFrameState({ phase: null, cx: 0, cy: 0, w: 0, h: 0, grow: 0, retract: 0 });
+      framePhaseWas = framePhase;
+      hook.pause = { k: pause.k, phase: framePhase, grow, snapped };
       // the pull to Contact: it falls away into the dark as the section scrolls off (held still: only the fade)
       const o = clamp01((y - (L.top + L.H - vh)) / vh);
       if (!reduced) {
@@ -726,7 +780,7 @@ export function AboutPendant() {
       const near = sv !== null && hits(clipBox(padBox(guarded, sv.PAD / 2), L.vw, L.vh), L.texts, sTarget, fixed) > 0;
       if (near) { guardBack = true; clearFor = 0; } else if (guardBack && (clearFor += dt) >= GUARD_HOLD) guardBack = false;
       const forcedLayer = debug ? window.__pendantLayer : undefined;
-      const asked: Layer = forcedLayer ?? (L.layer?.(sAt) === "front" && !guardBack ? "front" : "back");
+      const asked: Layer = forcedLayer ?? (framePhase !== null ? "front" : L.layer?.(sAt) === "front" && !guardBack ? "front" : "back");
       // Stacked, what the canvas's opacity is made of besides a dip: the fade-in once drawn, the opening's wait off the chrome
       // (as of the last frame: it hangs on the layer, below), the reduced-motion crossfade and the pull to Contact. On the
       // track, about.css fades it in once drawn.
@@ -781,7 +835,7 @@ export function AboutPendant() {
       const opening = stack && (reduced ? held === 0 : f.index === 0 && f.t < 0.5);
       // The brightness (Liam, 2026-10-18): softly dimmed all through About; the lit shots (the build, the pendant seen
       // through the glass) come up once, slowly, and go down once. Behind the words it is the dim whatever the shot says.
-      const lit = shotBright(f, L.shots) && asked === "front" && presence?.layer !== "back";
+      const lit = (framePhase !== null || shotBright(f, L.shots)) && asked === "front" && presence?.layer !== "back";
       const shotDim = lit ? 1 : (sv?.FORCED_DIM ?? 0.4);
       const wantDim = stack ? shotDim : shotDim * (1 - o);
       presence = presence

@@ -41,21 +41,21 @@ describe("the pendant's shots (spec 2026-10-16 §3)", () => {
     expect(by("opening").lock).toBeNull();
   });
 
-  test("the build passes: big and in front on the stage right of \"Build it.\", wire to brass across a comfortable scroll (Liam, 2026-10-18)", () => {
+  test("the build, in its frame: big, in front, lit, both keys where the stage is centred (the pause between them drives it; Liam, 2026-10-18)", () => {
     const by = (id: string) => SHOTS.find((s) => s.id === id)!;
     for (const id of ["build", "buildEnd"]) {
-      // (the desk film they hung on left About: never its anchor again)
       expect(by(id).anchor).toEqual({ pendant: "buildstage", fallback: "build" });
+      expect(by(id).fx).toBe(0.5);
       expect(by(id).layer).toBe("front");
-      expect(by(id).h).toBeGreaterThanOrEqual(0.5);
-      expect(by(id).spin).toBe(0);
+      expect(by(id).bright).toBe(true);
+      expect(by(id).h).toBeGreaterThanOrEqual(0.6);
+      expect([by(id).ax, by(id).ay]).toEqual([0.5, 0.47]);
+      expect(by(id).lock).toBeNull(); // (still turning in place while it builds)
     }
     expect([by("build").wire, by("buildEnd").wire]).toEqual([0, 1]);
-    expect(by("build").h).toBeGreaterThanOrEqual(0.6); // (it settles a little smaller as the brass arrives, to pass under the site's name)
-    // a three-quarter view (two faces turned), and a span of at least a quarter of the screen's width for the sweep
-    expect(Math.abs(by("build").az)).toBeGreaterThanOrEqual(20);
-    expect(by("build").fx - by("buildEnd").fx).toBeGreaterThanOrEqual(0.25);
+    expect(Math.abs(by("build").az)).toBeGreaterThanOrEqual(20); // (a three-quarter view)
   });
+
 });
 
 describe("the stacked shots (spec §8, plan Task 11)", () => {
@@ -401,63 +401,9 @@ describe("settle and ride (the build under a fast scroll)", () => {
   // (the shot before the build is the centre hold now; a fast-spinning stand-in keeps the settle's property under test)
   const whirl = { ...by("holdEnd"), spin: 1.3, ride: 0 }, build = by("build"), buildEnd = by("buildEnd");
 
-  test("the build settles over the first half of the move into it: spin and lock there, the framing over the whole move", () => {
-    expect(build.settle).toBe(0.5);
-    expect(buildEnd.settle).toBe(1);
-    expect(by("hero").settle).toBe(1);
-    const keys = [0, 1000];
-    const at = (s: number) => shotAt(s, keys, [whirl, build], AT);
-    // halfway: the spin is gone and the face is held, while the framing is only halfway there
-    expect(at(500).spin).toBe(0);
-    expect(at(500).lockMix).toBe(1);
-    expect(at(500).lock).toBe(-10);
-    expect(at(500).t).toBeCloseTo(0.5, 12);
-    expect(at(500).h).toBeLessThan(build.h);
-    // a quarter of the way: the spin and the lock's strength halfway (smootherstep over the first half)
-    expect(at(250).spin).toBeCloseTo(whirl.spin / 2, 9);
-    expect(at(250).lockMix).toBeCloseTo(0.5, 9);
-    // eased at both ends of the settle: no step in the lock's strength anywhere
-    let prev = 0;
-    for (let s = 0; s <= 1000; s++) {
-      const m = at(s).lockMix;
-      expect(m - prev).toBeLessThanOrEqual((15 / 8) * (2 / 1000) + 1e-9);
-      prev = m;
-    }
-  });
 
-  test("at a brisk scroll (960 px/s) the build sweep's middle has its face held: within 20 degrees for nine entry faces in ten, where without the settle only seven in ten", () => {
-    // the live spacing at 1440 x 900: whirl to build about 960 px, the sweep about 374 px; the scroll follow as the mount's
-    const keys = [0, 960, 960 + 374], FOLLOW = 0.018, v = 960, dt = 1 / 60;
-    const run = (shots: Shot[]) => {
-      const offs: number[] = [];
-      let jerk = 0;
-      for (let j = 0; j < 72; j++) {
-        let m: MotionState = { ...REST, yaw: (j * 5) * D };
-        let page = 0, sm = 0, prev = 0;
-        const yaws: number[] = [];
-        while (sm < (keys[1] + keys[2]) / 2) {
-          page += v * dt;
-          sm += (page - sm) * (1 - FOLLOW ** dt);
-          const f = shotAt(sm, keys, shots, AT);
-          m = stepMotion(m, { dt, spin: f.spin, tumble: f.tumble, lock: f.lock, lockMix: f.lockMix, scrollVel: (sm - prev) / dt, dragging: false, dragDX: 0, dragDY: 0, reduced: false });
-          prev = sm;
-          yaws.push(m.yaw);
-        }
-        for (let k = 2; k < yaws.length; k++) jerk = Math.max(jerk, Math.abs(yaws[k] - 2 * yaws[k - 1] + yaws[k - 2]));
-        const f = shotAt(sm, keys, shots, AT);
-        offs.push(Math.abs(((((m.yaw / D - (f.lock as number)) % 360) + 540) % 360) - 180));
-      }
-      offs.sort((a, b) => a - b);
-      return { median: offs[36], held: offs.filter((o) => o <= 20).length / offs.length, jerk: jerk / D };
-    };
-    const settled = run([whirl, build, buildEnd]);
-    const plain = run([whirl, { ...build, settle: 1 }, buildEnd]);
-    expect(settled.held).toBeGreaterThanOrEqual(0.9);
-    expect(settled.median).toBeLessThanOrEqual(5);
-    expect(plain.held).toBeLessThan(0.75);
-    // (the spin is shed over half the move, not all of it: a quicker slowing, still eased, never a kick)
-    expect(settled.jerk).toBeLessThan(1);
-  });
+
+
 
   test("the build rides with the page; the whirl before it and the hero after it don't; rideShift carries at most RIDE_MAX of the width", () => {
     expect([whirl.ride, build.ride, buildEnd.ride, by("hero").ride]).toEqual([0, 1, 1, 0]);

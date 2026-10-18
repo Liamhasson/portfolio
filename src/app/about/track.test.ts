@@ -1,6 +1,6 @@
 // src/app/about/track.test.ts
 import { describe, expect, test } from "vitest";
-import { scrollForSlide, sectionHeight, trackLayout, trackProgress, trackX } from "./track";
+import { dwellTravel, scrollForSlide, scrollForTravel, sectionHeight, trackLayout, trackProgress, trackX } from "./track";
 
 describe("About's sideways track (spec 2026-10-12 §3)", () => {
   test("the page is a screen plus the track's overflow: one pixel of scroll moves it one pixel", () => {
@@ -35,3 +35,25 @@ describe("About's sideways track (spec 2026-10-12 §3)", () => {
   });
 });
 
+
+describe("the build's pause (dwellTravel)", () => {
+  const d = { at: 1000, length: 800 };
+  test("one px of scroll moves the track one px, except across the pause, where it holds", () => {
+    expect(dwellTravel(500, 3000, d)).toEqual({ s: 500, k: 0 });
+    expect(dwellTravel(1000, 3000, d)).toEqual({ s: 1000, k: 0 });
+    expect(dwellTravel(1400, 3000, d)).toEqual({ s: 1000, k: 0.5 });
+    expect(dwellTravel(1800, 3000, d)).toEqual({ s: 1000, k: 1 });
+    expect(dwellTravel(2800, 3000, d)).toEqual({ s: 2000, k: 1 });
+    expect(dwellTravel(9999, 3000, d).s).toBe(3000);
+  });
+  test("continuous at both ends; no pause is the plain track", () => {
+    expect(dwellTravel(1000.001, 3000, d).s).toBeCloseTo(1000, 6);
+    expect(dwellTravel(1800.001, 3000, d).s).toBeCloseTo(1000, 2);
+    expect(dwellTravel(1234, 3000, null)).toEqual({ s: 1234, k: 0 });
+  });
+  test("scrollForTravel is its inverse outside the pause", () => {
+    expect(scrollForTravel(500, d)).toBe(500);
+    expect(scrollForTravel(2000, d)).toBe(2800);
+    expect(dwellTravel(scrollForTravel(2500, d), 3000, d).s).toBe(2500);
+  });
+});
