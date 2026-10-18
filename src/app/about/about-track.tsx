@@ -31,9 +31,9 @@ function Words({ line, inLink }: { line: Line; inLink?: ReactNode }) {
  * words next to it already say what it shows (a link's name stays its words), so the frame is hidden from assistive tech.
  * `.ab-pic` / `.ab-pic-f` / `.ab-pic-cap` are the hooks the pictures' motion takes hold of.
  */
-function Pic({ p, className = "", sizes, width, height, decor, anchor }: { p: Picture; className?: string; sizes?: string; width?: number; height?: number; decor?: boolean; anchor?: string }) {
+function Pic({ p, className = "", sizes, width, height, decor }: { p: Picture; className?: string; sizes?: string; width?: number; height?: number; decor?: boolean }) {
   return (
-    <span className={`ab-pic ${className}`.trim()} data-pic={p.id} data-pendant={anchor} title={p.title}>
+    <span className={`ab-pic ${className}`.trim()} data-pic={p.id} title={p.title}>
       <span className="ab-pic-f" aria-hidden={decor ? true : undefined}>
         {p.loop
           ? <video muted loop playsInline preload="none" poster={p.poster} src={p.src} aria-label={decor ? undefined : p.alt} />
@@ -210,8 +210,9 @@ export function AboutTrack() {
                       ))}
                     </ul>
                   </div>
-                  {/* "Build it.": the desk film, wire to final, right of its skills */}
-                  {i === ABOUT.verbs.length - 1 && <Pic p={ABOUT.pictures.desk} className="ab-deskvid" anchor="deskfilm" />}
+                  {/* "Build it.": right of its skills, an empty stage where the pendant builds itself up close, wire to clay to brass (the
+                      shader's, not a picture; Liam, 2026-10-18: the desk film that stood here left About, "Let's focus on the pendant") */}
+                  {i === ABOUT.verbs.length - 1 && <div className="ab-buildstage" data-pendant="buildstage" aria-hidden="true" />}
                 </div>
               ))}
               <p className="ab-slide ab-big"><Words line={ABOUT.closing} /></p>

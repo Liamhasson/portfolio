@@ -229,7 +229,7 @@ function coveredNow({ TEXT, CHROME, STILLS = "" }: { TEXT: string; CHROME: strin
   }
   // the pictures, where the track draws them: not when hidden or emptied (inset(50%)), else from its clip's top and left in
   // (about-track.tsx writes `inset(T% -100vw 0 Lpx round R)`: T% of the picture's height, L px from its left). A frame whose
-  // exit cut has started (L > 0) may be passed over, its caption with it (Liam, 2026-10-16: the hero over the leaving desk film).
+  // exit cut has started (L > 0) may be passed over, its caption with it (Liam, 2026-10-16: a picture already leaving).
   for (const pic of document.querySelectorAll<HTMLElement>(".ab-pic")) {
     if (pic.style.visibility === "hidden" || pic.style.clipPath === "inset(50%)") continue;
     const m = /^inset\(([-\d.e+]+)% -100vw 0(?:px)? ([-\d.e+]+)px/.exec(pic.style.clipPath);
@@ -284,6 +284,32 @@ for (const [w, h] of [[1440, 900], [1280, 800], [1920, 1080], [1024, 768]] as co
       }
       expect(bad).toEqual([]);
       expect(errors).toEqual([]);
+    });
+    test("the build passes play big and in front on the stage right of \"Build it.\", over no line, wire to brass", async ({ page }) => {
+      test.setTimeout(90_000);
+      await page.goto("/about");
+      await ready(page, 30_000);
+      await page.waitForTimeout(1500);
+      await page.mouse.move(w - 2, h - 2);
+      const hook = await page.evaluate(() => ({ solve: window.__pendant!.solve, keys: window.__pendant!.keys }));
+      // (Liam, 2026-10-18: the desk film left About; the pendant builds itself up close in its place)
+      expect(hook.solve.behind).not.toContain("build");
+      expect(hook.solve.behind).not.toContain("buildEnd");
+      const key = (id: string) => hook.keys.find((k) => k.id === id)!.y;
+      const [kb, ke] = [key("build"), key("buildEnd")];
+      // a comfortable scroll for the sweep: at least a quarter of the screen's width
+      expect(ke - kb).toBeGreaterThanOrEqual(0.25 * w);
+      // the build key, the sweep's middle and its brass end
+      for (const [name, y] of [["build", kb], ["mid-sweep", (kb + ke) / 2], ["buildEnd", ke]] as const) {
+        await page.evaluate((y) => window.scrollTo(0, y), Math.round(y));
+        await page.waitForTimeout(2500);
+        const at = await page.evaluate(() => ({ layer: window.__pendant!.layer, bright: window.__pendant!.bright, box: window.__pendant!.box }));
+        expect(at.layer, name).toBe("front");
+        expect(at.bright, name).toBeGreaterThan(0.95);
+        const tall = Math.min(at.box.b, h) - Math.max(at.box.t, 0);
+        expect(tall / h, `${name}: its box's share of the screen's height`).toBeGreaterThanOrEqual(0.3);
+        expect(await frontOverlaps(page), name).toEqual([]);
+      }
     });
     test("the hero plays its storyboard framing: in front, at the left edge", async ({ page }) => {
       test.setTimeout(60_000);
@@ -578,8 +604,14 @@ test.describe("the motion pass: brightness and layers", () => {
     expect(checked.some((c) => c.dir === "down" && inTumble(c.s))).toBe(true);
     expect(checked.some((c) => c.dir === "up" && inTumble(c.s))).toBe(true);
     expect(checked.filter((c) => !inTumble(c.s)).length).toBeGreaterThan(0);
-    // and away from the track's start every one meets the plain bound (the start's allowance is more than 0.01 for one only)
-    expect(checked.filter((c) => c.most > FORCED_DIM + 0.06).length).toBeLessThanOrEqual(1);
+    // and every one meets the plain bound but the two the scroll's cold start bounds (0.35 s of easing from full bright since
+    // the scroll began): the tumble's entry going down from the track's top, and, going up from its end, the whirl-to-build
+    // approach behind "Build it." (since the desk film left About, 2026-10-18, it is ~50 frames from the end: the dim starts
+    // with the scroll, and the brightness can't shed more in that time). Counted by what each needed, not where it fell.
+    const leaning = checked.filter((c) => c.bright > FORCED_DIM + 0.06);
+    const coldStart = (c: (typeof checked)[number]) => (c.dir === "down" && inTumble(c.s)) || (c.dir === "up" && c.s > at("whirl") && c.s < at("build"));
+    expect(leaning.filter((c) => !coldStart(c))).toEqual([]);
+    expect(leaning.length).toBeLessThanOrEqual(2);
     expect(errors).toEqual([]);
   });
 

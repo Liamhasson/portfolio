@@ -36,6 +36,8 @@ Each shot is fully on when its anchor's centre reaches `fx` of the screen width 
 | 10 | end of the track | Hero: close and low, cut by the left edge, its face turned to "I'd like to hear about it" | az −62°, el −12°, roll 6°, fov 24°, h 1.35, aim the face, at (0.03, 0.5) | settles face −62° | front |
 | out | the pull to Contact | It falls away into the dark as Contact rises | | | |
 
+Shot 09 since 2026-10-18 (Liam: the desk film left About; build shot = candidate (b)): anchored on an empty stage right of "Build it." (`data-pendant="buildstage"`, 36vw), a big three-quarter close-up in front riding with it, 0.53 to 0.25: az −35° to −25°, el 12°, fov 30°, h 0.64 to 0.53, at (0.54, 0.43) to (0.32, 0.475), spin 0, lock −10° to 0°. Values in `src/three/pendant/shots.ts`.
+
 Key to the columns:
 - **h:** the pendant's height as a share of the screen's height.
 - **at:** the aim point's screen position. A lens shift places it there, so perspective stays true.

@@ -85,10 +85,10 @@ describe("About and Contact content (spec 2026-10-12-about-contact-design.md)", 
     expect(CONTACT).toEqual({ headline: "Got something on your mind?", email: "Liamhasson@gmail.com", linkedin: "https://www.linkedin.com/in/liamhasson/", phone: "+49 160 771 0652" });
   });
   // the pictures along the track (spec 2026-10-16-about-pictures-design.md §2)
-  const pictures = () => [...ABOUT.pictures.bands, ABOUT.pictures.studio, ...ABOUT.pictures.strip, ABOUT.pictures.desk];
+  const pictures = () => [...ABOUT.pictures.bands, ABOUT.pictures.studio, ...ABOUT.pictures.strip];
   test("every picture's source is unique (the portrait included)", () => {
     const srcs = [ABOUT.portrait!.src, ...pictures().map((p) => p.src)];
-    expect(srcs).toHaveLength(8);
+    expect(srcs).toHaveLength(7);
     expect(new Set(srcs).size).toBe(srcs.length);
   });
   test("the strip links to the three case studies, in order", () => {
@@ -111,13 +111,18 @@ describe("About and Contact content (spec 2026-10-12-about-contact-design.md)", 
       for (const v of [p.src, p.poster, p.caption, p.title, p.alt, p.href]) expect(v ?? "").not.toMatch(/pulse/i);
     }
   });
-  test("the bands, the studio and the desk are the spec's table, verbatim", () => {
+  test("the bands and the studio are the spec's table, verbatim", () => {
     expect(ABOUT.pictures.bands.map((p) => [p.src, p.poster, p.title])).toEqual([
       ["/about/loops/after-heartbreaks-loop.mp4", "/playground/after-heartbreaks-film.jpg", "Marni Came"],
       ["/about/loops/my-small-world-loop.mp4", "/playground/my-small-world.jpg", "Sanskrit"],
     ]);
     expect(ABOUT.pictures.studio).toMatchObject({ src: "/playground/studio-overhead.jpg", caption: "Producing · Marni Came", loop: false });
-    expect(ABOUT.pictures.desk).toMatchObject({ src: "/about/desk-build.mp4", poster: "/about/desk-build.jpg", caption: "This desk · wire to final", loop: true });
+  });
+  test("the desk film left About (Liam, 2026-10-18: \"Remove the desk.\"); its files stay in the repo for a one-line restore", () => {
+    expect(Object.keys(ABOUT.pictures).sort()).toEqual(["bands", "strip", "studio"]);
+    for (const p of pictures()) expect(p.src).not.toMatch(/desk-build/);
+    expect(existsSync(join(process.cwd(), "public/about/desk-build.mp4"))).toBe(true);
+    expect(existsSync(join(process.cwd(), "public/about/desk-build.jpg"))).toBe(true);
   });
   test("videos loop and have a poster; every file exists under public/; every picture has an alt", () => {
     for (const p of pictures()) {

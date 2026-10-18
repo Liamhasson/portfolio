@@ -36,6 +36,8 @@ The track, left to right (text unchanged; `docs/copy/about.md`):
 | Between Yoav's and Andrada's quotes | **The glass ball** (§4.2) | ~15vw across | Not a picture: drawn in the testimonials' canvas. |
 | Right of "Build it." | **The desk build-up video** (§5) | 34vw wide, 16:10 | 7vw before it, 5vw after it (more room than a slide gap: Liam, "it deserves space"). Caption: "This desk · wire to final". |
 
+**Removed from About by Liam on 2026-10-18** ("Remove the desk. Let's focus on the pendant."): the desk build-up video is no longer on the track; an empty stage right of "Build it." holds the pendant's build shot instead. Its files (`public/about/desk-build.{mp4,jpg}`, `blender/lookdev/desk_passes*.py`) stay in the repo, unreferenced, for a one-line restore.
+
 Nothing on "That's still how I work", Find the problem, Check I'm right, Andrada's quote, or the closing line.
 
 ## 3. Picture motion (desktop track)
@@ -103,6 +105,8 @@ on screen.
 - Canvas at devicePixelRatio ≤ 1.5; the frame loop stops when nothing is on screen.
 
 ## 5. The desk build-up video
+
+**Removed from About by Liam on 2026-10-18;** the files below are kept, unreferenced, for a one-line restore.
 
 Liam's idea: the desk the site is built around, modelled and lit in Blender, building itself up layer by layer.
 

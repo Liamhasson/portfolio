@@ -82,13 +82,29 @@ test.beforeEach(async ({ page }) => {
   await settle(page);
 });
 
+test("the desk film has left About (Liam, 2026-10-18): not in the DOM, never requested, an empty stage in its place", async ({ page }) => {
+  const imgs: string[] = [];
+  page.on("request", (r) => { if (/desk-build/.test(r.url())) imgs.push(r.url()); });
+  for (let i = 0; i <= 10; i++) await scrollTrack(page, i / 10);
+  const dom = await page.evaluate(() => ({
+    film: document.querySelectorAll('[data-pic="desk"], [data-pendant="deskfilm"], .ab-deskvid, [src*="desk-build"], [poster*="desk-build"], [srcset*="desk-build"]').length,
+    caption: (document.querySelector("section.ab")!.textContent ?? "").includes("This desk"),
+    stage: (() => { const el = document.querySelector<HTMLElement>('[data-pendant="buildstage"]'); return el ? { kids: el.childElementCount, w: el.getBoundingClientRect().width, inBuild: !!el.closest('[data-pendant="build"]') } : null; })(),
+  }));
+  expect(dom.film).toBe(0);
+  expect(dom.caption).toBe(false);
+  expect(dom.stage).toEqual({ kids: 0, w: expect.any(Number), inBuild: true });
+  expect(dom.stage!.w).toBeGreaterThan(0);
+  expect([...mp4s, ...imgs].filter((u) => /desk-build/.test(u))).toEqual([]);
+});
+
 test("pictures rise and are cut as About scrolls, with no console errors", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
 
   const ids = (await readPics(page)).map((s) => s.id);
-  expect(ids.sort()).toEqual(["cyvore", "desk", "eventread", "marni-came", "nordic-logic", "sanskrit", "studio"]);
+  expect(ids.sort()).toEqual(["cyvore", "eventread", "marni-came", "nordic-logic", "sanskrit", "studio"]);
 
   const seen = new Set<string>(), total = { hidden: 0, risen: 0, rising: 0, cutting: 0 };
   for (let i = 0; i <= 60; i++) {
@@ -117,7 +133,7 @@ test("a jump shows the right state at once", async ({ page }) => {
     await settle(page);
     await page.waitForTimeout(400);
     const settled = expectRule(await readPics(page), `settled after ${key}`);
-    // Home is the start of the page (the first line's pictures not yet risen), End is past the track (the desk film at the end of it)
+    // Home is the start of the page (the first line's pictures not yet risen), End is past the track (every picture cut away by then)
     if (key === "Home") expect(settled.hidden).toBeGreaterThan(0);
   }
   // a plain jump with no in-between frames: the start to the middle to the end and back, one frame each
@@ -241,11 +257,6 @@ test("the loops play only while their picture is on screen", async ({ page }) =>
   await scrollTrack(page, 0);
   for (const id of ["cyvore", "eventread", "nordic-logic"]) await stopped(id);
 
-  // the desk film
-  await scrollTrack(page, 0.9);
-  await playing("desk");
-  await scrollTrack(page, 0.3);
-  await stopped("desk");
   expect(mp4s).toContain("/about/loops/eventread.mp4");
 });
 

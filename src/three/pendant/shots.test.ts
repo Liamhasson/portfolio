@@ -12,7 +12,7 @@ const centres = (present: Record<string, number>) => (a: Anchor) => {
   return present[a.pendant] ?? null;
 };
 
-const ALL = { band: 1700, how: 2900, strip: 4300, e2e: 4000, glass: 5200, quote1: 5000, quote2: 5600, find: 6400, check: 7300, deskfilm: 8000, build: 7800 };
+const ALL = { band: 1700, how: 2900, strip: 4300, e2e: 4000, glass: 5200, quote1: 5000, quote2: 5600, find: 6400, check: 7300, buildstage: 8000, build: 7800 };
 
 /** ALL minus some anchors, as the page would be if it lacked them. */
 const without = (...names: string[]) => Object.fromEntries(Object.entries(ALL).filter(([k]) => !names.includes(k)));
@@ -36,6 +36,22 @@ describe("the pendant's shots (spec 2026-10-16 §3)", () => {
     expect(by("worm").aim[1]).toBeCloseTo(-0.08, 9); // the prototype's 0.42 from the feet
     expect(by("opening").aim).toEqual([0, 0, 0]);
     expect(by("opening").lock).toBeNull();
+  });
+
+  test("the build passes: big and in front on the stage right of \"Build it.\", wire to brass across a comfortable scroll (Liam, 2026-10-18)", () => {
+    const by = (id: string) => SHOTS.find((s) => s.id === id)!;
+    for (const id of ["build", "buildEnd"]) {
+      // (the desk film they hung on left About: never its anchor again)
+      expect(by(id).anchor).toEqual({ pendant: "buildstage", fallback: "build" });
+      expect(by(id).layer).toBe("front");
+      expect(by(id).h).toBeGreaterThanOrEqual(0.5);
+      expect(by(id).spin).toBe(0);
+    }
+    expect([by("build").wire, by("buildEnd").wire]).toEqual([0, 1]);
+    expect(by("build").h).toBeGreaterThanOrEqual(0.6); // (it settles a little smaller as the brass arrives, to pass under the site's name)
+    // a three-quarter view (two faces turned), and a span of at least a quarter of the screen's width for the sweep
+    expect(Math.abs(by("build").az)).toBeGreaterThanOrEqual(20);
+    expect(by("build").fx - by("buildEnd").fx).toBeGreaterThanOrEqual(0.25);
   });
 });
 
@@ -120,7 +136,7 @@ describe("solveKeys", () => {
   });
 
   test("anchors crowded at the end of the track keep every key inside 0..travel and the hero reachable", () => {
-    const keys = solveKeys(SHOTS, centres({ ...ALL, deskfilm: 99999 }), VW, TRAVEL);
+    const keys = solveKeys(SHOTS, centres({ ...ALL, buildstage: 99999 }), VW, TRAVEL);
     expect(keys.at(-1)).toBe(TRAVEL);
     for (const k of keys) {
       expect(k).toBeGreaterThanOrEqual(0);

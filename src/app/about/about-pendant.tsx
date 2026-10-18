@@ -103,8 +103,8 @@ const TEXT = ".ab-big, .ab-quote blockquote, .ab-quote figcaption, .ab-verb .ab-
 /** The pictures along the track (about-track.tsx `.ab-pic`), content like the words: each frame (a still or a loop) is one
  *  box, the whole frame (a picture has no lines to read between), plus its caption's lines. Each counts only where it is
  *  drawn at that point of the track (pendant-pictures.ts): risen so far as it arrives, nothing before; and a picture whose
- *  exit cut at the margin has started no longer counts at all, caption included (Liam's ruling: the hero may pass over the
- *  desk film as it leaves). */
+ *  exit cut at the margin has started no longer counts at all, caption included (Liam's ruling, 2026-10-16: the pendant may
+ *  pass over a picture as it leaves). */
 const PIC = ".ab-pic", PIC_FRAME = ".ab-pic-f", PIC_CAP = ".ab-pic-cap";
 /** What holds still on screen over the track, treated exactly as words: the site's wordmark, pill nav and burger (fixed to
  *  the viewport), and About's resume pill (fixed in the pinned frame). The 1 px progress bar is not avoided (Liam's ruling). */

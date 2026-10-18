@@ -10,8 +10,8 @@ export interface PicPlace { l: number; t: number; w: number; h: number }
  * For a picture (its frame or its caption's lines, cut together) at travel `s`: the screen point left of and above which
  * none of it shows, or null when the pendant need not keep clear of it at all. Arriving and fully shown pictures count
  * wherever they have risen to. A picture stops counting the moment its exit cut at the margin starts (Liam, 2026-10-16: the
- * pendant may pass over a picture already leaving; that is what lets the hero's storyboard framing play over the desk
- * film's last sliver). Its caption goes with it: it is part of the picture and cut with it (pictures spec §3), and a
+ * pendant may pass over a picture already leaving; it let the hero's storyboard framing play over the desk film's last
+ * sliver, before that film left About on 2026-10-18). Its caption goes with it: it is part of the picture and cut with it (pictures spec §3), and a
  * caption half cut away at the margin is no longer a line anyone reads.
  */
 export function pictureShown(p: PicPlace, vw: number): (s: number) => { x: number; y: number } | null {

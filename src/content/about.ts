@@ -21,7 +21,6 @@ type Pictures = {
   bands: [Picture, Picture];
   studio: Picture;
   strip: [Linked, Linked, Linked];
-  desk: Picture;
 };
 const PICTURES: Pictures = {
   // word-sized loops, inline right after "two rock bands", part of the link to /playground; the title shows on hover.
@@ -41,8 +40,8 @@ const PICTURES: Pictures = {
     { id: "eventread", src: "/about/loops/eventread.mp4", poster: "/work/eventread.jpg", alt: "Eventread, the night's risk read in the app", caption: "Eventread", href: "/eventread", loop: true },
     { id: "nordic-logic", src: "/about/loops/nordic-logic-live.mp4", poster: "/work/nordic-logic-live.jpg", alt: "The Nordic Logic site, live", caption: "Nordic Logic", href: "/nordic-logic", loop: true },
   ],
-  // right of "Build it.": the desk film, wire to final
-  desk: { id: "desk", src: "/about/desk-build.mp4", poster: "/about/desk-build.jpg", alt: "The desk on this site being built, from wireframe to the final render", caption: "This desk · wire to final", loop: true },
+  // (the desk film, "This desk · wire to final", right of "Build it.", left About on 2026-10-18: Liam, "Remove the desk. Let's
+  // focus on the pendant." Its files stay in public/about/desk-build.{mp4,jpg}; restoring it is a `desk` entry here and its <Pic>.)
 };
 
 export const ABOUT = {

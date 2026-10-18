@@ -66,13 +66,19 @@ test("the glass slot sits between the two quotes and is empty", () => {
   expect(slot.nextElementSibling!.textContent).toContain("Andrada Popan-Dorca");
 });
 
-test("the desk film follows Build it, with its caption", () => {
+test("the desk film has left About (Liam, 2026-10-18): Build it is followed by the pendant's empty stage", () => {
   const { container } = render(<AboutTrack />);
-  const film = container.querySelector<HTMLElement>('.ab-pic[data-pendant="deskfilm"]')!;
-  expect(film).toHaveAttribute("data-pic", "desk");
-  expect(slideOf(film).textContent).toContain("Build it.");
-  expect(within(film).getByText("This desk · wire to final").className).toContain("ab-pic-cap");
-  expect(film.querySelector("video")).toHaveAttribute("src", ABOUT.pictures.desk.src);
+  expect(container.querySelector('[data-pic="desk"], [data-pendant="deskfilm"], .ab-deskvid')).toBeNull();
+  expect(container.querySelector('video[src*="desk-build"], video[poster*="desk-build"]')).toBeNull();
+  expect(container.textContent).not.toContain("This desk");
+  expect("desk" in ABOUT.pictures).toBe(false);
+  const stage = container.querySelector<HTMLElement>('[data-pendant="buildstage"]')!;
+  expect(stage).not.toBeNull();
+  expect(slideOf(stage).textContent).toContain("Build it.");
+  expect(slideOf(stage)).toHaveAttribute("data-pendant", "build");
+  expect(stage).toHaveAttribute("aria-hidden", "true");
+  expect(stage.childElementCount).toBe(0);
+  expect(stage.textContent).toBe("");
 });
 
 test("nothing appears twice", () => {
@@ -81,7 +87,7 @@ test("nothing appears twice", () => {
     const m = p.querySelector("video, img")!;
     return m.getAttribute("src");
   });
-  expect(srcs).toHaveLength(7);
+  expect(srcs).toHaveLength(6);
   expect(new Set(srcs).size).toBe(srcs.length);
 });
 
@@ -104,13 +110,13 @@ function laidOut(places: Record<string, [left: number, width: number]>) {
 const scrollTo = (y: number) => { Object.defineProperty(window, "scrollY", { value: y, configurable: true }); act(() => { window.dispatchEvent(new Event("scroll")); }); };
 
 test("on the track a picture rises out of its line as it arrives and is cut at the margin line as it leaves", () => {
-  laidOut({ studio: [2000, 100], desk: [100, 100] });
+  laidOut({ studio: [2000, 100], cyvore: [100, 100] });
   const { container } = render(<AboutTrack />);
   const studio = pic(container, "studio");
-  // at the start: the studio is far to the right: not there yet; the desk (at 100px, risen) is
+  // at the start: the studio is far to the right: not there yet; Cyvore (at 100px, risen) is
   expect(studio.style.visibility).toBe("hidden");
   expect(studio.style.clipPath).toMatch(/^inset\(100% /);
-  expect(pic(container, "desk").style.visibility).toBe("");
+  expect(pic(container, "cyvore").style.clipPath).toMatch(/^inset\(0% -100vw 0 0px /);
   // scrolled 1500px along: the studio is at 500px of the 1024px screen (under 70%): fully risen
   scrollTo(1500);
   expect(studio.style.visibility).toBe("");
@@ -181,16 +187,16 @@ function mockLoops(reduced = false) {
 const flush = () => act(async () => { await Promise.resolve(); });
 const videoOf = (c: ParentNode, id: string) => pic(c, id).querySelector("video")!;
 /** every loop sits in the shown range of the 1024px screen (on the track the pictures are otherwise 0px wide: cut away) */
-const allShown = () => laidOut(Object.fromEntries(["marni-came", "sanskrit", "cyvore", "eventread", "nordic-logic", "desk"].map((id) => [id, [300, 100] as [number, number]])));
+const allShown = () => laidOut(Object.fromEntries(["marni-came", "sanskrit", "cyvore", "eventread", "nordic-logic"].map((id) => [id, [300, 100] as [number, number]])));
 
 test("a loop plays when it enters the screen and pauses when it leaves; off screen it is never started", () => {
   allShown();
   const m = mockLoops();
   const { container } = render(<AboutTrack />);
-  // all six loops are watched, none started (preload none: no play, no load, so nothing downloads)
-  expect(m.loopObserver().els.size).toBe(6);
+  // all five loops are watched, none started (preload none: no play, no load, so nothing downloads)
+  expect(m.loopObserver().els.size).toBe(5);
   expect(m.play).not.toHaveBeenCalled();
-  const v = videoOf(container, "desk");
+  const v = videoOf(container, "eventread");
   m.see(v, true);
   expect(m.play).toHaveBeenCalledTimes(1);
   expect(m.play.mock.contexts[0]).toBe(v);
@@ -202,10 +208,10 @@ test("a loop plays when it enters the screen and pauses when it leaves; off scre
 test("under reduced motion loops never play; their posters show", () => {
   const m = mockLoops(true);
   const { container } = render(<AboutTrack />);
-  const v = videoOf(container, "desk");
+  const v = videoOf(container, "eventread");
   m.see(v, true);
   expect(m.play).not.toHaveBeenCalled();
-  expect(v).toHaveAttribute("poster", ABOUT.pictures.desk.poster);
+  expect(v).toHaveAttribute("poster", ABOUT.pictures.strip[1].poster);
   expect(v).toHaveAttribute("preload", "none");
 });
 
@@ -213,7 +219,7 @@ test("choosing reduced motion while a loop plays pauses it; choosing it away let
   allShown();
   const m = mockLoops();
   const { container } = render(<AboutTrack />);
-  const v = videoOf(container, "desk");
+  const v = videoOf(container, "eventread");
   m.see(v, true);
   expect(m.play).toHaveBeenCalledTimes(1);
   m.mq.matches = true; act(() => { m.mq.listeners.forEach((l) => l()); });
@@ -231,12 +237,12 @@ test("a loop that fails to play keeps its poster and logs nothing", async () => 
   const unhandled = vi.fn();
   process.on("unhandledRejection", unhandled);
   const { container } = render(<AboutTrack />);
-  const v = videoOf(container, "desk");
+  const v = videoOf(container, "eventread");
   m.see(v, true);
   await flush(); await new Promise((r) => setTimeout(r, 0));
   process.off("unhandledRejection", unhandled);
   expect(m.play).toHaveBeenCalled();
-  expect(v).toHaveAttribute("poster", ABOUT.pictures.desk.poster);
+  expect(v).toHaveAttribute("poster", ABOUT.pictures.strip[1].poster);
   expect(err).not.toHaveBeenCalled();
   expect(warn).not.toHaveBeenCalled();
   expect(unhandled).not.toHaveBeenCalled();
@@ -249,11 +255,11 @@ test("a video error leaves the poster, logs nothing, and is not retried", () => 
   const m = mockLoops();
   const err = vi.spyOn(console, "error").mockImplementation(() => {});
   const { container } = render(<AboutTrack />);
-  const v = videoOf(container, "desk");
+  const v = videoOf(container, "eventread");
   act(() => { v.dispatchEvent(new Event("error")); });
   m.see(v, true);
   expect(m.play).not.toHaveBeenCalled();
-  expect(v).toHaveAttribute("poster", ABOUT.pictures.desk.poster);
+  expect(v).toHaveAttribute("poster", ABOUT.pictures.strip[1].poster);
   expect(err).not.toHaveBeenCalled();
 });
 
@@ -261,7 +267,7 @@ test("the tab hidden pauses every loop; coming back resumes the visible ones onl
   allShown();
   const m = mockLoops();
   const { container } = render(<AboutTrack />);
-  const a = videoOf(container, "desk"), b = videoOf(container, "cyvore");
+  const a = videoOf(container, "eventread"), b = videoOf(container, "cyvore");
   m.see(a, true); m.see(b, true); m.see(b, false);
   m.play.mockClear(); m.pause.mockClear();
   let hidden = true;
@@ -275,17 +281,18 @@ test("the tab hidden pauses every loop; coming back resumes the visible ones onl
 });
 
 test("a loop whose picture is cut away or not yet risen does not play even if its box is on screen", () => {
-  laidOut({ desk: [3000, 100] });
+  laidOut({ eventread: [3000, 100] });
   const m = mockLoops();
   const { container } = render(<AboutTrack />);
-  const v = videoOf(container, "desk");
-  // the desk film is far to the right: hidden by the track's clip; the observer sees its box (inside the viewport, say) but it must not play
-  expect(pic(container, "desk").style.visibility).toBe("hidden");
+  const v = videoOf(container, "eventread");
+  // the loop is far to the right: emptied by the track's clip (inside its link: never visibility:hidden); the observer sees its box
+  // (inside the viewport, say) but it must not play
+  expect(pic(container, "eventread").style.clipPath).toBe("inset(50%)");
   m.see(v, true);
   expect(m.play).not.toHaveBeenCalled();
   // scrolled until it has risen: it plays
   scrollTo(3000 - 0.06 * 1024);
-  expect(pic(container, "desk").style.visibility).toBe("");
+  expect(pic(container, "eventread").style.clipPath).toMatch(/^inset\(0% -100vw 0 0px /);
   expect(m.play).toHaveBeenCalledTimes(1);
   // and cut away at the margin again: it pauses
   scrollTo(3000 - 0.06 * 1024 + 100.5);
@@ -297,7 +304,7 @@ test("on unmount the loops' observer and listeners are gone", () => {
   const m = mockLoops();
   const remove = vi.spyOn(document, "removeEventListener");
   const { container, unmount } = render(<AboutTrack />);
-  const v = videoOf(container, "desk");
+  const v = videoOf(container, "eventread");
   m.see(v, true);
   const obs = m.loopObserver();
   unmount();
@@ -311,7 +318,7 @@ test("a late play() rejection (the AbortError of an earlier pause) does not stra
   allShown();
   const m = mockLoops();
   const { container } = render(<AboutTrack />);
-  const v = videoOf(container, "desk");
+  const v = videoOf(container, "eventread");
   // a video that tracks `paused` the way a browser does: play() un-pauses at once, pause() pauses
   let isPaused = true;
   Object.defineProperty(v, "paused", { configurable: true, get: () => isPaused });

@@ -115,9 +115,15 @@ export const SHOTS: readonly Shot[] = fill([
   { id: "glideEnd", anchor: { pendant: "find" }, fx: 0.28, ax: -0.08 },
   // 08 Whirl: stands up spinning fast, slows to a new face
   { id: "whirl", anchor: { pendant: "check" }, fx: 0.5, az: 20, el: 10, roll: 0, fov: 34, h: 0.3, ax: 0.13, ay: 0.17, spin: 1.3, rz: 0, aperture: 0.0008 },
-  // 09 Build passes: wire, clay, brass, swept left to right over the desk film
-  { id: "build", anchor: { pendant: "deskfilm", fallback: "build" }, fx: 0.62, az: -25, el: 12, roll: 0, fov: 32, h: 0.28, ax: 0.5, ay: 0.15, spin: 0.08, aperture: 0.0008, wire: 0 },
-  { id: "buildEnd", anchor: { pendant: "deskfilm", fallback: "build" }, fx: 0.36, az: 10, wire: 1 },
+  // 09 Build passes: wire, clay, brass, swept across the faces and the crown, big and in front on the empty stage right of
+  // "Build it." (Liam, 2026-10-18: candidate (b), the big three-quarter close-up, in the desk film's place). It rides with the
+  // stage, right to left, across 0.28 of the screen's width of scroll. Its size is the most the screen's middle holds with the
+  // motion's clearance: the crown under the top edge, the foot clear above the resume pill it passes over (h 0.64, its box
+  // about 0.68 of the screen's height; at the asked 0.8 the foot sits on the pill and the solve puts it behind mid-sweep).
+  // It settles a little smaller and lower as the brass arrives (h 0.53), left of the pill, so that from there to the hero its
+  // crown passes under the site's name, not over it: in front all the way to the hero.
+  { id: "build", anchor: { pendant: "buildstage", fallback: "build" }, fx: 0.53, az: -35, el: 12, roll: 0, fov: 30, h: 0.64, ax: 0.54, ay: 0.43, aim: [0, 0, 0], spin: 0, lock: -10, aperture: 0.0012, wire: 0 },
+  { id: "buildEnd", anchor: { pendant: "buildstage", fallback: "build" }, fx: 0.25, az: -25, h: 0.53, ax: 0.32, ay: 0.475, lock: 0, wire: 1 },
   // 10 Hero: close and low, cut by the left edge, its face turned to the last line (the aim is the face)
   { id: "hero", anchor: "end", fx: 0, az: -62, el: -12, roll: 6, fov: 24, h: 1.35, ax: 0.03, ay: 0.5, aim: [0, 0.02, -0.1], spin: 0, lock: -62, aperture: 0.0016,
     // while About's layout leaves words beside the left edge at the end: the same shot mirrored, close at the right, cut by
