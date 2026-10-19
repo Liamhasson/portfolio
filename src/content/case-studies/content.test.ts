@@ -6,7 +6,7 @@ import { eventread } from "./eventread";
 import { nordicLogic } from "./nordic-logic";
 import { pulse } from "./pulse";
 
-const studies = [eventread, cyvore, pulse, nordicLogic];
+const studies = [nordicLogic, eventread, cyvore, pulse];
 
 describe("case-study content", () => {
   test.each(studies)("$slug fits the frame", (study) => {

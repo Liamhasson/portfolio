@@ -7,8 +7,15 @@ export interface Project {
   readonly tags: readonly string[];
 }
 
-/** Order = order on the home grid. */
+/** Order = order on the home grid (Liam, 2026-10-19: Nordic Logic, Eventread, Cyvore, Pulse), and of the next-project
+ *  banners at the foot of each case study. */
 export const projects: readonly Project[] = [
+  {
+    slug: "nordic-logic",
+    name: "Nordic Logic",
+    status: "live",
+    tags: ["B2B", "Web design", "Motion", "Brand", "Design system"],
+  },
   { slug: "eventread", name: "Eventread", status: "live", tags: ["B2B", "Web design", "Designer-builder"] },
   {
     slug: "cyvore",
@@ -21,12 +28,6 @@ export const projects: readonly Project[] = [
     name: "Pulse",
     status: "live",
     tags: ["Front-end development", "Usability testing", "Habit formation focused"],
-  },
-  {
-    slug: "nordic-logic",
-    name: "Nordic Logic",
-    status: "live",
-    tags: ["B2B", "Web design", "Motion", "Brand", "Design system"],
   },
   {
     slug: "stub",

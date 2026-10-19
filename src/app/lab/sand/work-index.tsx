@@ -22,10 +22,10 @@ import { NextPagePull } from "@/components/shell/next-page-pull";
 /** The projects (copy and tags from the approved plan and the current portfolio). Each opens its case study and plays a
  *  loop of the product in use (Nordic Logic live since 2026-10-13: its hero film landing on the portal). */
 const CARDS: { n: string; name: string; tags: string[]; line: string; href?: string; video?: string; poster: string; progress?: boolean }[] = [
-  { n: "01", name: "Eventread", tags: ["SaaS web app", "Designer-builder"], line: "The check every booker skips.", href: "/eventread", video: "/work/eventread", poster: "/work/eventread.jpg" },
-  { n: "02", name: "Cyvore", tags: ["B2B website", "Information architecture"], line: "A cybersecurity startup needed a site investors would believe in.", href: "/cyvore", video: "/work/cyvore", poster: "/work/cyvore.jpg" },
-  { n: "03", name: "Pulse", tags: ["Fitness app", "User research"], line: "A goal-focused fitness app designed around four retention milestones.", href: "/pulse", video: "/work/pulse", poster: "/work/pulse.jpg" },
-  { n: "04", name: "Nordic Logic", tags: ["B2B website", "Design system"], line: "A launch site for a startup with no clients to point to yet.", href: "/nordic-logic", video: "/work/nordic-logic-live", poster: "/work/nordic-logic-live.jpg" },
+  { n: "01", name: "Nordic Logic", tags: ["B2B website", "Design system"], line: "A launch site for a startup with no clients to point to yet.", href: "/nordic-logic", video: "/work/nordic-logic-live", poster: "/work/nordic-logic-live.jpg" },
+  { n: "02", name: "Eventread", tags: ["SaaS web app", "Designer-builder"], line: "The check every booker skips.", href: "/eventread", video: "/work/eventread", poster: "/work/eventread.jpg" },
+  { n: "03", name: "Cyvore", tags: ["B2B website", "Information architecture"], line: "A cybersecurity startup needed a site investors would believe in.", href: "/cyvore", video: "/work/cyvore", poster: "/work/cyvore.jpg" },
+  { n: "04", name: "Pulse", tags: ["Fitness app", "User research"], line: "A goal-focused fitness app designed around four retention milestones.", href: "/pulse", video: "/work/pulse", poster: "/work/pulse.jpg" },
 ];
 
 export interface WorkIndexHandle {
