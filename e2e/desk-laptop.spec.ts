@@ -63,7 +63,7 @@ const arrival = (t: [number, number][]) => {
   return { end, at: t.find(([, y]) => Math.abs(y - end) <= 2)![0] };
 };
 
-test("on the desk, a click on the laptop ends at the index, as the nav's Projects does", async ({ page }) => {
+test("on the desk, a click on the laptop ends at the index, as the nav's Projects does, at the drive's slower pace", async ({ page }) => {
   if (CLIP) mkdirSync(CLIP, { recursive: true });
   await onDesk(page);
 
@@ -90,7 +90,7 @@ test("on the desk, a click on the laptop ends at the index, as the nav's Project
 
   // the laptop
   const from = await page.evaluate(() => window.scrollY);
-  await track(page, 4000);
+  await track(page, 5500);
   await page.mouse.click(pt.x, pt.y);
   if (CLIP) {
     // the glide's first half, on the way in (it lasts about a second from the desk)
@@ -100,7 +100,7 @@ test("on the desk, a click on the laptop ends at the index, as the nav's Project
       await page.screenshot({ path: `${CLIP}/laptop-mid-glide-${i + 1}.png` });
     }
   }
-  const viaLaptop = await tracked(page, 4000);
+  const viaLaptop = await tracked(page, 5500);
   const laptopEnd = arrival(viaLaptop);
   const hashLaptop = await page.evaluate(() => location.hash);
   expect(laptopEnd.end).toBeGreaterThan(from);
@@ -123,6 +123,9 @@ test("on the desk, a click on the laptop ends at the index, as the nav's Project
 
   expect(Math.abs(laptopEnd.end - navEnd.end)).toBeLessThanOrEqual(2);   // the same place
   expect(hashLaptop).toBe(hashNav);                                       // the same anchor
-  expect(Math.abs(laptopEnd.at - navEnd.at)).toBeLessThan(400);           // the same glide (Lenis's 1.5 s)
+  // the drive's pace into the screen (Liam, 2026-10-19: the nav's 1.5 s was "way too fast"): 2.8 to 4.2 s
+  expect(laptopEnd.at).toBeGreaterThan(2600);
+  expect(laptopEnd.at).toBeLessThan(4700);
+  expect(laptopEnd.at).toBeGreaterThan(navEnd.at + 800);
   console.log(`laptop: ${from} -> ${laptopEnd.end} px in ${Math.round(laptopEnd.at)} ms; nav: -> ${navEnd.end} px in ${Math.round(navEnd.at)} ms; hash ${hashLaptop}`);
 });

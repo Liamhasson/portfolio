@@ -79,6 +79,11 @@ const STORY = { blur: 14, dim: 0.45, rate: 5 } as const;
 /** The drive's way in (seconds): the glide into the laptop, whose screen shows the playground itself (Liam, 2026-10-15:
  *  no in-between window); arriving, the page takes over in place, the same picture. */
 const DRIVE_FLOW = { glide: 2.8 } as const;
+/** The laptop's way in (Liam, 2026-10-19: the nav's 1.5 s jump was "way too fast"; match the drive's pull in): the same
+ *  glide and easing as the drive's, carried on past the screen onto the projects. Its seconds: the drive's for the way into
+ *  the screen, grown by the square root of how much further the projects are (so the pull into the screen keeps the
+ *  drive's pace and the last stretch, already inside the screen, doesn't drag), within these bounds. */
+const LAPTOP_FLOW = { min: DRIVE_FLOW.glide, max: 4.2 } as const;
 /** The floating grains' density through the page (Liam: strong in the hero, sparse over the desk, none on the index). */
 const DRIFT = { hero: 1, desk: 0.12 } as const;
 
@@ -636,7 +641,15 @@ export function SandLab({ hero }: { hero: boolean }) {
         if (laptopOn() && laptopAt(e.clientX, e.clientY)) {
           laptopOver = false;
           document.documentElement.style.cursor = "";
-          goToWork();   // (the nav's own anchor: its click sets jumpingSince above, Lenis glides)
+          // into the screen at the drive's pace and on onto the projects (the snap's own landing); the snap is held off
+          // meanwhile so it doesn't cut in with its quicker glide. Without the story's end measured yet: the nav's anchor.
+          if (!lastStoryEnd) { goToWork(); return; }
+          const from = window.scrollY, screenY = ((BEATS.takeover[0] + 0.04) / (STORY_SCREENS + SCREEN_HOLD)) * lastStoryEnd;
+          const further = Math.max(lastStoryEnd - from, 1) / Math.max(screenY - from, 1);
+          const seconds = Math.min(Math.max(DRIVE_FLOW.glide * Math.sqrt(further), LAPTOP_FLOW.min), LAPTOP_FLOW.max);
+          snapping = true;
+          history.pushState(null, "", "#projects");   // (the address the nav's anchor gives: Back returns to the desk)
+          glideTo(lastStoryEnd, seconds, () => { snapping = false; }, reduced);
         }
       }) as EventListener);
       const driveAt = (x: number, y: number) => !!drive?.ready && drive.hit(new THREE.Vector2((x / (canvas.clientWidth || 1)) * 2 - 1, 1 - (y / (canvas.clientHeight || 1)) * 2), stage!.camera) !== null;
