@@ -116,6 +116,9 @@ const fallbackScrolled = () => window.scrollY / Math.max(1, document.documentEle
 
 export function SandLab({ hero }: { hero: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  /** The sketches, sharp: their own see-through canvas at the screen's full density over the scene (Liam, 2026-10-19:
+   *  "not in focus": the scene draws below the screen's density, which hairlines can't take). */
+  const sharpRef = useRef<HTMLCanvasElement>(null);
   const [compare] = useState<CompareTarget | null>(() => {
     const v = new URLSearchParams(window.location.search).get("compare");
     return v === "chaos" || v === "mid" || v === "ball" ? v : null;
@@ -163,7 +166,8 @@ export function SandLab({ hero }: { hero: boolean }) {
     storyStarted();   // (the boot script's safety net stands down)
     let disposed = false;
     let stage: Stage | null = null;
-    let disposeNotes: (() => void) | null = null;   // (the notes' story, if it was made: its overlay and any hold it has)
+    let disposeNotes: (() => void) | null = null;
+    let disposeSharp: (() => void) | null = null;   // (the sketches' sharp canvas's renderer, once made)   // (the notes' story, if it was made: its overlay and any hold it has)
     let field: SandField | null = null;
     let paint: PaintField | null = null;
     // the desk's download, and whether the build took it (else unmounting gives its files back)
@@ -343,6 +347,48 @@ export function SandLab({ hero }: { hero: boolean }) {
       const noteFx = { rack: 0, focus: 1, blur: 0 };
       // the sketches of the work behind the desk, seen through the tilt (desk-sketches.ts; Liam, 2026-10-12)
       let sketches: DeskSketches | null = null;
+      // ...drawn sharp (Liam, 2026-10-19: always in focus but for the notes): the same sketches drawn a second time by a
+      // renderer of their own on a see-through canvas over the scene, at the screen's full density, from the scene's
+      // camera; the desk's own shapes first, depth only (stand-ins following each of its meshes), so the laptop's lid
+      // still hides them where it rises in front. While a note is racked into focus or its story is up the scene's own
+      // copy takes over (the lens and the story's blur and dim reach it there), crossfading, and the sharp one gives way.
+      let sharp: THREE.WebGLRenderer | null = null;
+      const sharpScene = new THREE.Scene();
+      const sharpDepth = new THREE.MeshBasicMaterial({ colorWrite: false });
+      let sharpStandIns: { src: THREE.Mesh; proxy: THREE.Mesh }[] | null = null;
+      let sharpShown = false;
+      const sharpSize = new THREE.Vector2();
+      const shownInWorld = (o: THREE.Object3D | null) => { for (; o; o = o.parent) if (!o.visible) return false; return true; };
+      const drawSharp = (sceneShare: number) => {
+        if (!sketches) return;
+        const k = Math.min(Math.max(sceneShare, 0), 1);
+        if (!sharp || !sketches.showing || k >= 0.999) {
+          if (sharp && sharpShown) { sharp.clear(); sharpShown = false; }
+          sketches.weight(1);
+          return;
+        }
+        const el = sharp.domElement, w = el.clientWidth || 1, h = el.clientHeight || 1;
+        if (sharp.getSize(sharpSize).x !== w || sharpSize.y !== h) sharp.setSize(w, h, false);
+        if (!sharpStandIns && deskLoaded) {
+          sharpStandIns = [];
+          deskLoaded.group.traverse((o) => {
+            const m = o as THREE.Mesh;
+            if (!m.isMesh) return;
+            const proxy = new THREE.Mesh(m.geometry, sharpDepth);
+            proxy.matrixAutoUpdate = false;
+            proxy.matrixWorldAutoUpdate = false;
+            sharpScene.add(proxy);
+            sharpStandIns!.push({ src: m, proxy });
+          });
+        }
+        for (const { src, proxy } of sharpStandIns ?? []) { proxy.matrixWorld.copy(src.matrixWorld); proxy.visible = shownInWorld(src); }
+        sketches.weight(1 - k);
+        sharp.clear();
+        sharp.render(sharpScene, stage!.camera);
+        sharp.render(sketches.group, stage!.camera);
+        sketches.weight(k);
+        sharpShown = true;
+      };
       const placeSketches = () => {
         if (!sketches || !shot || !shotMeta || !deskTop) return;
         // from the tilt's last frame, behind the desk's far edge
@@ -365,7 +411,7 @@ export function SandLab({ hero }: { hero: boolean }) {
         sketches.layout(portrait ? DESK_PORTRAIT.sketches : null);
         const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
         const far = new THREE.Vector3((deskTop.min.x + deskTop.max.x) / 2, deskTop.y, deskTop.min.y);
-        sketches.place(cam, far.sub(cam.position).dot(fwd) + 1.2, stage!.bufferHeight);
+        sketches.place(cam, far.sub(cam.position).dot(fwd) + 1.2, canvas.clientHeight || window.innerHeight);
       };
       // the desk's files download from the moment the hero's are in (during the loader: the network is free, the GPU
       // untouched); its loading line counts them (pre-launch audit, 2026-10-12)
@@ -439,6 +485,22 @@ export function SandLab({ hero }: { hero: boolean }) {
         if (disposed) return;
         sketches = sk;
         st.scene.add(sketches.group);
+        if (sharpRef.current) {
+          try {
+            const r = new THREE.WebGLRenderer({ canvas: sharpRef.current, alpha: true, antialias: true, powerPreference: "high-performance" });
+            r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 3));
+            r.outputColorSpace = THREE.SRGBColorSpace;
+            r.toneMapping = THREE.NoToneMapping;
+            r.setClearColor(0x000000, 0);
+            r.autoClear = false;
+            await sk.precompile(r, st.camera, sharpScene).catch(() => {});   // (none compiles mid-tilt here either)
+            if (disposed) { r.dispose(); return; }
+            sharp = r;
+            disposeSharp = () => { r.dispose(); sharpDepth.dispose(); };
+          } catch {
+            sharp = null;   // (no second context: the scene's own sketches, as before)
+          }
+        }
         placeSketches();
         st.onSettings(placeSketches);
         const spots = await RisingSand.loadSpots(`${SAND_BASE}/desk-spill.bin`, shot.data.chaos_center, shot.data.chaos_scale).catch(() => null);
@@ -1024,6 +1086,7 @@ export function SandLab({ hero }: { hero: boolean }) {
           sketchClock = sketches?.showing ? sketchClock + (reduced || still ? 0 : dt) : 0;
           // (the hover lights the part of a sketch under a mouse: Liam, 2026-10-12)
           sketches?.update(p, reduced, sketchClock, { x: (pointer.x / canvas.clientWidth) * 2 - 1, y: 1 - (pointer.y / canvas.clientHeight) * 2, on: pointer.active && !pointer.touch });
+          drawSharp(Math.max(noteFx.rack, noteFx.blur));
           // the rising sand: on once the desk is coming into view, off inside the screen (its clock: ambient; frozen, so still,
           // under reduced motion)
           const um = field!.material.uniforms;
@@ -1226,6 +1289,7 @@ export function SandLab({ hero }: { hero: boolean }) {
       if (deskFiles && !deskTaken) deskFiles.then(releaseDesk).catch(() => {});
       document.documentElement.style.cursor = "";   // (a hand over the laptop, a note or the drive never outlives the page)
       disposeNotes?.();
+      disposeSharp?.();
       paint?.dispose();
       field?.dispose();
       stage?.dispose();
@@ -1295,6 +1359,7 @@ export function SandLab({ hero }: { hero: boolean }) {
       <div className="fixed inset-0 grid place-items-center bg-black">
         <div className="relative" style={{ width: "min(100vw, 160vh)", aspectRatio: "16 / 10" }}>
           <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" data-testid="sand-canvas" />
+          <canvas ref={sharpRef} aria-hidden className="pointer-events-none absolute inset-0 h-full w-full" data-testid="sketch-canvas" />
           {/* eslint-disable-next-line @next/next/no-img-element -- a lab overlay, compared pixel for pixel */}
           <img
             src={`${SAND_BASE}/targets/${compare}.jpg`}
@@ -1325,6 +1390,7 @@ export function SandLab({ hero }: { hero: boolean }) {
     <>
     <div ref={pageRef} className="relative bg-black" style={{ height: hero ? `${PAGE_VH}vh` : "400vh" }}>
       <canvas ref={canvasRef} className="fixed inset-0 h-screen w-screen" data-testid="sand-canvas" />
+      <canvas ref={sharpRef} aria-hidden className="pointer-events-none fixed inset-0 h-screen w-screen" data-testid="sketch-canvas" />
       {hero && <div ref={veilRef} aria-hidden className="pointer-events-none fixed inset-0 bg-black opacity-0" style={{ zIndex: 30 }} />}
       {/* the nav's Projects (/#projects) lands where the index has settled (once this page is the home) */}
       {hero && <div ref={projectsRef} id="projects" aria-hidden className="pointer-events-none absolute left-0 w-px" style={{ top: `${PAGE_VH - 100}vh`, height: "100vh" }} />}

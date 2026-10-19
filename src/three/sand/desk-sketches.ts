@@ -156,6 +156,8 @@ void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(
 type Built = {
   sketch: Sketch; box: [number, number, number, number]; place: THREE.Group; pivot: THREE.Group;
   lines: THREE.ShaderMaterial; tone: THREE.ShaderMaterial; notes: THREE.ShaderMaterial;
+  /** This frame's opacities before `weight` (update sets them). */
+  base: { lines: number; tone: number; notes: number };
 };
 
 /** Pixels a unit in the tone's and notes' textures. */
@@ -227,7 +229,7 @@ export class DeskSketches {
       const place = new THREE.Group(); place.add(pivot);
       place.visible = false;
       this.group.add(place);
-      this.built.push({ sketch: sk, box, place, pivot, lines, tone, notes });
+      this.built.push({ sketch: sk, box, place, pivot, lines, tone, notes, base: { lines: 0, tone: 0, notes: 0 } });
     });
   }
 
@@ -237,7 +239,9 @@ export class DeskSketches {
   private override: Record<string, { at: [number, number]; scale: number }> | null = null;
   layout(o: Record<string, { at: [number, number]; scale: number }> | null): void { this.override = o; }
 
-  place(camera: THREE.PerspectiveCamera, distance: number, bufferHeight: number): void {
+  /** `screenHeight`: the view's height in CSS px (the hairline is SKETCH_LOOK.widthPx CSS px wide whatever the density it
+   *  is drawn at: the scene's, often under the screen's, or the sharp canvas's full one). */
+  place(camera: THREE.PerspectiveCamera, distance: number, screenHeight: number): void {
     camera.updateMatrixWorld();
     this.hover.value.z = camera.aspect;
     const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
@@ -250,9 +254,9 @@ export class DeskSketches {
       b.place.quaternion.copy(camera.quaternion).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -b.sketch.roll));
       const s = (b.sketch.per100 / 100) * (own?.scale ?? 1) * 2 * distance * tanV;   // (world units a sketch unit)
       b.place.scale.set(s, -s, s);   // (y down)
-      // the hairline: its width in the sketch's units, for SKETCH_LOOK.widthPx at this distance
-      const pxPerUnit = (bufferHeight / (2 * distance * tanV)) * s;
-      b.lines.uniforms.uWidth.value = SKETCH_LOOK.widthPx * (window.devicePixelRatio || 1) / pxPerUnit;
+      // the hairline: its width in the sketch's units, for SKETCH_LOOK.widthPx CSS px at this distance
+      const pxPerUnit = (screenHeight / (2 * distance * tanV)) * s;
+      b.lines.uniforms.uWidth.value = SKETCH_LOOK.widthPx / pxPerUnit;
     }
   }
 
@@ -270,14 +274,26 @@ export class DeskSketches {
       if (!b.place.visible) return;
       const o = s.opacity * SKETCH_LOOK.opacity;
       b.lines.uniforms.uReveal.value = s.reveal;
-      b.lines.uniforms.uOpacity.value = o;
-      b.tone.uniforms.uOpacity.value = o * ease(span(s.reveal, 0.7, 1));   // (rubbed in as the hatching lands)
+      b.base.lines = o;
+      b.base.tone = o * ease(span(s.reveal, 0.7, 1));   // (rubbed in as the hatching lands)
       b.notes.uniforms.uReveal.value = s.notes;
-      b.notes.uniforms.uOpacity.value = o * 1.2;
+      b.base.notes = o * 1.2;
       const f = sketchFloat(time, i, reduced);
       b.pivot.position.set(f.x, f.y, f.z);
       b.pivot.rotation.set(s.tilt + f.rx, s.spin + f.ry, f.rz);
     });
+    this.weight(1);
+  }
+
+  /** Scales this frame's opacities (0..1) for the next draw: the sketches are drawn twice, sharp on their own canvas at
+   *  the screen's full density and in the scene (where the lens and the story's blur reach them); each draw takes its
+   *  share (the mount's: all sharp, but for a note racked into focus or its story up). Call after `update`. */
+  weight(w: number): void {
+    for (const b of this.built) {
+      b.lines.uniforms.uOpacity.value = b.base.lines * w;
+      b.tone.uniforms.uOpacity.value = b.base.tone * w;
+      b.notes.uniforms.uOpacity.value = b.base.notes * w;
+    }
   }
 
   /** Any sketch on screen (its float's clock runs only then). */
