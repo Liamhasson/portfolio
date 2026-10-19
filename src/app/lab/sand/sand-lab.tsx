@@ -84,6 +84,24 @@ const DRIVE_FLOW = { glide: 2.8 } as const;
  *  the screen, grown by the square root of how much further the projects are (so the pull into the screen keeps the
  *  drive's pace and the last stretch, already inside the screen, doesn't drag), within these bounds. */
 const LAPTOP_FLOW = { min: DRIVE_FLOW.glide, max: 4.2 } as const;
+/**
+ * The desk on a portrait screen (Liam, 2026-10-19: cut off at the sides, the lower half empty): over the desk the view
+ * widens to `wide` of the shot's own width (the laptop, the drive and the notes all in frame) and tilts so the desk sits
+ * low (`pitch`: the share of the portrait's extra height put above the desk's composition rather than below it: 1 all
+ * above, 0 centred, -1 all below, the old top-aligned framing), the sketches stacked in the room above (`sketches`: each
+ * one's place, NDC, and size). The ball, which on the desktop hangs above the desk just out of frame (its shadow on the
+ * desk), rises `lift` (scene units) as the framing comes in, so it leaves the taller frame as it leaves the desktop's. In over the tilt, out over `out` (screens), back to the narrow framing before the
+ * pull into the screen takes over.
+ */
+const DESK_PORTRAIT = {
+  wide: 1,
+  pitch: 0.85,
+  lift: 12,
+  out: [3.3, 3.95] as [number, number],
+  sketches: { pulse: { at: [0, 0.6], scale: 0.8 }, eventread: { at: [0, 0.24], scale: 0.8 }, cyvore: { at: [0, -0.12], scale: 0.8 } } as Record<string, { at: [number, number]; scale: number }>,
+};
+/** The desk's portrait framing's weight at story progress `p` (screens). */
+const deskPortraitAt = (p: number) => ease(p, BEATS.tilt) * (1 - ease(p, DESK_PORTRAIT.out));
 /** The floating grains' density through the page (Liam: strong in the hero, sparse over the desk, none on the index). */
 const DRIFT = { hero: 1, desk: 0.12 } as const;
 
@@ -331,8 +349,20 @@ export function SandLab({ hero }: { hero: boolean }) {
         const v = shot.view(shotMeta.beats.tilt[1]);
         const cam = stage!.camera.clone();
         cam.position.copy(v.position); cam.quaternion.copy(v.quaternion);
+        // (portrait: from the desk's own framing, as the story frames the desk there, the sketches stacked above it)
+        const portrait = cam.aspect < 1;
+        const was = stage!.portraitMix;
+        stage!.portraitWide = DESK_PORTRAIT.wide;
+        stage!.portraitMix = portrait ? 1 : 0;
         cam.fov = THREE.MathUtils.radToDeg(stage!.vfovFor(cam.aspect, v.lens));
-        cam.updateProjectionMatrix(); cam.updateMatrixWorld();
+        stage!.portraitMix = was;
+        cam.updateProjectionMatrix();
+        if (portrait) {
+          const tanV = Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2), room = Math.max(Math.atan(tanV) - Math.atan(18 / v.lens / 1.6), 0);
+          cam.quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(room * DESK_PORTRAIT.pitch, 0, 0, "YXZ")));
+        }
+        cam.updateMatrixWorld();
+        sketches.layout(portrait ? DESK_PORTRAIT.sketches : null);
         const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
         const far = new THREE.Vector3((deskTop.min.x + deskTop.max.x) / 2, deskTop.y, deskTop.min.y);
         sketches.place(cam, far.sub(cam.position).dot(fwd) + 1.2, stage!.bufferHeight);
@@ -692,6 +722,9 @@ export function SandLab({ hero }: { hero: boolean }) {
       const chaosShift = field.material.uniforms.uChaosShift.value as THREE.Vector3;
       const chaosC = new THREE.Vector3();   // where the cloud stands (moved right of the copy in the hero)
       const ballC = field.material.uniforms.uBallC.value as THREE.Vector3;
+      // (where the ball hangs: its shadow and spill keep to it; on a portrait screen over the desk the drawn ball rises
+      // out of the taller frame, DESK_PORTRAIT.lift, as it leaves the desktop's frame)
+      const ballHome = ballC.clone();
 
       stage.onFrame((dt) => {
         const desk3d = deskLoaded, rising = risingLoaded;
@@ -840,15 +873,23 @@ export function SandLab({ hero }: { hero: boolean }) {
             if (inv.lean > 0 && room > 1e-6) { inviteDebug.lean = Math.min(inv.lean * leanUnits, room); v.position.addScaledVector(leanDir, inviteDebug.lean / room); }
             inviteDebug.toScreen = leanDir.subVectors(leanTo, v.position).length();
           }
+          const W = canvas.clientWidth || 1, H = canvas.clientHeight || 1;
+          const deskK = W / H < 1 ? deskPortraitAt(p) : 0;
+          stage!.portraitWide = DESK_PORTRAIT.wide;
+          stage!.portraitMix = deskK;
+          ballC.copy(ballHome);
+          ballC.y += DESK_PORTRAIT.lift * deskK;
           stage!.setView(v.position, v.quaternion, v.lens);
           const cam = stage!.camera;
           inviteDebug.camera[0] = v.position.x; inviteDebug.camera[1] = v.position.y; inviteDebug.camera[2] = v.position.z;
-          const W = canvas.clientWidth || 1, H = canvas.clientHeight || 1;
-          // portrait phones see far more height: the tilt goes further there so the ball leaves the frame (spec §10)
+          // portrait phones see far more height: the tilt goes further there so the ball leaves the frame (spec §10); over
+          // the desk, the desk's own framing instead: the desk low, its extra height above it (DESK_PORTRAIT.pitch)
           {
             const tanV = Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2), tanV16 = 18 / v.lens / 1.6;   // (16:10, horizontal fit: the shot's own frame)
-            const extra = Math.max(Math.atan(tanV) - Math.atan(tanV16), 0) * ease(p, BEATS.tilt) * (1 - ease(p, BEATS.glide));
-            if (extra > 1e-4) { cam.quaternion.multiply(leanQ.setFromEuler(leanE.set(-extra, 0, 0, "YXZ"))); cam.updateMatrixWorld(); }
+            const room = Math.max(Math.atan(tanV) - Math.atan(tanV16), 0);
+            const story = room * ease(p, BEATS.tilt) * (1 - ease(p, BEATS.glide));
+            const extra = story * (1 - deskK) - room * DESK_PORTRAIT.pitch * deskK;
+            if (Math.abs(extra) > 1e-4) { cam.quaternion.multiply(leanQ.setFromEuler(leanE.set(-extra, 0, 0, "YXZ"))); cam.updateMatrixWorld(); }
           }
           // the lean: toward the cursor, eased; out as the index takes over
           {
@@ -951,9 +992,9 @@ export function SandLab({ hero }: { hero: boolean }) {
           if (desk3d) {
             const ballR = (field!.material.uniforms.uBallR.value as number) * shadowK[2];
             const k = shadowK[1] * state.compact;
-            desk3d.setBallShadow(ballC, ballR, deskNow.lights[0].pos, shadowK[0], k, 0, k, k);
-            rising?.setShadow(ballC, ballR, deskNow.lights[0].pos, shadowK[0], k);   // the grains in it too (Liam: they looked pasted)
-            const below = new THREE.Vector3(ballC.x, deskTop ? deskTop.y : ballC.y - 4.6, ballC.z);
+            desk3d.setBallShadow(ballHome, ballR, deskNow.lights[0].pos, shadowK[0], k, 0, k, k);
+            rising?.setShadow(ballHome, ballR, deskNow.lights[0].pos, shadowK[0], k);   // the grains in it too (Liam: they looked pasted)
+            const below = new THREE.Vector3(ballHome.x, deskTop ? deskTop.y : ballHome.y - 4.6, ballHome.z);
             desk3d.setSpill(below, 2.5, new THREE.Vector3(0.35, 0.26, 0.2).multiplyScalar(state.compact * h));
           }
           field!.setPointScale(stage!.bufferHeight, THREE.MathUtils.degToRad(stage!.camera.fov));

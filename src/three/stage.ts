@@ -79,11 +79,20 @@ export class Stage {
 
   /** Vertical field of view for the current aspect (at the current lens, or `lensMm`). Exact framing reproduces Blender's
    *  horizontal fit. */
+  /** Portrait (phones, upright tablets), the desk's own framing (Liam, 2026-10-19: the desk was cut off at the sides):
+   *  `portraitMix` (0..1, the story sets it over the desk) blends the narrow portrait view toward `portraitWide` of the
+   *  shot's own width. */
+  portraitMix = 0;
+  portraitWide = 1;
+
   vfovFor(aspect: number, lensMm?: number): number {
     let tanH = lensMm ? this.sensorMm / 2 / lensMm : Math.tan(this.hfov / 2);
-    // Portrait (phones): narrow the view so the ball keeps ~65% of the width; the chaos overflows the edges.
-    // A lab stand-in: the real responsive framing comes with the hero layout.
-    if (!this.exactFraming && aspect < 1) tanH *= 1 - 0.58 * Math.min((1 - aspect) / 0.55, 1);
+    // Portrait (phones): narrow the view so the ball keeps ~65% of the width; the chaos overflows the edges. Over the
+    // desk, eased toward the desk's own wider framing (portraitMix).
+    if (!this.exactFraming && aspect < 1) {
+      const narrow = 1 - 0.58 * Math.min((1 - aspect) / 0.55, 1);
+      tanH *= narrow + (Math.max(this.portraitWide, narrow) - narrow) * Math.min(Math.max(this.portraitMix, 0), 1);
+    }
     // Blender: horizontal fit. Wider screens keep the render's vertical framing (more void at the sides).
     const fitAspect = this.exactFraming ? aspect : Math.min(aspect, this.renderAspect);
     return 2 * Math.atan(tanH / fitAspect);

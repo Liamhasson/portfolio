@@ -232,17 +232,23 @@ export class DeskSketches {
   }
 
   /** Placed from the tilt's last frame: each at its spot on screen, `distance` along its line of sight, facing the camera. */
+  /** Portrait's own places (the desk's portrait framing: the sketches stacked above the desk), by id: each one's place
+   *  (NDC) and a scale on its size; null: the sketches' own (sketch-data.ts). Takes effect at the next `place`. */
+  private override: Record<string, { at: [number, number]; scale: number }> | null = null;
+  layout(o: Record<string, { at: [number, number]; scale: number }> | null): void { this.override = o; }
+
   place(camera: THREE.PerspectiveCamera, distance: number, bufferHeight: number): void {
     camera.updateMatrixWorld();
     this.hover.value.z = camera.aspect;
     const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
     for (const b of this.built) {
-      const [ax, ay] = b.sketch.at;
+      const own = this.override?.[b.sketch.id];
+      const [ax, ay] = own?.at ?? b.sketch.at;
       const dir = new THREE.Vector3(ax * tanV * camera.aspect, ay * tanV, -1).applyQuaternion(camera.quaternion).normalize();
       const along = distance / dir.dot(new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion));
       b.place.position.copy(camera.position).addScaledVector(dir, along);
       b.place.quaternion.copy(camera.quaternion).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -b.sketch.roll));
-      const s = (b.sketch.per100 / 100) * 2 * distance * tanV;   // (world units a sketch unit)
+      const s = (b.sketch.per100 / 100) * (own?.scale ?? 1) * 2 * distance * tanV;   // (world units a sketch unit)
       b.place.scale.set(s, -s, s);   // (y down)
       // the hairline: its width in the sketch's units, for SKETCH_LOOK.widthPx at this distance
       const pxPerUnit = (bufferHeight / (2 * distance * tanV)) * s;
