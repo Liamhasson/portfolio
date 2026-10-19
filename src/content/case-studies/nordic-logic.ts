@@ -45,9 +45,9 @@ export const nordicLogic: CaseStudy = {
     link: { href: "https://nordic-logic.vercel.app", label: "Visit site" },
   },
   peek: { src: "/case-studies/nordic-logic/peek.jpg", alt: "Nordic Logic's home page: Your carriers owe you, over the client portal's overview", width: 1200, height: 750 },
-  // Measured on the built page at 1440×900: 10.3 screens on 2026-10-13; 13.5 on 2026-10-19 with the Brand section (3.7
-  // screens: the strategy, the voice, the mark, colour and type, the dot grid, the brand in use; the system strip it
-  // replaced left How it works). Liam's call (2026-10-19) to add it at this length: the cap sits on the real numbers.
-  screenCap: 13.6,
-  budget: { ...STANDARD_BUDGET, signature: 2.7, supporting: 5.6, challenges: 1.6, outcome: 0.6 },
+  // Measured on the built page at 1440×900: 10.3 screens on 2026-10-13; 11.9 on 2026-10-19 with the Brand section, image
+  // first and held to about two screens (Liam: no more than two): the lockup's construction on the dot grid, the strategy
+  // row, and one bento. The system strip it replaced left How it works.
+  screenCap: 12,
+  budget: { ...STANDARD_BUDGET, signature: 2.7, supporting: 4, challenges: 1.6, outcome: 0.6 },
 };
