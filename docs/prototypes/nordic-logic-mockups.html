@@ -300,6 +300,60 @@ button.fa-node.choice:active { transform: scale(.985); }
   .phone-row .frame { margin: 0 auto; }
   .phone-notes { position: static; }
 }
+
+/* ------------------------------ 05b · Brand (Liam, 2026-10-19) ------------------------------ */
+.brand { padding: calc(var(--u) * 120) 0 calc(var(--u) * 112); }
+.br-strat { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: calc(var(--u) * 24); margin: calc(var(--u) * 80) calc(var(--u) * 72) 0; border-top: calc(var(--u) * 1) solid var(--hair-2); }
+.br-strat > div { display: flex; flex-direction: column; gap: calc(var(--u) * 14); padding: calc(var(--u) * 24) calc(var(--u) * 24) 0 0; }
+.br-strat > div + div { border-left: calc(var(--u) * 1) solid var(--hair); padding-left: calc(var(--u) * 24); }
+.br-strat .say { font: 500 calc(var(--u) * 22)/1.3 var(--nl-display); letter-spacing: -.012em; color: var(--ink); }
+.br-words { display: flex; flex-wrap: wrap; gap: calc(var(--u) * 6); }
+.br-words span { font: 500 calc(var(--u) * 12)/1 var(--nl-mono); letter-spacing: .06em; text-transform: uppercase; padding: calc(var(--u) * 7) calc(var(--u) * 10); border-radius: calc(var(--u) * 4); background: var(--mist); color: var(--ink-2); }
+.br-words.no span { background: transparent; box-shadow: inset 0 0 0 1px var(--hair-2); color: var(--ink-3); text-decoration: line-through; text-decoration-color: rgba(90, 102, 114, .6); }
+.br-voice { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: calc(var(--u) * 24); padding: 0 calc(var(--u) * 72); margin-top: calc(var(--u) * 88); align-items: center; }
+.br-pair { grid-column: 6/13; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: calc(var(--u) * 16); }
+.br-pair > div { border-radius: calc(var(--u) * 8); padding: calc(var(--u) * 28); display: flex; flex-direction: column; gap: calc(var(--u) * 18); min-height: calc(var(--u) * 230); }
+.br-pair .was { background: transparent; box-shadow: inset 0 0 0 1px var(--hair-2); }
+.br-pair .now { background: var(--surface); box-shadow: inset 0 0 0 1px var(--hair); }
+.br-pair .q { font: 500 calc(var(--u) * 28)/1.15 var(--nl-display); letter-spacing: -.02em; color: var(--ink); }
+.br-pair .was .q { color: var(--ink-3); }
+.br-pair .q .quiet { color: var(--ink-3); }
+.br-pair .note { font: 400 calc(var(--u) * 14)/1.5 var(--nl-body); color: var(--ink-3); margin-top: auto; }
+.br-mark { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: calc(var(--u) * 24); padding: 0 calc(var(--u) * 72); margin-top: calc(var(--u) * 80); align-items: center; }
+.br-plate { grid-column: 1/8; background: var(--mist); border-radius: calc(var(--u) * 8); height: calc(var(--u) * 480); display: grid; place-items: center; position: relative; }
+.br-plate svg { width: calc(var(--u) * 340); height: auto; overflow: visible; }
+.br-plate .g { stroke: var(--signal); stroke-width: .6; fill: none; opacity: .55; vector-effect: non-scaling-stroke; }
+.br-plate .g.d { stroke-dasharray: 3 3; }
+.br-plate .err { stroke: var(--signal); stroke-width: 1.2; fill: rgba(27, 77, 255, .08); stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
+.br-plate .ann { font: 500 7px var(--nl-mono); letter-spacing: .06em; fill: var(--signal); text-transform: uppercase; }
+.br-side { grid-column: 9/13; display: flex; flex-direction: column; gap: calc(var(--u) * 20); }
+.br-two { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: calc(var(--u) * 24); padding: 0 calc(var(--u) * 72); margin-top: calc(var(--u) * 104); align-items: start; }
+.br-col { display: flex; flex-direction: column; gap: calc(var(--u) * 20); }
+.br-sw { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(var(--u) * 10); margin-top: calc(var(--u) * 8); }
+.br-sw .grp { grid-column: 1/-1; margin-top: calc(var(--u) * 6); }
+.br-sw div { display: flex; flex-direction: column; gap: calc(var(--u) * 8); }
+.br-sw i { display: block; height: calc(var(--u) * 64); border-radius: calc(var(--u) * 6); box-shadow: inset 0 0 0 1px rgba(12, 17, 22, .08); }
+.br-sw span { font: 500 calc(var(--u) * 11)/1.35 var(--nl-mono); letter-spacing: .06em; color: var(--ink-3); }
+.br-type { display: flex; flex-direction: column; gap: calc(var(--u) * 26); margin-top: calc(var(--u) * 8); }
+.br-type > div { display: flex; flex-direction: column; gap: calc(var(--u) * 8); padding-bottom: calc(var(--u) * 22); border-bottom: calc(var(--u) * 1) solid var(--hair); }
+.br-type .t1 { font: 500 calc(var(--u) * 52)/1.05 var(--nl-display); letter-spacing: -.025em; color: var(--ink); }
+.br-type .t2 { font: 400 calc(var(--u) * 18)/1.55 var(--nl-body); letter-spacing: .01em; color: var(--ink-2); }
+.br-type .t3 { font: 500 calc(var(--u) * 14)/1.4 var(--nl-mono); letter-spacing: .06em; color: var(--ink-2); }
+.br-type .t3 b { color: var(--signal); font-weight: 500; }
+.br-tex { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: calc(var(--u) * 24); padding: 0 calc(var(--u) * 72); margin-top: calc(var(--u) * 104); align-items: center; }
+.br-tex video { grid-column: 6/13; width: 100%; display: block; border-radius: calc(var(--u) * 8); box-shadow: inset 0 0 0 1px var(--hair), 0 0 0 1px var(--hair); background: #f9f9f8; }
+.br-use { padding: 0 calc(var(--u) * 72); margin-top: calc(var(--u) * 104); }
+.br-lockups { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, .8fr); gap: calc(var(--u) * 16); margin-top: calc(var(--u) * 24); }
+.br-lockups > div { height: calc(var(--u) * 168); border-radius: calc(var(--u) * 8); display: grid; place-items: center; }
+.br-lockups .on-day { background: var(--surface); box-shadow: inset 0 0 0 1px var(--hair); }
+.br-lockups .on-mist { background: var(--mist); }
+.br-lockups .on-onyx { background: var(--onyx); }
+.br-lockups img { width: 72%; height: auto; }
+.br-lockups .br-ic img { width: 52%; border-radius: 22%; }
+.br-shots { display: grid; align-items: start; grid-template-columns: minmax(0, 1.62fr) minmax(0, 1fr); gap: calc(var(--u) * 16); margin-top: calc(var(--u) * 16); }
+.br-shots figure { margin: 0; border-radius: calc(var(--u) * 8); overflow: hidden; box-shadow: inset 0 0 0 1px var(--hair); background: var(--surface); }
+.br-shots img { display: block; width: 100%; height: auto; }
+.br-shots figcaption { padding: calc(var(--u) * 14) calc(var(--u) * 18); }
 </style>
 </head>
 <body>
@@ -450,7 +504,7 @@ button.fa-node.choice:active { transform: scale(.985); }
 
 <!-- ============================== 5 HOW IT WORKS ============================== -->
 <section class="block">
-  <div class="cap"><span><b>05 · How it works</b> — the site's dark chapter: four 3D cards, the denial chapter, the system</span><span>~2.4 screens · 1440 × ~2150</span></div>
+  <div class="cap"><span><b>05 · How it works</b> — the site's dark chapter: four 3D cards and the denial chapter (the system strip moved to 05b · Brand)</span><span>~1.9 screens · 1440 × ~1700</span></div>
   <div class="frame"><div class="f onyx how">
     <div class="fold" style="top:calc(var(--u) * 900)"><span>900</span></div>
     <div class="fold" style="top:calc(var(--u) * 1800)"><span>1800</span></div>
@@ -477,30 +531,108 @@ button.fa-node.choice:active { transform: scale(.985); }
       </div>
     </div>
 
-    <div class="sys">
-      <div>
-        <div class="label" style="margin-bottom:calc(var(--u) * 18)">Colour</div>
-        <div class="sys-sw">
-          <div><i style="background:#1b4dff"></i><span>SIGNAL<br>1B4DFF</span></div>
-          <div><i style="background:#0c1116"></i><span>INK<br>0C1116</span></div>
-          <div><i style="background:#0f151b"></i><span>ONYX<br>0F151B</span></div>
+  </div></div>
+</section>
+
+<!-- ============================== 5b BRAND ============================== -->
+<section class="block">
+  <div class="cap"><span><b>05b · Brand</b> — the strategy and the voice, then the mark, the colour, the type, the texture, and the brand in use (the old system strip from 05 lives here now)</span><span>~3.6 screens · 1440 × ~3250</span></div>
+  <div class="frame"><div class="f brand">
+    <div class="fold" style="top:calc(var(--u) * 900)"><span>900</span></div>
+    <div class="fold" style="top:calc(var(--u) * 1800)"><span>1800</span></div>
+    <div class="g12" style="align-items:end">
+      <h2 class="title" style="grid-column:1/7;margin-left:calc(var(--u) * -3)">Brand</h2>
+      <p class="body" style="grid-column:8/13"><span class="lead">Trust without proof.</span> A one-person company with no clients to point to can't borrow anyone's credibility. So the brand earns it the way the site does: precise where the evidence is, warm where it asks for trust, and nothing on it that isn't doing a job.</p>
+    </div>
+
+    <div class="br-strat">
+      <div><span class="label">Audience</span><p class="say">The person who signs off the freight bill: a finance or operations lead who expects to be sold to, and checks.</p></div>
+      <div><span class="label">The unspoken truth</span><p class="say">A buyer who's being sold to stops listening. One who's shown the work starts to trust.</p></div>
+      <div><span class="label">Brand words · from the brief</span>
+        <div class="br-words"><span>Efficient</span><span>Automated</span><span>Precise</span><span>Personal</span><span>Safe</span><span>Modern</span><span>Alive</span></div>
+        <span class="label" style="margin-top:calc(var(--u) * 6)">And never</span>
+        <div class="br-words no"><span>Industrial</span><span>Boring</span><span>Generic fintech</span><span>Playful</span><span>Startup-cute</span></div>
+      </div>
+    </div>
+
+    <div class="br-voice">
+      <div class="br-col" style="grid-column:1/5">
+        <div class="label">Voice</div>
+        <h3 class="w-title">Every claim survives a check.</h3>
+        <p class="body">Plain, specific and checkable. The brief sold on price with a comparison a buyer could disprove on a competitor's own pricing page. The site states the fee as fact and puts the promise in the heading, so there is nothing to argue with.</p>
+      </div>
+      <div class="br-pair">
+        <div class="was"><span class="label">The brief</span><p class="q">35%, the market standard is 40–50%.</p><p class="note">A comparison the competitor's own pricing page disproves in ten minutes.</p></div>
+        <div class="now"><span class="label">The site</span><p class="q">What this costs. <span class="quiet">One invoice, and only if we recover.</span></p><p class="note">The fee as plain fact, and the risk taken off the buyer in the heading itself.</p></div>
+      </div>
+    </div>
+
+    <div class="br-mark">
+      <div class="br-plate">
+        <svg viewBox="-34 -30 344 300" role="img" aria-label="The Nordic Logic mark under its construction: five bars, the 30° diagonal, and the one bar that never reaches the margin">
+          <g class="g"><line x1="-30" x2="306" y1="0" y2="0"/><line x1="-30" x2="306" y1="35.31" y2="35.31"/><line x1="-30" x2="306" y1="50.99" y2="50.99"/><line x1="-30" x2="306" y1="86.59" y2="86.59"/><line x1="-30" x2="306" y1="102.28" y2="102.28"/><line x1="-30" x2="306" y1="137.73" y2="137.73"/><line x1="-30" x2="306" y1="153.41" y2="153.41"/><line x1="-30" x2="306" y1="188.86" y2="188.86"/><line x1="-30" x2="306" y1="204.55" y2="204.55"/><line x1="-30" x2="306" y1="240" y2="240"/></g>
+          <g class="g d"><line x1="-15.6" y1="-27" x2="155.9" y2="270"/><line x1="33.5" y1="-27" x2="205" y2="270"/><line x1="0" y1="-27" x2="0" y2="270"/></g>
+          <path d="M49.0908 240.002H0V204.546H49.0908V240.002ZM275.457 240.002H139.092L118.543 204.546H275.457V240.002ZM49.0908 188.864H0V153.411H49.0908V188.864ZM139.092 155.183V153.411H188.184V188.864H109.454L88.9072 153.411H138.064L139.092 155.183ZM128.969 137.729H79.8184L59.2715 102.275H108.407L128.969 137.729ZM188.184 137.729H139.092V102.275H188.184V137.729ZM99.3115 86.5928H50.1816L49.0908 84.71V86.5928H0V50.9893H78.6631L99.3115 86.5928ZM188.184 86.5928H139.092V50.9893H188.184V86.5928ZM69.5674 35.3066H0V0H49.0908L69.5674 35.3066ZM188.184 35.3066H139.092V0H188.184V35.3066Z" fill="#0C1116"/>
+          <rect class="err" x="0" y="102.28" width="49.09" height="35.45"/>
+          <path class="g" d="M0 -14 A14 14 0 0 1 8 -11.5" />
+          <text class="ann" x="6" y="-17" style="font-size:9px">30°</text>
+          <text class="ann" x="-5" y="122.5" text-anchor="end">The error</text>
+        </svg>
+      </div>
+      <div class="br-side">
+        <div class="label">Mark</div>
+        <h3 class="w-title">The error is in the mark.</h3>
+        <p class="body">N and L share one stem, sliced into five bars. The diagonal runs at 30°, taken from Schibsted Grotesk's own N, so the mark and the wordmark cut on one angle. One bar never reaches the margin: the billing error Nordic Logic exists to find. It's drawn in geometry, not colour, so it survives a single ink.</p>
+        <p class="label" style="margin-top:calc(var(--u) * 4)">Designed by me, after three rounds of directions</p>
+      </div>
+    </div>
+
+    <div class="br-two">
+      <div class="br-col" style="grid-column:1/6">
+        <div class="label">Colour</div>
+        <h3 class="w-title">Only the surfaces turned warm.</h3>
+        <p class="body">The first palette was blue all the way through: precise, and clinical. Wrong for a page that asks a stranger for a power of attorney. Only the surfaces moved, to a warm hue at the same lightness, so every contrast ratio held. The type stays cool, where the forensic tone belongs, and Signal is the one accent: one per screen, never a fill.</p>
+        <div class="br-sw">
+          <div class="label grp">Surfaces · warm</div>
           <div><i style="background:#f9f9f8"></i><span>DAYLIGHT<br>F9F9F8</span></div>
           <div><i style="background:#efedeb"></i><span>MIST<br>EFEDEB</span></div>
+          <div><i style="background:#ebe9e6"></i><span>FROST<br>EBE9E6</span></div>
+          <div class="label grp">Type · cool</div>
+          <div><i style="background:#0c1116"></i><span>INK<br>0C1116</span></div>
           <div><i style="background:#5a6672"></i><span>SLATE<br>5A6672</span></div>
+          <div><i style="background:#0f151b"></i><span>ONYX<br>0F151B</span></div>
+          <div class="label grp">Brand</div>
+          <div><i style="background:#1b4dff"></i><span>SIGNAL<br>1B4DFF</span></div>
+          <div><i style="background:#edf2fa"></i><span>HAZE<br>EDF2FA</span></div>
         </div>
       </div>
-      <div>
-        <div class="label" style="margin-bottom:calc(var(--u) * 18)">Type</div>
-        <div class="sys-type">
-          <div><span class="label">Schibsted Grotesk</span><span class="s1">Your carriers owe you.</span></div>
-          <div><span class="label">Instrument Sans</span><span class="s2">Every charge on every invoice, against the carrier's own rules.</span></div>
-          <div><span class="label">IBM Plex Mono</span><span class="s3">FEDEX GROUND · 42 LB BILLED · <b>+$25.97</b></span></div>
+      <div class="br-col" style="grid-column:7/13">
+        <div class="label">Type</div>
+        <h3 class="w-title">Each typeface has one job.</h3>
+        <p class="body">Schibsted Grotesk is Norwegian: the Nordic is real, not costume. Headlines are tracked tight and body copy loose, and nothing is heavier than 500. Authority comes from size and space, not weight.</p>
+        <div class="br-type">
+          <div><span class="label">Schibsted Grotesk · display</span><span class="t1">Your carriers owe you.</span></div>
+          <div><span class="label">Instrument Sans · body</span><span class="t2">Every charge on every invoice, against the carrier's own rules.</span></div>
+          <div><span class="label">IBM Plex Mono · labels and figures</span><span class="t3">FEDEX GROUND · 42 LB BILLED · <b>+$25.97</b></span></div>
         </div>
       </div>
-      <div class="sys-mark">
-        <div class="label">Mark</div>
-        <img src="nordic-logic-mockups/mark-knockout.svg" alt="The Nordic Logic mark: N and L sharing one stroke, with a void between them">
-        <p class="body" style="font-size:calc(var(--u) * 14)">Signal is the one accent, never a fill. Weight stops at 500.</p>
+    </div>
+
+    <div class="br-tex">
+      <div class="br-col" style="grid-column:1/5">
+        <div class="label">Texture</div>
+        <h3 class="w-title">Every page sits on paper.</h3>
+        <p class="body">Every page is set on a fine dot grid, the pattern of a notebook page, so the site reads as a working document rather than a sales page. The grid answers the cursor: the dots part around it, hold for a moment, then ease back into place. Only their position changes, never their colour or size, so the texture stays beneath the content.</p>
+        <p class="label" style="margin-top:calc(var(--u) * 4)">Live on the site · an 11px grid, drawn in code</p>
+      </div>
+      <video src="nordic-logic-mockups/dot-grid.mp4" poster="nordic-logic-mockups/dot-grid-poster.jpg" autoplay muted loop playsinline aria-label="The site's dot grid: the dots part around the cursor and ease back into place"></video>
+    </div>
+
+    <div class="br-use">
+      <div class="label">In use</div>
+      <div class="br-shots">
+        <figure><img src="nordic-logic-mockups/in-use-site.jpg" alt="The site's home page: the lockup in the header, the headline in Schibsted Grotesk and the one Signal button"><figcaption class="label">The site · nordic-logic.vercel.app</figcaption></figure>
+        <figure><img src="nordic-logic-mockups/in-use-portal.jpg" alt="The client portal: the mark on a Signal tile at the top of the dark sidebar"><figcaption class="label">The client portal</figcaption></figure>
       </div>
     </div>
   </div></div>

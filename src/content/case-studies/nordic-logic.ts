@@ -45,9 +45,9 @@ export const nordicLogic: CaseStudy = {
     link: { href: "https://nordic-logic.vercel.app", label: "Visit site" },
   },
   peek: { src: "/case-studies/nordic-logic/peek.jpg", alt: "Nordic Logic's home page: Your carriers owe you, over the client portal's overview", width: 1200, height: 750 },
-  // Measured on the built page at 1440×900 (2026-10-13): 10.3 screens. The Solution holds the comparison and the working
-  // first audit (2.7), How it works the four 3D cards, the denial chapter and the system (2.4). Longer than Eventread's
-  // 9.5: Liam's call to keep or cut, so the cap sits on the real numbers rather than hiding them.
-  screenCap: 10.5,
-  budget: { ...STANDARD_BUDGET, signature: 2.7, supporting: 2.4, challenges: 1.6, outcome: 0.6 },
+  // Measured on the built page at 1440×900: 10.3 screens on 2026-10-13; 13.5 on 2026-10-19 with the Brand section (3.7
+  // screens: the strategy, the voice, the mark, colour and type, the dot grid, the brand in use; the system strip it
+  // replaced left How it works). Liam's call (2026-10-19) to add it at this length: the cap sits on the real numbers.
+  screenCap: 13.6,
+  budget: { ...STANDARD_BUDGET, signature: 2.7, supporting: 5.6, challenges: 1.6, outcome: 0.6 },
 };
