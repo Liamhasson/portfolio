@@ -10,26 +10,30 @@ describe("contactLayout", () => {
     expect(l.r).toBeCloseTo(135, 9);
   });
 
-  // an iPhone 13 Pro Max with Safari's toolbars showing (visible 428 x 746, the canvas the large viewport 926), an iPhone
-  // SE the same (375 x 548 / 667), an upright iPad mini and iPad Pro
-  for (const [name, w, h, H, wordsH] of [["13 Pro Max", 428, 746, 926, 230], ["SE", 375, 548, 667, 250], ["iPad mini", 768, 1024, 1024, 230], ["iPad Pro", 1024, 1366, 1366, 240]] as const) {
-    test(`upright (${name}): the ball and the words one group, never touching, clear of the header and the foot`, () => {
+  test("upright with room: the approved framing as it was, the words in their own place", () => {
+    const l = contactLayout(768, 1024, 1024, 200);
+    expect([l.share, l.at, l.wordsTop]).toEqual([CONTACT_FRAME.share, CONTACT_FRAME.at, null]);
+  });
+
+  // an iPhone 13 Pro Max with Safari's toolbars showing (visible 428 x 746, the canvas the large viewport 926) and hidden,
+  // an iPhone SE with its toolbars (375 x 548 / 667)
+  for (const [name, w, h, H, wordsH] of [["13 Pro Max, toolbars", 428, 746, 926, 260], ["13 Pro Max", 428, 926, 926, 260], ["SE", 375, 548, 667, 280]] as const) {
+    test(`upright (${name}): the ball its approved size wherever it fits, never under the words, all on screen`, () => {
       const l = contactLayout(w, h, H, wordsH);
-      expect(l.wordsTop).not.toBeNull();
-      const ballBottom = l.cy + l.r;
-      expect(l.wordsTop! - ballBottom).toBeGreaterThanOrEqual(PORTRAIT.gapMin - 1e-9);
-      expect(l.cy - l.r).toBeGreaterThanOrEqual(PORTRAIT.top - 1e-9);
-      expect(l.wordsTop! + wordsH).toBeLessThanOrEqual(h - PORTRAIT.bottom + 1e-9);
-      expect(2 * l.r).toBeLessThanOrEqual(PORTRAIT.ballW * w + 1e-9);
-      // the framing the camera is given agrees with the ball on screen
+      const top = l.wordsTop ?? h - PORTRAIT.foot * h - wordsH;
+      expect(top - (l.cy + l.r)).toBeGreaterThanOrEqual(PORTRAIT.gapMin - 1e-9);
+      expect(top + wordsH).toBeLessThanOrEqual(h - PORTRAIT.bottom + 1e-9);
       expect(l.share * H).toBeCloseTo(2 * l.r, 9);
       expect(l.at * H).toBeCloseTo(l.cy, 9);
+      if (l.cy - l.r > PORTRAIT.top + 1e-6) expect(l.r).toBeCloseTo((CONTACT_FRAME.share * H) / 2, 9); // (its size kept)
+      expect(l.cy).toBeLessThanOrEqual(CONTACT_FRAME.at * H + 1e-9); // (never lower than it was)
     });
   }
 
-  test("upright with room to spare: the group is centred in what is visible", () => {
-    const l = contactLayout(768, 1024, 1024, 230);
-    const top = l.cy - l.r, bottom = l.wordsTop! + 230;
-    expect(top - 0).toBeCloseTo(1024 - bottom, 6);
+  test("the ball moves up only as far as the words need", () => {
+    const l = contactLayout(428, 746, 926, 260);
+    const gap = Math.max(PORTRAIT.gapMin, PORTRAIT.gap * 746);
+    expect(l.wordsTop! + 260).toBeCloseTo(746 - PORTRAIT.bottom, 6);
+    expect(l.wordsTop! - (l.cy + l.r)).toBeCloseTo(gap, 6);
   });
 });

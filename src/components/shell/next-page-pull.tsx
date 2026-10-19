@@ -100,35 +100,24 @@ export function NextPagePull({ href, label, line, className, active = true }: { 
       touched = true;
       feed(e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? window.innerHeight : 1));
     };
-    const onTouchStart = (e: TouchEvent) => { touched = true; touchY = e.touches[0]?.clientY ?? null; touchFrom = e.target; s = { ...s, lastT: -Infinity }; };
+    // A finger that comes down at the end holds the page still while it fills the line (Liam, 2026-10-19): its moves on
+    // down are kept from scrolling, so iOS never drags the page up past its end and springs it back (the rubber band).
+    // One that started above the end scrolls as ever (a scroll under way can't be held), and a move back up scrolls back.
+    let startedAtEnd = false;
+    const onTouchStart = (e: TouchEvent) => { touched = true; touchY = e.touches[0]?.clientY ?? null; touchFrom = e.target; startedAtEnd = atEnd() && shown(); s = { ...s, lastT: -Infinity }; };
     const onTouchMove = (e: TouchEvent) => {
       const y = e.touches[0]?.clientY;
       if (touchY === null || y === undefined) return;
-      feed(touchY - y, touchFrom ?? window);
+      const dy = touchY - y;
+      if (startedAtEnd && dy > 0 && e.cancelable && e.touches.length === 1) e.preventDefault();
+      feed(dy, touchFrom ?? window);
       touchY = y;
     };
-    // At the end the page holds still while the line fills (Liam, 2026-10-19): no elastic overscroll (iOS Safari drags
-    // the whole page up under the finger and springs it back, a trackpad's bounce on a Mac the same). Only at the end, so
-    // the top keeps its own behaviour (pull to refresh).
-    let still = false;
-    const hold = () => {
-      const want = atEnd();
-      if (want === still) return;
-      still = want;
-      root.style.overscrollBehaviorY = want ? "none" : "";
-      document.body.style.overscrollBehaviorY = want ? "none" : "";
-    };
-    hold();
-    window.addEventListener("scroll", hold, { passive: true });
-    window.addEventListener("resize", hold, { passive: true });
     window.addEventListener("wheel", onWheel, { passive: true });
     window.addEventListener("touchstart", onTouchStart, { passive: true });
-    window.addEventListener("touchmove", onTouchMove, { passive: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: false });
     return () => {
       stopLater();
-      window.removeEventListener("scroll", hold);
-      window.removeEventListener("resize", hold);
-      if (still) { root.style.overscrollBehaviorY = ""; document.body.style.overscrollBehaviorY = ""; }
       window.removeEventListener("wheel", onWheel);
       window.removeEventListener("touchstart", onTouchStart);
       window.removeEventListener("touchmove", onTouchMove);

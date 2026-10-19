@@ -46,20 +46,24 @@ describe("NextPagePull", () => {
     expect(push).toHaveBeenCalledWith("/about");
     expect(push).toHaveBeenCalledTimes(1);
   });
-  test("at the end the page holds still while the line fills: no elastic overscroll there, and the top keeps its own (Liam, 2026-10-19)", () => {
+  test("a finger that comes down at the end holds the page still while it fills the line; one from above scrolls as ever (Liam, 2026-10-19)", () => {
     setPage(1500);
-    const { unmount } = render(<NextPagePull href="/about" label="About" line="x" />);
-    expect(document.documentElement.style.overscrollBehaviorY).toBe("");
+    render(<NextPagePull href="/about" label="About" line="x" />);
+    const move = (y: number) => {
+      const e = new TouchEvent("touchmove", { cancelable: true, touches: [{ clientY: y } as Touch] });
+      act(() => { window.dispatchEvent(e); });
+      return e.defaultPrevented;
+    };
+    const start = (y: number) => act(() => { window.dispatchEvent(new TouchEvent("touchstart", { touches: [{ clientY: y } as Touch] })); });
+    // above the end: scrolls
+    start(500);
+    expect(move(480)).toBe(false);
+    // at the end: on down is held, back up scrolls
     scrollY = 2000;
-    act(() => { fireEvent.scroll(window); });
-    expect(document.documentElement.style.overscrollBehaviorY).toBe("none");
-    expect(document.body.style.overscrollBehaviorY).toBe("none");
-    scrollY = 1200;
-    act(() => { fireEvent.scroll(window); });
-    expect(document.documentElement.style.overscrollBehaviorY).toBe("");
-    scrollY = 2000;
-    act(() => { fireEvent.scroll(window); });
-    unmount();
+    now += 1000;
+    start(500);
+    expect(move(480)).toBe(true);
+    expect(move(490)).toBe(false);
     expect(document.documentElement.style.overscrollBehaviorY).toBe("");
   });
   test("arriving back at the end (history) lands just above it: nothing fires by itself (Review Focus 2)", () => {
