@@ -1,6 +1,9 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { MOVES_FRAG, MOVES_VERT, OFF, burnBreath, settled, sliceOffsets, stepMoves, type DoubledSpec, type MoveState } from "@/lib/marni-came/moves";
+
+const noop = () => () => {};
+const hasWebGL2 = () => typeof window.WebGL2RenderingContext !== "undefined";
 
 type Props = { src: string; alt: string; burnSrc: string; doubled: DoubledSpec; state: MoveState; seed?: number; className?: string };
 
@@ -8,32 +11,30 @@ type Props = { src: string; alt: string; burnSrc: string; doubled: DoubledSpec; 
  *  image stays (data-fallback="true") and the moves simply don't show. Draws only while a move is changing or the burn
  *  is on, and never animates under reduced motion. */
 export function MovesCanvas({ src, alt, burnSrc, doubled, state, seed = 3, className }: Props) {
-  const [ok, setOk] = useState(false);
+  const supported = useSyncExternalStore(noop, hasWebGL2, () => false);
+  const [lost, setLost] = useState(false);
+  const ok = supported && !lost;
   const canvas = useRef<HTMLCanvasElement>(null);
   const target = useRef(state);
   const kick = useRef<() => void>(() => {});
-  target.current = state;
   // (the doubled spec by value, so a parent passing a fresh object each render doesn't rebuild the GL program)
   const dkey = `${doubled.box.join(",")}|${doubled.dx}|${doubled.dy}|${doubled.scale}`;
-
-  useEffect(() => {
-    if (typeof window === "undefined" || typeof window.WebGL2RenderingContext === "undefined") return;
-    setOk(true);
-  }, []);
 
   useEffect(() => {
     const cv = canvas.current;
     if (!ok || !cv) return;
     const gl = cv.getContext("webgl2", { premultipliedAlpha: false, antialias: false });
-    if (!gl) { setOk(false); return; }
-    const lost = (e: Event) => { e.preventDefault(); setOk(false); };
-    cv.addEventListener("webglcontextlost", lost);
+    // (no context, or a failed program: fall back to the plain image, after this effect)
+    const fail = () => queueMicrotask(() => setLost(true));
+    if (!gl) { fail(); return; }
+    const onLost = (e: Event) => { e.preventDefault(); setLost(true); };
+    cv.addEventListener("webglcontextlost", onLost);
     const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
     const sh = (type: number, code: string) => { const s = gl.createShader(type)!; gl.shaderSource(s, code); gl.compileShader(s); return s; };
     const prog = gl.createProgram()!;
     gl.attachShader(prog, sh(gl.VERTEX_SHADER, MOVES_VERT)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, MOVES_FRAG)); gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { setOk(false); return; }
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { cv.removeEventListener("webglcontextlost", onLost); fail(); return; }
     gl.useProgram(prog);
     const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
@@ -56,7 +57,8 @@ export function MovesCanvas({ src, alt, burnSrc, doubled, state, seed = 3, class
       im.src = url;
     });
 
-    let cur: MoveState = { ...OFF }, raf = 0, last = 0, t0 = performance.now(), ready = false, gone = false;
+    const t0 = performance.now();
+    let cur: MoveState = { ...OFF }, raf = 0, last = 0, ready = false, gone = false;
     const draw = (now: number) => {
       raf = 0;
       if (gone || !ready) return;
@@ -77,11 +79,11 @@ export function MovesCanvas({ src, alt, burnSrc, doubled, state, seed = 3, class
     };
     const ro = new ResizeObserver(size); ro.observe(cv);
     Promise.all([tex(0, src, (w, h) => gl.uniform2f(u("uImgSize"), w, h)), tex(1, burnSrc)]).then(() => { ready = true; size(); });
-    return () => { gone = true; ro.disconnect(); cancelAnimationFrame(raf); cv.removeEventListener("webglcontextlost", lost); kick.current = () => {}; };
+    return () => { gone = true; ro.disconnect(); cancelAnimationFrame(raf); cv.removeEventListener("webglcontextlost", onLost); kick.current = () => {}; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ok, src, burnSrc, seed, dkey]);
 
-  useEffect(() => { kick.current(); }, [state]);
+  useEffect(() => { target.current = state; kick.current(); }, [state]);
 
   return (
     <div className={className} data-fallback={ok ? undefined : "true"} style={{ position: "relative" }}>
