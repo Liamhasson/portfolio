@@ -21,3 +21,12 @@ test("the frame in order: hero, at a glance, middle, challenges, impact, next", 
   expect(screen.getAllByText("What happened")).toHaveLength(pulse.challenges.length);
   expect(screen.getByRole("img", { name: /Nordic Logic.s home page/ })).toBeInTheDocument(); // the next study peeks in
 });
+
+test("an entry's Shell renders inside the article, after Back", () => {
+  const Middle = () => <section aria-label="Middle">middle</section>;
+  render(<CaseStudyPage study={pulse} Middle={Middle} HeroVisual={() => <div />} ChallengeExtras={() => null} Shell={() => <i data-testid="shell" />} />);
+  const shell = screen.getByTestId("shell");
+  expect(document.querySelector("article")).toContainElement(shell);
+  const back = screen.getByRole("link", { name: "Back to projects" });
+  expect(back.compareDocumentPosition(shell) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
