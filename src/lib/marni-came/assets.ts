@@ -1,0 +1,48 @@
+/** Every Marni Came file the case study and the band site serve (built by tools/marni-came/build-assets.sh). */
+const R = "/case-studies/marni-came";
+
+export const MC_ASSETS = {
+  heroLoop: `${R}/video/hero-badehaus.mp4`,
+  heroPoster: `${R}/video/hero-badehaus.jpg`,
+  releaseLoop: `${R}/video/release-loop.mp4`,
+  releasePoster: `${R}/video/release-loop.jpg`,
+  releaseVideo: `${R}/video/after-heartbreaks.mp4`,
+  releaseVideoPoster: `${R}/video/after-heartbreaks.jpg`,
+  /** The playground's own file: Dopamine live at Badehaus. */
+  dopamineVideo: "/playground/dopamine.mp4",
+  dopamineVideoPoster: "/playground/dopamine.jpg",
+  wordmark: `${R}/logo/wordmark.svg`,
+  wordmarkBone: `${R}/logo/wordmark-bone.svg`,
+  wordmarkBlack: `${R}/logo/wordmark-black.svg`,
+  wordmarkDistressed: `${R}/logo/wordmark-distressed.svg`,
+  wordmarkDistressedBone: `${R}/logo/wordmark-distressed-bone.svg`,
+  logoBurned: `${R}/logo/burned.jpg`,
+  cover: `${R}/cover-after-heartbreaks.jpg`,
+  posters: { lido: `${R}/posters/lido.jpg`, badehaus24: `${R}/posters/badehaus-2024.jpg`, badehaus23: `${R}/posters/badehaus-2023.jpg`, endOfTerm: `${R}/posters/end-of-term.jpg` },
+  moves: { slice: `${R}/moves/slice.jpg`, burn: `${R}/moves/burn.jpg`, doubled: `${R}/moves/doubled.jpg`, lens: `${R}/moves/lens.jpg` },
+  switchPhoto: `${R}/switch.jpg`,
+  burnLight: `${R}/burn-light.jpg`,
+  problem: `${R}/problem-crowd.jpg`,
+  fanPhoto: `${R}/fan-lido.jpg`,
+  glowAllowed: `${R}/glow-allowed.jpg`,
+  band: { liam: `${R}/band/liam.jpg`, sami: `${R}/band/sami.jpg`, pedro: `${R}/band/pedro.jpg`, rikki: `${R}/band/rikki.jpg` },
+  /** The video's own doubles, by file; the moodboard's order and credits live with the component. */
+  doubled: {
+    "01": `${R}/doubled/01.jpg`, "02": `${R}/doubled/02.jpg`, "03": `${R}/doubled/03.jpg`, "04": `${R}/doubled/04.jpg`, "05": `${R}/doubled/05.jpg`,
+    "06": `${R}/doubled/06.jpg`, "07": `${R}/doubled/07.jpg`, "08": `${R}/doubled/08.jpg`, "09": `${R}/doubled/09.jpg`, "10": `${R}/doubled/10.jpg`,
+    tall: `${R}/doubled/tall.jpg`, sameFrame: `${R}/doubled/same-frame.jpg`,
+  },
+  tracks: {
+    afterHeartbreaks: { src: `${R}/audio/after-heartbreaks.m4a`, peaks: `${R}/audio/after-heartbreaks.peaks.json` },
+    dopamine: { src: `${R}/audio/dopamine.m4a`, peaks: `${R}/audio/dopamine.peaks.json` },
+    /** The playground's own files. */
+    youllBeYou: { src: "/playground/youll-be-you.m4a", peaks: "/playground/youll-be-you.peaks.json" },
+  },
+} as const;
+
+/** Every path in the manifest, for the asset test. */
+export function assetPaths(node: unknown = MC_ASSETS): string[] {
+  if (typeof node === "string") return [node];
+  if (node && typeof node === "object") return Object.values(node).flatMap((v) => assetPaths(v));
+  return [];
+}
