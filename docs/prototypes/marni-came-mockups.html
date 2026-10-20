@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marni Came mockups</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500&family=Geist+Mono:wght@400;500&family=Cormorant+Garamond:wght@500;600&family=Archivo:wght@400;500&display=block" rel="stylesheet">
+<style>
+/* ------------------------------------------------------------------
+   Board chrome (real px). Spreads use --u = 1/1440 of the frame width (container query units).
+   Round 3 (Liam, 2026-10-20): the brand leads, songs only appear as applications. Badehaus live footage opens the book;
+   the idea line cycles through the moves; red logo gone, a burned one added; type as a pure specimen; the sans shown in
+   Marni Came's own use; a crowd spread; Doubled as one rule + moodboard; cover route A; a four-show poster series;
+   the site promoting a new release with a strong one-line title.
+   Every word about the board is Geist; Cormorant Garamond and Archivo appear only inside the brand.
+   ------------------------------------------------------------------ */
+:root {
+  --black: #0a0908; --bone: #eeeae2; --red: #ec1302; --ash: #8f8a82; --dim: #5d5952; --line: rgba(238,234,226,.14);
+  --sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --mono: "Geist Mono", ui-monospace, monospace;
+  --serif: "Cormorant Garamond", "Times New Roman", serif;
+  --info: "Archivo", "Helvetica Neue", Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { background: #111113; }
+body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
+.board { max-width: 1536px; margin: 0 auto; padding: 64px 48px 160px; }
+.board-head { display: grid; grid-template-columns: 1fr auto; gap: 24px 48px; align-items: end; padding-bottom: 40px; border-bottom: 1px solid #26262b; }
+.board-head h1 { margin: 0; font: 400 32px/1.1 var(--sans); color: #f2f2f4; letter-spacing: -.01em; }
+.board-head p { margin: 10px 0 0; max-width: 80ch; color: #8c8c96; }
+.board-head .meta { font: 400 12px/1.6 var(--mono); color: #6c6c76; text-align: right; }
+.block { margin-top: 64px; }
+.cap { display: flex; justify-content: space-between; gap: 24px; margin-bottom: 14px; font: 400 13px/1.4 var(--mono); color: #8c8c96; }
+.cap b { color: #f2f2f4; font-weight: 500; }
+.frame { container-type: inline-size; width: 100%; max-width: 1440px; margin: 0 auto; }
+.f { --u: calc(100cqw / 1440); position: relative; background: var(--black); color: var(--bone); overflow: hidden; font-family: var(--info); }
+.note { margin: 14px auto 0; max-width: 1440px; color: #8c8c96; font-size: 14px; }
+.note b { color: #f2f2f4; font-weight: 500; }
+
+/* ---------- the brand's own voice ---------- */
+.f img, .f video { display: block; }
+.k { font: 500 calc(var(--u) * 11)/1.35 var(--info); letter-spacing: .16em; text-transform: uppercase; color: var(--ash); margin: 0; }
+.k.b { color: var(--bone); }
+.s { font: 600 calc(var(--u) * 64)/.92 var(--serif); text-transform: uppercase; color: var(--red); margin: 0; letter-spacing: .005em; }
+.p { font: 400 calc(var(--u) * 17)/1.55 var(--info); color: rgba(238,234,226,.8); margin: 0; }
+.num { position: absolute; top: calc(var(--u) * 40); right: calc(var(--u) * 48); z-index: 2; }
+.folio { position: absolute; left: calc(var(--u) * 48); right: calc(var(--u) * 48); bottom: calc(var(--u) * 32); display: flex; justify-content: space-between; z-index: 2; }
+.grain::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .2; mix-blend-mode: overlay; z-index: 3;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+.sp { min-height: calc(var(--u) * 900); padding: calc(var(--u) * 120) calc(var(--u) * 48) calc(var(--u) * 110); }
+.credit { position: absolute; left: calc(var(--u) * 14); bottom: calc(var(--u) * 12); font: 500 calc(var(--u) * 9)/1 var(--info); letter-spacing: .16em; text-transform: uppercase; color: rgba(238,234,226,.6); }
+
+/* 01 cover */
+.cov { min-height: calc(var(--u) * 900); display: grid; place-items: center; }
+.cov video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.cov .logo { position: relative; z-index: 1; width: calc(var(--u) * 700); }
+/* 02 idea */
+.man { display: grid; grid-template-columns: 1.1fr 1fr; gap: calc(var(--u) * 48); align-items: end; }
+.man .s { font-size: calc(var(--u) * 132); line-height: .84; }
+.man .cyc { display: inline-block; min-width: 4.6em; }
+.man .moves { display: flex; gap: calc(var(--u) * 18); margin-top: calc(var(--u) * 28); }
+.man .moves span { font: 500 calc(var(--u) * 12)/1 var(--info); letter-spacing: .18em; text-transform: uppercase; color: var(--dim); }
+.man .moves span.on { color: var(--bone); }
+.man .pill { display: grid; grid-template-columns: calc(var(--u) * 150) 1fr; gap: calc(var(--u) * 20); padding: calc(var(--u) * 18) 0; border-top: 1px solid var(--line); }
+.man .pill b { font: 600 calc(var(--u) * 26)/1 var(--serif); text-transform: uppercase; color: var(--bone); }
+/* 03 logo */
+.lg { display: grid; grid-template-columns: 1.5fr 1fr; grid-template-rows: auto auto; gap: calc(var(--u) * 16); }
+.lg > div { position: relative; display: grid; place-items: center; background: #141210; min-height: calc(var(--u) * 300); overflow: hidden; }
+.lg > div.big { grid-row: 1 / 3; min-height: calc(var(--u) * 616); }
+.lg > div.bn { background: var(--bone); }
+.lg > div.burn img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.lg .k { position: absolute; left: calc(var(--u) * 18); bottom: calc(var(--u) * 16); z-index: 1; }
+.lg .bn .k { color: var(--dim); }
+/* 04 colour */
+.col { display: grid; grid-template-columns: 2.2fr 1fr .55fr; grid-template-rows: calc(var(--u) * 520); }
+.col > div { position: relative; padding: calc(var(--u) * 22); display: flex; flex-direction: column; justify-content: flex-end; gap: calc(var(--u) * 6); }
+.col b { font: 600 calc(var(--u) * 34)/1 var(--serif); text-transform: uppercase; }
+.burnrow { margin-top: calc(var(--u) * 16); height: calc(var(--u) * 150); position: relative; background: #0a0908 url("marni-came-mockups/burn-swatch.jpg") 30% 50% / cover; }
+.burnrow > span { position: absolute; left: calc(var(--u) * 22); bottom: calc(var(--u) * 18); }
+/* 05 type specimen */
+.fam { display: grid; grid-template-columns: calc(var(--u) * 360) 1fr; gap: calc(var(--u) * 48); padding-top: calc(var(--u) * 28); border-top: 1px solid var(--line); }
+.fam + .fam { margin-top: calc(var(--u) * 64); }
+.fam .aa { font-size: calc(var(--u) * 220); line-height: .8; color: var(--bone); margin: calc(var(--u) * 12) 0 calc(var(--u) * 14); }
+.fam .set { color: rgba(238,234,226,.86); word-break: break-all; }
+.styles { display: grid; gap: 0; margin-top: calc(var(--u) * 28); }
+.styles > div { display: grid; grid-template-columns: calc(var(--u) * 200) calc(var(--u) * 260) 1fr; gap: calc(var(--u) * 20); align-items: baseline; padding: calc(var(--u) * 14) 0; border-top: 1px solid var(--line); overflow: hidden; }
+.styles .smp { white-space: nowrap; overflow: hidden; }
+/* 06 the sans at work */
+.work { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: calc(var(--u) * 16); }
+.work .card { position: relative; background: #141210; min-height: calc(var(--u) * 560); padding: calc(var(--u) * 40) calc(var(--u) * 36); display: flex; flex-direction: column; }
+.work .card .lbl { margin-top: auto; padding-top: calc(var(--u) * 20); }
+.work .sm { font: 500 calc(var(--u) * 12)/1.75 var(--info); letter-spacing: .18em; text-transform: uppercase; color: var(--bone); margin: 0; }
+.work .sm i { font-style: normal; color: var(--ash); }
+.work .row2 { display: flex; justify-content: space-between; gap: calc(var(--u) * 12); padding: calc(var(--u) * 11) 0; border-bottom: 1px solid var(--line); }
+.ticket { background: var(--bone) !important; color: var(--black); }
+.ticket .sm { color: var(--black); }
+.ticket .sm i { color: var(--dim); }
+.ticket .row2 { border-color: rgba(10,9,8,.16); }
+.ticket .perf { margin: auto calc(var(--u) * -36) calc(var(--u) * 6); border-top: 2px dashed rgba(10,9,8,.25); }
+/* 07 moves */
+.mv { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--u) * 48) calc(var(--u) * 16); }
+.mv .im { position: relative; }
+.mv .im .ph { position: relative; }
+.mv .im img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; }
+.mv .lbl { display: grid; grid-template-columns: calc(var(--u) * 180) 1fr; gap: calc(var(--u) * 16); padding-top: calc(var(--u) * 14); align-items: start; }
+.mv .lbl b { font: 600 calc(var(--u) * 36)/1 var(--serif); text-transform: uppercase; color: var(--bone); }
+.mv .lbl .p { font-size: calc(var(--u) * 14); }
+/* 08 crowd */
+.crowd { display: grid; grid-template-columns: 1.35fr 1fr; gap: calc(var(--u) * 48); align-items: end; }
+.crowd .ph { position: relative; }
+.crowd .ph img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
+.crowd .fact { padding: calc(var(--u) * 22) 0; border-top: 1px solid var(--line); }
+.crowd .fact b { display: block; font: 600 calc(var(--u) * 40)/1 var(--serif); text-transform: uppercase; color: var(--bone); margin-bottom: calc(var(--u) * 10); }
+.crowd .fact .p { font-size: calc(var(--u) * 15); }
+/* 09 doubled */
+.db-head { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--u) * 48); align-items: end; }
+.mood { display: grid; grid-auto-flow: row dense; grid-template-columns: repeat(4, 1fr); grid-auto-rows: calc(var(--u) * 240); gap: calc(var(--u) * 10); margin-top: calc(var(--u) * 40); }
+.mood > div { position: relative; overflow: hidden; background: #141210; }
+.mood > div img { width: 100%; height: 100%; object-fit: cover; }
+.mood .w2 { grid-column: span 2; }
+.mood .h2 { grid-row: span 2; }
+/* Drop-in slots: a file at marni-came-mockups/doubled/NN.jpg fills its frame; until then the frame shows the name to use. */
+.mood .slot { display: grid; place-items: center; box-shadow: inset 0 0 0 1px var(--line); background: transparent; }
+.mood .slot img { position: absolute; inset: 0; }
+.mood .slot.full { box-shadow: none; }
+.mood .slot.full .k { display: none; }
+.mood .slot:not(.full) .credit { display: none; }
+.mood .slot img { width: 100%; height: 100%; object-fit: cover; }
+.yesno { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--u) * 16); margin-top: calc(var(--u) * 32); padding-top: calc(var(--u) * 18); border-top: 1px solid var(--line); }
+.yesno .p { font-size: calc(var(--u) * 14); }
+.yesno b { font: 500 calc(var(--u) * 11)/1 var(--info); letter-spacing: .16em; text-transform: uppercase; display: inline-block; padding: calc(var(--u) * 6) calc(var(--u) * 9); margin-bottom: calc(var(--u) * 10); background: var(--bone); color: var(--black); }
+.yesno .no b { background: var(--red); color: var(--bone); }
+/* 10 glow (approved) */
+.gl { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--u) * 16); }
+.gl .stage { position: relative; aspect-ratio: 4 / 3; display: grid; place-items: center; background: var(--black); box-shadow: inset 0 0 0 1px var(--line); overflow: hidden; }
+.gl .stage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.gl .fake { font: 600 calc(var(--u) * 92)/.9 var(--serif); text-transform: uppercase; color: var(--red); text-align: center; text-shadow: 0 0 calc(var(--u) * 18) rgba(236,19,2,.9), 0 0 calc(var(--u) * 60) rgba(255,120,40,.7); margin: 0; }
+.gl .tag { position: absolute; left: calc(var(--u) * 16); top: calc(var(--u) * 16); padding: calc(var(--u) * 7) calc(var(--u) * 10); background: var(--bone); color: var(--black); font: 600 calc(var(--u) * 11)/1 var(--info); letter-spacing: .14em; text-transform: uppercase; }
+.gl .tag.no { background: var(--red); color: var(--bone); }
+/* 11 the single (route A) */
+.single { display: grid; grid-template-columns: calc(var(--u) * 760) 1fr; gap: calc(var(--u) * 56); align-items: end; }
+.cvA { position: relative; aspect-ratio: 1; overflow: hidden; }
+.cvA img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.cvA .by { position: absolute; left: 0; right: 0; top: 6.5%; text-align: center; font: 500 calc(var(--u) * 15)/1 var(--info); letter-spacing: .34em; text-transform: uppercase; color: var(--bone); }
+.cvA .t { position: absolute; left: 0; right: 0; bottom: 9%; text-align: center; white-space: nowrap; margin: 0; font: 600 calc(var(--u) * 62)/1 var(--serif); letter-spacing: .04em; text-transform: uppercase; color: var(--red); }
+.cvA .cr { position: absolute; left: 0; right: 0; bottom: 5%; text-align: center; font: 500 calc(var(--u) * 10)/1 var(--info); letter-spacing: .24em; text-transform: uppercase; color: var(--ash); }
+/* 12 posters */
+.posters { display: grid; grid-template-columns: repeat(4, 1fr); gap: calc(var(--u) * 14); }
+.poster { position: relative; aspect-ratio: 1200 / 1700; overflow: hidden; }
+.poster img.bg { width: 100%; height: 100%; object-fit: cover; }
+.poster .mk { position: absolute; left: 8%; top: 5%; width: 40%; }
+.poster .big { position: absolute; left: 7%; bottom: 15%; margin: 0; white-space: nowrap; font: 600 calc(var(--u) * 78)/.82 var(--serif); text-transform: uppercase; color: var(--red); }
+.poster .inf { position: absolute; left: 8%; right: 8%; bottom: 5%; display: flex; justify-content: space-between; font: 500 calc(var(--u) * 8.5)/1.5 var(--info); letter-spacing: .18em; text-transform: uppercase; color: var(--bone); }
+.poster .inf i { font-style: normal; color: var(--ash); display: block; }
+.posters .lbl { padding-top: calc(var(--u) * 12); }
+/* 13 shot list */
+.mk-list { display: grid; grid-template-columns: 1fr 1fr; gap: 0 calc(var(--u) * 48); margin-top: calc(var(--u) * 36); }
+.mk-list > div { display: grid; grid-template-columns: calc(var(--u) * 36) calc(var(--u) * 170) 1fr; gap: calc(var(--u) * 14); padding: calc(var(--u) * 16) 0; border-top: 1px solid var(--line); align-items: baseline; }
+.mk-list b { font: 600 calc(var(--u) * 22)/1.05 var(--serif); text-transform: uppercase; color: var(--bone); }
+.mk-list .p { font-size: calc(var(--u) * 14); }
+/* 14 web */
+.web { position: relative; aspect-ratio: 16 / 9; overflow: hidden; }
+.web video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.web .shade { position: absolute; inset: 0; background: linear-gradient(to top, rgba(10,9,8,.7), rgba(10,9,8,0) 45%); }
+.web nav { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; justify-content: space-between; padding: calc(var(--u) * 26) calc(var(--u) * 36); z-index: 1; }
+.web nav .mk { width: calc(var(--u) * 132); }
+.web nav ul, .web .snd { mix-blend-mode: difference; }
+.web nav ul { display: flex; gap: calc(var(--u) * 30); list-style: none; margin: 0; padding: 0; font: 500 calc(var(--u) * 12)/1 var(--info); letter-spacing: .18em; text-transform: uppercase; color: var(--bone); }
+.web .snd { display: flex; align-items: center; gap: calc(var(--u) * 10); font: 500 calc(var(--u) * 12)/1 var(--info); letter-spacing: .18em; text-transform: uppercase; color: var(--bone); }
+.web .snd i { width: calc(var(--u) * 30); height: calc(var(--u) * 16); border-radius: calc(var(--u) * 8); box-shadow: inset 0 0 0 1px var(--bone); position: relative; }
+.web .snd i::after { content: ""; position: absolute; left: calc(var(--u) * 3); top: calc(var(--u) * 3); width: calc(var(--u) * 10); height: calc(var(--u) * 10); border-radius: 50%; background: var(--bone); }
+.web .rel { position: absolute; left: 0; right: 0; bottom: calc(var(--u) * 92); text-align: center; z-index: 1; }
+.web .rel .k { margin-bottom: calc(var(--u) * 18); color: var(--bone); letter-spacing: .34em; }
+.web .rel .t { margin: 0; white-space: nowrap; font: 600 calc(var(--u) * 132)/.9 var(--serif); letter-spacing: .03em; text-transform: uppercase; color: var(--red); }
+.web .foot { position: absolute; left: calc(var(--u) * 36); right: calc(var(--u) * 36); bottom: calc(var(--u) * 32); display: flex; justify-content: center; gap: calc(var(--u) * 12); z-index: 1; font: 500 calc(var(--u) * 12)/1 var(--info); letter-spacing: .18em; text-transform: uppercase; color: var(--bone); }
+.web .foot b { font-weight: 500; padding: calc(var(--u) * 12) calc(var(--u) * 18); box-shadow: inset 0 0 0 1px var(--bone); }
+</style>
+</head>
+<body>
+<div class="board">
+  <header class="board-head">
+    <div>
+      <h1>Marni Came · brand book, round 3</h1>
+      <p>The band's identity first; songs appear only where the brand is used. Live Badehaus footage opens the book, the idea line cycles through the four moves, the type is a pure specimen and the sans is shown at work in Marni Came's own pieces.</p>
+    </div>
+    <div class="meta">feat/marni-came<br>2026-10-20<br>spreads at 1440</div>
+  </header>
+
+  <!-- 01 COVER -->
+  <section class="block">
+    <div class="cap"><span><b>01 · Cover</b> — Dopamine live at Badehaus, regraded: black and white, the amber light breathing in from the left</span><span>1440 × 900 · loop</span></div>
+    <div class="frame"><div class="f cov grain">
+      <video data-t="0.6" src="marni-came-mockups/hero-badehaus.mp4" poster="marni-came-mockups/hero-badehaus.jpg" autoplay muted loop playsinline></video>
+      <img class="logo" src="marni-came-mockups/logo-bone.png" alt="Marni Came">
+      <div class="folio"><span class="k b">Brand book</span><span class="k b">Berlin · 2022 — 2024</span></div>
+    </div></div>
+  </section>
+
+  <!-- 02 IDEA -->
+  <section class="block">
+    <div class="cap"><span><b>02 · The idea</b> — the word cycles through the four moves (live on the board)</span><span>1440 × 900</span></div>
+    <div class="frame"><div class="f sp man grain">
+      <span class="k num">02</span>
+      <div>
+        <p class="s"><span class="cyc" data-cycle="Broken,Burned,Doubled,Bent">Broken</span><br>on<br>purpose.</p>
+        <div class="moves"><span class="on">Broken</span><span>Burned</span><span>Doubled</span><span>Bent</span></div>
+      </div>
+      <div>
+        <p class="p" style="font-size:calc(var(--u) * 21);max-width:30ch;margin-bottom:calc(var(--u) * 40)">Marni Came keeps the mistakes. The brand does the same to its pictures: real photographs and footage, damaged by hand, never polished into graphics.</p>
+        <div class="pill"><b>The sound</b><p class="p">Not overproduced. The cracked note and the long take stay in, so the record sounds like the room.</p></div>
+        <div class="pill"><b>The crowd</b><p class="p">The audience is part of the band, not its customer.</p></div>
+      </div>
+      <div class="folio"><span class="k">Marni Came</span><span class="k">The idea</span></div>
+    </div></div>
+  </section>
+
+  <!-- 03 LOGO -->
+  <section class="block">
+    <div class="cap"><span><b>03 · Logo</b> — master, print, and burned (the old PNG for now; the clean vector comes next)</span><span>1440 × 900</span></div>
+    <div class="frame"><div class="f sp grain">
+      <span class="k num">03</span>
+      <div class="lg">
+        <div class="big"><img src="marni-came-mockups/logo-bone.png" alt="" style="width:66%"><span class="k">Master · Bone on Blackout</span></div>
+        <div class="burn"><img src="marni-came-mockups/logo-burned.jpg" alt="The wordmark with amber light from the video burning in from the left"><span class="k b">Burned · the video's light on the mark</span></div>
+        <div class="bn"><img src="marni-came-mockups/logo-bone.png" alt="" style="width:62%;filter:invert(1)"><span class="k">Print · Blackout on Bone</span></div>
+      </div>
+      <div class="folio"><span class="k">Marni Came</span><span class="k">Logo</span></div>
+    </div></div>
+  </section>
+
+  <!-- 04 COLOUR (approved) -->
+  <section class="block">
+    <div class="cap"><span><b>04 · Colour</b> — approved</span><span>1440 × 900</span></div>
+    <div class="frame"><div class="f sp grain">
+      <span class="k num">04</span>
+      <div class="col">
+        <div style="background:var(--black);box-shadow:inset 0 0 0 1px var(--line)"><b>Blackout</b><span class="k">0A0908 · the ground, most of every page</span></div>
+        <div style="background:var(--bone);color:var(--black)"><b>Bone</b><span class="k" style="color:var(--dim)">EEEAE2 · skin under one light</span></div>
+        <div style="background:var(--red)"><b>Red</b><span class="k b">EC1302 · titles only</span></div>
+      </div>
+      <div class="burnrow"><span><b style="font:600 calc(var(--u) * 34)/1 var(--serif);text-transform:uppercase;display:block">Burn</b><span class="k b">8D4802 → B36F0B → FFE1AA · light coming in from an edge, never a flat fill</span></span></div>
+      <div class="folio"><span class="k">Marni Came</span><span class="k">Colour</span></div>
+    </div></div>
+  </section>
+
+  <!-- 05 TYPE SPECIMEN -->
+  <section class="block">
+    <div class="cap"><span><b>05 · Type</b> — the full specimen: both families and every text style, no words</span><span>1440 × ~1500</span></div>
+    <div class="frame"><div class="f sp grain">
+      <span class="k num">05</span>
+      <div class="fam">
+        <div>
+          <p class="k b">Cormorant Garamond · 600</p>
+          <p class="aa" style="font-family:var(--serif);font-weight:600">Aa</p>
+          <p class="k">Serif · capitals · titles</p>
+        </div>
+        <div>
+          <p class="set" style="font:600 calc(var(--u) * 52)/1.08 var(--serif)">ABCDEFGHIJKLM<br>NOPQRSTUVWXYZ<br>0123456789 &amp; ! ? . , — ·</p>
+          <div class="styles">
+            <div><span class="k b">Display</span><span class="k">196 · 0.82 · +0.5% · caps</span><span class="smp" style="font:600 calc(var(--u) * 64)/1 var(--serif);color:var(--red)">ABCDEFGH</span></div>
+            <div><span class="k b">Title</span><span class="k">64 · 0.92 · +0.5% · caps</span><span class="smp" style="font:600 calc(var(--u) * 48)/1 var(--serif);color:var(--red)">ABCDEFGHIJKL</span></div>
+            <div><span class="k b">Heading</span><span class="k">36 · 1.0 · 0 · caps</span><span class="smp" style="font:600 calc(var(--u) * 36)/1 var(--serif)">ABCDEFGHIJKLMNOP</span></div>
+            <div><span class="k b">Label</span><span class="k">24 · 1.0 · 0 · caps</span><span class="smp" style="font:600 calc(var(--u) * 24)/1 var(--serif)">ABCDEFGHIJKLMNOPQRSTUVWXYZ</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="fam">
+        <div>
+          <p class="k b">Archivo · 400 / 500</p>
+          <p class="aa" style="font-family:var(--info);font-weight:500">Aa</p>
+          <p class="k">Sans · small · information</p>
+        </div>
+        <div>
+          <p class="set" style="font:500 calc(var(--u) * 30)/1.3 var(--info);letter-spacing:.04em">ABCDEFGHIJKLMNOPQRSTUVWXYZ<br>abcdefghijklmnopqrstuvwxyz<br>0123456789 € &amp; / . , — ·</p>
+          <div class="styles">
+            <div><span class="k b">Info</span><span class="k">15 · 1.5 · +18% · caps · 500</span><span class="smp" style="font:500 calc(var(--u) * 15)/1 var(--info);letter-spacing:.18em">ABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789</span></div>
+            <div><span class="k b">Label</span><span class="k">12 · 1.35 · +16% · caps · 500</span><span class="smp" style="font:500 calc(var(--u) * 12)/1 var(--info);letter-spacing:.16em">ABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789</span></div>
+            <div><span class="k b">Micro</span><span class="k">9 · 1.0 · +24% · caps · 500</span><span class="smp" style="font:500 calc(var(--u) * 9)/1 var(--info);letter-spacing:.24em">ABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789</span></div>
+            <div><span class="k b">Body</span><span class="k">17 · 1.55 · 0 · sentence · 400</span><span class="smp" style="font:400 calc(var(--u) * 17)/1 var(--info)">abcdefghijklmnopqrstuvwxyz abcdefghijklm</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="folio"><span class="k">Marni Came</span><span class="k">Type</span></div>
+    </div></div>
+  </section>
+
+  <!-- 06 THE SANS AT WORK -->
+  <section class="block">
+    <div class="cap"><span><b>06 · The sans at work</b> — Marni Came's own pieces; every fact is from the band's material</span><span>1440 × ~800</span></div>
+    <div class="frame"><div class="f sp grain" style="min-height:0">
+      <span class="k num">06</span>
+      <div class="work">
+        <div class="card">
+          <p class="k" style="margin-bottom:calc(var(--u) * 24)">Credit block</p>
+          <p class="sm"><i>Directed and filmed by</i> Marni Came<br><i>Editing</i> Liam Wind Hasson<br><i>Colour grading</i> Imri Agmon<br><i>Mixing</i> Fabio Buemi<br><i>Mastering</i> Nadim Khoury</p>
+          <div class="lbl"><p class="k">Under a title · centred · Micro to Label</p></div>
+        </div>
+        <div class="card ticket">
+          <p class="k" style="margin-bottom:calc(var(--u) * 24);color:var(--dim)">Ticket</p>
+          <div class="row2"><span class="sm">Marni Came</span><span class="sm"><i>Live</i></span></div>
+          <div class="row2"><span class="sm">Badehaus</span><span class="sm">Berlin</span></div>
+          <div class="row2"><span class="sm">09.02.2024</span><span class="sm">18:30</span></div>
+          <div class="row2"><span class="sm"><i>With</i></span><span class="sm">Yasha 96 &amp; The Dead Actors</span></div>
+          <div class="perf"></div>
+          <div class="row2" style="border:0"><span class="sm">Early bird</span><span class="sm">9 € · 11 € + drink</span></div>
+          <div class="lbl" style="padding-top:calc(var(--u) * 6)"><p class="k" style="color:var(--dim)">Table · hairlines · Label</p></div>
+        </div>
+        <div class="card">
+          <p class="k" style="margin-bottom:calc(var(--u) * 24)">Tracklist · the singles</p>
+          <div class="row2"><span class="sm"><i>01</i> After Heartbreaks</span><span class="sm"><i>Single</i></span></div>
+          <div class="row2"><span class="sm"><i>02</i> Dopamine</span><span class="sm"><i>Single</i></span></div>
+          <div class="row2"><span class="sm"><i>03</i> You'll Be You</span><span class="sm"><i>Single</i></span></div>
+          <div class="lbl"><p class="k">Numbered · columns · Label</p></div>
+        </div>
+      </div>
+      <div class="folio" style="position:static;margin-top:calc(var(--u) * 48)"><span class="k">Marni Came</span><span class="k">The sans</span></div>
+    </div></div>
+    <p class="note"><b>Sources:</b> the credits are the After Heartbreaks video's own; the ticket's date, time, support act and prices are from the Badehaus 2024 poster and early-bird post.</p>
+  </section>
+
+  <!-- 07 MOVES -->
+  <section class="block">
+    <div class="cap"><span><b>07 · The four moves</b> — every picture uses one or two</span><span>1440 × ~1300</span></div>
+    <div class="frame"><div class="f sp grain">
+      <span class="k num">07</span>
+      <div class="mv">
+        <div class="im"><img src="marni-came-mockups/m-slice.jpg" alt="Liam from the video, cut into vertical bands and shifted"><div class="lbl"><b>Slice</b><p class="p">The cover's broken face. Bands cut and shifted: the heart breaking in the picture.</p></div></div>
+        <div class="im"><div class="ph"><img src="marni-came-mockups/burn-ah-still.jpg" alt="Liam half lit, the light burning around his face"><span class="credit">Still · After Heartbreaks video</span></div><div class="lbl"><b>Burn</b><p class="p">Light eating into the black from one side. The face stays, the dark always survives.</p></div></div>
+        <div class="im"><img src="marni-came-mockups/d-photo-ah.jpg" alt="The bassist, his head echoed from the next frame of the same moment"><div class="lbl"><b>Doubled</b><p class="p">Part of a person repeats with an offset, like a glitch. Same moment only (spread 09).</p></div></div>
+        <div class="im"><div class="ph"><img src="marni-came-mockups/lens-doubled-bass.jpg" alt="The bassist tripled at three sizes, the round lens dark at the frame's edges"><span class="credit">Still · After Heartbreaks video</span></div><div class="lbl"><b>Lens</b><p class="p">The round vignette closing in at the edges, here with the doubling inside it.</p></div></div>
+      </div>
+      <div class="folio"><span class="k">Marni Came</span><span class="k">Image</span></div>
+    </div></div>
+  </section>
+
+  <!-- 08 THE CROWD -->
+  <section class="block">
+    <div class="cap"><span><b>08 · The crowd</b> — the second half of the idea</span><span>1440 × 900</span></div>
+    <div class="frame"><div class="f sp grain">
+      <span class="k num">08</span>
+      <div class="crowd">
+        <div class="ph"><img src="marni-came-mockups/crowd-lido.jpg" alt="A fan headbanging at the Lido show"><span class="credit">Lido · 07.12.2023 · photo BIMM Institute Berlin</span></div>
+        <div>
+          <p class="s" style="font-size:calc(var(--u) * 84);margin-bottom:calc(var(--u) * 36)">Part of<br>the band.</p>
+          <div class="fact"><b>They chose the single</b><p class="p">Three songs, one video, the followers' pick. The post drew 176 likes and 37 comments, the most the band had seen.</p></div>
+          <div class="fact"><b>They held the cameras</b><p class="p">Thirteen cameras filmed the Dopamine video at a show, a few of them handed to friends in the crowd.</p></div>
+        </div>
+      </div>
+      <div class="folio"><span class="k">Marni Came</span><span class="k">The crowd</span></div>
+    </div></div>
+  </section>
+
+  <!-- 09 DOUBLED -->
+  <section class="block">
+    <div class="cap"><span><b>09 · Doubled</b> — one rule and a moodboard of the video's own doubles</span><span>1440 × ~1200</span></div>
+    <div class="frame"><div class="f sp grain">
+      <span class="k num">09</span>
+      <div class="db-head">
+        <p class="s" style="font-size:calc(var(--u) * 96)">Doubled</p>
+        <p class="p">A part of the subject repeats, offset and a little larger, so the frame looks like it glitched. Always from one moment, so it reads as an error, not a collage.</p>
+      </div>
+      <div class="mood">
+        <div class="w2 h2"><img src="marni-came-mockups/v-double-117.5.jpg" alt="The video at 1:57"><span class="credit">After Heartbreaks · 1:57</span></div>
+        <div class="h2"><img src="marni-came-mockups/d-photo-ah.jpg" alt=""><span class="credit">AH shoot · two frames</span></div>
+        <div><img src="marni-came-mockups/v-double-150.jpg" alt="The guitarist, the guitar neck doubled"><span class="credit">After Heartbreaks · 2:30</span></div>
+        <div><img src="marni-came-mockups/v-double-109.5.jpg" alt=""><span class="credit">After Heartbreaks · 1:49</span></div>
+        <div class="w2"><img src="marni-came-mockups/d-video.jpg" alt=""><span class="credit">Video · one frame, copied</span></div>
+        <div class="slot "><img src="marni-came-mockups/doubled/01.jpg" alt="" onload="this.parentElement.classList.add('full')" onerror="this.remove()"><span class="k">doubled/01.jpg</span><span class="credit">After Heartbreaks · 0:21</span></div>
+        <div class="slot "><img src="marni-came-mockups/doubled/02.jpg" alt="" onload="this.parentElement.classList.add('full')" onerror="this.remove()"><span class="k">doubled/02.jpg</span><span class="credit">After Heartbreaks · 3:14</span></div>
+        <div class="slot w2"><img src="marni-came-mockups/doubled/03.jpg" alt="" onload="this.parentElement.classList.add('full')" onerror="this.remove()"><span class="k">doubled/03.jpg</span><span class="credit">After Heartbreaks · 1:52</span></div>
+        <div class="slot h2"><img src="marni-came-mockups/doubled/04.jpg" alt="" onload="this.parentElement.classList.add('full')" onerror="this.remove()"><span class="k">doubled/04.jpg</span><span class="credit">After Heartbreaks · 1:50</span></div>
+        <div class="slot "><img src="marni-came-mockups/doubled/05.jpg" alt="" onload="this.parentElement.classList.add('full')" onerror="this.remove()"><span class="k">doubled/05.jpg</span><span class="credit">After Heartbreaks · 3:11</span></div>
+        <div class="slot "><img src="marni-came-mockups/doubled/06.jpg" alt="" onload="this.parentElement.classList.add('full')" onerror="this.remove()"><span class="k">doubled/06.jpg</span><span class="credit">After Heartbreaks · 0:21</span></div>
+        <div class="slot"><img src="marni-came-mockups/doubled/07.jpg" alt="" onload="this.parentElement.classList.add('full')" onerror="this.remove()"><span class="k">doubled/07.jpg</span><span class="credit">After Heartbreaks · 1:48</span></div>
+        <div class="slot "><img src="marni-came-mockups/doubled/08.jpg" alt="" onload="this.parentElement.classList.add('full')" onerror="this.remove()"><span class="k">doubled/08.jpg</span><span class="credit">After Heartbreaks · 1:56</span></div>
+      </div>
+      <div class="yesno">
+        <div><b>Yes</b><p class="p">Burst frames from one moment. Two members in one moment. The same photoshoot in the same outfits and setting. In video: the same frame, copied, screened back larger and offset.</p></div>
+        <div class="no"><b>No</b><p class="p">Frames from different shows, sessions or outfits. A whole frame laid over another. Two unrelated people made to share a picture.</p></div>
+      </div>
+      <div class="folio"><span class="k">Marni Came</span><span class="k">Doubled</span></div>
+    </div></div>
+  </section>
+
+  <!-- 10 GLOW (approved) -->
+  <section class="block">
+    <div class="cap"><span><b>10 · The glow line</b> — approved</span><span>1440 × ~900</span></div>
+    <div class="frame"><div class="f sp grain">
+      <span class="k num">10</span>
+      <div class="gl">
+        <div><div class="stage"><img src="marni-came-mockups/glow-captured.jpg" alt="The bass at 2:11, blown out by the stage light"><span class="tag">Allowed · captured</span></div><p class="p" style="margin-top:calc(var(--u) * 12);font-size:calc(var(--u) * 14)">The halo is in the footage. Burns and blown highlights stay, because they're the material.</p></div>
+        <div><div class="stage"><p class="fake">Marni<br>Came</p><span class="tag no">Banned · added</span></div><p class="p" style="margin-top:calc(var(--u) * 12);font-size:calc(var(--u) * 14)">Glow drawn by the design: halos around type, bloom on buttons, neon. Never.</p></div>
+      </div>
+      <div class="folio"><span class="k">Marni Came</span><span class="k">Light</span></div>
+    </div></div>
+  </section>
+
+  <!-- 11 THE SINGLE -->
+  <section class="block">
+    <div class="cap"><span><b>11 · Release artwork</b> — the original four-face edit, titled as a title card</span><span>1440 × ~900</span></div>
+    <div class="frame"><div class="f sp grain">
+      <span class="k num">11</span>
+      <div class="single">
+        <div class="cvA"><img src="marni-came-mockups/cover-original.jpg" alt="After Heartbreaks cover, the four-face edit"><span class="by">Marni Came</span><p class="t">After Heartbreaks</p><span class="cr">Mixed by Fabio Buemi · Mastered by Nadim Khoury</span></div>
+        <div>
+          <p class="k b">Single cover · 3000 × 3000</p>
+          <p class="p" style="margin-top:calc(var(--u) * 16);max-width:32ch">One line, one size, under the chin; the credit block beneath it; the band's name on the top edge. The same structure as the video's opening card.</p>
+        </div>
+      </div>
+      <div class="folio"><span class="k">Marni Came</span><span class="k">Release</span></div>
+    </div></div>
+  </section>
+
+  <!-- 12 POSTERS -->
+  <section class="block">
+    <div class="cap"><span><b>12 · Show posters</b> — one system, four real shows</span><span>1440 × ~900</span></div>
+    <div class="frame"><div class="f sp grain" style="min-height:0">
+      <span class="k num">12</span>
+      <div class="posters">
+        <div><div class="poster"><img class="bg" src="marni-came-mockups/poster-lido.jpg" alt="Lido poster"><img class="mk" src="marni-came-mockups/logo-bone.png" alt=""><p class="big">Lido</p><div class="inf"><span>Marni Came<i>Live</i></span><span style="text-align:right">07.12.2023<i>Berlin</i></span></div></div><p class="k lbl">Lido · photo BIMM Institute Berlin · Lens + Burn</p></div>
+        <div><div class="poster"><img class="bg" src="marni-came-mockups/poster-badehaus24.jpg" alt="Badehaus 2024 poster"><img class="mk" src="marni-came-mockups/logo-bone.png" alt=""><p class="big">Badehaus</p><div class="inf"><span>Marni Came<i>Live</i></span><span style="text-align:right">09.02.2024<i>Berlin</i></span></div></div><p class="k lbl">Badehaus 2024 · photo Ben · Lens + Burn</p></div>
+        <div><div class="poster"><img class="bg" src="marni-came-mockups/poster-badehaus23.jpg" alt="Badehaus 2023 poster"><img class="mk" src="marni-came-mockups/logo-bone.png" alt=""><p class="big">Badehaus</p><div class="inf"><span>Marni Came<i>Live</i></span><span style="text-align:right">09.02.2023<i>Berlin</i></span></div></div><p class="k lbl">Badehaus 2023 · video still · Lens + Burn</p></div>
+        <div><div class="poster"><img class="bg" src="marni-came-mockups/poster-endofterm.jpg" alt="End of Term poster"><img class="mk" src="marni-came-mockups/logo-bone.png" alt=""><p class="big">End of term</p><div class="inf"><span>Marni Came<i>Live</i></span><span style="text-align:right">03.2022<i>Berlin</i></span></div></div><p class="k lbl">End of Term · Lens + Burn</p></div>
+      </div>
+      <div class="folio" style="position:static;margin-top:calc(var(--u) * 48)"><span class="k">Marni Came</span><span class="k">Posters</span></div>
+    </div></div>
+  </section>
+
+  <!-- 13 SHOT LIST -->
+  <section class="block">
+    <div class="cap"><span><b>13 · The mockups</b> — seven shots for you to make, lit the way the band was lit</span><span>1440 × ~600</span></div>
+    <div class="frame"><div class="f sp grain" style="min-height:0">
+      <span class="k num">13</span>
+      <p class="s" style="font-size:calc(var(--u) * 56)">The shot list</p>
+      <p class="p" style="margin-top:calc(var(--u) * 14);max-width:70ch">Black ground, one hard light or an on-camera flash, amber spilling in from one side. No white studio sweeps, no floating objects.</p>
+      <div class="mk-list">
+        <div><span class="k">01</span><b>12" sleeve</b><p class="p">After Heartbreaks on a black floor, one hard light from the left, the record half out.</p></div>
+        <div><span class="k">02</span><b>Wheatpaste</b><p class="p">The posters pasted in a row on a Berlin wall at night, hit with direct flash.</p></div>
+        <div><span class="k">03</span><b>Stage flag</b><p class="p">The wordmark on black cloth behind the drum kit, a beam cutting across it.</p></div>
+        <div><span class="k">04</span><b>Crowd shirt</b><p class="p">Worn in the crowd, shot with flash: the chorus the crowd sings back, on the back.</p></div>
+        <div><span class="k">05</span><b>Ticket</b><p class="p">The Badehaus ticket torn in a hand under the venue's light.</p></div>
+        <div><span class="k">06</span><b>Press kit</b><p class="p">The EPK open on a dark table under one lamp, the four members' pages.</p></div>
+        <div><span class="k">07</span><b>The site</b><p class="p">A phone in a dark room, the release screen lighting the hand that holds it.</p></div>
+      </div>
+      <div class="folio" style="position:static;margin-top:calc(var(--u) * 48)"><span class="k">Marni Came</span><span class="k">Mockups</span></div>
+    </div></div>
+  </section>
+
+  <!-- 14 WEB -->
+  <section class="block">
+    <div class="cap"><span><b>14 · The website</b> — release week: the After Heartbreaks video behind one strong title line, no credits</span><span>1440 × 810 · loop</span></div>
+    <div class="frame"><div class="f grain">
+      <div class="web">
+        <video data-t="3.0" src="marni-came-mockups/web-ah-loop.mp4" poster="marni-came-mockups/web-ah-loop.jpg" autoplay muted loop playsinline></video>
+        <div class="shade"></div>
+        <nav>
+          <img class="mk" src="marni-came-mockups/logo-bone.png" alt="Marni Came">
+          <ul><li>Music</li><li>Videos</li><li>Shows</li><li>Merch</li><li>Band</li></ul>
+          <span class="snd"><i></i>Sound off</span>
+        </nav>
+        <div class="rel"><p class="k">New single · out now</p><p class="t">After Heartbreaks</p></div>
+        <div class="foot"><b>Watch the video ↗</b><b>Listen</b></div>
+      </div>
+    </div></div>
+  </section>
+</div>
+<script>
+/* Posters: the venue name set on one line at 86% of the poster's width. */
+document.fonts.ready.then(() => {
+  for (const big of document.querySelectorAll(".poster .big")) {
+    const w = big.parentElement.getBoundingClientRect().width * 0.86, fs = parseFloat(getComputedStyle(big).fontSize);
+    big.style.fontSize = Math.min(fs * w / big.getBoundingClientRect().width, w * 0.36) + "px";
+  }
+});
+/* The idea line: one word at a time, a hard swap every 1.6 s (no fade, no flashing). */
+for (const el of document.querySelectorAll("[data-cycle]")) {
+  const words = el.dataset.cycle.split(","); let i = 0;
+  const marks = el.closest(".man")?.querySelectorAll(".moves span") || [];
+  setInterval(() => { i = (i + 1) % words.length; el.textContent = words[i]; marks.forEach((m, k) => m.classList.toggle("on", k === i)); }, 1600);
+}
+</script>
+</body>
+</html>
