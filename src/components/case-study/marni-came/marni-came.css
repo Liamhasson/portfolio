@@ -128,6 +128,8 @@
 [data-world="marni-came"] .mc-site .bar em { font: 400 12px/1 var(--mono); font-style: normal; color: var(--ink-3); margin-left: 14px; }
 [data-world="marni-came"] .mc-site .win { position: relative; aspect-ratio: 16 / 9; overflow: hidden; }
 [data-world="marni-came"] .mc-site iframe { position: absolute; left: 0; top: 0; width: 1440px; height: 810px; border: 0; transform-origin: 0 0; background: var(--black); }
+/* focus inside the site shows on its frame, for keyboard users moving through the page */
+[data-world="marni-came"] .mc-site iframe:is(:focus, [data-focus]) { outline: 2px solid var(--bone); outline-offset: -2px; }
 [data-world="marni-came"] .mc-site-stills { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--u) * 8); }
 [data-world="marni-came"] .mc-site-stills img { width: 100%; height: 100%; object-fit: cover; display: block; aspect-ratio: 4 / 5; }
 [data-world="marni-came"] .mc-site-stills .wide { grid-column: 1 / -1; aspect-ratio: 16 / 9; }

@@ -9,7 +9,7 @@ const make = () => createAudioController(window, (src) => {
 });
 const playing = () => made.filter((a) => !a.paused).map((a) => a.src.split("/").pop());
 const hide = () => { Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true }); document.dispatchEvent(new Event("visibilitychange")); };
-const post = (data: unknown, origin: string) => window.dispatchEvent(new MessageEvent("message", { data, origin }));
+const post = (data: unknown, origin: string) => window.dispatchEvent(new MessageEvent("message", { data, origin, source: window }));
 
 beforeEach(() => { made = []; Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true }); });
 afterEach(() => vi.restoreAllMocks());
@@ -73,4 +73,26 @@ test("a remote controller mirrors the page's state and ignores other origins", a
   post({ type: MC_AUDIO_STATE, state: { on: true, track: "dopamine" } }, location.origin);
   expect(r.state()).toEqual({ on: true, track: "dopamine" });
   r.dispose();
+});
+
+test("a play cut short by a quick switch doesn't turn the state off", async () => {
+  let reject: (e: unknown) => void = () => {};
+  let first = true;
+  const c = createAudioController(window, (src) => {
+    const a = { src, paused: true, currentTime: 0, play() { a.paused = false; if (first) { first = false; return new Promise<void>((_, r) => { reject = r; }); } return Promise.resolve(); }, pause() { a.paused = true; }, addEventListener() {}, removeEventListener() {} };
+    return a as unknown as HTMLAudioElement;
+  });
+  c.play("after-heartbreaks"); c.play("dopamine");
+  reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+  await Promise.resolve(); await Promise.resolve();
+  expect(c.state()).toEqual({ on: true, track: "dopamine" });
+});
+
+test("a remote controller ignores state from a window that isn't its parent", async () => {
+  const { createRemoteController, MC_AUDIO_STATE } = await import("./audio");
+  const r = createRemoteController(window);
+  const other = document.createElement("iframe"); document.body.append(other);
+  window.dispatchEvent(new MessageEvent("message", { data: { type: MC_AUDIO_STATE, state: { on: true, track: "dopamine" } }, origin: location.origin, source: other.contentWindow }));
+  expect(r.state().on).toBe(false);
+  r.dispose(); other.remove();
 });

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { LazyVideo } from "@/components/case-study/lazy-video";
 import { MovesCanvas } from "@/components/marni-came/moves-canvas";
 import { POSTERS, Poster } from "@/components/marni-came/poster";
@@ -36,6 +36,9 @@ export function BandSite({ className }: { className?: string }) {
   }, []);
   const [video, setVideo] = useState<{ src: string; title: string } | null>(null);
   const [menu, setMenu] = useState(false);
+  const menuBtn = useRef<HTMLButtonElement>(null);
+  const closeMenu = useCallback(() => { setMenu(false); menuBtn.current?.focus(); }, []);
+  const closeVideo = useCallback(() => setVideo(null), []);
 
   return (
     <article data-world="marni-came" className={`ms ${className ?? ""}`}>
@@ -44,19 +47,9 @@ export function BandSite({ className }: { className?: string }) {
         <a href="#top" className="ms-mark"><img src={MC_ASSETS.wordmarkDistressedBone} alt="Marni Came" /></a>
         <nav aria-label="Sections" className="ms-links">{NAV.map(([id, label]) => <a key={id} href={`#${id}`}>{label}</a>)}</nav>
         {ctrl && !embedded && <SoundToggle ctrl={ctrl} className="ms-sound" />}
-        <button type="button" className="ms-menu-b" onClick={() => setMenu(true)}>Menu</button>
+        <button type="button" className="ms-menu-b" ref={menuBtn} aria-expanded={menu} aria-haspopup="dialog" onClick={() => setMenu(true)}>Menu</button>
       </header>
-      {menu && (
-        <div role="dialog" aria-modal="true" aria-label="Menu" className="ms-menu">
-          <div className="ms-menu-top">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={MC_ASSETS.wordmarkDistressedBone} alt="" />
-            <button type="button" onClick={() => setMenu(false)}>Close</button>
-          </div>
-          {NAV.map(([id, label]) => <a key={id} href={`#${id}`} onClick={() => setMenu(false)}>{label}</a>)}
-          {ctrl && !embedded && <SoundToggle ctrl={ctrl} className="ms-sound" />}
-        </div>
-      )}
+      <SiteMenu open={menu} onClose={closeMenu} ctrl={ctrl} embedded={embedded} />
 
       <section id="top" className="ms-hero" aria-label="New single">
         <LazyVideo className="rel-video" src={MC_ASSETS.releaseLoop} poster={MC_ASSETS.releasePoster} label="A loop from the After Heartbreaks music video" />
@@ -116,7 +109,7 @@ export function BandSite({ className }: { className?: string }) {
         <img src={MC_ASSETS.wordmarkDistressedBone} alt="Marni Came" /><span className="ms-k">Berlin</span>
       </footer>
 
-      {video && <Lightbox video={video} onClose={() => setVideo(null)} />}
+      {video && <Lightbox video={video} onClose={closeVideo} ctrl={ctrl} />}
     </article>
   );
 }
@@ -169,19 +162,56 @@ function Member({ name, plays, src, seed }: { name: string; plays: string; src: 
   );
 }
 
-function Lightbox({ video, onClose }: { video: { src: string; title: string }; onClose: () => void }) {
+/** The site's phone menu: a native modal dialog (focus moves in, Escape closes, the page behind is inert). */
+function SiteMenu({ open, onClose, ctrl, embedded }: { open: boolean; onClose: () => void; ctrl: AudioController | null; embedded: boolean }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const d = ref.current; if (!d) return;
-    d.showModal();
+    if (open && !d.open) d.showModal();
+    if (!open && d.open) d.close();
+  }, [open]);
+  useEffect(() => {
+    const d = ref.current; if (!d) return;
     const close = () => onClose();
     d.addEventListener("close", close);
     return () => d.removeEventListener("close", close);
   }, [onClose]);
   return (
+    <dialog ref={ref} aria-label="Menu" className="ms-menu">
+      <div className="ms-menu-top">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={MC_ASSETS.wordmarkDistressedBone} alt="" />
+        <button type="button" onClick={() => ref.current?.close()}>Close</button>
+      </div>
+      {NAV.map(([id, label]) => <a key={id} href={`#${id}`} onClick={() => ref.current?.close()}>{label}</a>)}
+      {ctrl && !embedded && <SoundToggle ctrl={ctrl} className="ms-sound" />}
+    </dialog>
+  );
+}
+
+/** A full video in a modal. It counts as the page's sound too: it pauses the moment the music is turned on, and when the
+ *  tab is hidden; playing it pauses the music. */
+function Lightbox({ video, onClose, ctrl }: { video: { src: string; title: string }; onClose: () => void; ctrl: AudioController | null }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const vid = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const d = ref.current; if (!d) return;
+    if (!d.open) d.showModal();
+    const close = () => onClose();
+    d.addEventListener("close", close);
+    return () => d.removeEventListener("close", close);
+  }, [onClose]);
+  useEffect(() => {
+    const pauseIfMusic = () => { if (ctrl?.state().on) vid.current?.pause(); };
+    const off = ctrl?.subscribe(pauseIfMusic);
+    const onVis = () => { if (document.visibilityState === "hidden") vid.current?.pause(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => { off?.(); document.removeEventListener("visibilitychange", onVis); };
+  }, [ctrl]);
+  return (
     <dialog ref={ref} className="ms-lightbox" aria-label={video.title}>
       <button type="button" className="ms-btn" onClick={() => ref.current?.close()}>Close</button>
-      <video src={video.src} controls autoPlay playsInline />
+      <video ref={vid} src={video.src} controls autoPlay playsInline onPlay={() => { if (ctrl?.state().on) ctrl.pause(); }} />
     </dialog>
   );
 }

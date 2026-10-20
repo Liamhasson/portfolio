@@ -68,9 +68,13 @@ for (const slug of STUDIES) {
     const missing: string[] = [];
     for (let i = 0; i < 40; i++) {
       await page.keyboard.press("Tab");
-      const r = await page.evaluate(() => {
-        const a = document.activeElement as HTMLElement | null;
+      const r = await page.evaluate(async () => {
+        await new Promise((d) => requestAnimationFrame(() => requestAnimationFrame(d)));
+        let a = document.activeElement as HTMLElement | null;
         if (!a || !a.closest("article[data-world]")) return null;
+        // an embedded page: the ring belongs to what is focused inside it, or to the frame itself
+        const doc = a instanceof HTMLIFrameElement ? a.contentDocument : null;
+        if (doc?.activeElement && doc.activeElement !== doc.body) a = doc.activeElement as HTMLElement;
         const cs = getComputedStyle(a);
         const ring = cs.outlineStyle !== "none" && parseFloat(cs.outlineWidth) > 0;
         return ring || cs.boxShadow !== "none" ? "" : a.outerHTML.slice(0, 80);

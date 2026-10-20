@@ -38,7 +38,9 @@ export function createAudioController(win: Window, make: (src: string) => HTMLAu
       el = make(TRACKS[id].src); el.addEventListener("ended", ended);
     }
     set({ on: true, track: id });
-    void el.play()?.catch(() => set({ ...st, on: false }));
+    // (a play() cut short by a later switch rejects with AbortError: that is not the music stopping)
+    const mine = el;
+    void mine.play()?.catch((e: unknown) => { if (el === mine && (e as { name?: string })?.name !== "AbortError") set({ ...st, on: false }); });
   };
   const onVis = () => { if (win.document.visibilityState === "hidden") pause(); };
   win.document.addEventListener("visibilitychange", onVis);
@@ -78,7 +80,7 @@ export function createRemoteController(win: Window): AudioController {
   let st: AudioState = { on: false, track: "after-heartbreaks" };
   const subs = new Set<() => void>();
   const on = (e: MessageEvent) => {
-    if (e.origin !== win.location.origin) return;
+    if (e.origin !== win.location.origin || e.source !== win.parent) return;
     const d = e.data as { type?: unknown; state?: AudioState } | null;
     if (!d || d.type !== MC_AUDIO_STATE || !d.state || !isTrack(d.state.track)) return;
     st = { on: !!d.state.on, track: d.state.track }; subs.forEach((f) => f());

@@ -85,7 +85,9 @@ test.describe("a 390 px phone", () => {
     await expect(menu).toBeVisible();
     const box = await menu.boundingBox();
     expect(box!.width).toBeGreaterThanOrEqual(389);
-    await page.getByRole("button", { name: /close/i }).click();
+    await page.keyboard.press("Escape");
+    await expect(menu).toBeHidden();
+    await expect(page.getByRole("button", { name: /menu/i })).toBeFocused();
     await expectTextFloors(page);
   });
 });
@@ -94,4 +96,17 @@ test("axe finds nothing serious", async ({ page }) => {
   await page.goto(URL);
   const { violations } = await new AxeBuilder({ page }).include("article").analyze();
   expect(violations.filter((v) => v.impact === "serious" || v.impact === "critical").map((v) => v.id)).toEqual([]);
+});
+
+test("turning the music on pauses the video in the lightbox", async ({ page }) => {
+  await page.goto(URL);
+  await page.getByRole("button", { name: /watch the video/i }).click();
+  const v = page.getByRole("dialog").locator("video");
+  await v.evaluate((el: HTMLVideoElement) => { el.muted = true; return el.play(); });
+  await page.getByRole("dialog").getByRole("button", { name: /close/i }).click();
+  await page.getByRole("button", { name: /watch the video/i }).click();
+  await page.evaluate(() => (document.querySelector(".ms-sound") as HTMLButtonElement | null)?.click());
+  await page.waitForTimeout(300);
+  const paused = await page.getByRole("dialog").locator("video").evaluate((el: HTMLVideoElement) => el.paused);
+  expect(paused).toBe(true);
 });

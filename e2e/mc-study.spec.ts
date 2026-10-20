@@ -21,12 +21,12 @@ test("the switch: four moves, off at load, each one toggles and changes the pict
   const canvas = page.locator(".mc-switch canvas");
   await canvas.scrollIntoViewIfNeeded();
   await page.waitForTimeout(800);
-  const before = await canvas.evaluate((c: HTMLCanvasElement) => c.toDataURL());
+  const before = await canvas.screenshot();
   await group.getByRole("button", { name: /^Burn/ }).click();
   await expect(group.getByRole("button", { name: /^Burn/ })).toHaveAttribute("aria-pressed", "true");
   await page.waitForTimeout(700);
-  const after = await canvas.evaluate((c: HTMLCanvasElement) => c.toDataURL());
-  expect(after).not.toBe(before);
+  const after = await canvas.screenshot();
+  expect(after.equals(before)).toBe(false);
 });
 
 test("the idea's word cycles every 1.6 s", async ({ page }) => {
@@ -101,6 +101,9 @@ test("website at 1440: the site live in the page, and Listen inside it turns the
   await expect(page.getByRole("link", { name: /open the site/i })).toHaveAttribute("href", "/marni-came/site");
   const site = page.frameLocator('iframe[src="/marni-came/site?embed=1"]');
   await expect(site.getByRole("button", { name: /sound/i })).toHaveCount(0); // (the page holds the one control)
+  // no smooth scroll inside the frame, so the wheel hands back to the page at the site's end
+  const inner = page.frames().find((f) => f.url().includes("/marni-came/site"))!;
+  expect(await inner.evaluate(() => document.documentElement.classList.contains("lenis"))).toBe(false);
   await site.getByRole("button", { name: /^listen$/i }).click();
   await expect(page.getByRole("button", { name: /sound on/i })).toHaveAttribute("aria-pressed", "true");
   const playing = await page.evaluate(() => (window as unknown as { __mcPlaying?: number }).__mcPlaying ?? null);

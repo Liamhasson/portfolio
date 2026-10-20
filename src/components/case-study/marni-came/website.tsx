@@ -13,6 +13,15 @@ export function MarniCameWebsite({ kind, title }: { kind: "supporting"; title: s
   const wide = useSyncExternalStore(subscribe, () => window.matchMedia(WIDE).matches, () => false);
   const box = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
+  const frame = useRef<HTMLIFrameElement>(null);
+  const [inside, setInside] = useState(false);
+  // keyboard focus inside the site: the page sees only its window losing focus, so check where it went
+  useEffect(() => {
+    const blur = () => setTimeout(() => setInside(document.activeElement === frame.current), 0);
+    const focus = () => setInside(false);
+    window.addEventListener("blur", blur); window.addEventListener("focus", focus);
+    return () => { window.removeEventListener("blur", blur); window.removeEventListener("focus", focus); };
+  }, []);
   useEffect(() => {
     const el = box.current; if (!el) return;
     const ro = new ResizeObserver(([e]) => setScale(e.contentRect.width / 1440));
@@ -26,7 +35,7 @@ export function MarniCameWebsite({ kind, title }: { kind: "supporting"; title: s
         <div className="mc-site">
           <div className="bar" aria-hidden="true"><span /><span /><span /><em>liamhasson.com/marni-came/site</em></div>
           <div className="win" ref={box}>
-            <iframe src="/marni-came/site?embed=1" title="Marni Came's site in the week After Heartbreaks came out" loading="lazy" style={{ transform: `scale(${scale})` }} />
+            <iframe ref={frame} data-focus={inside ? "" : undefined} src="/marni-came/site?embed=1" title="Marni Came's site in the week After Heartbreaks came out" loading="lazy" style={{ transform: `scale(${scale})` }} />
           </div>
         </div>
       ) : (
