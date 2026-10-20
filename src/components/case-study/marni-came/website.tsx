@@ -17,10 +17,14 @@ export function MarniCameWebsite({ kind, title }: { kind: "supporting"; title: s
   const [inside, setInside] = useState(false);
   // keyboard focus inside the site: the page sees only its window losing focus, so check where it went
   useEffect(() => {
-    const blur = () => setTimeout(() => setInside(document.activeElement === frame.current), 0);
-    const focus = () => setInside(false);
-    window.addEventListener("blur", blur); window.addEventListener("focus", focus);
-    return () => { window.removeEventListener("blur", blur); window.removeEventListener("focus", focus); };
+    const check = () => setInside(document.activeElement === frame.current);
+    const later = () => { check(); setTimeout(check, 0); requestAnimationFrame(check); };
+    window.addEventListener("blur", later); window.addEventListener("focus", check);
+    document.addEventListener("focusout", later);
+    return () => {
+      window.removeEventListener("blur", later); window.removeEventListener("focus", check);
+      document.removeEventListener("focusout", later);
+    };
   }, []);
   useEffect(() => {
     const el = box.current; if (!el) return;
