@@ -7,6 +7,11 @@ export const SITE_URL = "https://liamhasson.com";
 /** Every page, in the order a visitor meets them. */
 export const PAGES = ["/", "/eventread", "/cyvore", "/pulse", "/nordic-logic", "/about", "/contact"] as const;
 
+/** The Marni Came band site (/marni-came/site) is a page of its own: no portfolio nav or name over it (spec 2026-10-20 §5). */
+export function isBandSite(pathname: string | null): boolean {
+  return pathname === "/marni-came/site";
+}
+
 /** The site's link preview (app/opengraph-image.jpg, twitter-image.jpg). Next replaces a parent's openGraph and twitter
  *  whole when a page sets its own, so every page that does spreads these in (final review, 2026-10-12). */
 const PREVIEW = { url: "/opengraph-image.jpg", width: 1200, height: 630, alt: "Liam Hasson, Product Designer: a ball of rose-gold sand" };

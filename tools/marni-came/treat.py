@@ -137,6 +137,10 @@ def build(out):
     # the Premiere method on a still: the same frame, screened back larger and offset
     v = grade(load(frame(155), (1600, 1200)), lo=8, hi=225)
     save(grain(doubled(v, v, (0.30, 0.0, 0.62, 0.5), dx=0.06, dy=0.01, scale=1.12, amt=.85, feather=.06)), "doubled/same-frame.jpg")
+    # the videos' posters: Liam singing (the music video at 2:44), and Dopamine live at Badehaus graded to the brand (1:31)
+    save(load(frame(164), (1600, 900)), "video/after-heartbreaks.jpg")
+    repo = os.path.dirname(os.path.dirname(HERE))
+    save(grain(grade(load(frame(91, os.path.join(repo, "public/playground/dopamine.mp4")), (1600, 900)), lo=12, hi=225)), "video/dopamine.jpg")
     # the burned logo: the old PNG master on Blackout with the light from the left
     logo = Image.open(os.path.join(G, "logo/PNG/Marni Came logo.png")).crop((645, 733, 2840, 1751))
     tile = Image.new("RGB", (1600, 1000), BLACK); lw = 1100; l = logo.resize((lw, int(lw * logo.height / logo.width)), Image.LANCZOS)

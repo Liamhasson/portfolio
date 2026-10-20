@@ -8,9 +8,9 @@ export const MC_ASSETS = {
   releasePoster: `${R}/video/release-loop.jpg`,
   releaseVideo: `${R}/video/after-heartbreaks.mp4`,
   releaseVideoPoster: `${R}/video/after-heartbreaks.jpg`,
-  /** The playground's own file: Dopamine live at Badehaus. */
+  /** The playground's own file: Dopamine live at Badehaus (its poster graded to the brand). */
   dopamineVideo: "/playground/dopamine.mp4",
-  dopamineVideoPoster: "/playground/dopamine.jpg",
+  dopamineVideoPoster: `${R}/video/dopamine.jpg`,
   wordmark: `${R}/logo/wordmark.svg`,
   wordmarkBone: `${R}/logo/wordmark-bone.svg`,
   wordmarkBlack: `${R}/logo/wordmark-black.svg`,

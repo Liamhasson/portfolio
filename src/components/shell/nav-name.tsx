@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { isBandSite } from "@/lib/site";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { NAME, letterRoll, nameRoll } from "@/lib/name-roll";
@@ -45,6 +46,7 @@ export function NavName() {
     className: "sh-name sh-enter fixed left-[4.9vw] top-[clamp(12px,3.6vw,48px)] z-50",
     style: { "--i": 0 } as React.CSSProperties,
   };
+  if (isBandSite(pathname)) return null;
   return isStory ? (
     <a href={STORY_HREF} {...props} onClick={(e) => {
       e.preventDefault();

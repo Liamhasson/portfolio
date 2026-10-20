@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { holdScroll } from "@/lib/smooth-scroll";
 import { useActiveSection } from "@/hooks/use-active-section";
-import { PAGES } from "@/lib/site";
+import { PAGES, isBandSite } from "@/lib/site";
 import { STORY_HREF, STORY_PATH } from "@/lib/story";
 import { bindLight } from "./nav-light";
 import { useNavTone } from "./nav-tone";
@@ -99,6 +99,7 @@ export function PillNav() {
   const hrefOf = (id: string) => (id !== "projects" ? `/${id}` : isHome ? "#projects" : `${STORY_HREF}#projects`);
   const currentOf = (id: string): "location" | "page" | undefined => (active === id ? (isHome && id === "projects" ? "location" : "page") : undefined);
 
+  if (isBandSite(pathname)) return null;
   return (
     <>
     {/* on a case study, a scrim in the page's own colour behind the nav: text scrolling under it never collides with

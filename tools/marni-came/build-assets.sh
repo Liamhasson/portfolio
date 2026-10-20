@@ -41,7 +41,6 @@ scripts/encode-video.sh public/playground/after-heartbreaks-loop.mp4 "$OUT/video
 (cd "$tmp" && ffmpeg -v error -y -i "$VIDEO" -map 0:v:0 -vf "scale=-2:1080" -c:v libx264 -b:v 1150k -preset slow -pass 1 -an -f mp4 /dev/null \
   && ffmpeg -v error -y -i "$VIDEO" -map 0:v:0 -map 0:a:0 -vf "scale=-2:1080" -c:v libx264 -b:v 1150k -preset slow -pass 2 -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart ah.mp4)
 mv "$tmp/ah.mp4" "$OUT/video/after-heartbreaks.mp4"
-ffmpeg -v error -y -ss 9.5 -i "$VIDEO" -map 0:v:0 -frames:v 1 -vf "scale=1600:-2" -q:v 3 "$OUT/video/after-heartbreaks.jpg"
 
 # the masters, AAC 128 kbps, with their waveforms (You'll Be You is the playground's)
 ffmpeg -v error -y -i "$ARCHIVE/Masters/Marni Came - After Heartbreaks.wav" -c:a aac -b:a 128k -movflags +faststart "$OUT/audio/after-heartbreaks.m4a"

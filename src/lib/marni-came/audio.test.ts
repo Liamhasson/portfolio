@@ -64,3 +64,13 @@ test("the bridge plays and pauses a same-origin request", () => {
 test("a top-level page is not embedded", () => {
   expect(isEmbedded(window)).toBe(false);
 });
+
+test("a remote controller mirrors the page's state and ignores other origins", async () => {
+  const { createRemoteController, MC_AUDIO_STATE } = await import("./audio");
+  const r = createRemoteController(window);
+  post({ type: MC_AUDIO_STATE, state: { on: true, track: "dopamine" } }, "https://evil.test");
+  expect(r.state().on).toBe(false);
+  post({ type: MC_AUDIO_STATE, state: { on: true, track: "dopamine" } }, location.origin);
+  expect(r.state()).toEqual({ on: true, track: "dopamine" });
+  r.dispose();
+});
