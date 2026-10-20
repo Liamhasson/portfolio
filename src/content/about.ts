@@ -97,7 +97,7 @@ export const ABOUT = {
         { name: "Interaction & motion", proof: "Cyvore: the mission animation, the CTA’s states", href: "/cyvore" },
         { name: "Design systems", proof: "Eventread: one type family, three risk colours, a CI test", href: "/eventread" },
         { name: "Web design", proof: "Cyvore’s investor site, and this one", href: "/cyvore" },
-        { name: "Branding", proof: "Pulse: the brand and its promise", href: "/pulse" },
+        { name: "Branding", proof: "Nordic Logic: the mark, its logo suite and the system around it", href: "/nordic-logic" },
         { name: "Prototyping in code", proof: "Eventread: built and shipped in Next.js", href: "/eventread" },
         { name: "3D modeling", proof: "This site: the desk and the laptop, modelled and lit in Blender" },
       ],

@@ -73,7 +73,7 @@ describe("About and Contact content (spec 2026-10-12-about-contact-design.md)", 
     ]);
     for (const s of skills) {
       expect(s.proof.length).toBeGreaterThan(10);
-      if (s.href) expect(["/eventread", "/cyvore", "/pulse"]).toContain(s.href);
+      if (s.href) expect(["/eventread", "/cyvore", "/pulse", "/nordic-logic"]).toContain(s.href);
     }
     expect(skills.find((s) => s.name === "3D modeling")!.href).toBeUndefined();
     expect(ABOUT.opening).not.toHaveProperty("href");   // (plain text: Liam, 2026-10-12)
