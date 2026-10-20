@@ -6,6 +6,7 @@ const WORLD_BG: Record<(typeof STUDIES)[number], string> = {
   cyvore: "rgb(11, 8, 20)",        // --void #0b0814
   pulse: "rgb(6, 11, 20)",         // --void #060b14
   "nordic-logic": "rgb(249, 249, 248)", // --canvas #f9f9f8 (Nordic Logic's Daylight)
+  "marni-came": "rgb(10, 9, 8)",   // Blackout #0a0908
 };
 
 for (const slug of STUDIES) {

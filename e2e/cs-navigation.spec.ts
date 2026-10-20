@@ -4,8 +4,8 @@ import { expect, test } from "@playwright/test";
 test("leaving Cyvore by the next-project link leaves nothing of it running; Back brings it back working", async ({ page }) => {
   await page.goto("/cyvore");
   await page.waitForFunction(() => window.__csScrollTriggers && window.__csScrollTriggers().includes("cyvore"));
-  await page.getByRole("link", { name: "Next project: Pulse" }).click();
-  await expect(page).toHaveURL(/\/pulse$/);
+  await page.getByRole("link", { name: "Next project: Marni Came" }).click(); // Cyvore → Marni Came since 2026-10-20
+  await expect(page).toHaveURL(/\/marni-came$/);
   await expect.poll(() => page.evaluate(() => window.__csScrollTriggers!().filter((w) => w === "cyvore").length)).toBe(0);
   expect(await page.locator("[data-world='cyvore']").count()).toBe(0);
   await page.goBack();

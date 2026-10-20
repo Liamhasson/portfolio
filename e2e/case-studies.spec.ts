@@ -2,7 +2,8 @@ import { expect, test } from "@playwright/test";
 
 const loop = [
   ["eventread", "Cyvore", "cyvore", "The Danger Score."],
-  ["cyvore", "Pulse", "pulse", "One story, told in one screen."],
+  ["cyvore", "Marni Came", "marni-came", "One story, told in one screen."],
+  ["marni-came", "Pulse", "pulse", "on purpose."],
   ["pulse", "Nordic Logic", "nordic-logic", "Goal-based onboarding."],
   ["nordic-logic", "Eventread", "eventread", "Built for the sceptic."],
 ] as const;

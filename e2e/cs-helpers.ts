@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Locator, type Page } from "@playwright/test";
 
-export const STUDIES = ["eventread", "cyvore", "pulse", "nordic-logic"] as const;
+export const STUDIES = ["eventread", "cyvore", "pulse", "nordic-logic", "marni-came"] as const;
 
 export function collectConsoleErrors(page: Page): string[] {
   const errors: string[] = [];
