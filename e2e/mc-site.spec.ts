@@ -49,15 +49,31 @@ test("Listen plays After Heartbreaks and the toggle follows", async ({ page }) =
   await expect(page.getByRole("button", { name: /sound on/i })).toHaveAttribute("aria-pressed", "true");
 });
 
-test("dates appear only on the posters", async ({ page }) => {
+test("dates appear only on the posters and in the shows list, which holds every show (Liam, 2026-10-20)", async ({ page }) => {
   await page.goto(URL);
   const stray = await page.evaluate(() => {
     const out: string[] = [];
     const w = document.createTreeWalker(document.querySelector("article")!, NodeFilter.SHOW_TEXT);
-    for (let n = w.nextNode(); n; n = w.nextNode()) if (/\b\d{2}\.\d{4}\b/.test(n.textContent!) && !n.parentElement!.closest(".mc-poster")) out.push(n.textContent!);
+    for (let n = w.nextNode(); n; n = w.nextNode()) if (/\b\d{2}\.\d{4}\b/.test(n.textContent!) && !n.parentElement!.closest(".mc-poster, .ms-list")) out.push(n.textContent!);
     return out;
   });
   expect(stray).toEqual([]);
+  const shows = page.locator(".ms-list li");
+  await expect(shows).toHaveCount(9);
+  await expect(shows.first()).toContainText("09.02.2024");
+  await expect(shows.first()).toContainText("Badehaus");
+  await expect(shows.last()).toContainText("17.03.2022");
+  await expect(shows.last()).toContainText("Club Gretchen");
+  await expect(shows.filter({ hasText: "Emergenza Festival" })).toHaveCount(2);
+});
+
+test("the band is one photo with the four names under it, left to right", async ({ page }) => {
+  await page.goto(URL);
+  const names = page.locator("#band .ms-names span");
+  await expect(names).toHaveText(["Pedro", "Sami", "Liam", "Rikki"]);
+  const xs = await names.evaluateAll((els) => els.map((e) => e.getBoundingClientRect().left));
+  expect([...xs].sort((x, y) => x - y)).toEqual(xs);
+  await expect(page.locator("#band canvas")).toHaveCount(0);
 });
 
 test("no glow added anywhere", async ({ page }) => {
@@ -94,7 +110,8 @@ test.describe("a 390 px phone", () => {
 
 test("axe finds nothing serious", async ({ page }) => {
   await page.goto(URL);
-  const { violations } = await new AxeBuilder({ page }).include("article").analyze();
+  // (a poster's type is part of its picture, whose alt carries the words: WCAG 1.4.3 exempts it)
+  const { violations } = await new AxeBuilder({ page }).include("article").exclude("[data-product]").analyze();
   expect(violations.filter((v) => v.impact === "serious" || v.impact === "critical").map((v) => v.id)).toEqual([]);
 });
 

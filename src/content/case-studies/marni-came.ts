@@ -9,7 +9,7 @@ export const marniCame: CaseStudy = {
   slug: "marni-came",
   title: "Marni Came",
   descriptor: "Brand identity",
-  line: "A Berlin rock band that kept its mistakes, in sound and in picture.",
+  line: "A Berlin grunge rock band that kept its mistakes, in sound and in brand.",
   atAGlance: {
     role: "Brand identity, art direction, video & web design",
     timeline: "2022 – 2024",

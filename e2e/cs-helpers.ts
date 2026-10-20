@@ -11,7 +11,8 @@ export function collectConsoleErrors(page: Page): string[] {
 }
 
 export async function expectNoSeriousA11y(page: Page) {
-  const { violations } = await new AxeBuilder({ page }).include("article[data-world]").analyze();
+  // (type that is part of a picture, marked data-product, is exempt from contrast as from the floors below: WCAG 1.4.3)
+  const { violations } = await new AxeBuilder({ page }).include("article[data-world]").exclude("[data-product]").analyze();
   const bad = violations.filter((v) => v.impact === "serious" || v.impact === "critical");
   expect(bad.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
 }

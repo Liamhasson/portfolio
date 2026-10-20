@@ -15,8 +15,8 @@ export function MarniCameProblem({ kind, title }: { kind: "problem"; title: stri
         </div>
         <figure className="mc-ph">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={MC_ASSETS.problem} alt="Marni Came on stage at Badehaus, the crowd in front" loading="lazy" />
-          <figcaption className="label">Badehaus · video still</figcaption>
+          <img src={MC_ASSETS.problem} alt="Marni Came at Lido with the house lights up, the room's hands in the air and Liam on his knees by the microphone" loading="lazy" />
+          <figcaption className="label">Lido · video still</figcaption>
         </figure>
       </div>
     </section>

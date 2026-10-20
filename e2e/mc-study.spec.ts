@@ -106,7 +106,7 @@ test("imagery: the four moves with the glow note, the moodboard of the video's d
   await page.goto(URL);
   await expect(page.locator(".mc-moves figure")).toHaveCount(4);
   await expect(page.locator(".mc-moves")).toContainText("added glow: never");
-  await expect(page.locator(".mc-mood img")).toHaveCount(13);
+  await expect(page.locator(".mc-mood img")).toHaveCount(14);
 });
 
 test("applications: the cover and four posters, dated exactly as the files prove", async ({ page }) => {

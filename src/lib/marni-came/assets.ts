@@ -2,8 +2,9 @@
 const R = "/case-studies/marni-came";
 
 export const MC_ASSETS = {
-  heroLoop: `${R}/video/hero-badehaus.mp4`,
-  heroPoster: `${R}/video/hero-badehaus.jpg`,
+  /** Drop Dead live at Lido: the solo, then the drummer's view (Liam, 2026-10-20). */
+  heroLoop: `${R}/video/hero-lido.mp4`,
+  heroPoster: `${R}/video/hero-lido.jpg`,
   releaseLoop: `${R}/video/release-loop.mp4`,
   releasePoster: `${R}/video/release-loop.jpg`,
   releaseVideo: `${R}/video/after-heartbreaks.mp4`,
@@ -25,7 +26,10 @@ export const MC_ASSETS = {
   problem: `${R}/problem-crowd.jpg`,
   fanPhoto: `${R}/fan-lido.jpg`,
   glowAllowed: `${R}/glow-allowed.jpg`,
-  band: { liam: `${R}/band/liam.jpg`, sami: `${R}/band/sami.jpg`, pedro: `${R}/band/pedro.jpg`, rikki: `${R}/band/rikki.jpg` },
+  /** The four of you in 'b&w clothes 2': Pedro, Sami, Liam, Rikki, left to right. */
+  bandGroup: `${R}/band/group.jpg`,
+  /** The meet-up before Badehaus 2024, for the moodboard. */
+  backstage: `${R}/backstage.jpg`,
   /** The video's own doubles, by file; the moodboard's order and credits live with the component. */
   doubled: {
     "01": `${R}/doubled/01.jpg`, "02": `${R}/doubled/02.jpg`, "03": `${R}/doubled/03.jpg`, "04": `${R}/doubled/04.jpg`, "05": `${R}/doubled/05.jpg`,

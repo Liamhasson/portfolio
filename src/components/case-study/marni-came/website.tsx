@@ -37,7 +37,7 @@ export function MarniCameWebsite({ kind, title }: { kind: "supporting"; title: s
       <div className="mc-head"><h2 id={id} className="title">{title}</h2><p className="mc-open">Release week, as the band&rsquo;s own site.</p></div>
       {wide ? (
         <div className="mc-site">
-          <div className="bar" aria-hidden="true"><span /><span /><span /><em>liamhasson.com/marni-came/site</em></div>
+          <div className="bar" aria-hidden="true"><span /><span /><span /></div>
           <div className="win" ref={box}>
             <iframe ref={frame} data-focus={inside ? "" : undefined} src="/marni-came/site?embed=1" title="Marni Came's site in the week After Heartbreaks came out" loading="lazy" style={{ transform: `scale(${scale})` }} />
           </div>
@@ -47,7 +47,7 @@ export function MarniCameWebsite({ kind, title }: { kind: "supporting"; title: s
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img className="wide" src={MC_ASSETS.releasePoster} alt="The site's first screen: After Heartbreaks, new single, out now" loading="lazy" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={MC_ASSETS.band.liam} alt="The site's band section: Liam, vocals and guitar" loading="lazy" />
+          <img src={MC_ASSETS.bandGroup} alt="The site's band section: Pedro, Sami, Liam and Rikki" loading="lazy" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={MC_ASSETS.posters.lido} alt="The site's shows section: the Lido poster" loading="lazy" />
         </div>

@@ -24,6 +24,7 @@ const MOOD: { src: string; alt: string; cls?: string }[] = [
   { src: D["08"], alt: "The drummer doubled over the kit, seen wide, the video at 0:21" },
   { src: D["09"], alt: "Two guitarists in the amber burn, the video at 1:48" },
   { src: D["10"], alt: "The guitarist with his strap doubled, the video at 1:56" },
+  { src: MC_ASSETS.backstage, alt: "The band talking with friends backstage before the Badehaus 2024 show, in black and white", cls: "w2" },
 ];
 
 /** Board CS 06 · Imagery: the four moves (the glow line folded into Burn), then Doubled as a moodboard with its rule. */

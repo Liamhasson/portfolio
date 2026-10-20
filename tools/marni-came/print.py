@@ -39,12 +39,15 @@ def build(out):
     sources = {
         "lido": (os.path.join(lido, "417412541_926263995968841_17596110508459146_n.jpg"), dict(lo=22, hi=215), (.3, .7), ((0.5, 0), "t", .45)),
         "badehaus-2024": (os.path.join(G, "Badehaus 2024/Ben's pics/2024-02-09 Imris badehaus shoot Colord ex1-OBD00681.jpg"), dict(lo=16, hi=215), (.3, .72), ((1, 0.5), "r", .4)),
-        "badehaus-2023": (frame(1076, os.path.join(bh23, "Marni Came 1.MP4")), dict(lo=20, hi=225), (.3, .72), ((0, 0.5), "l", .4)),
-        "end-of-term": (os.path.join(SRC, "end-of-term-2022-DSC09253.jpg"), dict(lo=14, hi=220), (.3, .72), ((0.5, 1), "b", .4)),
+        "end-of-term": (os.path.join(lido, "416839192_926264049302169_1082200003046739174_n.jpg"), dict(lo=14, hi=220), (.3, .75), ((0, 1), "b", .45)),
     }
     for name, (src, g, (inner, outer), (pos, edge, reach)) in sources.items():
         print(name, "source", Image.open(src).size)
         save(print_grain(burn(lens(grade(load(src, A3), **g), inner, outer), light, pos, edge, reach)), f"poster-{name}.jpg")
+    # Badehaus 2023 is framed: its photo sits inside the black margin (90% x 76% of the trim), the whole band at 11:43
+    F = (px(297 * 0.9), px(420 * 0.76))
+    st = frame(703, os.path.join(bh23, "Marni Came steady 1.MP4"))
+    save(print_grain(burn(lens(grade(load(st, F), lo=8, hi=225), .32, .8), light, (0.5, 0), "t", .45)), "poster-badehaus-2023.jpg")
 
     # the 12" sleeve: the cover's master (3000 px), to 12" with bleed
     S = px(304.8 + 2 * BLEED)

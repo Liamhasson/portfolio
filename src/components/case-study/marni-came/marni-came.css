@@ -19,6 +19,17 @@
 [data-world="marni-came"] .mc-sound i::after { content: ""; position: absolute; left: 3px; top: 3px; width: 10px; height: 10px; border-radius: 50%; background: var(--bone); transition: transform .2s; }
 [data-world="marni-came"] .mc-sound i[data-on]::after { transform: translateX(14px); }
 [data-world="marni-came"] .mc-sound:focus-visible { outline: 2px solid var(--bone); outline-offset: 3px; }
+/* sound on: the video's amber light breathes across the pill from its left edge, one slow swell every 8.6 s, and drifts a
+   little each time (Liam 10-20: more visible when on; off stays quiet). Captured light, screened in: no added glow. */
+[data-world="marni-came"] .mc-sound { overflow: hidden; isolation: isolate; }
+[data-world="marni-came"] .mc-sound > * { position: relative; z-index: 1; }
+[data-world="marni-came"] .mc-sound::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0;
+  background: url("/case-studies/marni-came/burn-light.jpg") 0% 50% / 180% auto no-repeat; mix-blend-mode: screen; transition: opacity .35s; }
+[data-world="marni-came"] .mc-sound[aria-pressed="true"]::before { opacity: .55; animation: mc-sound-burn 8.6s ease-in-out infinite; }
+@keyframes mc-sound-burn {
+  0%, 100% { opacity: .38; background-position: 0% 50%; background-size: 170% auto; }
+  50% { opacity: .95; background-position: 28% 40%; background-size: 230% auto; }
+}
 /* ------------------------------ 1 hero ------------------------------ */
 [data-world="marni-came"] .hero { height: calc(var(--u) * 900); }
 [data-world="marni-came"] .mc-hero { position: absolute; inset: 0; }
@@ -48,7 +59,26 @@
 [data-world="marni-came"] .mc-ph figcaption { margin-top: calc(var(--u) * 10); }
 /* Solution: the idea, then the switch */
 [data-world="marni-came"] .mc-idea { font: 600 calc(var(--u) * 150)/.86 var(--mc-serif); text-transform: uppercase; color: var(--red); }
-[data-world="marni-came"] .mc-cyc { display: inline-block; min-width: 4.2em; }
+/* the word sets its own width, so "on purpose" follows it at the same gap (Liam 10-20); each word arrives with its own move */
+[data-world="marni-came"] .mc-cyc { display: inline-block; position: relative; }
+[data-world="marni-came"] .mc-cyc::before, [data-world="marni-came"] .mc-cyc::after { content: attr(data-word); position: absolute; left: 0; top: 0; pointer-events: none; opacity: 0; }
+/* Broken: the word arrives cut in two bands, shifted apart, that snap together (the word itself shows once they meet) */
+[data-world="marni-came"] .mc-cyc[data-fx="broken"] { animation: mc-broken-base .5s step-end both; }
+[data-world="marni-came"] .mc-cyc[data-fx="broken"]::before { opacity: 1; color: var(--red); clip-path: inset(0 0 52% 0); animation: mc-broken-a .5s steps(4, end) both; }
+[data-world="marni-came"] .mc-cyc[data-fx="broken"]::after { opacity: 1; color: var(--red); clip-path: inset(48% 0 0 0); animation: mc-broken-b .5s steps(4, end) both; }
+@keyframes mc-broken-base { from { color: transparent; } to { color: var(--red); } }
+@keyframes mc-broken-a { from { transform: translateX(-.16em); } to { transform: none; } }
+@keyframes mc-broken-b { from { transform: translateX(.12em); } to { transform: none; } }
+/* Burned: a band of the video's amber light passes across the letters */
+[data-world="marni-came"] .mc-cyc[data-fx="burned"] { background: linear-gradient(100deg, var(--red) 0 38%, #b36f0b 45%, #ffe1aa 50%, #b36f0b 55%, var(--red) 62% 100%) 100% 0 / 320% 100% no-repeat;
+  -webkit-background-clip: text; background-clip: text; color: transparent; animation: mc-burned .7s cubic-bezier(.3, 0, .2, 1) both; }
+@keyframes mc-burned { from { background-position: 100% 0; } to { background-position: 0% 0; } }
+/* Doubled: a screened copy, offset and larger, slides onto the word and is gone */
+[data-world="marni-came"] .mc-cyc[data-fx="doubled"]::after { color: var(--bone); mix-blend-mode: screen; animation: mc-doubled .55s cubic-bezier(.2, 0, .1, 1) both; }
+@keyframes mc-doubled { from { opacity: .7; transform: translate(.12em, -.06em) scale(1.08); } 70% { opacity: .45; } to { opacity: 0; transform: none; } }
+/* Bent: the word swells as if through a wide lens up close, then flattens */
+[data-world="marni-came"] .mc-cyc[data-fx="bent"] { transform-origin: 50% 60%; animation: mc-bent .55s cubic-bezier(.2, .7, .2, 1) both; }
+@keyframes mc-bent { from { transform: scale(1.22, 1.12); letter-spacing: .06em; } to { transform: none; letter-spacing: normal; } }
 [data-world="marni-came"] .mc-pillars { grid-template-columns: 1fr 1fr; align-items: start; margin-top: calc(var(--u) * 56); }
 [data-world="marni-came"] .mc-pillars .label { margin-bottom: calc(var(--u) * 8); }
 [data-world="marni-came"] .mc-switch { display: grid; grid-template-columns: 1.7fr 1fr; gap: calc(var(--u) * 40); margin-top: calc(var(--u) * 120); align-items: center; }
@@ -127,7 +157,6 @@
 [data-world="marni-came"] .mc-site { border: 1px solid var(--hair-2); }
 [data-world="marni-came"] .mc-site .bar { display: flex; align-items: center; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--hair-2); }
 [data-world="marni-came"] .mc-site .bar span { width: 10px; height: 10px; border-radius: 50%; background: #2a2723; }
-[data-world="marni-came"] .mc-site .bar em { font: 400 12px/1 var(--mono); font-style: normal; color: var(--ink-3); margin-left: 14px; }
 [data-world="marni-came"] .mc-site .win { position: relative; aspect-ratio: 16 / 9; overflow: hidden; }
 [data-world="marni-came"] .mc-site iframe { position: absolute; left: 0; top: 0; width: 1440px; height: 810px; border: 0; transform-origin: 0 0; background: var(--black); }
 /* focus inside the site shows on its frame, for keyboard users moving through the page */
@@ -145,6 +174,17 @@
 [data-world="marni-came"] .mc-poster-info { position: absolute; left: 8%; right: 8%; bottom: 5%; margin: 0; display: flex; justify-content: space-between; font: 500 4.4cqw/1.45 var(--mc-info); letter-spacing: .14em; text-transform: uppercase; color: var(--bone); }
 [data-world="marni-came"] .mc-poster-info span:last-child { text-align: right; }
 [data-world="marni-came"] .mc-poster-info i { font-style: normal; color: var(--ash); display: block; }
+/* the series' layouts (Liam 10-20): side, framed, stacked; classic is the rules above */
+[data-world="marni-came"] .mc-poster[data-layout="side"] .mc-poster-mark { left: auto; right: 7%; width: 36%; }
+[data-world="marni-came"] .mc-poster[data-layout="side"] .mc-poster-venue { left: 5%; bottom: 5%; transform: rotate(-90deg); transform-origin: left bottom; }
+[data-world="marni-came"] .mc-poster[data-layout="side"] .mc-poster-info { left: auto; right: 7%; flex-direction: column; gap: 3cqw; text-align: right; }
+[data-world="marni-came"] .mc-poster[data-layout="framed"] { background: var(--black); box-shadow: inset 0 0 0 1px rgba(238,234,226,.16); }  /* (its edge, on a black page) */
+[data-world="marni-came"] .mc-poster-frame { position: absolute; left: 5%; top: 4%; width: 90%; height: 76%; overflow: hidden; }
+[data-world="marni-came"] .mc-poster[data-layout="framed"] .mc-poster-mark { left: 9%; top: 7%; width: 30%; }
+[data-world="marni-came"] .mc-poster[data-layout="framed"] .mc-poster-venue { left: 5%; bottom: 6%; }
+[data-world="marni-came"] .mc-poster[data-layout="framed"] .mc-poster-info { left: auto; right: 5%; bottom: 6%; flex-direction: column; gap: 1cqw; text-align: right; font-size: 3.8cqw; }
+[data-world="marni-came"] .mc-poster[data-layout="stacked"] .mc-poster-mark { width: 32%; }
+[data-world="marni-came"] .mc-poster[data-layout="stacked"] .mc-poster-venue { bottom: 15%; display: flex; flex-direction: column; gap: 1.4cqw; line-height: .78; }
 /* ------------------------------ 6 challenges ------------------------------ */
 [data-world="marni-came"] .chal { padding: calc(var(--u) * 110) 0 calc(var(--u) * 100); display: grid; grid-template-columns: 1.3fr 1fr; column-gap: calc(var(--u) * 56); }
 [data-world="marni-came"] .chal > .g12 { grid-column: 1 / -1; }
@@ -176,6 +216,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   [data-world="marni-came"] .mc-move, [data-world="marni-came"] .mc-sound i::after { transition: none; }
+  [data-world="marni-came"] .mc-sound[aria-pressed="true"]::before { animation: none; opacity: .7; }
+  [data-world="marni-came"] .mc-cyc, [data-world="marni-came"] .mc-cyc::before, [data-world="marni-came"] .mc-cyc::after { animation: none !important; }
 }
 
 /* ------------------------------ phones and tablets (< 1100px) ------------------------------ */

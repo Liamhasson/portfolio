@@ -43,21 +43,44 @@ html,body { margin:0; background:transparent; }
 .row { display:flex; justify-content:space-between; gap:3mm; padding:var(--pad) 0; border-bottom:.25mm solid rgba(238,234,226,.16); }
 </style>`;
 
+// the series' four layouts, as poster.tsx sets them (Liam, 2026-10-20)
 const POSTERS = [
-  ["lido", "Lido", "12.2023"],
-  ["badehaus-2024", "Badehaus", "09.02.2024"],
-  ["badehaus-2023", "Badehaus", "02.2023"],
-  ["end-of-term", "End of term", "03.2022"],
+  ["lido", "Lido", "12.2023", "classic"],
+  ["badehaus-2024", "Badehaus", "09.02.2024", "side"],
+  ["badehaus-2023", "Badehaus", "02.2023", "framed"],
+  ["end-of-term", "End of term", "03.2022", "stacked"],
 ];
-const venueSize = (v) => Math.min(36, 86 / (v.length * 0.68)); // poster.tsx
+const fit = (width, chars) => Math.min(36, width / (chars * 0.68)); // poster.tsx
+const MARK = pub("logo/wordmark-distressed-bone.svg");
+const INFO = (date) => `<p class="info"><span>Marni Came<i>Live</i></span><span>${date}<i>Berlin</i></span></p>`;
+function posterHtml(slug, venue, date, layout) {
+  const photo = `<img class="bg" src="${img(`poster-${slug}.jpg`)}">`;
+  if (layout === "side") {
+    const size = fit(0.8 * 141, venue.length);
+    return `${photo}<div class="trim"><img class="mark" style="left:auto;right:7%;width:36%" src="${MARK}">
+      <p class="venue" style="left:5%;bottom:5%;font-size:${size.toFixed(2)}cqw;transform:rotate(-90deg);transform-origin:left bottom;translate:${(size * 0.79).toFixed(2)}cqw 0">${venue}</p>
+      <p class="info" style="left:auto;right:7%;flex-direction:column;gap:3cqw;text-align:right"><span>Marni Came<i>Live</i></span><span>${date}<i>Berlin</i></span></p></div>`;
+  }
+  if (layout === "framed") {
+    return `<div class="bg" style="background:var(--black)"></div><div class="trim">
+      <img src="${img(`poster-${slug}.jpg`)}" style="position:absolute;left:5%;top:4%;width:90%;height:76%;object-fit:cover">
+      <img class="mark" style="left:9%;top:7%;width:30%" src="${MARK}">
+      <p class="venue" style="left:5%;bottom:6%;font-size:${fit(64, venue.length).toFixed(2)}cqw">${venue}</p>
+      <p class="info" style="left:auto;right:5%;bottom:6%;flex-direction:column;gap:1cqw;text-align:right;font-size:3.8cqw"><span>Live<i>Berlin</i></span><span>${date}</span></p></div>`;
+  }
+  if (layout === "stacked") {
+    const words = venue.split(" "); const last = words.pop(); const lead = words.join(" ");
+    return `${photo}<div class="trim"><img class="mark" style="width:32%" src="${MARK}">
+      <p class="venue" style="bottom:15%;display:flex;flex-direction:column;gap:1.4cqw;line-height:.78">
+        <span style="font-size:${fit(30, lead.length).toFixed(2)}cqw">${lead}</span><span style="font-size:${fit(86, last.length).toFixed(2)}cqw">${last}</span></p>${INFO(date)}</div>`;
+  }
+  return `${photo}<div class="trim"><img class="mark" src="${MARK}">
+    <p class="venue" style="font-size:${fit(86, venue.length).toFixed(2)}cqw">${venue}</p>${INFO(date)}</div>`;
+}
 
 const pieces = [
-  ...POSTERS.map(([slug, venue, date]) => ({
-    name: `poster-${slug}-A3`, w: 297 + 2 * B, h: 420 + 2 * B, dpi: 300, jpg: true,
-    html: `<img class="bg" src="${img(`poster-${slug}.jpg`)}"><div class="trim">
-      <img class="mark" src="${pub("logo/wordmark-distressed-bone.svg")}">
-      <p class="venue" style="font-size:${venueSize(venue).toFixed(2)}cqw">${venue}</p>
-      <p class="info"><span>Marni Came<i>Live</i></span><span>${date}<i>Berlin</i></span></p></div>`,
+  ...POSTERS.map(([slug, venue, date, layout]) => ({
+    name: `poster-${slug}-A3`, w: 297 + 2 * B, h: 420 + 2 * B, dpi: 300, jpg: true, html: posterHtml(slug, venue, date, layout),
   })),
   {
     name: "sleeve-12in", w: 304.8 + 2 * B, h: 304.8 + 2 * B, dpi: 300, jpg: true,

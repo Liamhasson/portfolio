@@ -18,22 +18,13 @@ for v in wordmark wordmark-distressed; do
   sed 's/fill="currentColor"/fill="#0A0908"/' "$OUT/logo/$v.svg" > "$OUT/logo/$v-black.svg"
 done
 
-# the hero: Dopamine live at Badehaus (84–92.6 s), graded black and white, the video's amber light breathing in from the left
+# the hero: Drop Dead live at Lido, the solo then the drummer's view, black and white with a burn that keeps moving (lido.py);
+# the MP4 at CRF 31 keeps the grain under 2 MB
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
-python3 - "$tmp" "$OUT/burn-light.jpg" <<'PY'
-import sys, math
-from PIL import Image, ImageFilter
-tmp, light = sys.argv[1:]
-b = Image.open(light).convert("RGB").resize((1440, 810)).filter(ImageFilter.GaussianBlur(18))
-for i in range(215):
-    t = i / 215; reach = 0.34 + 0.24 * (0.5 - 0.5 * math.cos(2 * math.pi * t))
-    m = Image.new("L", (256, 1)); m.putdata([int(255 * max(0, 1 - (x / 255) / reach) ** 2.2) for x in range(256)])
-    Image.composite(b, Image.new("RGB", b.size), m.resize(b.size, Image.BILINEAR)).save(f"{tmp}/b{i:03d}.png")
-PY
-ffmpeg -v error -y -ss 84 -t 8.6 -i public/playground/dopamine.mp4 -framerate 25 -i "$tmp/b%03d.png" -filter_complex \
-  "[0:v]scale=1440:810,fps=25,hue=s=0,curves=all='0/0 0.07/0 0.5/0.46 0.9/0.96 1/1',colorchannelmixer=rr=1.0:gg=0.985:bb=0.955,noise=alls=10:allf=t,format=gbrp[bs];[1:v]format=gbrp[b];[bs][b]blend=all_mode=screen,format=yuv420p" \
-  -an -c:v libx264 -crf 14 -preset slow "$tmp/hero.mp4"
-scripts/encode-video.sh "$tmp/hero.mp4" "$OUT/video/hero-badehaus" 1440 0.6
+python3 tools/marni-came/lido.py "$tmp/hero"
+scripts/encode-video.sh "$tmp/hero.mp4" "$OUT/video/hero-lido" 1440 1.5
+n="$(ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=nb_read_frames -of csv=p=0 "$tmp/hero.mp4")"
+ffmpeg -v error -y -i "$tmp/hero.mp4" -c:v libx264 -crf 31 -preset slow -profile:v high -g "$n" -keyint_min "$n" -sc_threshold 0 -pix_fmt yuv420p -movflags +faststart -an "$OUT/video/hero-lido.mp4"
 
 # release week: the After Heartbreaks loop, and the full video for the lightbox (the Dopamine live video is the playground's)
 scripts/encode-video.sh public/playground/after-heartbreaks-loop.mp4 "$OUT/video/release-loop" 1280 3.0

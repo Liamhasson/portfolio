@@ -61,17 +61,19 @@
 .ms-cap { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-top: max(10px, calc(var(--u) * 14)); }
 .ms-shows { display: grid; grid-template-columns: 1fr 1.6fr; gap: max(32px, calc(var(--u) * 48)); align-items: start; }
 .ms-list { list-style: none; margin: 0; padding: 0; }
-.ms-list li { display: flex; justify-content: space-between; gap: 12px; padding: max(10px, calc(var(--u) * 12)) 0; border-bottom: 1px solid var(--line); font: 500 max(11px, calc(var(--u) * 12))/1.6 var(--mc-info); letter-spacing: .18em; text-transform: uppercase; }
-.ms-list i { font-style: normal; color: var(--ash); }
+.ms-list li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: baseline; column-gap: max(14px, calc(var(--u) * 20)); padding: max(10px, calc(var(--u) * 12)) 0; border-bottom: 1px solid var(--line); font: 500 max(11px, calc(var(--u) * 12))/1.6 var(--mc-info); letter-spacing: .18em; text-transform: uppercase; }
+.ms-list i, .ms-list time { font-style: normal; color: var(--ash); }
+.ms-list em { display: block; font-style: normal; color: var(--ash); }
 .ms-posters { display: grid; grid-template-columns: repeat(4, 1fr); gap: max(8px, calc(var(--u) * 10)); }
 .ms-merch { display: grid; grid-template-columns: 1fr 1fr; gap: max(10px, calc(var(--u) * 16)); }
 .ms-art { position: relative; margin: 0; aspect-ratio: 16 / 10; background: #141210; display: grid; place-items: center; overflow: hidden; }
 .ms-art > img { width: 46%; }
 .ms-art > img.ms-fill { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .ms-art figcaption { position: absolute; left: 16px; bottom: 14px; z-index: 1; }
-.ms-band { display: grid; grid-template-columns: repeat(4, 1fr); gap: max(10px, calc(var(--u) * 14)); }
-.ms-member { margin: 0; outline-offset: 4px; }
-.ms-portrait { aspect-ratio: 4 / 5; overflow: hidden; }
+.ms-group { margin: 0; }
+.ms-group img { display: block; width: 100%; height: auto; }
+.ms-names { position: relative; height: max(36px, calc(var(--u) * 52)); }
+.ms-names span { position: absolute; top: max(12px, calc(var(--u) * 16)); transform: translateX(-50%); white-space: nowrap; }
 .ms-foot { display: flex; align-items: center; justify-content: space-between; padding: max(32px, calc(var(--u) * 48)) max(16px, calc(var(--u) * 48)); border-top: 1px solid var(--line); }
 .ms-foot img { width: 120px; }
 .ms-lightbox { width: min(1280px, 94vw); max-width: none; padding: 0; border: 0; background: var(--black); color: var(--bone); }
@@ -87,6 +89,17 @@
 .mc-poster-info { position: absolute; left: 8%; right: 8%; bottom: 5%; margin: 0; display: flex; justify-content: space-between; font: 500 4.4cqw/1.45 var(--mc-info); letter-spacing: .14em; text-transform: uppercase; color: var(--bone); }
 .mc-poster-info span:last-child { text-align: right; }
 .mc-poster-info i { font-style: normal; color: var(--ash); display: block; }
+/* the series' layouts (Liam 10-20): side, framed, stacked; classic is the rules above */
+.mc-poster[data-layout="side"] .mc-poster-mark { left: auto; right: 7%; width: 36%; }
+.mc-poster[data-layout="side"] .mc-poster-venue { left: 5%; bottom: 5%; transform: rotate(-90deg); transform-origin: left bottom; }
+.mc-poster[data-layout="side"] .mc-poster-info { left: auto; right: 7%; flex-direction: column; gap: 3cqw; text-align: right; }
+.mc-poster[data-layout="framed"] { background: var(--black); box-shadow: inset 0 0 0 1px rgba(238,234,226,.16); }  /* (its edge, on a black page) */
+.mc-poster-frame { position: absolute; left: 5%; top: 4%; width: 90%; height: 76%; overflow: hidden; }
+.mc-poster[data-layout="framed"] .mc-poster-mark { left: 9%; top: 7%; width: 30%; }
+.mc-poster[data-layout="framed"] .mc-poster-venue { left: 5%; bottom: 6%; }
+.mc-poster[data-layout="framed"] .mc-poster-info { left: auto; right: 5%; bottom: 6%; flex-direction: column; gap: 1cqw; text-align: right; font-size: 3.8cqw; }
+.mc-poster[data-layout="stacked"] .mc-poster-mark { width: 32%; }
+.mc-poster[data-layout="stacked"] .mc-poster-venue { bottom: 15%; display: flex; flex-direction: column; gap: 1.4cqw; line-height: .78; }
 
 @media (max-width: 900px) {
   .ms-links, .ms-nav > .ms-sound { display: none; }
@@ -97,8 +110,6 @@
   .ms-wave { display: none; }
   .ms-videos, .ms-shows, .ms-merch { grid-template-columns: 1fr; }
   .ms-posters { grid-template-columns: 1fr 1fr; }
-  .ms-band { grid-template-columns: 1fr 1fr; }
-  .ms-member .ms-cap { flex-direction: column; gap: 4px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .rel-burn { animation: none; opacity: .8; transform: none; }

@@ -1,23 +1,28 @@
 "use client";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { LazyVideo } from "@/components/case-study/lazy-video";
-import { MovesCanvas } from "@/components/marni-came/moves-canvas";
 import { POSTERS, Poster } from "@/components/marni-came/poster";
 import { SoundToggle } from "@/components/marni-came/sound-toggle";
 import { MC_ASSETS } from "@/lib/marni-came/assets";
 import { TRACKS, createAudioController, createRemoteController, isEmbedded, type AudioController, type TrackId } from "@/lib/marni-came/audio";
-import { OFF, type DoubledSpec, type MoveState } from "@/lib/marni-came/moves";
 import "./band-site.css";
 
 const noop = () => () => {};
-const reducedNow = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 const NAV = [["music", "Music"], ["videos", "Videos"], ["shows", "Shows"], ["merch", "Merch"], ["band", "Band"]] as const;
-const FACE: DoubledSpec = { box: [0.22, 0.08, 0.78, 0.62], dx: 0.09, dy: -0.01, scale: 1.1 };
-const BAND = [
-  { name: "Liam", plays: "Vocals · guitar", src: MC_ASSETS.band.liam },
-  { name: "Sami", plays: "Drums", src: MC_ASSETS.band.sami },
-  { name: "Pedro", plays: "Bass", src: MC_ASSETS.band.pedro },
-  { name: "Rikki", plays: "Guitar", src: MC_ASSETS.band.rikki },
+/** The four of you in 'b&w clothes 2', left to right, and where each stands across the photo (Liam, 2026-10-20). */
+const BAND = [["Pedro", 18], ["Sami", 39], ["Liam", 62], ["Rikki", 84]] as const;
+/** Every show the band played, newest first, from the band's own list (Liam, 2026-10-20). Club Gretchen was the BIMM End of
+ *  Term show. */
+const SHOWS = [
+  ["09.02.2024", "Badehaus", ""],
+  ["07.12.2023", "Lido", ""],
+  ["20.07.2023", "Marie Antoinette", ""],
+  ["01.06.2023", "Privat Club", "Emergenza Festival"],
+  ["03.05.2023", "Panke Culture", ""],
+  ["09.03.2023", "Cassiopeia", "Emergenza Festival"],
+  ["09.02.2023", "Badehaus", "Out Of The Rabbit Hole"],
+  ["14.12.2022", "Festsaal Kreuzberg", ""],
+  ["17.03.2022", "Club Gretchen", "BIMM End of Term"],
 ] as const;
 const VIDEOS = [
   { title: "After Heartbreaks", kind: "Music video", src: MC_ASSETS.releaseVideo, poster: MC_ASSETS.releaseVideoPoster },
@@ -80,7 +85,9 @@ export function BandSite({ className }: { className?: string }) {
 
       <section id="shows" className="ms-sec" aria-labelledby="ms-shows"><h2 id="ms-shows" className="ms-h">Shows</h2>
         <div className="ms-shows">
-          <ul className="ms-list">{[["Lido", "Berlin"], ["Badehaus", "Berlin"], ["Emergenza · semi-finals", "Berlin"], ["BIMM End of Term", "Berlin"]].map(([v, c]) => <li key={v}><span>{v}</span><i>{c}</i></li>)}</ul>
+          <ul className="ms-list">{SHOWS.map(([d, v, note]) => (
+            <li key={d}><time>{d}</time><span>{v}{note && <em>{note}</em>}</span><i>Berlin</i></li>
+          ))}</ul>
           <div className="ms-posters">{POSTERS.map((p) => <Poster key={p.photo} {...p} />)}</div>
         </div>
       </section>
@@ -101,7 +108,11 @@ export function BandSite({ className }: { className?: string }) {
       </section>
 
       <section id="band" className="ms-sec" aria-labelledby="ms-band"><h2 id="ms-band" className="ms-h">Band</h2>
-        <div className="ms-band">{BAND.map((m, i) => <Member key={m.name} {...m} seed={i + 3} />)}</div>
+        <figure className="ms-group">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={MC_ASSETS.bandGroup} alt="Pedro, Sami, Liam and Rikki, left to right, in black and white" loading="lazy" />
+          <figcaption className="ms-names">{BAND.map(([name, x]) => <span key={name} className="ms-t" style={{ left: `${x}%` }}>{name}</span>)}</figcaption>
+        </figure>
       </section>
 
       <footer className="ms-foot">
@@ -133,32 +144,6 @@ function Track({ id, n, ctrl }: { id: TrackId; n: number; ctrl: AudioController 
         <span className="ms-k">{dur} {on ? "❚❚" : "▶"}</span>
       </button>
     </li>
-  );
-}
-
-function Member({ name, plays, src, seed }: { name: string; plays: string; src: string; seed: number }) {
-  const [state, setState] = useState<MoveState>(OFF);
-  const ref = useRef<HTMLElement>(null);
-  // slice when the portrait comes into view, then settle (never under reduced motion: on-then-off would be a flash)
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || reducedNow() || typeof IntersectionObserver === "undefined") return;
-    let t = 0;
-    const io = new IntersectionObserver(([e]) => {
-      if (!e.isIntersecting) return;
-      setState((s) => ({ ...s, slice: 1 }));
-      t = window.setTimeout(() => setState((s) => ({ ...s, slice: 0 })), 350);
-      io.disconnect();
-    }, { threshold: 0.5 });
-    io.observe(el);
-    return () => { io.disconnect(); clearTimeout(t); };
-  }, []);
-  const doubled = (on: boolean) => setState((s) => ({ ...s, doubled: on ? 1 : 0 }));
-  return (
-    <figure ref={ref} className="ms-member" tabIndex={0} onMouseEnter={() => doubled(true)} onMouseLeave={() => doubled(false)} onFocus={() => doubled(true)} onBlur={() => doubled(false)}>
-      <MovesCanvas className="ms-portrait" src={src} alt={`${name}, ${plays.toLowerCase()}`} burnSrc={MC_ASSETS.burnLight} doubled={FACE} state={state} seed={seed} />
-      <figcaption className="ms-cap"><span className="ms-t">{name}</span><span className="ms-k">{plays}</span></figcaption>
-    </figure>
   );
 }
 
