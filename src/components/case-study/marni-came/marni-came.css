@@ -214,8 +214,8 @@
   [data-world="marni-came"] .mc-mood { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-auto-rows: calc(var(--u) * 130); }
   [data-world="marni-came"] .mc-app-posters { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   [data-world="marni-came"] .mc-collage { height: auto; display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--u) * 8); }
-  [data-world="marni-came"] .mc-collage figure { position: relative; inset: auto; width: auto; height: auto; aspect-ratio: 4 / 5; transform: none; }
-  [data-world="marni-came"] .mc-collage .a1 { grid-column: 1 / -1; aspect-ratio: 16 / 10; }
+  [data-world="marni-came"] .mc-collage :is(.a1, .a2, .a3) { position: relative; left: auto; top: auto; width: auto; height: auto; aspect-ratio: 4 / 5; transform: none; }
+  [data-world="marni-came"] .mc-collage .a1.a1 { grid-column: 1 / -1; aspect-ratio: 16 / 10; }
   [data-world="marni-came"] .chal { grid-template-columns: minmax(0, 1fr); padding: calc(var(--u) * 56) 0; }
   [data-world="marni-came"] .chs { margin: calc(var(--u) * 24) calc(var(--u) * 16) 0; }
   [data-world="marni-came"] .mc-crowd { grid-column: 1; grid-row: auto; margin: calc(var(--u) * 24) calc(var(--u) * 16) 0; }

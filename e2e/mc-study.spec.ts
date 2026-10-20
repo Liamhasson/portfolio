@@ -123,3 +123,13 @@ test("the page stays within its 14.5-screen cap at 1440×900", async ({ page }) 
   const screens = await page.evaluate(() => document.documentElement.scrollHeight / 900);
   expect(screens).toBeLessThanOrEqual(14.5);
 });
+
+test.describe("applications on a 390 px phone", () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true });
+  test("the collage stacks: every piece at least half the column wide", async ({ page }) => {
+    await page.goto(URL);
+    const widths = await page.locator(".mc-collage figure").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().width));
+    expect(widths.length).toBe(3);
+    for (const w of widths) expect(w).toBeGreaterThan(150);
+  });
+});
