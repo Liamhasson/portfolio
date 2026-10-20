@@ -39,3 +39,14 @@
   background: var(--canvas); color: var(--ink);
 }
 [data-world="nordic-logic"] .f { background: var(--canvas); color: var(--ink); }
+
+/* Marni Came: docs/prototypes/marni-came-mockups.html (Blackout, Bone, Title red for brand material only) */
+[data-world="marni-came"] {
+  --nav-ink: #0a0908; --nav-canvas: #eeeae2; /* the site nav and Back in this world (ink = the dark, canvas = the light) */
+  --black: #0a0908; --bone: #eeeae2; --red: #ec1302; --ash: #8f8a82; --panel: #141210;
+  --hair: rgba(238,234,226,.12); --hair-2: rgba(238,234,226,.2);
+  --ink: #eeeae2; --ink-2: rgba(238,234,226,.78); --ink-3: rgba(238,234,226,.6);
+  --settle: cubic-bezier(0.22, 1, 0.36, 1);
+  background: var(--black); color: var(--ink);
+}
+[data-world="marni-came"] .f { background: var(--black); color: var(--ink); }

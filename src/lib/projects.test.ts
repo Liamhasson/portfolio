@@ -7,13 +7,14 @@ describe("project registry", () => {
       "nordic-logic",
       "eventread",
       "cyvore",
+      "marni-came",
       "pulse",
       "stub",
     ]);
   });
 
-  test("Nordic Logic, Eventread, Cyvore and Pulse are live, in that order (Liam, 2026-10-19)", () => {
-    expect(liveProjects.map((p) => p.slug)).toEqual(["nordic-logic", "eventread", "cyvore", "pulse"]);
+  test("Nordic Logic, Eventread, Cyvore, Marni Came and Pulse are live, in that order (Liam, 2026-10-20)", () => {
+    expect(liveProjects.map((p) => p.slug)).toEqual(["nordic-logic", "eventread", "cyvore", "marni-came", "pulse"]);
   });
 
   test("tags have no duplicates", () => {
@@ -23,7 +24,8 @@ describe("project registry", () => {
   test("next project cycles through live projects, in their order", () => {
     expect(nextProject("nordic-logic").slug).toBe("eventread");
     expect(nextProject("eventread").slug).toBe("cyvore");
-    expect(nextProject("cyvore").slug).toBe("pulse");
+    expect(nextProject("cyvore").slug).toBe("marni-came");
+    expect(nextProject("marni-came").slug).toBe("pulse");
     expect(nextProject("pulse").slug).toBe("nordic-logic"); // (the last back to the first)
   });
 

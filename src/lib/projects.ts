@@ -7,8 +7,8 @@ export interface Project {
   readonly tags: readonly string[];
 }
 
-/** Order = order on the home grid (Liam, 2026-10-19: Nordic Logic, Eventread, Cyvore, Pulse), and of the next-project
- *  banners at the foot of each case study. */
+/** Order = order on the home grid (Liam, 2026-10-19: Nordic Logic, Eventread, Cyvore, Pulse; 2026-10-20: Marni Came
+ *  before Pulse), and of the next-project banners at the foot of each case study. */
 export const projects: readonly Project[] = [
   {
     slug: "nordic-logic",
@@ -22,6 +22,12 @@ export const projects: readonly Project[] = [
     name: "Cyvore",
     status: "live",
     tags: ["B2B website design", "Information architecture", "Advanced animation"],
+  },
+  {
+    slug: "marni-came",
+    name: "Marni Came",
+    status: "live",
+    tags: ["Brand identity", "Art direction", "Video", "Web design"],
   },
   {
     slug: "pulse",

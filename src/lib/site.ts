@@ -5,7 +5,7 @@ import type { CaseStudy } from "@/lib/case-studies/types";
 export const SITE_URL = "https://liamhasson.com";
 
 /** Every page, in the order a visitor meets them. */
-export const PAGES = ["/", "/eventread", "/cyvore", "/pulse", "/nordic-logic", "/about", "/contact"] as const;
+export const PAGES = ["/", "/eventread", "/cyvore", "/marni-came", "/pulse", "/nordic-logic", "/about", "/contact"] as const;
 
 /** The Marni Came band site (/marni-came/site) is a page of its own: no portfolio nav or name over it (spec 2026-10-20 §5). */
 export function isBandSite(pathname: string | null): boolean {

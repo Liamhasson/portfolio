@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
 
-export type CaseSlug = "eventread" | "cyvore" | "pulse" | "nordic-logic";
+export type CaseSlug = "eventread" | "cyvore" | "pulse" | "nordic-logic" | "marni-came";
 
 /** Spec §2: the eight blocks of the frame, in page order. */
 export type BlockId =

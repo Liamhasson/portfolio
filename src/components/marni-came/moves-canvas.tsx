@@ -23,7 +23,7 @@ export function MovesCanvas({ src, alt, burnSrc, doubled, state, seed = 3, class
   useEffect(() => {
     const cv = canvas.current;
     if (!ok || !cv) return;
-    const gl = cv.getContext("webgl2", { premultipliedAlpha: false, antialias: false });
+    const gl = cv.getContext("webgl2", { premultipliedAlpha: false, antialias: false, preserveDrawingBuffer: true });
     // (no context, or a failed program: fall back to the plain image, after this effect)
     const fail = () => queueMicrotask(() => setLost(true));
     if (!gl) { fail(); return; }

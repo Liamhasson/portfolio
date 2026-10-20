@@ -252,6 +252,15 @@
 [data-world="cyvore"] .f .pu-line { font-size: max(15px, calc(var(--u) * 19)); line-height: 1.5; color: rgba(255,255,255,.62); margin-top: calc(var(--u) * 40); max-width: 34ch; }
 [data-world="cyvore"] .pu-phone { position: absolute; left: calc(var(--u) * 860); top: calc(var(--u) * 64); width: calc(var(--u) * 290); border-radius: calc(var(--u) * 40); overflow: hidden; box-shadow: 0 0 0 calc(var(--u) * 8) #0b1222, 0 0 0 calc(var(--u) * 9) rgba(255,255,255,.12), 0 calc(var(--u) * 40) calc(var(--u) * 80) rgba(0,0,0,.5); }
 [data-world="cyvore"] .pu-phone img { display: block; width: 100%; height: auto; }
+/* ------------------------------ 8 next: Marni Came peeks in (since 2026-10-20; Pulse's peek above is no longer shown here) ------------------------------ */
+[data-world="cyvore"] .mc { position: absolute; left: 0; right: 0; top: calc(var(--u) * 64); bottom: calc(var(--u) * -40); background: #0a0908; border-radius: calc(var(--u) * 32) calc(var(--u) * 32) 0 0; overflow: hidden; box-shadow: inset 0 0 0 calc(var(--u) * 1) rgba(238,234,226,.12); }
+[data-world="cyvore"] .mc-text { position: absolute; left: calc(var(--u) * 72); top: calc(var(--u) * 72); width: calc(var(--u) * 520); }
+[data-world="cyvore"] .mc-next { display: flex; align-items: center; gap: calc(var(--u) * 14); font: 400 max(11px, calc(var(--u) * 13))/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: rgba(238,234,226,.62); }
+[data-world="cyvore"] .mc-next i { display: block; width: calc(var(--u) * 80); height: calc(var(--u) * 1); background: rgba(238,234,226,.35); }
+[data-world="cyvore"] .mc-title { font-size: calc(var(--u) * 72); line-height: .95; letter-spacing: -.025em; color: rgba(238,234,226,.6); margin-top: calc(var(--u) * 150); }
+[data-world="cyvore"] .f .mc-line { font-size: max(15px, calc(var(--u) * 19)); line-height: 1.5; color: rgba(238,234,226,.66); margin-top: calc(var(--u) * 40); max-width: 32ch; }
+[data-world="cyvore"] .mc-frame { position: absolute; left: calc(var(--u) * 640); top: calc(var(--u) * 72); width: calc(var(--u) * 728); height: calc(var(--u) * 560); border-radius: calc(var(--u) * 20); overflow: hidden; background: #0a0908; }
+[data-world="cyvore"] .mc-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
 /* ------------------------------ references (board) ------------------------------ */
 /* ------------------------------ mobile frame (--u = 1/390) ------------------------------ */
 /* phone story: the same site, stacked; --s is a 390th of the phone frame */
@@ -316,11 +325,11 @@
   [data-world="cyvore"] .outcome { padding: calc(var(--u) * 64) 0; }
   [data-world="cyvore"] .out-lines, [data-world="cyvore"] .outcome .display, [data-world="cyvore"] .quote p { font-size: calc(var(--u) * 30); }
   [data-world="cyvore"] .next { height: auto; padding-bottom: calc(var(--u) * 40); }
-  [data-world="cyvore"] :is(.er, .cy, .pu) { position: relative; inset: auto; display: block; padding: calc(var(--u) * 40) calc(var(--u) * 16) calc(var(--u) * 24); margin-top: calc(var(--u) * 24); }
-  [data-world="cyvore"] :is(.er-text, .cy-text, .pu-text) { position: static; width: auto; }
-  [data-world="cyvore"] :is(.er-title, .cy-title, .pu-title) { font-size: calc(var(--u) * 48); margin-top: calc(var(--u) * 24); }
-  [data-world="cyvore"] :is(.er-line, .cy-line, .pu-line) { margin-top: calc(var(--u) * 16); }
-  [data-world="cyvore"] :is(.er-frame, .cy-frame) { position: relative; left: auto; top: auto; width: 100%; height: calc(var(--u) * 240); margin-top: calc(var(--u) * 28); }
+  [data-world="cyvore"] :is(.er, .cy, .pu, .mc) { position: relative; inset: auto; display: block; padding: calc(var(--u) * 40) calc(var(--u) * 16) calc(var(--u) * 24); margin-top: calc(var(--u) * 24); }
+  [data-world="cyvore"] :is(.er-text, .cy-text, .pu-text, .mc-text) { position: static; width: auto; }
+  [data-world="cyvore"] :is(.er-title, .cy-title, .pu-title, .mc-title) { font-size: calc(var(--u) * 48); margin-top: calc(var(--u) * 24); }
+  [data-world="cyvore"] :is(.er-line, .cy-line, .pu-line, .mc-line) { margin-top: calc(var(--u) * 16); }
+  [data-world="cyvore"] :is(.er-frame, .cy-frame, .mc-frame) { position: relative; left: auto; top: auto; width: 100%; height: calc(var(--u) * 240); margin-top: calc(var(--u) * 28); }
   [data-world="cyvore"] .pu-phone { position: relative; left: auto; top: auto; width: calc(var(--u) * 200); margin: calc(var(--u) * 28) auto 0; }
 }
 
