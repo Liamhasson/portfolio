@@ -68,3 +68,58 @@ test.describe("a 390 px phone", () => {
     await expectTextFloors(page);
   });
 });
+
+test("identity: three logo versions, none of them red; the specimen has no words", async ({ page }) => {
+  await page.goto(URL);
+  const logos = page.locator(".mc-logos figure");
+  await expect(logos).toHaveCount(3);
+  const reds = await page.evaluate(() => [...document.querySelectorAll(".mc-logos *")].filter((el) => { const s = getComputedStyle(el); return s.color === "rgb(236, 19, 2)" || s.fill === "rgb(236, 19, 2)"; }).length);
+  expect(reds).toBe(0);
+  for (const t of await page.locator(".mc-spec-serif, .mc-spec-sans").allInnerTexts()) expect(t.replace(/\s/g, "")).toMatch(/^[A-Z0-9·/—&]+$/);
+});
+
+test("imagery: the four moves with the glow note, the moodboard of the video's doubles", async ({ page }) => {
+  await page.goto(URL);
+  await expect(page.locator(".mc-moves figure")).toHaveCount(4);
+  await expect(page.locator(".mc-moves")).toContainText("added glow: never");
+  await expect(page.locator(".mc-mood img")).toHaveCount(13);
+});
+
+test("applications: the cover and four posters, dated exactly as the files prove", async ({ page }) => {
+  await page.goto(URL);
+  await expect(page.locator(".mc-cover")).toBeVisible();
+  const dates = await page.locator(".applications .mc-poster-info span:last-child").evaluateAll((els) => els.map((e) => e.firstChild!.textContent!.trim()));
+  expect(dates).toEqual(["12.2023", "09.02.2024", "02.2023", "03.2022"]);
+});
+
+test("website at 1440: the site live in the page, and Listen inside it turns the page's sound on", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(URL);
+  const frame = page.locator('iframe[src="/marni-came/site?embed=1"]');
+  await frame.scrollIntoViewIfNeeded();
+  await expect(frame).toBeVisible();
+  await expect(page.getByRole("link", { name: /open the site/i })).toHaveAttribute("href", "/marni-came/site");
+  const site = page.frameLocator('iframe[src="/marni-came/site?embed=1"]');
+  await expect(site.getByRole("button", { name: /sound/i })).toHaveCount(0); // (the page holds the one control)
+  await site.getByRole("button", { name: /^listen$/i }).click();
+  await expect(page.getByRole("button", { name: /sound on/i })).toHaveAttribute("aria-pressed", "true");
+  const playing = await page.evaluate(() => (window as unknown as { __mcPlaying?: number }).__mcPlaying ?? null);
+  expect(playing === null || playing <= 1).toBe(true);
+});
+
+test.describe("website on a 390 px phone", () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true });
+  test("no iframe: three stills and the link", async ({ page }) => {
+    await page.goto(URL);
+    await expect(page.locator(".website iframe")).toHaveCount(0);
+    await expect(page.locator(".mc-site-stills img")).toHaveCount(3);
+    await expect(page.getByRole("link", { name: /open the site/i })).toBeVisible();
+  });
+});
+
+test("the page stays within its 14.5-screen cap at 1440×900", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(URL);
+  const screens = await page.evaluate(() => document.documentElement.scrollHeight / 900);
+  expect(screens).toBeLessThanOrEqual(14.5);
+});
