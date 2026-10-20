@@ -43,6 +43,30 @@ test("sound starts off, nothing plays, the hero video is muted", async ({ page }
   expect(await page.locator(".mc-hero-video").evaluate((v: HTMLVideoElement) => v.muted)).toBe(true);
 });
 
+test("the sound toggle clears the nav's pills, at 1440 and 1024", async ({ page }) => {
+  for (const width of [1440, 1024]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(URL);
+    const t = (await page.locator("[data-sound-toggle]").boundingBox())!;
+    for (const pill of await page.locator("nav a, nav button").filter({ visible: true }).all()) {
+      const b = await pill.boundingBox();
+      if (!b) continue;
+      const overlap = t.x < b.x + b.width && b.x < t.x + t.width && t.y < b.y + b.height && b.y < t.y + t.height;
+      expect(overlap, `${width}: overlaps ${await pill.textContent()}`).toBe(false);
+    }
+  }
+});
+
+test("every colour's name fits its swatch, down to 390", async ({ page }) => {
+  for (const width of [1440, 768, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto(URL);
+    const clipped = await page.locator(".mc-colours li").evaluateAll((lis) =>
+      lis.filter((li) => { const b = li.querySelector("b")!; return b.getBoundingClientRect().right > li.getBoundingClientRect().right - 2; }).map((li) => li.textContent));
+    expect(clipped, `${width}`).toEqual([]);
+  }
+});
+
 test("no glow added anywhere, floors and contrast hold at 1440", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(URL);
