@@ -32,9 +32,13 @@ test("without WebGL, arriving at /#projects (Back from a case study) lands on th
   window.history.replaceState(null, "", "/");
 });
 
-test("the index ends on its four projects: no 'More coming soon' line (Liam, 2026-10-13)", async () => {
+test("the index holds its five projects, then a card for the next one, which opens nothing yet (Liam, 2026-10-20)", async () => {
   window.history.replaceState(null, "", "/");
   render(<SandLab hero />);
   await waitFor(() => expect(screen.getByTestId("sand-fallback")).toBeInTheDocument());
-  expect(screen.queryByText(/coming soon/i)).toBeNull();
+  const names = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
+  expect(names).toEqual(["Nordic Logic", "Eventread", "Cyvore", "Marni Came", "Pulse", "Coming soon"]);
+  expect(screen.getByRole("link", { name: /Marni Came/ })).toHaveAttribute("href", "/marni-came");
+  expect(screen.getByText("Coming soon").closest("a")).toBeNull();
+  expect(screen.queryByText(/more coming soon/i)).toBeNull();
 });

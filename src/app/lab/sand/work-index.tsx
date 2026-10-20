@@ -21,11 +21,14 @@ import { NextPagePull } from "@/components/shell/next-page-pull";
 
 /** The projects (copy and tags from the approved plan and the current portfolio). Each opens its case study and plays a
  *  loop of the product in use (Nordic Logic live since 2026-10-13: its hero film landing on the portal). */
-const CARDS: { n: string; name: string; tags: string[]; line: string; href?: string; video?: string; poster: string; progress?: boolean }[] = [
+const CARDS: { n: string; name: string; tags: string[]; line?: string; href?: string; video?: string; poster?: string; progress?: boolean; soon?: boolean }[] = [
   { n: "01", name: "Nordic Logic", tags: ["B2B website", "Design system"], line: "A launch site for a startup with no clients to point to yet.", href: "/nordic-logic", video: "/work/nordic-logic-live", poster: "/work/nordic-logic-live.jpg" },
   { n: "02", name: "Eventread", tags: ["SaaS web app", "Designer-builder"], line: "The check every booker skips.", href: "/eventread", video: "/work/eventread", poster: "/work/eventread.jpg" },
   { n: "03", name: "Cyvore", tags: ["B2B website", "Information architecture"], line: "A cybersecurity startup needed a site investors would believe in.", href: "/cyvore", video: "/work/cyvore", poster: "/work/cyvore.jpg" },
-  { n: "04", name: "Pulse", tags: ["Fitness app", "User research"], line: "A goal-focused fitness app designed around four retention milestones.", href: "/pulse", video: "/work/pulse", poster: "/work/pulse.jpg" },
+  { n: "04", name: "Marni Came", tags: ["Brand identity", "Art direction"], line: "A Berlin rock band that kept its mistakes, in sound and in picture.", href: "/marni-came", video: "/work/marni-came", poster: "/work/marni-came.jpg" },
+  { n: "05", name: "Pulse", tags: ["Fitness app", "User research"], line: "A goal-focused fitness app designed around four retention milestones.", href: "/pulse", video: "/work/pulse", poster: "/work/pulse.jpg" },
+  // always more on the way: the next case study, still being made (Liam, 2026-10-20)
+  { n: "06", name: "Coming soon", tags: ["In progress"], soon: true },
 ];
 
 export interface WorkIndexHandle {
@@ -68,6 +71,9 @@ const CSS = `
 .wi .card:hover .media canvas, .wi .card:hover .media img, .wi .card:focus-visible .media canvas, .wi .card:focus-visible .media img { transform:scale(1.035); }
 .wi .card:focus-visible, .wl .card:focus-visible { outline:1px solid var(--ink); outline-offset:6px; border-radius:4px; }
 .wi .tag, .wl .tag { position:absolute; left:1.2cqw; top:1.2cqw; font:500 .85cqw/1 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; color:var(--ink); background:rgba(10,10,11,.72); border-radius:999px; padding:.55cqw .9cqw; }
+.wi .soon, .wl .soon { position:absolute; inset:0; display:grid; place-items:center; letter-spacing:-.02em; color:rgba(244,241,238,.2); }
+.wi .soon { font-size:6.4cqw; }
+.wl .soon { font-size:64px; }
 .wi .meta { display:flex; gap:.9cqw; margin-top:1.3cqw; font:400 .85cqw/1.2 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; color:var(--dim); }
 .wi .meta .n, .wl .meta .n { color:var(--ink); }
 .wi .name { font-size:2.15cqw; font-weight:400; letter-spacing:-.01em; margin:.7cqw 0 0; }
@@ -126,7 +132,8 @@ function Media({ c, playing }: { c: (typeof CARDS)[number]; playing: boolean }) 
   return (
     <div className="media">
       {/* eslint-disable-next-line @next/next/no-img-element -- a still inside a transformed layer (no layout shift) */}
-      <img src={c.poster} alt="" />
+      {c.poster && <img src={c.poster} alt="" />}
+      {c.soon && <span className="soon" aria-hidden>Next</span>}
       {c.video && <canvas ref={ref} aria-hidden />}
       {c.progress && <span className="tag">In progress</span>}
     </div>
@@ -143,7 +150,7 @@ function Cards({ playing, itemRef }: { playing: boolean; itemRef?: (el: HTMLElem
               <Media c={c} playing={playing} />
               <div className="meta"><span className="n">{c.n}</span>{c.tags.flatMap((t, k) => (k ? [<span key={`d${k}`}>·</span>, <span key={t}>{t}</span>] : [<span key={t}>{t}</span>]))}</div>
               <h3 className="name">{c.name}</h3>
-              <p className="line">{c.line}</p>
+              {c.line && <p className="line">{c.line}</p>}
             </>
           );
           return (

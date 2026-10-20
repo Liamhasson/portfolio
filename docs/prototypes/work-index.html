@@ -21,16 +21,19 @@ html,body { margin:0; background:#000; }
 .media video, .media img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transition:transform .9s cubic-bezier(.22,1,.36,1); }
 .card:hover .media video, .card:hover .media img { transform:scale(1.035); }
 .tag { position:absolute; left:1.2cqw; top:1.2cqw; font:500 .85cqw/1 var(--mono); letter-spacing:.08em; text-transform:uppercase; color:var(--ink); background:rgba(10,10,11,.72); border-radius:999px; padding:.55cqw .9cqw; }
+/* the next case study, still being made: its panel holds a word, not a picture (Liam, 2026-10-20) */
+.soon { position:absolute; inset:0; display:grid; place-items:center; font-size:6.4cqw; letter-spacing:-.02em; color:rgba(244,241,238,.2); }
 .meta { display:flex; gap:.9cqw; margin-top:1.3cqw; font:400 .85cqw/1.2 var(--mono); letter-spacing:.08em; text-transform:uppercase; color:var(--dim); }
 .meta .n { color:var(--ink); }
 .name { font-size:2.15cqw; font-weight:400; letter-spacing:-.01em; margin:.7cqw 0 0; }
 .line { font-size:1.3cqw; line-height:1.35; color:var(--dim); margin:.5cqw 0 0; max-width:36cqw; }
+.grid { padding-bottom:3.4cqw; }
 .more { margin:3.6cqw 3.6cqw 3.4cqw; padding-top:1.6cqw; border-top:1px solid var(--rule); display:flex; gap:.9cqw; font:400 .85cqw/1 var(--mono); letter-spacing:.08em; text-transform:uppercase; color:var(--dim); }
 .more .n { color:var(--ink); }
 /* first reveal: the screen wakes from black and each card surfaces in turn */
-.play .title, .play .card, .play .more { animation:surface .9s cubic-bezier(.22,1,.36,1) both; }
+.play .title, .play .card { animation:surface .9s cubic-bezier(.22,1,.36,1) both; }
 .play .title { animation-delay:.2s }
-.play li:nth-child(1) .card{animation-delay:.45s} .play li:nth-child(2) .card{animation-delay:.58s} .play li:nth-child(3) .card{animation-delay:.71s} .play li:nth-child(4) .card{animation-delay:.84s} .play .more{animation-delay:.97s}
+.play li:nth-child(1) .card{animation-delay:.45s} .play li:nth-child(2) .card{animation-delay:.58s} .play li:nth-child(3) .card{animation-delay:.71s} .play li:nth-child(4) .card{animation-delay:.84s} .play li:nth-child(5) .card{animation-delay:.97s} .play li:nth-child(6) .card{animation-delay:1.1s}
 @keyframes surface { from { opacity:0; transform:translateY(1.2cqw); filter:blur(6px); } }
 .wake { position:absolute; inset:0; background:#000; pointer-events:none; }
 .play .wake { animation:wake .6s ease-out both; }
@@ -50,11 +53,16 @@ html,body { margin:0; background:#000; }
     <li><a class="card" href="#cyvore"><div class="media"><video src="../../public/work/cyvore.mp4" poster="../../public/work/cyvore.jpg" muted loop playsinline autoplay></video></div>
       <div class="meta"><span class="n">03</span><span>B2B website</span><span>·</span><span>Information architecture</span></div>
       <h2 class="name">Cyvore</h2><p class="line">A cybersecurity startup needed a site investors would believe in.</p></a></li>
+    <li><a class="card" href="#marni-came"><div class="media"><video src="../../public/work/marni-came.mp4" poster="../../public/work/marni-came.jpg" muted loop playsinline autoplay></video></div>
+      <div class="meta"><span class="n">04</span><span>Brand identity</span><span>·</span><span>Art direction</span></div>
+      <h2 class="name">Marni Came</h2><p class="line">A Berlin rock band that kept its mistakes, in sound and in picture.</p></a></li>
     <li><a class="card" href="#pulse"><div class="media"><video src="../../public/work/pulse.mp4" poster="../../public/work/pulse.jpg" muted loop playsinline autoplay></video></div>
-      <div class="meta"><span class="n">04</span><span>Fitness app</span><span>·</span><span>User research</span></div>
+      <div class="meta"><span class="n">05</span><span>Fitness app</span><span>·</span><span>User research</span></div>
       <h2 class="name">Pulse</h2><p class="line">A goal-focused fitness app designed around four retention milestones.</p></a></li>
+    <li><div class="card" aria-label="Coming soon, in progress"><div class="media"><span class="soon" aria-hidden="true">Next</span></div>
+      <div class="meta"><span class="n">06</span><span>In progress</span></div>
+      <h2 class="name">Coming soon</h2></div></li>
   </ol>
-  <div class="more"><span class="n">05</span><span>More coming soon</span></div>
 </div>
   <div class="wake"></div>
 </div>

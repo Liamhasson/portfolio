@@ -33,13 +33,15 @@ const layout = await page.evaluate(async (src) => {
   const els = [
     { name: "title", el: document.querySelector(".title"), delay: 0.2 },
     ...[...document.querySelectorAll("li .card")].map((el, i) => ({ name: `card${i + 1}`, el, delay: 0.45 + 0.13 * i })),
-    { name: "more", el: document.querySelector(".more"), delay: 0.97 },
+    // (the "more coming soon" line, while the index had one; a card says it now: Liam, 2026-10-20)
+    ...(document.querySelector(".more") ? [{ name: "more", el: document.querySelector(".more"), delay: 0.97 }] : []),
   ];
   // where each card's media sits (the loops play there), and its source
+  // (only the cards the screen shows: those wholly below its fold never play there, and each costs the screen a texture)
   const media = [...document.querySelectorAll("li .card .media")].map((m) => {
     const v = m.querySelector("video");
     return { box: box(m).map((x) => +x.toFixed(5)), src: v ? v.getAttribute("src").replace(/^.*public/, "") : null };
-  });
+  }).filter((m) => m.box[1] < 1);
   const img = new Image();
   img.src = src;
   await img.decode();
