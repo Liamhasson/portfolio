@@ -67,8 +67,8 @@ export const ROWS: Piece[][] = [
       image: P("untitled-cover-2024.jpg"), light: true, w: 292,
     },
     {
-      id: "live-lido", kind: "Photo", title: "Live at Lido, Berlin", meta: "Dec 2024",
-      credit: "Marni Came live at Lido, Berlin, December 2024. Me on guitar.", image: P("live-lido-berlin.jpg"), w: 484,
+      id: "live-lido", kind: "Photo", title: "Live at Lido, Berlin", meta: "Dec 2023",
+      credit: "Marni Came live at Lido, Berlin, December 2023. Me on guitar.", image: P("live-lido-berlin.jpg"), w: 484,
     },
   ],
   [
