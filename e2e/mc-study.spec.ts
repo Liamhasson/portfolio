@@ -29,24 +29,12 @@ test("the switch: five moves, off at load, each one toggles and changes the pict
   expect(after.equals(before)).toBe(false);
 });
 
-test("the idea's word types out, deletes and types the next; 'on' sits one space after its letters (Liam, 2026-10-21)", async ({ page }) => {
+test("the idea is one still line: no typing, no swapping (Liam, 2026-10-22)", async ({ page }) => {
   await page.goto(URL);
-  const word = page.locator(".mc-cyc");
-  await expect(word).toHaveText("Broken");
-  // it deletes letter by letter (a part of the word shows on the way), then types the next word
-  const seen = new Set<string>();
-  for (let i = 0; i < 120 && !seen.has("Burned"); i++) { seen.add(await word.innerText()); await page.waitForTimeout(25); }
-  expect([...seen].some((t) => t.length > 0 && t.length < 6 && "Broken".startsWith(t))).toBe(true);
-  await expect(word).toHaveText("Burned", { timeout: 3000 });
-  // the gap from the word's last letter to "on" is the same for every word
-  const gap = () => page.locator(".mc-idea [aria-hidden]").evaluate((el) => {
-    const w = el.querySelector(".mc-cyc")!.getBoundingClientRect();
-    const r = document.createRange(); const t = el.lastChild!; r.setStart(t, 1); r.setEnd(t, 2);
-    return Math.round(r.getBoundingClientRect().left - w.right);
-  });
-  const g1 = await gap();
-  await expect(word).toHaveText("Doubled", { timeout: 4000 });
-  expect(Math.abs((await gap()) - g1)).toBeLessThanOrEqual(1);
+  const idea = page.locator(".mc-idea");
+  await expect(idea).toHaveText("Broken on purpose.");
+  await page.waitForTimeout(2000);
+  await expect(idea).toHaveText("Broken on purpose.");
 });
 
 test("sound starts off, nothing plays, the hero video is muted", async ({ page }) => {
@@ -96,7 +84,7 @@ test.describe("reduced motion", () => {
   test("the word stays on Broken", async ({ page }) => {
     await page.goto(URL);
     await page.waitForTimeout(2200);
-    await expect(page.locator(".mc-cyc")).toHaveText("Broken");
+    await expect(page.locator(".mc-idea")).toHaveText("Broken on purpose.");
   });
 });
 

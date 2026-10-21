@@ -1,14 +1,11 @@
 "use client";
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 import { marniFonts } from "@/components/marni-came/fonts";
 import { MovesCanvas } from "@/components/marni-came/moves-canvas";
 import { MC_ASSETS } from "@/lib/marni-came/assets";
 import { OFF, type DoubledSpec, type MoveName, type MoveState } from "@/lib/marni-came/moves";
 import "./marni-came.css";
 
-const WORDS = ["Broken", "Burned", "Doubled", "Bent", "Blown"] as const;
-/** The typewriter (Liam 10-21): ms a letter typing, ms holding the word, ms a letter deleting, ms empty. */
-const TYPE = 85, HOLD = 1400, DELETE = 45, GAP = 250;
 const RULES: [MoveName, string, string][] = [
   ["slice", "Slice", "Bands cut and shifted: the face breaks where the heart does."],
   ["burn", "Burn", "Light eats into the black from one edge. The dark always survives."],
@@ -19,33 +16,16 @@ const RULES: [MoveName, string, string][] = [
 // the copy grows from Liam, centre stage, and lands up and to the right
 const FACE: DoubledSpec = { box: [0.42, 0.1, 0.7, 0.66], dx: 0.07, dy: -0.04, scale: 1.12 };
 
-/** Board CS 04 · Solution: the idea (its word typed out through the five moves, "on purpose" following it; still under
- *  reduced motion), then the effects switch, the brand's five moves applied live to the Lido stage photo. */
+/** Board CS 04 · Solution: the idea in one still line (Liam 10-22: no animation; the switch shows the moves), then the
+ *  effects switch, the brand's five moves applied live to the Lido stage photo. */
 export function MarniCameSolution({ kind, title }: { kind: "signature"; title: string }) {
   const id = useId();
-  const [typed, setTyped] = useState<string>(WORDS[0]);
   const [moves, setMoves] = useState<MoveState>(OFF);
-  useEffect(() => {
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
-    // type, hold, backspace, then the next word; "on purpose" sits right after the letters, so it follows them
-    let w = 0, n = WORDS[0].length, deleting = false, t = 0;
-    const step = () => {
-      const word = WORDS[w];
-      if (!deleting && n === word.length) { deleting = true; t = window.setTimeout(step, HOLD); return; }
-      if (deleting && n === 0) { deleting = false; w = (w + 1) % WORDS.length; t = window.setTimeout(step, GAP); return; }
-      n += deleting ? -1 : 1;
-      setTyped(WORDS[w].slice(0, n));
-      t = window.setTimeout(step, deleting ? DELETE : TYPE);
-    };
-    t = window.setTimeout(step, HOLD);
-    return () => clearTimeout(t);
-  }, []);
   return (
     <section aria-labelledby={id} data-block={kind} className={`f mc-sec solution ${marniFonts}`}>
       <div className="mc-head"><h2 id={id} className="title">{title}</h2></div>
       <p className="mc-idea">
-        <span className="sr-only">Broken, burned, doubled, bent, blown: on purpose.</span>
-        <span aria-hidden="true"><span className="mc-cyc">{typed}</span> on purpose.</span>
+Broken on purpose.
       </p>
       <div className="mc-two mc-pillars">
         <div><p className="label">The sound</p><p className="body">Not overproduced. We kept the mistakes, the inaccuracies and the vocals that aren&rsquo;t pitch perfect, so the record sounds like the room.</p></div>

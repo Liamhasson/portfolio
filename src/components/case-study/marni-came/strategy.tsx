@@ -8,7 +8,7 @@ const REFS = [
   { name: "David Bowie", line: "A persona can be built on purpose.", src: MC_ASSETS.refs.bowie, alt: "David Bowie as Ziggy Stardust, singing on stage", credit: "Boris Yaro · CC BY 4.0", href: "https://commons.wikimedia.org/wiki/File:David_Bowie,_as_Ziggy_Stardust,_performing_at_the_Santa_Monica_Civic_Auditorium_(cropped).jpg" },
   { name: "Kurt Cobain", line: "Raw beats polished.", src: MC_ASSETS.refs.cobain, alt: "Kurt Cobain playing with Nirvana under the stage lights", credit: "P.B. Rage · CC BY-SA 2.0", href: "https://commons.wikimedia.org/wiki/File:Nirvana_around_1992_(high_quality).jpg" },
   { name: "Dave Grohl", line: "Talk to the crowd like old friends.", src: MC_ASSETS.refs.grohl, alt: "Dave Grohl singing and reaching out to the crowd at Rock am Ring 2018", credit: "Andreas Lawen, Fotandi · CC BY-SA 4.0", href: "https://commons.wikimedia.org/wiki/File:Foo_Fighters_-_Rock_am_Ring_2018-5613.jpg" },
-  { name: "Måneskin", line: "Keep the fans close, online too.", src: MC_ASSETS.refs.maneskin, alt: "Damiano David of Måneskin on stage, arms wide", credit: "Mr. Rossi · CC BY-SA 4.0", href: "https://commons.wikimedia.org/wiki/File:M%C3%A5neskin_-_Rock_im_Park_2022_-_IMG_1401_-_1.jpg" },
+  { name: "Måneskin", line: "Keep the fans close, online too.", src: MC_ASSETS.refs.maneskin, alt: "Victoria De Angelis of Måneskin in the middle of the crowd, fans screaming and singing around her", credit: "Photographer unknown", href: "" },
 ] as const;
 
 /** Board CS 03b · Strategy (Liam, 2026-10-21): the five points of his BA, sharpened: the mission, who it's for, the USP,
@@ -43,7 +43,7 @@ export function MarniCameStrategy({ kind, title }: { kind: "supporting"; title: 
               <figure>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={r.src} alt={r.alt} loading="lazy" />
-                <figcaption className="label"><a href={r.href} target="_blank" rel="noreferrer">{r.credit} · edited<span className="sr-only"> (opens in a new tab)</span></a></figcaption>
+                <figcaption className="label">{r.href ? <a href={r.href} target="_blank" rel="noreferrer">{r.credit} · edited<span className="sr-only"> (opens in a new tab)</span></a> : <>{r.credit} · edited</>}</figcaption>
               </figure>
               <p className="mc-st-name">{r.name}</p>
               <p className="body">{r.line}</p>
@@ -57,13 +57,8 @@ export function MarniCameStrategy({ kind, title }: { kind: "supporting"; title: 
         <figure className="mc-st-voice-ph">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={MC_ASSETS.backstage} alt="Liam and Imri talking with some of the audience backstage at Badehaus, before the Dopamine video shoot" loading="lazy" />
-          <figcaption className="label">Backstage at Badehaus, with our audience, before the Dopamine shoot</figcaption>
+          <figcaption className="label">For example: Liam and Imri with our audience, backstage at Badehaus before the Dopamine shoot</figcaption>
         </figure>
-        <ul className="mc-st-habits">
-          <li className="body"><b>Like old friends:</b> stories and jokes, nothing rehearsed.</li>
-          <li className="body"><b>Room for everyone:</b> the pit, the side of the stage, the beer at the back.</li>
-          <li className="body"><b>Make them members:</b> they picked the single and held the cameras.</li>
-        </ul>
       </div>
     </section>
   );

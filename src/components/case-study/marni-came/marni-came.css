@@ -60,8 +60,6 @@
 [data-world="marni-came"] .mc-ph figcaption { margin-top: calc(var(--u) * 10); }
 /* Solution: the idea, then the switch */
 [data-world="marni-came"] .mc-idea { font: 600 calc(var(--u) * 150)/.86 var(--mc-serif); text-transform: uppercase; color: var(--red); }
-/* the typewriter's word: inline, so "on purpose" follows its letters at one space, whatever the word (Liam 10-21) */
-[data-world="marni-came"] .mc-cyc { white-space: pre; }
 /* Strategy (board CS 03b, Liam 10-21): the mission in the brand's serif, then the audience, the USP, the references, the voice */
 [data-world="marni-came"] .mc-mission { font: 600 calc(var(--u) * 92)/.9 var(--mc-serif); text-transform: uppercase; color: var(--bone); margin: calc(var(--u) * 14) 0 0; letter-spacing: .005em; }
 [data-world="marni-came"] .mc-st-row { display: grid; grid-template-columns: 1.15fr 1fr; gap: calc(var(--u) * 56); margin-top: calc(var(--u) * 96); align-items: start; }
@@ -83,9 +81,6 @@
 [data-world="marni-came"] .mc-st-voice-ph { margin: calc(var(--u) * 32) 0 0; }
 [data-world="marni-came"] .mc-st-voice-ph img { display: block; width: 100%; aspect-ratio: 21 / 9; object-fit: cover; object-position: 50% 40%; }
 [data-world="marni-came"] .mc-st-voice-ph figcaption { margin-top: calc(var(--u) * 8); }
-[data-world="marni-came"] .mc-st-habits { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(var(--u) * 28); margin: calc(var(--u) * 32) 0 0; padding: 0; list-style: none; }
-[data-world="marni-came"] .mc-st-habits li { border-top: 1px solid var(--hair-2); padding-top: calc(var(--u) * 16); max-width: none; }
-[data-world="marni-came"] .mc-st-habits b { font-weight: 500; color: var(--ink); }
 /* Problem: the split (Liam 10-21, after the Ember page): the words centred on the left half, the crowd filling the right */
 [data-world="marni-came"] .mc-split { display: grid; grid-template-columns: 1fr 1fr; padding: 0; min-height: calc(var(--u) * 900); align-items: center; }
 [data-world="marni-came"] .mc-split-text { padding: calc(var(--u) * 110) calc(var(--u) * 96) calc(var(--u) * 110) calc(var(--u) * 48); }
@@ -258,9 +253,8 @@
   [data-world="marni-came"] .mc-split-text { padding: calc(var(--u) * 56) calc(var(--u) * 16) calc(var(--u) * 28); }
   [data-world="marni-came"] .mc-split-media { aspect-ratio: 4 / 5; }
   [data-world="marni-came"] .mc-mission { font-size: calc(var(--u) * 31); }
-  [data-world="marni-came"] .mc-st-row, [data-world="marni-came"] .mc-st-refs, [data-world="marni-came"] .mc-st-habits { grid-template-columns: minmax(0, 1fr); gap: calc(var(--u) * 24); margin-top: calc(var(--u) * 40); }
+  [data-world="marni-came"] .mc-st-row, [data-world="marni-came"] .mc-st-refs { grid-template-columns: minmax(0, 1fr); gap: calc(var(--u) * 24); margin-top: calc(var(--u) * 40); }
   [data-world="marni-came"] .mc-st-refs { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: calc(var(--u) * 16); margin-top: calc(var(--u) * 12); }
-  [data-world="marni-came"] .mc-st-habits { margin-top: calc(var(--u) * 16); gap: calc(var(--u) * 14); }
   [data-world="marni-came"] .mc-st-block { margin-top: calc(var(--u) * 40); }
   [data-world="marni-came"] .mc-st-rows > div { grid-template-columns: calc(var(--u) * 100) minmax(0, 1fr); }
   [data-world="marni-came"] .mc-st-rule { font-size: calc(var(--u) * 34); }
