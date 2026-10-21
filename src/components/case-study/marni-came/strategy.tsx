@@ -7,7 +7,7 @@ import { MC_ASSETS } from "@/lib/marni-came/assets";
 const REFS = [
   { name: "David Bowie", line: "A persona can be built on purpose.", src: MC_ASSETS.refs.bowie, alt: "David Bowie as Ziggy Stardust, singing on stage", credit: "Boris Yaro · CC BY 4.0", href: "https://commons.wikimedia.org/wiki/File:David_Bowie,_as_Ziggy_Stardust,_performing_at_the_Santa_Monica_Civic_Auditorium_(cropped).jpg" },
   { name: "Kurt Cobain", line: "Raw beats polished.", src: MC_ASSETS.refs.cobain, alt: "Kurt Cobain playing with Nirvana under the stage lights", credit: "P.B. Rage · CC BY-SA 2.0", href: "https://commons.wikimedia.org/wiki/File:Nirvana_around_1992_(high_quality).jpg" },
-  { name: "Dave Grohl", line: "Talk to the crowd like old friends.", src: MC_ASSETS.refs.grohl, alt: "Dave Grohl laughing on stage with his guitar", credit: "Roger Woolman · CC BY 3.0", href: "https://commons.wikimedia.org/wiki/File:Dave_Grohl_(55208432).jpeg" },
+  { name: "Dave Grohl", line: "Talk to the crowd like old friends.", src: MC_ASSETS.refs.grohl, alt: "Dave Grohl singing and reaching out to the crowd at Rock am Ring 2018", credit: "Andreas Lawen, Fotandi · CC BY-SA 4.0", href: "https://commons.wikimedia.org/wiki/File:Foo_Fighters_-_Rock_am_Ring_2018-5613.jpg" },
   { name: "Måneskin", line: "Keep the fans close, online too.", src: MC_ASSETS.refs.maneskin, alt: "Damiano David of Måneskin on stage, arms wide", credit: "Mr. Rossi · CC BY-SA 4.0", href: "https://commons.wikimedia.org/wiki/File:M%C3%A5neskin_-_Rock_im_Park_2022_-_IMG_1401_-_1.jpg" },
 ] as const;
 
@@ -54,6 +54,11 @@ export function MarniCameStrategy({ kind, title }: { kind: "supporting"; title: 
       <div className="mc-st-block">
         <p className="label">Voice</p>
         <p className="mc-st-rule">Talk with them, not to them.</p>
+        <figure className="mc-st-voice-ph">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={MC_ASSETS.backstage} alt="Liam and Imri talking with some of the audience backstage at Badehaus, before the Dopamine video shoot" loading="lazy" />
+          <figcaption className="label">Backstage at Badehaus, with our audience, before the Dopamine shoot</figcaption>
+        </figure>
         <ul className="mc-st-habits">
           <li className="body"><b>Like old friends:</b> stories and jokes, nothing rehearsed.</li>
           <li className="body"><b>Room for everyone:</b> the pit, the side of the stage, the beer at the back.</li>

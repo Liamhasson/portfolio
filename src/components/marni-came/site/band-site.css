@@ -11,7 +11,7 @@
 .ms :focus-visible { outline: 2px solid var(--bone); outline-offset: 3px; }
 .ms-k { font: 500 max(11px, calc(var(--u) * 12))/1.4 var(--mc-info); letter-spacing: .18em; text-transform: uppercase; color: var(--ash); }
 .ms-t { font: 600 max(20px, calc(var(--u) * 34))/1 var(--mc-serif); text-transform: uppercase; color: var(--bone); }
-.ms-h { font: 600 max(44px, calc(var(--u) * 120))/.85 var(--mc-serif); text-transform: uppercase; color: var(--red); margin: 0 0 calc(var(--u) * 40); }
+.ms-h { font: 600 max(44px, calc(var(--u) * 120))/.85 var(--mc-serif); text-transform: uppercase; color: var(--bone); margin: 0 0 calc(var(--u) * 40); }
 .ms-btn { font: 500 max(11px, calc(var(--u) * 12))/1 var(--mc-info) !important; letter-spacing: .18em; text-transform: uppercase; color: var(--bone);
   padding: max(11px, calc(var(--u) * 13)) max(16px, calc(var(--u) * 20)) !important; box-shadow: inset 0 0 0 1px var(--bone); }
 .ms-btn:hover { background: var(--bone) !important; color: var(--black) !important; }
@@ -44,17 +44,29 @@
 @keyframes mc-breath { 0%, 100% { opacity: .55; transform: translateX(-6%); } 50% { opacity: 1; transform: translateX(0); } }
 .rel-copy { position: absolute; left: 0; right: 0; bottom: max(32px, calc(var(--u) * 48)); z-index: 2; text-align: center; padding: 0 16px; }
 .rel-copy .ms-k { color: var(--bone); letter-spacing: .34em; margin: 0 0 max(12px, calc(var(--u) * 18)); }
-.rel-title { margin: 0; white-space: nowrap; font: 600 clamp(34px, 7.6vw, 132px)/.95 var(--mc-serif); letter-spacing: .03em; text-transform: uppercase; color: var(--red); }
+.rel-title { margin: 0; white-space: nowrap; font: 600 clamp(34px, 7.6vw, 132px)/.95 var(--mc-serif); letter-spacing: .03em; text-transform: uppercase; color: var(--bone); }
 .rel-buttons { display: flex; justify-content: center; gap: 12px; margin-top: max(18px, calc(var(--u) * 28)); }
 
 /* sections */
 .ms-sec { padding: max(72px, calc(var(--u) * 120)) max(16px, calc(var(--u) * 48)); }
 .ms-tracks { list-style: none; margin: 0; padding: 0; }
-.ms-track button { display: grid; grid-template-columns: calc(var(--u) * 60) minmax(0, calc(var(--u) * 420)) 1fr auto; gap: calc(var(--u) * 24); align-items: center; width: 100%; text-align: left; padding: max(16px, calc(var(--u) * 22)) 0; border-top: 1px solid var(--line); }
-.ms-wave { display: flex; align-items: center; gap: 2px; height: max(22px, calc(var(--u) * 28)); }
-.ms-wave i { flex: 1; background: rgba(238,234,226,.3); }
-.ms-track.on .ms-wave i { background: var(--bone); }
-.ms-track.on .ms-t { color: var(--red); }
+/* the music (Liam 10-21: SoundCloud-style, more polished): play button, title, waveform you can click into, time */
+.ms-track { display: grid; grid-template-columns: max(44px, calc(var(--u) * 52)) minmax(0, calc(var(--u) * 440)) 1fr max(88px, calc(var(--u) * 110)); gap: max(14px, calc(var(--u) * 24)); align-items: center; padding: max(16px, calc(var(--u) * 20)) 0; border-top: 1px solid var(--line); }
+.ms-track:last-child { border-bottom: 1px solid var(--line); }
+.ms .ms-play { width: max(44px, calc(var(--u) * 52)); aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center; background: var(--bone); color: var(--black); transition: transform .15s; }
+.ms .ms-play:hover { transform: scale(1.06); }
+.ms-play:focus-visible, .ms-wave:focus-visible { outline: 2px solid var(--bone); outline-offset: 4px; }
+.ms-ico-play { width: 0; height: 0; border-left: 13px solid currentColor; border-top: 8px solid transparent; border-bottom: 8px solid transparent; margin-left: 4px; }
+.ms-ico-pause { width: 12px; height: 15px; border-left: 4px solid currentColor; border-right: 4px solid currentColor; }
+.ms-tmeta { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ms-tmeta .ms-t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ms-wave { position: relative; display: flex; align-items: center; gap: 1px; height: max(36px, calc(var(--u) * 44)); cursor: pointer; }
+.ms-wave i { flex: 1; min-width: 1px; border-radius: 1px; background: rgba(238,234,226,.24); transition: background .12s; }
+.ms-wave i[data-s="hover"] { background: rgba(238,234,226,.55); }
+.ms-wave i[data-s="played"] { background: var(--bone); }
+.ms-wave-tip { position: absolute; top: -22px; transform: translateX(-50%); font: 500 11px/1 var(--mc-info); letter-spacing: .08em; color: var(--black); background: var(--bone); padding: 4px 6px; pointer-events: none; white-space: nowrap; }
+.ms-time { font: 500 max(11px, calc(var(--u) * 12))/1 var(--mc-info); letter-spacing: .12em; color: var(--ash); text-align: right; font-variant-numeric: tabular-nums; }
+.ms-track.on .ms-time { color: var(--bone); }
 .ms-videos { display: grid; grid-template-columns: 1fr 1fr; gap: max(10px, calc(var(--u) * 16)); }
 .ms-video { text-align: left; display: block; }
 .ms-video img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
@@ -68,6 +80,7 @@
 .ms-merch { display: grid; grid-template-columns: 1fr 1fr; gap: max(10px, calc(var(--u) * 16)); }
 .ms-art { position: relative; margin: 0; aspect-ratio: 16 / 10; background: #141210; display: grid; place-items: center; overflow: hidden; }
 .ms-art > img { width: 46%; }
+.ms-shirt > img { width: auto; height: 100%; }
 .ms-art > img.ms-fill { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .ms-art figcaption { position: absolute; left: 16px; bottom: 14px; z-index: 1; }
 .ms-group { margin: 0; }
@@ -106,12 +119,13 @@
   .ms-menu-b { display: block; }
   .rel-title { white-space: normal; font-size: clamp(34px, 11vw, 64px); }
   .rel-buttons { flex-direction: column; align-items: center; }
-  .ms-track button { grid-template-columns: 30px 1fr auto; }
-  .ms-wave { display: none; }
+  .ms-track { grid-template-columns: 44px minmax(0, 1fr) auto; grid-template-areas: "play meta time" "wave wave wave"; row-gap: 12px; }
+  .ms-play { grid-area: play; } .ms-tmeta { grid-area: meta; } .ms-time { grid-area: time; } .ms-wave { grid-area: wave; }
   .ms-videos, .ms-shows, .ms-merch { grid-template-columns: 1fr; }
   .ms-posters { grid-template-columns: 1fr 1fr; }
 }
 @media (prefers-reduced-motion: reduce) {
   .rel-burn { animation: none; opacity: .8; transform: none; }
+  .ms-play, .ms-wave i { transition: none; }
   .ms-sound i::after { transition: none; }
 }

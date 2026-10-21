@@ -2,7 +2,9 @@
 import { useEffect, useRef } from "react";
 
 /** Board videos: muted loops that fetch only when near the screen and play only while on it. Reduced motion: poster. */
-export function LazyVideo({ src, poster, label, className, loop = true }: { src: string; poster: string; label: string; className?: string; loop?: boolean }) {
+/** `ahead`: how far below the screen a video starts loading (a big one right under the first view loads later, so the
+ *  first view stays in its budget). */
+export function LazyVideo({ src, poster, label, className, loop = true, ahead = "150%" }: { src: string; poster: string; label: string; className?: string; loop?: boolean; ahead?: string }) {
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     const v = ref.current;
@@ -22,7 +24,7 @@ export function LazyVideo({ src, poster, label, className, loop = true }: { src:
       load();
       if (visible) play();
       near.disconnect();
-    }, { rootMargin: "150% 0px" });
+    }, { rootMargin: `${ahead} 0px` });
     // On screen is judged by the box the video sits in: a cropped recording is far bigger than what shows of it.
     const box = v.parentElement ?? v;
     const seen = new IntersectionObserver(([e]) => {
@@ -33,6 +35,6 @@ export function LazyVideo({ src, poster, label, className, loop = true }: { src:
     near.observe(v);
     seen.observe(box);
     return () => { near.disconnect(); seen.disconnect(); v.pause(); };
-  }, [src]);
+  }, [src, ahead]);
   return <video ref={ref} className={className} poster={poster} muted playsInline loop={loop} preload="none" aria-label={label} data-src={src} />;
 }

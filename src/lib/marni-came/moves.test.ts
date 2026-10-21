@@ -1,9 +1,9 @@
 import { expect, test } from "vitest";
 import { MOVES, OFF, burnBreath, sliceOffsets, stepMoves } from "./moves";
 
-test("the four moves, in the board's order", () => {
-  expect(MOVES).toEqual(["slice", "burn", "doubled", "lens"]);
-  expect(OFF).toEqual({ slice: 0, burn: 0, doubled: 0, lens: 0 });
+test("the five moves, in the board's order (Blowout joined, Liam 2026-10-21)", () => {
+  expect(MOVES).toEqual(["slice", "burn", "doubled", "lens", "blowout"]);
+  expect(OFF).toEqual({ slice: 0, burn: 0, doubled: 0, lens: 0, blowout: 0 });
 });
 
 test("reduced motion jumps straight to the target", () => {

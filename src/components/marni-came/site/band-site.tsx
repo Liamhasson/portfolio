@@ -96,8 +96,8 @@ export function BandSite({ className }: { className?: string }) {
         <div className="ms-merch">
           <figure className="ms-art ms-shirt">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={MC_ASSETS.wordmarkDistressedBone} alt="The crowd shirt's front: the wordmark in bone on black" />
-            <figcaption className="ms-k">Crowd shirt · front · artwork</figcaption>
+            <img src={MC_ASSETS.shirtBack} alt="The crowd shirt's back: the single's cut faces in bone ink, and the chorus, I need it, I want it, I'm after" />
+            <figcaption className="ms-k">Crowd shirt · back · artwork</figcaption>
           </figure>
           <figure className="ms-art">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -125,24 +125,51 @@ export function BandSite({ className }: { className?: string }) {
   );
 }
 
+const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
+
+/** One track, SoundCloud-style (Liam 10-21): a round play button, the title and time, and the waveform: it fills as the
+ *  track plays, shows where a click would land, and a click (or the arrow keys) jumps there and plays. */
 function Track({ id, n, ctrl }: { id: TrackId; n: number; ctrl: AudioController | null }) {
   const st = useSyncExternalStore(ctrl?.subscribe ?? noop, () => ctrl?.state() ?? null, () => null);
-  const on = !!st?.on && st.track === id;
+  const current = st?.track === id;
+  const on = !!st?.on && current;
   const [peaks, setPeaks] = useState<{ duration: number; peaks: number[] } | null>(null);
+  const [hover, setHover] = useState<number | null>(null);
   useEffect(() => {
     let gone = false;
     fetch(TRACKS[id].peaks).then((r) => r.json()).then((d) => { if (!gone) setPeaks(d); }).catch(() => {});
     return () => { gone = true; };
   }, [id]);
-  const dur = peaks ? `${Math.floor(peaks.duration / 60)}:${String(Math.round(peaks.duration % 60)).padStart(2, "0")}` : "";
+  const total = (current && st?.duration) || peaks?.duration || 0;
+  const time = current ? st?.time ?? 0 : 0;
+  const played = total ? Math.min(1, time / total) : 0;
+  const bars = peaks?.peaks ?? [];
+  const at = (e: { clientX: number; currentTarget: HTMLElement }) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    return Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+  };
+  const key = (e: { key: string; preventDefault(): void }) => {
+    if (!total || !ctrl) return;
+    const step = e.key === "ArrowRight" ? 5 : e.key === "ArrowLeft" ? -5 : 0;
+    if (!step) return;
+    e.preventDefault();
+    ctrl.seek(id, Math.min(1, Math.max(0, (time + step) / total)));
+  };
   return (
     <li className={`ms-track${on ? " on" : ""}`}>
-      <button type="button" aria-pressed={on} onClick={() => (on ? ctrl?.pause() : ctrl?.play(id))}>
-        <span className="ms-k">{String(n).padStart(2, "0")}</span>
-        <span className="ms-t">{TRACKS[id].title}</span>
-        <span className="ms-wave" aria-hidden="true">{peaks?.peaks.filter((_, i) => i % 2 === 0).map((p, i) => <i key={i} style={{ height: `${Math.max(8, p * 100)}%` }} />)}</span>
-        <span className="ms-k">{dur} {on ? "❚❚" : "▶"}</span>
+      <button type="button" className="ms-play" aria-label={`${on ? "Pause" : "Play"} ${TRACKS[id].title}`} aria-pressed={on} onClick={() => (on ? ctrl?.pause() : ctrl?.play(id))}>
+        <span aria-hidden="true" className={on ? "ms-ico-pause" : "ms-ico-play"} />
       </button>
+      <div className="ms-tmeta"><span className="ms-k">{String(n).padStart(2, "0")}</span><span className="ms-t">{TRACKS[id].title}</span></div>
+      <div className="ms-wave" role="slider" tabIndex={0} aria-label={`Seek in ${TRACKS[id].title}`} aria-valuemin={0} aria-valuemax={Math.round(total)} aria-valuenow={Math.round(time)} aria-valuetext={`${clock(time)} of ${clock(total)}`}
+        onClick={(e) => ctrl?.seek(id, at(e))} onMouseMove={(e) => setHover(at(e))} onMouseLeave={() => setHover(null)} onKeyDown={key}>
+        {bars.map((p, i) => {
+          const x = (i + 0.5) / bars.length;
+          return <i key={i} data-s={x <= played ? "played" : hover !== null && x <= hover ? "hover" : undefined} style={{ height: `${Math.max(10, p * 100)}%` }} />;
+        })}
+        {hover !== null && total > 0 && <span className="ms-wave-tip" style={{ left: `${hover * 100}%` }}>{clock(hover * total)}</span>}
+      </div>
+      <span className="ms-time">{current && time > 0 ? `${clock(time)} / ` : ""}{total ? clock(total) : ""}</span>
     </li>
   );
 }

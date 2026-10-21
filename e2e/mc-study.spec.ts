@@ -14,10 +14,10 @@ async function noAddedGlow(page: Page) {
   expect(bad).toEqual([]);
 }
 
-test("the switch: four moves, off at load, each one toggles and changes the picture", async ({ page }) => {
+test("the switch: five moves, off at load, each one toggles and changes the picture", async ({ page }) => {
   await page.goto(URL);
-  const group = page.getByRole("group", { name: "The four moves" });
-  for (const m of ["Slice", "Burn", "Doubled", "Lens"]) await expect(group.getByRole("button", { name: new RegExp(`^${m}`) })).toHaveAttribute("aria-pressed", "false");
+  const group = page.getByRole("group", { name: "The five moves" });
+  for (const m of ["Slice", "Burn", "Doubled", "Lens", "Blowout"]) await expect(group.getByRole("button", { name: new RegExp(`^${m}`) })).toHaveAttribute("aria-pressed", "false");
   const canvas = page.locator(".mc-switch canvas");
   await canvas.scrollIntoViewIfNeeded();
   await page.waitForTimeout(800);
@@ -29,11 +29,24 @@ test("the switch: four moves, off at load, each one toggles and changes the pict
   expect(after.equals(before)).toBe(false);
 });
 
-test("the idea's word cycles every 1.6 s", async ({ page }) => {
+test("the idea's word types out, deletes and types the next; 'on' sits one space after its letters (Liam, 2026-10-21)", async ({ page }) => {
   await page.goto(URL);
   const word = page.locator(".mc-cyc");
   await expect(word).toHaveText("Broken");
-  await expect(word).toHaveText("Burned", { timeout: 2500 });
+  // it deletes letter by letter (a part of the word shows on the way), then types the next word
+  const seen = new Set<string>();
+  for (let i = 0; i < 120 && !seen.has("Burned"); i++) { seen.add(await word.innerText()); await page.waitForTimeout(25); }
+  expect([...seen].some((t) => t.length > 0 && t.length < 6 && "Broken".startsWith(t))).toBe(true);
+  await expect(word).toHaveText("Burned", { timeout: 3000 });
+  // the gap from the word's last letter to "on" is the same for every word
+  const gap = () => page.locator(".mc-idea [aria-hidden]").evaluate((el) => {
+    const w = el.querySelector(".mc-cyc")!.getBoundingClientRect();
+    const r = document.createRange(); const t = el.lastChild!; r.setStart(t, 1); r.setEnd(t, 2);
+    return Math.round(r.getBoundingClientRect().left - w.right);
+  });
+  const g1 = await gap();
+  await expect(word).toHaveText("Doubled", { timeout: 4000 });
+  expect(Math.abs((await gap()) - g1)).toBeLessThanOrEqual(1);
 });
 
 test("sound starts off, nothing plays, the hero video is muted", async ({ page }) => {
@@ -57,12 +70,15 @@ test("the sound toggle clears the nav's pills, at 1440 and 1024", async ({ page 
   }
 });
 
-test("every colour's name fits its swatch, down to 390", async ({ page }) => {
+test("every colour shows its name and code the same way, fitting its column down to 390 (Liam, 2026-10-21)", async ({ page }) => {
   for (const width of [1440, 768, 390]) {
     await page.setViewportSize({ width, height: 844 });
     await page.goto(URL);
-    const clipped = await page.locator(".mc-colours li").evaluateAll((lis) =>
-      lis.filter((li) => { const b = li.querySelector("b")!; return b.getBoundingClientRect().right > li.getBoundingClientRect().right - 2; }).map((li) => li.textContent));
+    const cols = page.locator(".mc-colours li");
+    await expect(cols.locator("span")).toHaveText(["0A0908", "EEEAE2", "EC1302", "Screen"]);
+    for (const el of await cols.locator("b, span").all()) await expect(el).toBeVisible();
+    const clipped = await cols.evaluateAll((lis) =>
+      lis.filter((li) => [...li.querySelectorAll("b, span")].some((t) => t.getBoundingClientRect().right > li.getBoundingClientRect().right + 1)).map((li) => li.textContent));
     expect(clipped, `${width}`).toEqual([]);
   }
 });
@@ -102,11 +118,11 @@ test("identity: three logo versions, none of them red; the specimen has no words
   for (const t of await page.locator(".mc-spec-serif, .mc-spec-sans").allInnerTexts()) expect(t.replace(/\s/g, "")).toMatch(/^[A-Z0-9·/—&]+$/);
 });
 
-test("imagery: the four moves with the glow note, the moodboard of the video's doubles", async ({ page }) => {
+test("imagery: the five moves with Blowout's note, the moodboard of the video's doubles", async ({ page }) => {
   await page.goto(URL);
-  await expect(page.locator(".mc-moves figure")).toHaveCount(4);
-  await expect(page.locator(".mc-moves")).toContainText("added glow: never");
-  await expect(page.locator(".mc-mood img")).toHaveCount(14);
+  await expect(page.locator(".mc-moves figure")).toHaveCount(5);
+  await expect(page.locator(".mc-moves")).toContainText("On pictures only, never on type");
+  await expect(page.locator(".mc-mood img")).toHaveCount(13);
 });
 
 test("applications: the cover and four posters, dated exactly as the files prove", async ({ page }) => {
@@ -156,7 +172,7 @@ test.describe("applications on a 390 px phone", () => {
   test("the collage stacks: every piece at least half the column wide", async ({ page }) => {
     await page.goto(URL);
     const widths = await page.locator(".mc-collage figure").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().width));
-    expect(widths.length).toBe(3);
+    expect(widths.length).toBe(2);   // the flag and the shirt (the wheatpaste went, Liam 2026-10-21)
     for (const w of widths) expect(w).toBeGreaterThan(150);
   });
 });

@@ -5,9 +5,10 @@ import { MC_ASSETS } from "@/lib/marni-came/assets";
 const D = MC_ASSETS.doubled;
 const MOVES = [
   { name: "Slice", src: MC_ASSETS.moves.slice, alt: "Liam from the After Heartbreaks video, cut into vertical bands and shifted" },
-  { name: "Burn", src: MC_ASSETS.moves.burn, alt: "Liam half lit in the After Heartbreaks video, the light eating into the black", note: "Captured light: yes · added glow: never" },
+  { name: "Burn", src: MC_ASSETS.moves.burn, alt: "Liam half lit in the After Heartbreaks video, the light eating into the black" },
   { name: "Doubled", src: MC_ASSETS.moves.doubled, alt: "The bassist at the After Heartbreaks shoot, his head echoed from the next frame of the same moment" },
-  { name: "Lens", src: MC_ASSETS.moves.lens, alt: "The bassist tripled at three sizes in the After Heartbreaks video, the round lens dark at the edges" },
+  { name: "Lens", src: MC_ASSETS.moves.lens, alt: "The drummer in the After Heartbreaks video, sharp in the middle, the frame's edges smeared" },
+  { name: "Blowout", src: MC_ASSETS.moves.blowout, alt: "The bassist in the After Heartbreaks video, the light on his face and the headstock blown out and bleeding", note: "On pictures only, never on type" },
 ] as const;
 /** The moodboard: the video's own doubles (timestamps in the alt), the shoot's two-frame double and the same-frame method. */
 const MOOD: { src: string; alt: string; cls?: string }[] = [
@@ -24,10 +25,9 @@ const MOOD: { src: string; alt: string; cls?: string }[] = [
   { src: D["08"], alt: "The drummer doubled over the kit, seen wide, the video at 0:21" },
   { src: D["09"], alt: "Two guitarists in the amber burn, the video at 1:48" },
   { src: D["10"], alt: "The guitarist with his strap doubled, the video at 1:56" },
-  { src: MC_ASSETS.backstage, alt: "The band talking with friends backstage before the Badehaus 2024 show, in black and white", cls: "w2" },
 ];
 
-/** Board CS 06 · Imagery: the four moves (the glow line folded into Burn), then Doubled as a moodboard with its rule. */
+/** Board CS 06 · Imagery: the five moves (Blowout, the picture-only glow, joined 10-21), then Doubled as a moodboard with its rule. */
 export function MarniCameImagery({ kind, title }: { kind: "supporting"; title: string }) {
   const id = useId();
   return (

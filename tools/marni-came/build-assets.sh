@@ -26,6 +26,12 @@ scripts/encode-video.sh "$tmp/hero.mp4" "$OUT/video/hero-lido" 1440 1.5
 n="$(ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=nb_read_frames -of csv=p=0 "$tmp/hero.mp4")"
 ffmpeg -v error -y -i "$tmp/hero.mp4" -c:v libx264 -crf 31 -preset slow -profile:v high -g "$n" -keyint_min "$n" -sc_threshold 0 -pix_fmt yuv420p -movflags +faststart -an "$OUT/video/hero-lido.mp4"
 
+# the Problem's half: the crowd during Dopamine at Badehaus, 4:5, graded like the hero (crowd.py)
+python3 tools/marni-came/crowd.py "$tmp/crowd"
+scripts/encode-video.sh "$tmp/crowd.mp4" "$OUT/video/problem-crowd" 864 4.5
+n="$(ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=nb_read_frames -of csv=p=0 "$tmp/crowd.mp4")"
+ffmpeg -v error -y -i "$tmp/crowd.mp4" -c:v libx264 -crf 31 -preset slow -profile:v high -g "$n" -keyint_min "$n" -sc_threshold 0 -pix_fmt yuv420p -movflags +faststart -an "$OUT/video/problem-crowd.mp4"
+
 # release week: the After Heartbreaks loop, and the full video for the lightbox (the Dopamine live video is the playground's)
 scripts/encode-video.sh public/playground/after-heartbreaks-loop.mp4 "$OUT/video/release-loop" 1280 3.0
 # two-pass at 1150 kbps keeps the 3:38 video near 35 MB, in line with the playground's Dopamine video

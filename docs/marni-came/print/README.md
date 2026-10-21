@@ -11,12 +11,14 @@ transparent pieces are PNG. The dpi is written into every file.
 | `poster-badehaus-2024-A3.jpg` | A3 | 3 mm | 3579 × 5031 | 300 | Side layout: the venue runs up the left edge. The source is 2048 px wide, about 172 dpi at A3. |
 | `poster-badehaus-2023-A3.jpg` | A3 | 3 mm | 3579 × 5031 | 300 | Framed layout: the whole band, from the 4K steady cam at 11:43, inside a black margin. The photo gets about 172 dpi. |
 | `poster-end-of-term-A3.jpg` | A3 | 3 mm | 3579 × 5031 | 300 | Stacked layout, with a bandmate mid-solo (BIMM Lido photo, 1365 px wide, about 114 dpi at A3). |
-| `sleeve-12in.jpg` | 12 × 12 in (304.8 mm) | 3 mm | 3671 × 3671 | 300 | The cover master is 3000 px, about 245 dpi at 12". |
+| `sleeve-12in.jpg` | 12 × 12 in (304.8 mm) | 3 mm | 3671 × 3671 | 300 | The cover master is 3000 px, about 245 dpi at 12". The title is set in bone (Liam, 2026-10-21). |
 | `ticket.png` | 70 × 140 mm | 3 mm | 898 × 1724 | 300 | The Badehaus ticket. The dashed tear line sits above the price. |
 | `stage-flag.jpg` | 1200 × 800 mm | none | 7087 × 4724 | 150 | 150 dpi is the large-format standard. Black cloth, edge to edge. Hems and grommets are the printer's allowance. |
-| `shirt-front.png` | 12 × 16 in print area | none | 3600 × 4800 | 300 | Transparent. The bone distressed wordmark, 10 in wide, for a black tee. |
-| `shirt-back.png` | 12 × 16 in print area | none | 3600 × 4800 | 300 | Transparent. "I need it / I want it / I'm after" in bone, for a black tee. |
+| `shirt-front.png` | 12 × 16 in print area | none | 3600 × 4800 | 300 | Transparent. The bone distressed wordmark, small (4 in) on the left chest, for a black tee. |
+| `shirt-back.png` | 12 × 16 in print area | none | 3600 × 4800 | 300 | Transparent. The single's cut faces large, in one-colour bone ink, then "I need it / I want it / I'm after". |
 | `epk-spread.jpg` | A4 spread, 420 × 297 mm | 3 mm | 5031 × 3579 | 300 | Left: the burned logo, the singles, the stages. Right: the four members. No contact details. |
+
+The four posters here are the coded placeholders; Liam is designing the final ones in Photoshop (see `../posters-handoff/`).
 
 **No A2 posters.** No poster photo reaches 150 dpi at A2: Lido gets about 81, Badehaus 2024 about 122, Badehaus 2023
 about 121, End of Term about 81. So every poster is A3 only, as the plan says.

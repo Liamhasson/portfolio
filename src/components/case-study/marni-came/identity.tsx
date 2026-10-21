@@ -6,7 +6,7 @@ const COLOURS = [
   { name: "Blackout", hex: "0A0908", share: 6.5, cls: "c-black" },
   { name: "Bone", hex: "EEEAE2", share: 2.2, cls: "c-bone" },
   { name: "Red", hex: "EC1302", share: 0.6, cls: "c-red" },
-  { name: "Burn", hex: "light only", share: 1.4, cls: "c-burn" },
+  { name: "Burn", hex: "Screen", share: 1.4, cls: "c-burn" },
 ] as const;
 
 /** Board CS 05 · Identity: the mark (master, burned, print, and at 64 px), the colours in proportion, the type, and the
@@ -38,7 +38,7 @@ export function MarniCameIdentity({ kind, title }: { kind: "supporting"; title: 
       </div>
       <ul className="mc-colours" aria-label="The colours, in proportion">
         {COLOURS.map((c) => (
-          <li key={c.name} className={c.cls} style={{ flex: c.share }} aria-label={`${c.name}, ${c.hex}`}><b>{c.name}</b><span>{c.hex}</span></li>
+          <li key={c.name} className={c.cls} style={{ flex: c.share }} aria-label={c.cls === "c-burn" ? `${c.name}, light screened over the picture` : `${c.name}, ${c.hex}`}><i aria-hidden="true" /><b>{c.name}</b><span>{c.hex}</span></li>
         ))}
       </ul>
       <div className="mc-type">

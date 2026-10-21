@@ -35,7 +35,7 @@ html,body { margin:0; background:transparent; }
 .info span:last-child { text-align:right; } .info i { font-style:normal; color:var(--ash); display:block; }
 /* the sleeve (marni-came.css .mc-cover) */
 .by { position:absolute; left:0; right:0; top:6.5%; text-align:center; font:500 2.4cqw/1 var(--info); letter-spacing:.34em; text-transform:uppercase; color:var(--bone); }
-.t { position:absolute; left:0; right:0; bottom:9%; margin:0; text-align:center; white-space:nowrap; font:600 7.4cqw/1 var(--serif); letter-spacing:.04em; text-transform:uppercase; color:var(--red); }
+.t { position:absolute; left:0; right:0; bottom:9%; margin:0; text-align:center; white-space:nowrap; font:600 7.4cqw/1 var(--serif); letter-spacing:.04em; text-transform:uppercase; color:var(--bone); }
 .cr { position:absolute; left:0; right:0; bottom:5%; text-align:center; font:500 1.6cqw/1 var(--info); letter-spacing:.24em; text-transform:uppercase; color:var(--ash); }
 /* tables (board spread 06: hairlines, Label) */
 .sm { font:500 var(--fs)/1.75 var(--info); letter-spacing:.18em; text-transform:uppercase; margin:0; }
@@ -106,14 +106,17 @@ const pieces = [
       <img src="${pub("logo/wordmark-distressed-bone.svg")}" style="position:absolute;left:15%;width:70%;top:50%;transform:translateY(-50%)">`,
   },
   {
-    // a black tee, front: the distressed wordmark across the chest (12 x 16 in print area, transparent)
+    // a black tee, front: the distressed wordmark small on the left chest, 4 in wide (Liam, 2026-10-21; 12 x 16 in print
+    // area, transparent, placed as worn: the wearer's left is the print's right)
     name: "shirt-front", w: 304.8, h: 406.4, dpi: 300, transparent: true,
-    html: `<img src="${pub("logo/wordmark-distressed-bone.svg")}" style="position:absolute;left:${(304.8 - 254) / 2}mm;width:254mm;top:12mm">`,
+    html: `<img src="${pub("logo/wordmark-distressed-bone.svg")}" style="position:absolute;right:38mm;width:101.6mm;top:30mm">`,
   },
   {
-    // the back: the chorus the crowd sings back (Liam, 2026-10-20)
+    // the back: the single's cut faces, large, in one-colour bone ink, and under them the chorus the crowd sings back
+    // (Liam, 2026-10-20 and 10-21)
     name: "shirt-back", w: 304.8, h: 406.4, dpi: 300, transparent: true,
-    html: `<div style="position:absolute;left:0;right:0;top:50mm;text-align:center;font:600 50mm/.9 var(--serif);text-transform:uppercase;color:var(--bone);letter-spacing:.01em">I need it<br>I want it<br>I’m after</div>`,
+    html: `<img src="${img("shirt-faces.png")}" style="position:absolute;left:12.7mm;top:6mm;width:279.4mm">
+      <div style="position:absolute;left:0;right:0;top:292mm;text-align:center;font:600 30mm/.92 var(--serif);text-transform:uppercase;color:var(--bone);letter-spacing:.01em">I need it<br>I want it<br>I’m after</div>`,
   },
   {
     // the press kit open on the four members (A4 spread): the burned logo, the singles and the stages; then the band

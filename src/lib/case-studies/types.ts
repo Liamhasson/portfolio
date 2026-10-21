@@ -34,6 +34,8 @@ export interface AtAGlance {
   tools: readonly string[];
   /** Only where it explains the context (contract, course project). */
   type?: string;
+  /** One headline result, where the study wants it up front (the full Impact block stays at the end). */
+  impact?: string;
 }
 
 /** An image or video from the board, served from public/case-studies/<slug>/. */

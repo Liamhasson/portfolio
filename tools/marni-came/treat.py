@@ -107,14 +107,15 @@ def build(out):
     a = grade(load(os.path.join(G, "Pictures from After Heartbreaks photoshoot/C0020T01.JPG"), (1600, 1200)), lo=6, hi=170)
     b = grade(load(os.path.join(G, "Pictures from After Heartbreaks photoshoot/C0019T01.JPG"), (1600, 1200)), lo=6, hi=170)
     save(grain(lens(doubled(a, b, (0.18, 0.0, 0.62, 0.62), dx=0.05, dy=-0.01, amt=.95, feather=.06), .34, .8)), "moves/doubled.jpg")
-    save(load(os.path.join(SRC, "after-heartbreaks-still-bass-lens.jpg"), (1600, 1200)), "moves/lens.jpg")
+    # (Liam 10-21: the lens is a sharp centre with smeared edges; and Blowout, the fifth move: two stills Liam picked)
+    save(load(os.path.join(SRC, "after-heartbreaks-still-lens.jpg"), (1600, 1200), (0.55, 0.5)), "moves/lens.jpg", q=84)
+    save(load(os.path.join(SRC, "after-heartbreaks-still-blowout.jpg"), (1600, 1200), (0.5, 0.5)), "moves/blowout.jpg", q=84)
     # the switch: the face, graded, with nothing applied (the page applies the moves live)
     # (Liam 10-20: the Lido stage photo, arms up, the guitarist in front, in the brand's black and white)
     save(grain(grade(load(os.path.join(lido, "416742665_926263899302184_7215614059312349568_n.jpg"), (1600, 900), (0.5, 0.4)), lo=6, hi=230, gamma=1.05, contrast=1.15), .12), "switch.jpg", q=72)
     # problem: the Badehaus 2023 crowd (video still)
     bh23 = os.path.join(G, "Badehaus 2023")
-    # (Liam 10-20: the band and the room going wild, Drop Dead live at Lido at 3:25, burned from the top left)
-    save(grain(burn(grade(load(frame(205.8, LIDO), (1600, 733), (0.5, 0.55)), lo=10, hi=228), light, (0, 0), "l", .4)), "problem-crowd.jpg", q=76)
+    # (the Problem is now a video: crowd.py, Liam 10-21)
     # the fan at Lido, and the captured-glow example
     save(grain(lens(grade(load(os.path.join(lido, "415052473_926257569302817_8722647996964470191_n.jpeg"), (1600, 1200)), lo=15, hi=215), .2, .5)), "fan-lido.jpg")
     save(grain(grade(load(frame(131), (1600, 1200)), lo=6, hi=235)), "glow-allowed.jpg")
@@ -134,7 +135,7 @@ def build(out):
     save(grain(grade(load(os.path.join(G, "Badehaus 2024/Pictures from the show/Dopamine videoshoot direction meet up before the show.JPG"), (1600, 1067)), lo=6, hi=225), .12), "backstage.jpg", q=80)
     # the Strategy section's references (Liam 10-21): free-licensed Wikimedia Commons photos, credits in sources/refs/credits.json,
     # graded to the brand's black and white (an edit, credited as such)
-    for name, c in (("bowie", (0.5, 0.3)), ("cobain", (0.62, 0.45)), ("grohl", (0.38, 0.3)), ("maneskin", (0.5, 0.4))):
+    for name, c in (("bowie", (0.5, 0.3)), ("cobain", (0.62, 0.45)), ("grohl", (0.42, 0.3)), ("maneskin", (0.5, 0.4))):
         save(grain(grade(load(os.path.join(SRC, "refs", f"{name}.jpg"), (640, 800), c), lo=6, hi=232, gamma=1.05, contrast=1.12), .12), f"refs/{name}.jpg", q=72)
     # the Doubled moodboard: the video's own doubles (timestamps in seconds)
     for i, t in enumerate((117.5, 150.24, 109.5, 21.26, 194.1, 112.24, 191.24, 21.74, 108.24, 116.5)):
@@ -145,7 +146,8 @@ def build(out):
     v = grade(load(frame(155), (1600, 1200)), lo=8, hi=225)
     save(grain(doubled(v, v, (0.30, 0.0, 0.62, 0.5), dx=0.06, dy=0.01, scale=1.12, amt=.85, feather=.06)), "doubled/same-frame.jpg")
     # the videos' posters: Liam singing (the music video at 2:44), and Dopamine live at Badehaus graded to the brand (1:31)
-    save(load(frame(164), (1600, 900)), "video/after-heartbreaks.jpg")
+    # (Liam 10-21: the video's original thumbnail, the amber scream)
+    save(load(os.path.join(SRC, "after-heartbreaks-thumbnail.jpg"), (1600, 900)), "video/after-heartbreaks.jpg", q=84)
     repo = os.path.dirname(os.path.dirname(HERE))
     save(grain(grade(load(frame(91, os.path.join(repo, "public/playground/dopamine.mp4")), (1600, 900)), lo=12, hi=225)), "video/dopamine.jpg")
     # the burned logo: the old PNG master on Blackout with the light from the left

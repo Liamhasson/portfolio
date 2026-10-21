@@ -4,7 +4,7 @@ import type { AtAGlance as Data } from "@/lib/case-studies/types";
 export function AtAGlance({ data }: { data: Data }) {
   return (
     <div className="f glance">
-      <dl aria-label="At a glance" className="strip">
+      <dl aria-label="At a glance" className={data.impact ? "strip has-impact" : "strip"}>
         <div>
           <dt className="label">Role</dt>
           <dd><p>{data.role}</p></dd>
@@ -31,6 +31,12 @@ export function AtAGlance({ data }: { data: Data }) {
             </>
           )}
         </div>
+        {data.impact && (
+          <div>
+            <dt className="label">Impact</dt>
+            <dd><p>{data.impact}</p></dd>
+          </div>
+        )}
       </dl>
     </div>
   );

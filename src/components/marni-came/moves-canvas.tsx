@@ -52,7 +52,9 @@ export function MovesCanvas({ src, alt, burnSrc, doubled, state, seed = 3, class
         if (gone) { res(); return; }
         const t = gl.createTexture()!; textures.push(t); gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, im);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        // (mipmapped: the blowout reads its glow from the blurred levels)
+        gl.generateMipmap(gl.TEXTURE_2D);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         onSize?.(im.naturalWidth, im.naturalHeight); res();
       };
@@ -67,7 +69,7 @@ export function MovesCanvas({ src, alt, burnSrc, doubled, state, seed = 3, class
       if (gone || !ready) return;
       const dt = last ? Math.min(0.1, (now - last) / 1000) : 0; last = now;
       cur = stepMoves(cur, target.current, dt, reduced);
-      gl.uniform1f(u("uSlice"), cur.slice); gl.uniform1f(u("uBurn"), cur.burn); gl.uniform1f(u("uDoubled"), cur.doubled); gl.uniform1f(u("uLens"), cur.lens);
+      gl.uniform1f(u("uSlice"), cur.slice); gl.uniform1f(u("uBurn"), cur.burn); gl.uniform1f(u("uDoubled"), cur.doubled); gl.uniform1f(u("uLens"), cur.lens); gl.uniform1f(u("uBlowout"), cur.blowout);
       gl.uniform1f(u("uBreath"), reduced ? 0.5 : burnBreath((now - t0) / 1000));
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       // (the burn breathes while it's on, but only while the picture is on screen)

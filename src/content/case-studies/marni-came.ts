@@ -16,6 +16,7 @@ export const marniCame: CaseStudy = {
     team: "Band of four · Imri Agmon, co-director (Badehaus)",
     tools: ["Photoshop", "Premiere Pro", "Pro Tools", "Ableton (live shows: lights, playback, click)"],
     type: "Band project, alongside a BA at BIMM Berlin",
+    impact: "Reach +74.5%",
   },
   challenges: [
     {

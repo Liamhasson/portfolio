@@ -67,6 +67,15 @@ def build(out):
     tile = Image.new("RGB", (tw, th), (10, 9, 8)); lw = round(tw * 0.69); l = logo.resize((lw, round(lw * logo.height / logo.width)), Image.LANCZOS)
     tile.paste(Image.new("RGB", l.size, (238, 234, 226)), ((tw - lw) // 2, (th - l.height) // 2), l)
     save(print_grain(burn(tile, frame(62.4), (0, 0.5), "l", .85, 1.0), .12, web_width=1600), "burned.jpg")
+    # the shirt's back: the single's cut faces as one-colour bone ink (alpha from light), fading out at the edges
+    from PIL import ImageOps, ImageDraw
+    g = ImageOps.autocontrast(ImageOps.grayscale(Image.open(os.path.join(G, "After Heartbreaks/After Heartbreaks cover art design.jpg"))), cutoff=1)
+    a = g.point([0 if v < 40 else 255 if v > 235 else int(255 * ((v - 40) / 195) ** 1.15) for v in range(256)])
+    w, h = a.size; m = Image.new("L", a.size, 0)
+    ImageDraw.Draw(m).ellipse((w * 0.08, h * 0.04, w * 0.92, h * 0.98), fill=255)
+    a = ImageChops.multiply(a, m.filter(ImageFilter.GaussianBlur(w * 0.06)))
+    ink = Image.new("RGBA", a.size, (238, 234, 226, 0)); ink.putalpha(a)
+    ink.save(os.path.join(out, "shirt-faces.png")); print("shirt-faces.png", ink.size)
 
 
 if __name__ == "__main__":

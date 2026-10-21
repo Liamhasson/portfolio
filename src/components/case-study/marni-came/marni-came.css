@@ -42,6 +42,7 @@
 /* ------------------------------ 2 at a glance ------------------------------ */
 [data-world="marni-came"] .glance { padding: calc(var(--u) * 40) 0; }
 [data-world="marni-came"] .strip { margin: 0 calc(var(--u) * 48); display: grid; grid-template-columns: calc(var(--u) * 380) calc(var(--u) * 220) calc(var(--u) * 360) 1fr; border-top: 1px solid var(--hair-2); border-bottom: 1px solid var(--hair-2); }
+[data-world="marni-came"] .strip.has-impact { grid-template-columns: calc(var(--u) * 340) calc(var(--u) * 180) calc(var(--u) * 330) 1fr calc(var(--u) * 200); }
 [data-world="marni-came"] .strip > div { padding: calc(var(--u) * 26) calc(var(--u) * 24) calc(var(--u) * 28); border-left: 1px solid var(--hair); }
 [data-world="marni-came"] .strip > div:first-child { padding-left: 0; border-left: 0; }
 [data-world="marni-came"] .strip .label { margin-bottom: calc(var(--u) * 12); }
@@ -59,26 +60,8 @@
 [data-world="marni-came"] .mc-ph figcaption { margin-top: calc(var(--u) * 10); }
 /* Solution: the idea, then the switch */
 [data-world="marni-came"] .mc-idea { font: 600 calc(var(--u) * 150)/.86 var(--mc-serif); text-transform: uppercase; color: var(--red); }
-/* the word sets its own width, so "on purpose" follows it at the same gap (Liam 10-20); each word arrives with its own move */
-[data-world="marni-came"] .mc-cyc { display: inline-block; position: relative; }
-[data-world="marni-came"] .mc-cyc::before, [data-world="marni-came"] .mc-cyc::after { content: attr(data-word); position: absolute; left: 0; top: 0; pointer-events: none; opacity: 0; }
-/* Broken: the word arrives cut in two bands, shifted apart, that snap together (the word itself shows once they meet) */
-[data-world="marni-came"] .mc-cyc[data-fx="broken"] { animation: mc-broken-base .5s step-end both; }
-[data-world="marni-came"] .mc-cyc[data-fx="broken"]::before { opacity: 1; color: var(--red); clip-path: inset(0 0 52% 0); animation: mc-broken-a .5s steps(4, end) both; }
-[data-world="marni-came"] .mc-cyc[data-fx="broken"]::after { opacity: 1; color: var(--red); clip-path: inset(48% 0 0 0); animation: mc-broken-b .5s steps(4, end) both; }
-@keyframes mc-broken-base { from { color: transparent; } to { color: var(--red); } }
-@keyframes mc-broken-a { from { transform: translateX(-.16em); } to { transform: none; } }
-@keyframes mc-broken-b { from { transform: translateX(.12em); } to { transform: none; } }
-/* Burned: a band of the video's amber light passes across the letters */
-[data-world="marni-came"] .mc-cyc[data-fx="burned"] { background: linear-gradient(100deg, var(--red) 0 38%, #b36f0b 45%, #ffe1aa 50%, #b36f0b 55%, var(--red) 62% 100%) 100% 0 / 320% 100% no-repeat;
-  -webkit-background-clip: text; background-clip: text; color: transparent; animation: mc-burned .7s cubic-bezier(.3, 0, .2, 1) both; }
-@keyframes mc-burned { from { background-position: 100% 0; } to { background-position: 0% 0; } }
-/* Doubled: a screened copy, offset and larger, slides onto the word and is gone */
-[data-world="marni-came"] .mc-cyc[data-fx="doubled"]::after { color: var(--bone); mix-blend-mode: screen; animation: mc-doubled .55s cubic-bezier(.2, 0, .1, 1) both; }
-@keyframes mc-doubled { from { opacity: .7; transform: translate(.12em, -.06em) scale(1.08); } 70% { opacity: .45; } to { opacity: 0; transform: none; } }
-/* Bent: the word swells as if through a wide lens up close, then flattens */
-[data-world="marni-came"] .mc-cyc[data-fx="bent"] { transform-origin: 50% 60%; animation: mc-bent .55s cubic-bezier(.2, .7, .2, 1) both; }
-@keyframes mc-bent { from { transform: scale(1.22, 1.12); letter-spacing: .06em; } to { transform: none; letter-spacing: normal; } }
+/* the typewriter's word: inline, so "on purpose" follows its letters at one space, whatever the word (Liam 10-21) */
+[data-world="marni-came"] .mc-cyc { white-space: pre; }
 /* Strategy (board CS 03b, Liam 10-21): the mission in the brand's serif, then the audience, the USP, the references, the voice */
 [data-world="marni-came"] .mc-mission { font: 600 calc(var(--u) * 92)/.9 var(--mc-serif); text-transform: uppercase; color: var(--bone); margin: calc(var(--u) * 14) 0 0; letter-spacing: .005em; }
 [data-world="marni-came"] .mc-st-row { display: grid; grid-template-columns: 1.15fr 1fr; gap: calc(var(--u) * 56); margin-top: calc(var(--u) * 96); align-items: start; }
@@ -97,9 +80,19 @@
 [data-world="marni-came"] .mc-st-refs figcaption a:hover { text-decoration: underline; }
 [data-world="marni-came"] .mc-st-name { font: 600 max(20px, calc(var(--u) * 30))/1 var(--mc-serif); text-transform: uppercase; color: var(--bone); margin: calc(var(--u) * 18) 0 calc(var(--u) * 8); }
 [data-world="marni-came"] .mc-st-rule { font-size: calc(var(--u) * 56); line-height: 1.02; letter-spacing: -.02em; color: var(--ink); margin-top: calc(var(--u) * 12); }
+[data-world="marni-came"] .mc-st-voice-ph { margin: calc(var(--u) * 32) 0 0; }
+[data-world="marni-came"] .mc-st-voice-ph img { display: block; width: 100%; aspect-ratio: 21 / 9; object-fit: cover; object-position: 50% 40%; }
+[data-world="marni-came"] .mc-st-voice-ph figcaption { margin-top: calc(var(--u) * 8); }
 [data-world="marni-came"] .mc-st-habits { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(var(--u) * 28); margin: calc(var(--u) * 32) 0 0; padding: 0; list-style: none; }
 [data-world="marni-came"] .mc-st-habits li { border-top: 1px solid var(--hair-2); padding-top: calc(var(--u) * 16); max-width: none; }
 [data-world="marni-came"] .mc-st-habits b { font-weight: 500; color: var(--ink); }
+/* Problem: the split (Liam 10-21, after the Ember page): the words centred on the left half, the crowd filling the right */
+[data-world="marni-came"] .mc-split { display: grid; grid-template-columns: 1fr 1fr; padding: 0; min-height: calc(var(--u) * 900); align-items: center; }
+[data-world="marni-came"] .mc-split-text { padding: calc(var(--u) * 110) calc(var(--u) * 96) calc(var(--u) * 110) calc(var(--u) * 48); }
+[data-world="marni-came"] .mc-split-text .title { margin-bottom: calc(var(--u) * 40); }
+[data-world="marni-came"] .mc-split-media { position: relative; margin: 0; align-self: stretch; overflow: hidden; }
+[data-world="marni-came"] .mc-split-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+[data-world="marni-came"] .mc-split-media figcaption { position: absolute; left: calc(var(--u) * 20); bottom: calc(var(--u) * 18); color: rgba(238,234,226,.7); }
 [data-world="marni-came"] .mc-pillars { grid-template-columns: 1fr 1fr; align-items: start; margin-top: calc(var(--u) * 56); }
 [data-world="marni-came"] .mc-pillars .label { margin-bottom: calc(var(--u) * 8); }
 [data-world="marni-came"] .mc-switch { display: grid; grid-template-columns: 1.7fr 1fr; gap: calc(var(--u) * 40); margin-top: calc(var(--u) * 120); align-items: center; }
@@ -120,19 +113,16 @@
 [data-world="marni-came"] .mc-logos img.lg-tiny { position: absolute; right: calc(var(--u) * 18); top: calc(var(--u) * 18); width: 64px; }
 [data-world="marni-came"] .mc-logos .lg-tiny-l { position: absolute; right: calc(var(--u) * 18 + 76px); top: calc(var(--u) * 24); }
 [data-world="marni-came"] .mc-logos figcaption { position: absolute; left: calc(var(--u) * 16); bottom: calc(var(--u) * 14); z-index: 1; }
-[data-world="marni-came"] .mc-colours { display: flex; height: calc(var(--u) * 150); margin-top: calc(var(--u) * 14); }
-[data-world="marni-came"] .mc-colours li { padding: calc(var(--u) * 14); display: flex; flex-direction: column; justify-content: flex-end; gap: 4px; min-width: 0; }
-[data-world="marni-came"] .mc-colours b { font: 600 max(15px, calc(var(--u) * 22))/1 var(--mc-serif); text-transform: uppercase; }
-[data-world="marni-came"] .mc-colours span { font: 500 max(11px, calc(var(--u) * 11))/1.3 var(--mc-info); letter-spacing: .12em; text-transform: uppercase; }
-[data-world="marni-came"] .mc-colours .c-black { background: var(--black); box-shadow: inset 0 0 0 1px var(--hair-2); }
-[data-world="marni-came"] .mc-colours .c-bone { background: var(--bone); color: var(--black); }
-[data-world="marni-came"] .mc-colours .c-red { background: var(--red); color: var(--black); }
-/* (black on the title red is 4.3:1: enough for large text only, so the red swatch keeps just its name, set large) */
-[data-world="marni-came"] .mc-colours .c-red b { font-size: max(24px, calc(var(--u) * 24)); }
-[data-world="marni-came"] .mc-colours .c-red span { display: none; }
-/* (its share is too narrow for its name on tablets and phones: it keeps room for the word, the others give way) */
-[data-world="marni-came"] .mc-colours .c-red { min-width: max(72px, calc(var(--u) * 78)); }
-[data-world="marni-came"] .mc-colours .c-burn { background: var(--black) url("/case-studies/marni-came/burn-light.jpg") 20% 50% / cover; color: var(--bone); }
+/* the colours in proportion; under each, its name and its code, set the same way for all four (Liam 10-21) */
+[data-world="marni-came"] .mc-colours { display: flex; gap: 2px; margin-top: calc(var(--u) * 14); }
+[data-world="marni-came"] .mc-colours li { display: flex; flex-direction: column; gap: 4px; min-width: max(72px, calc(var(--u) * 78)); }
+[data-world="marni-came"] .mc-colours li > i { display: block; height: calc(var(--u) * 150); margin-bottom: calc(var(--u) * 10); }
+[data-world="marni-came"] .mc-colours b { font: 600 max(15px, calc(var(--u) * 22))/1 var(--mc-serif); text-transform: uppercase; color: var(--bone); }
+[data-world="marni-came"] .mc-colours span { font: 500 max(11px, calc(var(--u) * 11))/1.3 var(--mc-info); letter-spacing: .12em; text-transform: uppercase; color: var(--ash); }
+[data-world="marni-came"] .mc-colours .c-black > i { background: var(--black); box-shadow: inset 0 0 0 1px var(--hair-2); }
+[data-world="marni-came"] .mc-colours .c-bone > i { background: var(--bone); }
+[data-world="marni-came"] .mc-colours .c-red > i { background: var(--red); }
+[data-world="marni-came"] .mc-colours .c-burn > i { background: var(--black) url("/case-studies/marni-came/burn-light.jpg") 20% 50% / cover; }
 [data-world="marni-came"] .mc-type { display: grid; grid-template-columns: 1.2fr 1fr; gap: calc(var(--u) * 40); margin-top: calc(var(--u) * 72); padding-top: calc(var(--u) * 24); border-top: 1px solid var(--hair-2); }
 [data-world="marni-came"] .mc-spec-serif { font: 600 calc(var(--u) * 64)/1 var(--mc-serif); color: var(--bone); margin-top: calc(var(--u) * 14); }
 [data-world="marni-came"] .mc-spec-sans { font: 500 max(15px, calc(var(--u) * 24))/1.5 var(--mc-info); letter-spacing: .06em; color: var(--bone); margin-top: calc(var(--u) * 14); }
@@ -148,7 +138,7 @@
 [data-world="marni-came"] .mc-work .r2 { display: flex; justify-content: space-between; gap: 12px; padding: calc(var(--u) * 10) 0; border-bottom: 1px solid var(--hair-2); }
 [data-world="marni-came"] .mc-work .tk .r2 { border-color: rgba(10,9,8,.16); }
 /* Imagery */
-[data-world="marni-came"] .mc-moves { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: calc(var(--u) * 12); }
+[data-world="marni-came"] .mc-moves { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: calc(var(--u) * 12); }
 [data-world="marni-came"] .mc-moves img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; display: block; }
 [data-world="marni-came"] .mc-moves figcaption { padding-top: calc(var(--u) * 10); display: flex; flex-direction: column; gap: 6px; }
 [data-world="marni-came"] .mc-moves b { font: 600 max(18px, calc(var(--u) * 26))/1 var(--mc-serif); text-transform: uppercase; color: var(--bone); }
@@ -163,17 +153,16 @@
 [data-world="marni-came"] .mc-cover { position: relative; aspect-ratio: 1; overflow: hidden; container-type: inline-size; }
 [data-world="marni-came"] .mc-cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 [data-world="marni-came"] .mc-cover .by { position: absolute; left: 0; right: 0; top: 6.5%; text-align: center; font: 500 2.4cqw/1 var(--mc-info); letter-spacing: .34em; text-transform: uppercase; color: var(--bone); }
-[data-world="marni-came"] .mc-cover .t { position: absolute; left: 0; right: 0; bottom: 9%; text-align: center; white-space: nowrap; font: 600 7.4cqw/1 var(--mc-serif); letter-spacing: .04em; text-transform: uppercase; color: var(--red); }
+[data-world="marni-came"] .mc-cover .t { position: absolute; left: 0; right: 0; bottom: 9%; text-align: center; white-space: nowrap; font: 600 7.4cqw/1 var(--mc-serif); letter-spacing: .04em; text-transform: uppercase; color: var(--bone); }
 [data-world="marni-came"] .mc-cover .cr { position: absolute; left: 0; right: 0; bottom: 5%; text-align: center; font: 500 1.6cqw/1 var(--mc-info); letter-spacing: .24em; text-transform: uppercase; color: var(--ash); }
 [data-world="marni-came"] .mc-app-posters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: calc(var(--u) * 10); align-content: start; }
 [data-world="marni-came"] .mc-collage { position: relative; height: calc(var(--u) * 420); margin-top: calc(var(--u) * 32); }
 [data-world="marni-came"] .mc-collage figure { position: absolute; background: var(--panel); overflow: hidden; display: grid; place-items: center; }
 [data-world="marni-came"] .mc-collage img { width: 100%; height: 100%; object-fit: cover; }
-[data-world="marni-came"] .mc-collage .a2 img { width: 60%; height: auto; object-fit: contain; }
 [data-world="marni-came"] .mc-collage figcaption { position: absolute; left: 12px; bottom: 10px; }
-[data-world="marni-came"] .mc-collage .a1 { left: 0; top: 20px; width: 44%; height: 86%; transform: rotate(-1.5deg); }
-[data-world="marni-came"] .mc-collage .a2 { left: 42%; top: 0; width: 34%; height: 70%; transform: rotate(1.2deg); }
-[data-world="marni-came"] .mc-collage .a3 { left: 78%; top: 36px; width: 22%; height: 88%; transform: rotate(-1deg); }
+[data-world="marni-came"] .mc-collage .a1 { left: 0; top: 20px; width: 62%; height: 86%; transform: rotate(-1.5deg); }
+[data-world="marni-came"] .mc-collage .a2 { left: 66%; top: 0; width: 30%; height: 100%; transform: rotate(1.2deg); background: var(--black); }
+[data-world="marni-came"] .mc-collage .a2 img { object-fit: contain; }
 /* Website */
 [data-world="marni-came"] .mc-site { border: 1px solid var(--hair-2); }
 [data-world="marni-came"] .mc-site .bar { display: flex; align-items: center; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--hair-2); }
@@ -238,7 +227,6 @@
 @media (prefers-reduced-motion: reduce) {
   [data-world="marni-came"] .mc-move, [data-world="marni-came"] .mc-sound i::after { transition: none; }
   [data-world="marni-came"] .mc-sound[aria-pressed="true"]::before { animation: none; opacity: .7; }
-  [data-world="marni-came"] .mc-cyc, [data-world="marni-came"] .mc-cyc::before, [data-world="marni-came"] .mc-cyc::after { animation: none !important; }
 }
 
 /* ------------------------------ phones and tablets (< 1100px) ------------------------------ */
@@ -260,9 +248,15 @@
   [data-world="marni-came"] .strip > div { padding: calc(var(--u) * 18) calc(var(--u) * 12) calc(var(--u) * 18) 0; border-left: 0; border-top: 1px solid var(--hair); }
   [data-world="marni-came"] .strip > div:nth-child(-n + 2) { border-top: 0; }
   [data-world="marni-came"] .strip > div:last-child { grid-column: 1 / -1; }
+  /* (with the impact: role | timeline, team | impact, then the tools across) */
+  [data-world="marni-came"] .strip.has-impact > div:nth-child(4) { order: 5; grid-column: 1 / -1; }
+  [data-world="marni-came"] .strip.has-impact > div:last-child { grid-column: auto; }
   [data-world="marni-came"] .mc-sec { padding: calc(var(--u) * 56) calc(var(--u) * 16); }
   [data-world="marni-came"] .mc-head { display: block; margin-bottom: calc(var(--u) * 24); }
   [data-world="marni-came"] .mc-head .mc-open { margin-top: calc(var(--u) * 14); }
+  [data-world="marni-came"] .mc-split { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+  [data-world="marni-came"] .mc-split-text { padding: calc(var(--u) * 56) calc(var(--u) * 16) calc(var(--u) * 28); }
+  [data-world="marni-came"] .mc-split-media { aspect-ratio: 4 / 5; }
   [data-world="marni-came"] .mc-mission { font-size: calc(var(--u) * 31); }
   [data-world="marni-came"] .mc-st-row, [data-world="marni-came"] .mc-st-refs, [data-world="marni-came"] .mc-st-habits { grid-template-columns: minmax(0, 1fr); gap: calc(var(--u) * 24); margin-top: calc(var(--u) * 40); }
   [data-world="marni-came"] .mc-st-refs { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: calc(var(--u) * 16); margin-top: calc(var(--u) * 12); }
@@ -273,23 +267,22 @@
   [data-world="marni-came"] .mc-two, [data-world="marni-came"] .mc-pillars, [data-world="marni-came"] .mc-switch { grid-template-columns: minmax(0, 1fr); gap: calc(var(--u) * 24); }
   [data-world="marni-came"] .mc-idea { font-size: calc(var(--u) * 58); }
   [data-world="marni-came"] .mc-switch { margin-top: calc(var(--u) * 56); }
-  [data-world="marni-came"] .mc-switch-ctl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+  [data-world="marni-came"] .mc-switch-ctl { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
   [data-world="marni-came"] .mc-switch-ctl .mc-open { grid-column: 1 / -1; }
   [data-world="marni-came"] .mc-move { display: block; text-align: center; padding: calc(var(--u) * 10) 0; margin: 0; }
-  [data-world="marni-came"] .mc-move b { font-size: 15px; }
+  [data-world="marni-came"] .mc-move b { font-size: 13px; }
   [data-world="marni-came"] .mc-move span { display: none; }
   [data-world="marni-came"] .mc-logos, [data-world="marni-came"] .mc-type, [data-world="marni-came"] .mc-work, [data-world="marni-came"] .mc-apps { grid-template-columns: minmax(0, 1fr); }
   [data-world="marni-came"] .mc-logos figure { min-height: calc(var(--u) * 200); }
-  [data-world="marni-came"] .mc-colours { height: calc(var(--u) * 110); }
-  [data-world="marni-came"] .mc-colours li { padding: calc(var(--u) * 8); }
-  [data-world="marni-came"] .mc-colours span { display: none; }
+  [data-world="marni-came"] .mc-colours li > i { height: calc(var(--u) * 90); }
   [data-world="marni-came"] .mc-spec-serif { font-size: calc(var(--u) * 34); }
   [data-world="marni-came"] .mc-moves { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   [data-world="marni-came"] .mc-mood { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-auto-rows: calc(var(--u) * 130); }
   [data-world="marni-came"] .mc-app-posters { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   [data-world="marni-came"] .mc-collage { height: auto; display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--u) * 8); }
-  [data-world="marni-came"] .mc-collage :is(.a1, .a2, .a3) { position: relative; left: auto; top: auto; width: auto; height: auto; aspect-ratio: 4 / 5; transform: none; }
+  [data-world="marni-came"] .mc-collage :is(.a1, .a2) { position: relative; left: auto; top: auto; width: auto; height: auto; aspect-ratio: 4 / 5; transform: none; }
   [data-world="marni-came"] .mc-collage .a1.a1 { grid-column: 1 / -1; aspect-ratio: 16 / 10; }
+  [data-world="marni-came"] .mc-collage .a2.a2 { grid-column: 1 / -1; aspect-ratio: 3 / 4; }
   [data-world="marni-came"] .chal { grid-template-columns: minmax(0, 1fr); padding: calc(var(--u) * 56) 0; }
   [data-world="marni-came"] .chs { margin: calc(var(--u) * 24) calc(var(--u) * 16) 0; }
   [data-world="marni-came"] .mc-crowd { grid-column: 1; grid-row: auto; margin: calc(var(--u) * 24) calc(var(--u) * 16) 0; }

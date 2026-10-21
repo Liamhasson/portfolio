@@ -3,8 +3,8 @@ import { marniFonts } from "@/components/marni-came/fonts";
 import { POSTERS, Poster } from "@/components/marni-came/poster";
 import { MC_ASSETS } from "@/lib/marni-came/assets";
 
-/** Board CS 07 · Applications: the single (route A), the four show posters, and the pieces made for the stage and the
- *  crowd. Until Liam's photographs of them exist, their flat artwork stands in, labelled as artwork (spec §6). */
+/** Board CS 07 · Applications: the single (route A), the four show posters, the stage flag and the crowd shirt (Liam 10-21:
+ *  the wheatpaste repeated a poster, so it went). Until Liam's photographs of them exist, their flat artwork stands in, labelled as artwork (spec §6). */
 export function MarniCameApplications({ kind, title }: { kind: "supporting"; title: string }) {
   const id = useId();
   return (
@@ -28,13 +28,8 @@ export function MarniCameApplications({ kind, title }: { kind: "supporting"; tit
         </figure>
         <figure className="a2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={MC_ASSETS.wordmarkDistressedBone} alt="The crowd shirt's front: the wordmark in bone on black" loading="lazy" />
-          <figcaption className="label">Crowd shirt · front · artwork</figcaption>
-        </figure>
-        <figure className="a3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={MC_ASSETS.posters.lido} alt="The Lido poster as a print" loading="lazy" />
-          <figcaption className="label">Wheatpaste · artwork</figcaption>
+          <img src={MC_ASSETS.shirtBack} alt="The crowd shirt's back: the single's cut faces in bone ink, and under them the chorus, I need it, I want it, I'm after (its front carries the wordmark, small)" loading="lazy" />
+          <figcaption className="label">Crowd shirt · back · artwork</figcaption>
         </figure>
       </div>
     </section>

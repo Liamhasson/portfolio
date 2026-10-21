@@ -19,11 +19,15 @@ export const MC_ASSETS = {
   wordmarkDistressedBone: `${R}/logo/wordmark-distressed-bone.svg`,
   logoBurned: `${R}/logo/burned.jpg`,
   cover: `${R}/cover-after-heartbreaks.jpg`,
+  /** The crowd shirt's back: the cut faces and the chorus (docs/marni-came/print/shirt-back.png on black). */
+  shirtBack: `${R}/merch/shirt-back.jpg`,
   posters: { lido: `${R}/posters/lido.jpg`, badehaus24: `${R}/posters/badehaus-2024.jpg`, badehaus23: `${R}/posters/badehaus-2023.jpg`, endOfTerm: `${R}/posters/end-of-term.jpg` },
-  moves: { slice: `${R}/moves/slice.jpg`, burn: `${R}/moves/burn.jpg`, doubled: `${R}/moves/doubled.jpg`, lens: `${R}/moves/lens.jpg` },
+  moves: { slice: `${R}/moves/slice.jpg`, burn: `${R}/moves/burn.jpg`, doubled: `${R}/moves/doubled.jpg`, lens: `${R}/moves/lens.jpg`, blowout: `${R}/moves/blowout.jpg` },
   switchPhoto: `${R}/switch.jpg`,
   burnLight: `${R}/burn-light.jpg`,
-  problem: `${R}/problem-crowd.jpg`,
+  /** The crowd during Dopamine at Badehaus, 4:5, for the Problem's half (Liam, 2026-10-21). */
+  problemLoop: `${R}/video/problem-crowd.mp4`,
+  problemPoster: `${R}/video/problem-crowd.jpg`,
   fanPhoto: `${R}/fan-lido.jpg`,
   glowAllowed: `${R}/glow-allowed.jpg`,
   /** The four of you in 'b&w clothes 2': Pedro, Sami, Liam, Rikki, left to right. */
