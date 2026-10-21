@@ -284,6 +284,28 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
 .cs-imp li { font: 400 calc(var(--u) * 24)/1.35 var(--sans); color: var(--bone); padding-top: calc(var(--u) * 16); border-top: 1px solid var(--line); }
 .cs-next { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--u) * 48); padding: calc(var(--u) * 80) calc(var(--u) * 48); min-height: calc(var(--u) * 630); align-items: center; }
 .cs-next .peek { height: 100%; min-height: calc(var(--u) * 420); display: grid; place-items: center; box-shadow: inset 0 0 0 1px var(--line); font: 400 13px/1 var(--mono); color: rgba(238,234,226,.4); }
+/* CS 03b · Strategy (Liam 10-21): the five points from the BA, sharpened */
+.st-mission { font: 600 calc(var(--u) * 92)/.9 var(--serif); text-transform: uppercase; color: var(--bone); margin: calc(var(--u) * 14) 0 0; max-width: 15em; letter-spacing: .005em; }
+.st-row { display: grid; grid-template-columns: 1.15fr 1fr; gap: calc(var(--u) * 56); margin-top: calc(var(--u) * 96); align-items: start; }
+.st-card { border-top: 1px solid var(--line); padding-top: calc(var(--u) * 18); }
+.st-card .g-c { margin-top: calc(var(--u) * 12); }
+.st-rows > div { display: grid; grid-template-columns: calc(var(--u) * 150) 1fr; gap: calc(var(--u) * 16); padding: calc(var(--u) * 14) 0; border-top: 1px solid var(--line); align-items: baseline; }
+.st-usp .g-o { font-size: calc(var(--u) * 34); line-height: 1.18; margin-top: calc(var(--u) * 12); }
+.st-refs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: calc(var(--u) * 28); margin-top: calc(var(--u) * 14); }
+.st-refs > div { border-top: 1px solid var(--line); padding-top: calc(var(--u) * 16); }
+.st-refs b { display: block; font: 600 calc(var(--u) * 30)/1 var(--serif); text-transform: uppercase; color: var(--bone); margin-bottom: calc(var(--u) * 10); }
+.st-voice { margin-top: calc(var(--u) * 96); }
+.st-voice .g-t { margin-top: calc(var(--u) * 12); }
+.st-habits { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(var(--u) * 28); margin-top: calc(var(--u) * 32); }
+.st-habits > div { border-top: 1px solid var(--line); padding-top: calc(var(--u) * 16); }
+.pm .st-mission { font-size: calc(var(--u) * 31); }
+.pm .st-row, .pm .st-refs, .pm .st-habits { grid-template-columns: minmax(0, 1fr); gap: calc(var(--u) * 24); margin-top: calc(var(--u) * 40); }
+.pm .st-refs { gap: calc(var(--u) * 14); margin-top: calc(var(--u) * 12); }
+.pm .st-habits { margin-top: calc(var(--u) * 16); gap: calc(var(--u) * 14); }
+.pm .st-voice { margin-top: calc(var(--u) * 40); }
+.pm .st-rows > div { grid-template-columns: calc(var(--u) * 96) 1fr; }
+.pm .st-usp .g-o { font-size: calc(var(--u) * 22); }
+.pm .st-refs b { font-size: calc(var(--u) * 22); }
 /* phones */
 .phones { display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px; }
 .pf { container-type: inline-size; }
@@ -657,6 +679,88 @@ body { margin: 0; color: #b9b9c0; font: 400 15px/1.5 var(--sans); -webkit-font-s
         <figure class="cs-ph"><img src="marni-came-mockups/cs/problem-crowd.jpg" alt="Marni Came on stage at Badehaus, the crowd in front"><figcaption class="gk">Badehaus · video still</figcaption></figure>
       </div>
     </div></div>
+  </section>
+
+  <section class="block"><div class="cap"><span><b>CS 03b · Strategy</b> · ~1.5 screens · the five points from the BA, sharpened (Liam, 2026-10-21)</span><span>Approved 10-21: no opener · USP · reference photos · "Make them members"</span></div>
+    <div class="frame"><div class="f cs-sec grain">
+      <div class="cs-head"><h2 class="g-h">Strategy</h2></div>
+      <p class="gk">Mission</p>
+      <p class="st-mission">Nobody watches<br>a Marni Came show.<br>Everyone&rsquo;s in it.</p>
+      <div class="st-row">
+        <div class="st-card">
+          <p class="gk">Target audience</p>
+          <p class="g-c">Rock fans and players, 18&ndash;35, in Berlin&rsquo;s scene.</p>
+          <div class="st-rows">
+            <div><span class="gk">They value</span><p class="g-b">Real over polished, and a crowd to belong to.</p></div>
+            <div><span class="gk">They miss</span><p class="g-b">Rock that feels made for them, not for the charts.</p></div>
+            <div><span class="gk">Where they are</span><p class="g-b">At gigs, on Instagram and Facebook, digging on Spotify, YouTube and Apple Music.</p></div>
+          </div>
+        </div>
+        <div class="st-card st-usp">
+          <p class="gk">USP</p>
+          <p class="g-o">A modern grunge sound that keeps its mistakes, and a show the crowd plays in.</p>
+        </div>
+      </div>
+      <div class="st-voice">
+        <p class="gk">References · what each taught us</p>
+        <div class="st-refs">
+          <div><img src="../../public/case-studies/marni-came/refs/bowie.jpg" alt="" style="width:100%;aspect-ratio:4/5;object-fit:cover;margin-bottom:calc(var(--u) * 14)"><b>David Bowie</b><p class="g-b">A persona can be built on purpose.</p></div>
+          <div><img src="../../public/case-studies/marni-came/refs/cobain.jpg" alt="" style="width:100%;aspect-ratio:4/5;object-fit:cover;margin-bottom:calc(var(--u) * 14)"><b>Kurt Cobain</b><p class="g-b">Raw beats polished.</p></div>
+          <div><img src="../../public/case-studies/marni-came/refs/grohl.jpg" alt="" style="width:100%;aspect-ratio:4/5;object-fit:cover;margin-bottom:calc(var(--u) * 14)"><b>Dave Grohl</b><p class="g-b">Talk to the crowd like old friends.</p></div>
+          <div><img src="../../public/case-studies/marni-came/refs/maneskin.jpg" alt="" style="width:100%;aspect-ratio:4/5;object-fit:cover;margin-bottom:calc(var(--u) * 14)"><b>M&aring;neskin</b><p class="g-b">Keep the fans close, online too.</p></div>
+        </div>
+      </div>
+      <div class="st-voice">
+        <p class="gk">Voice</p>
+        <p class="g-t">Talk with them, not to them.</p>
+        <div class="st-habits">
+          <div><p class="g-b"><b>Like old friends:</b> stories and jokes, nothing rehearsed.</p></div>
+          <div><p class="g-b"><b>Room for everyone:</b> the pit, the side of the stage, the beer at the back.</p></div>
+          <div><p class="g-b"><b>Make them members:</b> they picked the single and held the cameras.</p></div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <section class="block"><div class="cap"><span><b>CS 03b · Strategy · phone (390)</b></span><span></span></div>
+    <div class="phones"><div class="pf" style="grid-column: span 2"><div class="f pm cs-sec grain">
+      <h2 class="g-h">Strategy</h2>
+      <p class="gk">Mission</p>
+      <p class="st-mission">Nobody watches<br>a Marni Came show.<br>Everyone&rsquo;s in it.</p>
+      <div class="st-row">
+        <div class="st-card">
+          <p class="gk">Target audience</p>
+          <p class="g-c">Rock fans and players, 18&ndash;35, in Berlin&rsquo;s scene.</p>
+          <div class="st-rows">
+            <div><span class="gk">They value</span><p class="g-b">Real over polished, and a crowd to belong to.</p></div>
+            <div><span class="gk">They miss</span><p class="g-b">Rock that feels made for them, not for the charts.</p></div>
+            <div><span class="gk">Where they are</span><p class="g-b">At gigs, on Instagram and Facebook, digging on Spotify, YouTube and Apple Music.</p></div>
+          </div>
+        </div>
+        <div class="st-card st-usp">
+          <p class="gk">USP</p>
+          <p class="g-o">A modern grunge sound that keeps its mistakes, and a show the crowd plays in.</p>
+        </div>
+      </div>
+      <div class="st-voice">
+        <p class="gk">References · what each taught us</p>
+        <div class="st-refs">
+          <div><img src="../../public/case-studies/marni-came/refs/bowie.jpg" alt="" style="width:100%;aspect-ratio:4/5;object-fit:cover;margin-bottom:calc(var(--u) * 14)"><b>David Bowie</b><p class="g-b">A persona can be built on purpose.</p></div>
+          <div><img src="../../public/case-studies/marni-came/refs/cobain.jpg" alt="" style="width:100%;aspect-ratio:4/5;object-fit:cover;margin-bottom:calc(var(--u) * 14)"><b>Kurt Cobain</b><p class="g-b">Raw beats polished.</p></div>
+          <div><img src="../../public/case-studies/marni-came/refs/grohl.jpg" alt="" style="width:100%;aspect-ratio:4/5;object-fit:cover;margin-bottom:calc(var(--u) * 14)"><b>Dave Grohl</b><p class="g-b">Talk to the crowd like old friends.</p></div>
+          <div><img src="../../public/case-studies/marni-came/refs/maneskin.jpg" alt="" style="width:100%;aspect-ratio:4/5;object-fit:cover;margin-bottom:calc(var(--u) * 14)"><b>M&aring;neskin</b><p class="g-b">Keep the fans close, online too.</p></div>
+        </div>
+      </div>
+      <div class="st-voice">
+        <p class="gk">Voice</p>
+        <p class="g-t">Talk with them, not to them.</p>
+        <div class="st-habits">
+          <div><p class="g-b"><b>Like old friends:</b> stories and jokes, nothing rehearsed.</p></div>
+          <div><p class="g-b"><b>Room for everyone:</b> the pit, the side of the stage, the beer at the back.</p></div>
+          <div><p class="g-b"><b>Make them members:</b> they picked the single and held the cameras.</p></div>
+        </div>
+      </div>
+    </div></div></div>
   </section>
 
   <section class="block"><div class="cap"><span><b>CS 04 · Solution</b> · 2 screens · the idea, then the effects switch (live on the board)</span><span>DRAFT</span></div>

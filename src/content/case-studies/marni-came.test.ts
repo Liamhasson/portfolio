@@ -2,9 +2,9 @@ import { expect, test } from "vitest";
 import { validateCaseStudy } from "@/lib/case-studies/validate";
 import { marniCame } from "./marni-came";
 
-test("Marni Came fits the frame: two or three challenges, one about people, within its 14.5-screen cap", () => {
+test("Marni Came fits the frame: two or three challenges, one about people, within its 16.5-screen cap (Strategy added, Liam 2026-10-21)", () => {
   expect(validateCaseStudy(marniCame)).toEqual([]);
-  expect(marniCame.screenCap).toBe(14.5);
+  expect(marniCame.screenCap).toBe(16.5);
 });
 
 test("dates appear nowhere in the study's own words (only on posters and the ticket)", () => {

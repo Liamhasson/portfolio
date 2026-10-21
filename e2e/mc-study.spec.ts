@@ -144,11 +144,11 @@ test.describe("website on a 390 px phone", () => {
   });
 });
 
-test("the page stays within its 14.5-screen cap at 1440×900", async ({ page }) => {
+test("the page stays within its 16.5-screen cap at 1440×900 (Strategy added, Liam 2026-10-21)", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(URL);
   const screens = await page.evaluate(() => document.documentElement.scrollHeight / 900);
-  expect(screens).toBeLessThanOrEqual(14.5);
+  expect(screens).toBeLessThanOrEqual(16.5);
 });
 
 test.describe("applications on a 390 px phone", () => {

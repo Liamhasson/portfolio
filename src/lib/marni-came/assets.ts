@@ -28,6 +28,8 @@ export const MC_ASSETS = {
   glowAllowed: `${R}/glow-allowed.jpg`,
   /** The four of you in 'b&w clothes 2': Pedro, Sami, Liam, Rikki, left to right. */
   bandGroup: `${R}/band/group.jpg`,
+  /** The Strategy section's references: Wikimedia Commons photos, graded (credits in tools/marni-came/sources/refs). */
+  refs: { bowie: `${R}/refs/bowie.jpg`, cobain: `${R}/refs/cobain.jpg`, grohl: `${R}/refs/grohl.jpg`, maneskin: `${R}/refs/maneskin.jpg` },
   /** The meet-up before Badehaus 2024, for the moodboard. */
   backstage: `${R}/backstage.jpg`,
   /** The video's own doubles, by file; the moodboard's order and credits live with the component. */

@@ -10,7 +10,7 @@ const MIDDLES: Record<string, [string, string][]> = {
   pulse: [["problem", "Problem"], ["signature", "Solution"], ["supporting", "How it works"]],
   "nordic-logic": [["problem", "Problem"], ["signature", "Solution"], ["supporting", "How it works"], ["supporting", "Brand"]],
   // the brand book as its middle (spec 2026-10-20 §3)
-  "marni-came": [["problem", "Problem"], ["signature", "Solution"], ["supporting", "Identity"], ["supporting", "Imagery"], ["supporting", "Applications"], ["supporting", "Website"]],
+  "marni-came": [["problem", "Problem"], ["supporting", "Strategy"], ["signature", "Solution"], ["supporting", "Identity"], ["supporting", "Imagery"], ["supporting", "Applications"], ["supporting", "Website"]],
 };
 
 test.each(Object.keys(MIDDLES))("%s middle blocks follow the frame order", (slug) => {

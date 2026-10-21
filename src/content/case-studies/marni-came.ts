@@ -42,7 +42,8 @@ export const marniCame: CaseStudy = {
     ],
   },
   peek: { src: MC_ASSETS.heroPoster, alt: "Marni Came live at Badehaus, in black and white, amber light burning in from the left", width: 1440, height: 810 },
-  // Brand-book middle (spec §3): about 13.7 screens at 1440×900; Liam allowed the longer page (2026-10-20).
-  screenCap: 14.5,
-  budget: { ...STANDARD_BUDGET, signature: 2, supporting: 7, challenges: 1.2, outcome: 0.5 },
+  // Brand-book middle (spec §3): about 13.7 screens at 1440×900, plus the Strategy section (~1.7); Liam let the page grow
+  // past the old 14.5 cap (2026-10-21).
+  screenCap: 16.5,
+  budget: { ...STANDARD_BUDGET, signature: 2, supporting: 8.8, challenges: 1.2, outcome: 0.5 },
 };

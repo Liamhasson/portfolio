@@ -132,6 +132,10 @@ def build(out):
     # Badehaus 2024 for the moodboard
     save(grain(grade(load(os.path.join(shoot, "b&w clothes 2.jpg"), (2000, 1333)), lo=4, hi=240, gamma=1.08, contrast=1.08), .12), "band/group.jpg", q=80)
     save(grain(grade(load(os.path.join(G, "Badehaus 2024/Pictures from the show/Dopamine videoshoot direction meet up before the show.JPG"), (1600, 1067)), lo=6, hi=225), .12), "backstage.jpg", q=80)
+    # the Strategy section's references (Liam 10-21): free-licensed Wikimedia Commons photos, credits in sources/refs/credits.json,
+    # graded to the brand's black and white (an edit, credited as such)
+    for name, c in (("bowie", (0.5, 0.3)), ("cobain", (0.62, 0.45)), ("grohl", (0.38, 0.3)), ("maneskin", (0.5, 0.4))):
+        save(grain(grade(load(os.path.join(SRC, "refs", f"{name}.jpg"), (640, 800), c), lo=6, hi=232, gamma=1.05, contrast=1.12), .12), f"refs/{name}.jpg", q=72)
     # the Doubled moodboard: the video's own doubles (timestamps in seconds)
     for i, t in enumerate((117.5, 150.24, 109.5, 21.26, 194.1, 112.24, 191.24, 21.74, 108.24, 116.5)):
         save(load(frame(t)).resize((1600, 900), Image.LANCZOS), f"doubled/{i + 1:02d}.jpg")
