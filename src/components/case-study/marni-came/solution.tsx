@@ -7,7 +7,7 @@ import { OFF, type DoubledSpec, type MoveName, type MoveState } from "@/lib/marn
 import "./marni-came.css";
 
 const RULES: [MoveName, string, string][] = [
-  ["slice", "Slice", "Bands cut and shifted: the face breaks where the heart does."],
+  ["slice", "Slice", "The frame is cut into bands, each shifted up or down."],
   ["burn", "Burn", "Light eats into the black from one edge. The dark always survives."],
   ["doubled", "Doubled", "Part of the subject repeats, offset and larger, from one moment."],
   ["lens", "Lens", "The centre stays sharp; the edges smear, never evenly."],
