@@ -8,6 +8,9 @@
 /* ------------------------------ Liam's type (Geist 400) ------------------------------ */
 [data-world="marni-came"] .label { font: 400 max(11px, calc(var(--u) * 11))/1.4 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
 [data-world="marni-came"] .title { font-size: calc(var(--u) * 64); line-height: 1; letter-spacing: -.025em; color: var(--ink); }
+/* section names (Problem, Strategy, … Challenges, Impact) as labels, like the hero's "Brand identity" (Liam 10-22): the
+   section's serif headline carries the weight. The hero's own title (h1) stays large. */
+[data-world="marni-came"] h2.title { font: 400 max(11px, calc(var(--u) * 11))/1.4 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); margin-left: 0 !important; }
 [data-world="marni-came"] .body { font-size: max(15px, calc(var(--u) * 17)); line-height: 1.6; color: var(--ink-2); max-width: 52ch; }
 [data-world="marni-came"] .g12 { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: calc(var(--u) * 24); padding: 0 calc(var(--u) * 48); }
 [data-world="marni-came"] .ic { width: calc(var(--u) * 16); height: calc(var(--u) * 16); fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; flex: none; }
@@ -46,7 +49,7 @@
 [data-world="marni-came"] .tools li:not(:last-child)::after { content: ""; position: absolute; right: calc(var(--u) * -12); top: .74em; width: 3px; height: 3px; border-radius: 50%; background: var(--ink-3); }
 /* ------------------------------ the middle's sections ------------------------------ */
 [data-world="marni-came"] .mc-sec { padding: calc(var(--u) * 110) calc(var(--u) * 48) calc(var(--u) * 100); }
-[data-world="marni-came"] .mc-head { display: grid; grid-template-columns: calc(var(--u) * 520) 1fr; align-items: baseline; gap: calc(var(--u) * 40); margin-bottom: calc(var(--u) * 48); }
+[data-world="marni-came"] .mc-head { display: grid; grid-template-columns: calc(var(--u) * 520) 1fr; align-items: baseline; gap: calc(var(--u) * 40); margin-bottom: calc(var(--u) * 20); }
 [data-world="marni-came"] .mc-open { font-size: max(19px, calc(var(--u) * 28)); line-height: 1.25; letter-spacing: -.01em; color: var(--ink); margin-bottom: calc(var(--u) * 18); }
 [data-world="marni-came"] .mc-head .mc-open { margin: 0; }
 /* the one title style (Liam 10-22): each section's headline in the brand's serif capitals, its key words in the title red
@@ -81,7 +84,7 @@
 /* Problem: the split (Liam 10-21, after the Ember page): the words centred on the left half, the crowd filling the right */
 [data-world="marni-came"] .mc-split { display: grid; grid-template-columns: 1fr 1fr; padding: 0; min-height: calc(var(--u) * 900); align-items: center; }
 [data-world="marni-came"] .mc-split-text { padding: calc(var(--u) * 110) calc(var(--u) * 96) calc(var(--u) * 110) calc(var(--u) * 48); }
-[data-world="marni-came"] .mc-split-text .title { margin-bottom: calc(var(--u) * 40); }
+[data-world="marni-came"] .mc-split-text .title { margin-bottom: calc(var(--u) * 20); }
 [data-world="marni-came"] .mc-split-media { position: relative; margin: 0; align-self: stretch; overflow: hidden; }
 [data-world="marni-came"] .mc-split-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 [data-world="marni-came"] .mc-split-media figcaption { position: absolute; left: calc(var(--u) * 20); bottom: calc(var(--u) * 18); color: rgba(238,234,226,.7); }
