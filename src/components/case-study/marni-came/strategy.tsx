@@ -18,12 +18,11 @@ export function MarniCameStrategy({ kind, title }: { kind: "supporting"; title: 
   return (
     <section aria-labelledby={id} data-block={kind} className={`f mc-sec strategy ${marniFonts}`}>
       <div className="mc-head"><h2 id={id} className="title">{title}</h2></div>
-      <p className="label">Mission</p>
-      <p className="mc-mission">Nobody watches<br /> a Marni Came show.<br /> Everyone&rsquo;s in it.</p>
+      <p className="mc-headline mc-mission">Nobody watches<br /> a Marni Came show.<br /> <em className="mc-red">Everyone&rsquo;s in it.</em></p>
       <div className="mc-st-row">
         <div className="mc-st-card">
           <p className="label">Target audience</p>
-          <p className="mc-st-head">Rock fans and players, 18&ndash;35, in Berlin&rsquo;s scene.</p>
+          <p className="mc-open mc-st-head">Rock fans and players, 18&ndash;35, in Berlin&rsquo;s scene.</p>
           <dl className="mc-st-rows">
             <div><dt className="label">They value</dt><dd className="body">Real over polished, and a crowd to belong to.</dd></div>
             <div><dt className="label">They miss</dt><dd className="body">Rock that feels made for them, not for the charts.</dd></div>
@@ -32,7 +31,7 @@ export function MarniCameStrategy({ kind, title }: { kind: "supporting"; title: 
         </div>
         <div className="mc-st-card">
           <p className="label">USP</p>
-          <p className="mc-st-usp">A modern grunge sound that keeps its mistakes, and a show the crowd plays in.</p>
+          <p className="mc-open mc-st-usp">A modern grunge sound that keeps its mistakes, and a show the crowd plays in.</p>
         </div>
       </div>
       <div className="mc-st-block">
@@ -45,7 +44,7 @@ export function MarniCameStrategy({ kind, title }: { kind: "supporting"; title: 
                 <img src={r.src} alt={r.alt} loading="lazy" />
                 <figcaption className="label">{r.href ? <a href={r.href} target="_blank" rel="noreferrer">{r.credit} · edited<span className="sr-only"> (opens in a new tab)</span></a> : <>{r.credit} · edited</>}</figcaption>
               </figure>
-              <p className="mc-st-name">{r.name}</p>
+              <p className="mc-open mc-st-name">{r.name}</p>
               <p className="body">{r.line}</p>
             </li>
           ))}
@@ -53,7 +52,7 @@ export function MarniCameStrategy({ kind, title }: { kind: "supporting"; title: 
       </div>
       <div className="mc-st-block">
         <p className="label">Voice</p>
-        <p className="mc-st-rule">Talk with them, not to them.</p>
+        <p className="mc-open mc-st-rule">Talk with them, not to them.</p>
         <figure className="mc-st-voice-ph">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={MC_ASSETS.backstage} alt="Liam and Imri talking with some of the audience backstage at Badehaus, before the Dopamine video shoot" loading="lazy" />

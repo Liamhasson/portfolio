@@ -4,7 +4,7 @@ import { MC_ASSETS } from "@/lib/marni-came/assets";
 
 const D = MC_ASSETS.doubled;
 const MOVES = [
-  { name: "Burn", src: MC_ASSETS.moves.burn, alt: "Liam half lit in the After Heartbreaks video, the light eating into the black" },
+  { name: "Burn", src: MC_ASSETS.moves.burn, alt: "Liam screaming in the After Heartbreaks video, amber film burn eating in from the left" },
   { name: "Doubled", src: MC_ASSETS.moves.doubled, alt: "The bassist at the After Heartbreaks shoot, his head echoed from the next frame of the same moment" },
   { name: "Lens", src: MC_ASSETS.moves.lens, alt: "The drummer in the After Heartbreaks video, sharp in the middle, the frame's edges smeared" },
   { name: "Blowout", src: MC_ASSETS.moves.blowout, alt: "The bassist in the After Heartbreaks video, the light on his face and the headstock blown out and bleeding", note: "On pictures only, never on type" },
@@ -31,7 +31,8 @@ export function MarniCameImagery({ kind, title }: { kind: "supporting"; title: s
   const id = useId();
   return (
     <section aria-labelledby={id} data-block={kind} className={`f mc-sec imagery ${marniFonts}`}>
-      <div className="mc-head"><h2 id={id} className="title">{title}</h2><p className="mc-open">Real photographs and footage, broken by hand.</p></div>
+      <div className="mc-head"><h2 id={id} className="title">{title}</h2></div>
+      <p className="mc-headline">Real photographs and footage, <em className="mc-red">broken by hand.</em></p>
       <div className="mc-moves">
         {MOVES.map((m) => (
           <figure key={m.name}>

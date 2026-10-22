@@ -23,9 +23,7 @@ export function MarniCameSolution({ kind, title }: { kind: "signature"; title: s
   return (
     <section aria-labelledby={id} data-block={kind} className={`f mc-sec solution ${marniFonts}`}>
       <div className="mc-head"><h2 id={id} className="title">{title}</h2></div>
-      <p className="mc-idea">
-Broken on purpose.
-      </p>
+      <p className="mc-headline mc-idea"><em className="mc-red">Broken</em> on purpose.</p>
       <div className="mc-two mc-pillars">
         <div><p className="label">The sound</p><p className="body">Not overproduced. We kept the mistakes, the inaccuracies and the vocals that aren&rsquo;t pitch perfect, so the record sounds like the room.</p></div>
         <div><p className="label">The crowd</p><p className="body">The audience is part of the band, not its customer.</p></div>
@@ -34,11 +32,14 @@ Broken on purpose.
         <MovesCanvas className="mc-switch-img" src={MC_ASSETS.switchPhoto} alt="Marni Came on stage at Lido, Liam with his arms up and the guitarist in front, with the chosen moves applied" burnSrcs={MC_ASSETS.burns} doubled={FACE} state={moves} />
         <div className="mc-switch-ctl" role="group" aria-label="The four moves">
           <p className="mc-open">The brand is four moves. Try them.</p>
-          {RULES.map(([m, name, rule]) => (
-            <button key={m} type="button" className="mc-move" aria-pressed={moves[m] === 1} onClick={() => setMoves((s) => ({ ...s, [m]: s[m] === 1 ? 0 : 1 }))}>
-              <b>{name}</b><span>{rule}</span>
-            </button>
-          ))}
+          <div className="mc-move-grid">
+            {RULES.map(([m, name, rule]) => (
+              <button key={m} type="button" className="mc-move" aria-pressed={moves[m] === 1} onClick={() => setMoves((s) => ({ ...s, [m]: s[m] === 1 ? 0 : 1 }))}>
+                <span className="mc-move-top"><b>{name}</b><i aria-hidden="true" /></span>
+                <span className="mc-move-rule">{rule}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </section>

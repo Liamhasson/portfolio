@@ -71,9 +71,6 @@ const CSS = `
 .wi .card:hover .media canvas, .wi .card:hover .media img, .wi .card:focus-visible .media canvas, .wi .card:focus-visible .media img { transform:scale(1.035); }
 .wi .card:focus-visible, .wl .card:focus-visible { outline:1px solid var(--ink); outline-offset:6px; border-radius:4px; }
 .wi .tag, .wl .tag { position:absolute; left:1.2cqw; top:1.2cqw; font:500 .85cqw/1 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; color:var(--ink); background:rgba(10,10,11,.72); border-radius:999px; padding:.55cqw .9cqw; }
-.wi .soon, .wl .soon { position:absolute; inset:0; display:grid; place-items:center; letter-spacing:-.02em; color:rgba(244,241,238,.2); }
-.wi .soon { font-size:6.4cqw; }
-.wl .soon { font-size:64px; }
 .wi .meta { display:flex; gap:.9cqw; margin-top:1.3cqw; font:400 .85cqw/1.2 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; color:var(--dim); }
 .wi .meta .n, .wl .meta .n { color:var(--ink); }
 .wi .name { font-size:2.15cqw; font-weight:400; letter-spacing:-.01em; margin:.7cqw 0 0; }
@@ -133,7 +130,6 @@ function Media({ c, playing }: { c: (typeof CARDS)[number]; playing: boolean }) 
     <div className="media">
       {/* eslint-disable-next-line @next/next/no-img-element -- a still inside a transformed layer (no layout shift) */}
       {c.poster && <img src={c.poster} alt="" />}
-      {c.soon && <span className="soon" aria-hidden>Next</span>}
       {c.video && <canvas ref={ref} aria-hidden />}
       {c.progress && <span className="tag">In progress</span>}
     </div>

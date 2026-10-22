@@ -9,7 +9,8 @@ export function MarniCameApplications({ kind, title }: { kind: "supporting"; tit
   const id = useId();
   return (
     <section aria-labelledby={id} data-block={kind} className={`f mc-sec applications ${marniFonts}`}>
-      <div className="mc-head"><h2 id={id} className="title">{title}</h2><p className="mc-open">The same rules, from a single to a stage.</p></div>
+      <div className="mc-head"><h2 id={id} className="title">{title}</h2></div>
+      <p className="mc-headline">The same rules, <em className="mc-red">from a single to a stage.</em></p>
       <div className="mc-apps">
         <figure className="mc-cover">
           {/* eslint-disable-next-line @next/next/no-img-element */}

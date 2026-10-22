@@ -103,7 +103,8 @@ def build(out):
     shoot = os.path.join(G, "12th March photoshoot edits")
     # the four moves
     # (Slice went, Liam 10-22: the video never used it)
-    save(load(face, (1600, 1200), (0.5, 0.45)), "moves/burn.jpg")
+    # (Liam 10-22: the Burn picture is a real burn frame, the video's thumbnail; the face still was a blowout)
+    save(load(os.path.join(SRC, "after-heartbreaks-thumbnail.jpg"), (1600, 1200), (0.55, 0.45)), "moves/burn.jpg")
     a = grade(load(os.path.join(G, "Pictures from After Heartbreaks photoshoot/C0020T01.JPG"), (1600, 1200)), lo=6, hi=170)
     b = grade(load(os.path.join(G, "Pictures from After Heartbreaks photoshoot/C0019T01.JPG"), (1600, 1200)), lo=6, hi=170)
     save(grain(lens(doubled(a, b, (0.18, 0.0, 0.62, 0.62), dx=0.05, dy=-0.01, amt=.95, feather=.06), .34, .8)), "moves/doubled.jpg")
