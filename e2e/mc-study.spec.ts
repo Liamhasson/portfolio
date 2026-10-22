@@ -14,10 +14,10 @@ async function noAddedGlow(page: Page) {
   expect(bad).toEqual([]);
 }
 
-test("the switch: five moves, off at load, each one toggles and changes the picture", async ({ page }) => {
+test("the switch: four moves, off at load, each one toggles and changes the picture", async ({ page }) => {
   await page.goto(URL);
-  const group = page.getByRole("group", { name: "The five moves" });
-  for (const m of ["Slice", "Burn", "Doubled", "Lens", "Blowout"]) await expect(group.getByRole("button", { name: new RegExp(`^${m}`) })).toHaveAttribute("aria-pressed", "false");
+  const group = page.getByRole("group", { name: "The four moves" });
+  for (const m of ["Burn", "Doubled", "Lens", "Blowout"]) await expect(group.getByRole("button", { name: new RegExp(`^${m}`) })).toHaveAttribute("aria-pressed", "false");
   const canvas = page.locator(".mc-switch canvas");
   await canvas.scrollIntoViewIfNeeded();
   await page.waitForTimeout(800);
@@ -106,9 +106,9 @@ test("identity: three logo versions, none of them red; the specimen has no words
   for (const t of await page.locator(".mc-spec-serif, .mc-spec-sans").allInnerTexts()) expect(t.replace(/\s/g, "")).toMatch(/^[A-Z0-9·/—&]+$/);
 });
 
-test("imagery: the five moves with Blowout's note, the moodboard of the video's doubles", async ({ page }) => {
+test("imagery: the four moves with Blowout's note, the moodboard of the video's doubles", async ({ page }) => {
   await page.goto(URL);
-  await expect(page.locator(".mc-moves figure")).toHaveCount(5);
+  await expect(page.locator(".mc-moves figure")).toHaveCount(4);
   await expect(page.locator(".mc-moves")).toContainText("On pictures only, never on type");
   await expect(page.locator(".mc-mood img")).toHaveCount(13);
 });

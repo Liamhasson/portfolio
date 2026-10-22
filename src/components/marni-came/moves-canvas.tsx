@@ -1,16 +1,17 @@
 "use client";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { MOVES_FRAG, MOVES_VERT, OFF, burnBreath, settled, sliceOffsets, stepMoves, type DoubledSpec, type MoveState } from "@/lib/marni-came/moves";
+import { MOVES_FRAG, MOVES_VERT, OFF, burnBreath, settled, stepMoves, type DoubledSpec, type MoveState } from "@/lib/marni-came/moves";
 
 const noop = () => () => {};
 const hasWebGL2 = () => typeof window.WebGL2RenderingContext !== "undefined";
 
-type Props = { src: string; alt: string; burnSrc: string; doubled: DoubledSpec; state: MoveState; seed?: number; className?: string };
+type Props = { src: string; alt: string; burnSrcs: readonly string[]; doubled: DoubledSpec; state: MoveState; className?: string };
 
-/** One archive image with the four moves applied live in WebGL2. Without WebGL2, or once its context is lost, the plain
+/** One archive image with the four moves applied live in WebGL2 (the burn: a different moment of the film-burn footage,
+ *  from burnSrcs, each time it's switched on). Without WebGL2, or once its context is lost, the plain
  *  image stays (data-fallback="true") and the moves simply don't show. Draws only while a move is changing or the burn
  *  is on, and never animates under reduced motion. */
-export function MovesCanvas({ src, alt, burnSrc, doubled, state, seed = 3, className }: Props) {
+export function MovesCanvas({ src, alt, burnSrcs, doubled, state, className }: Props) {
   const supported = useSyncExternalStore(noop, hasWebGL2, () => false);
   const [lost, setLost] = useState(false);
   const ok = supported && !lost;
@@ -19,6 +20,7 @@ export function MovesCanvas({ src, alt, burnSrc, doubled, state, seed = 3, class
   const kick = useRef<() => void>(() => {});
   // (the doubled spec by value, so a parent passing a fresh object each render doesn't rebuild the GL program)
   const dkey = `${doubled.box.join(",")}|${doubled.dx}|${doubled.dy}|${doubled.scale}`;
+  const bkey = burnSrcs.join("|");
 
   useEffect(() => {
     const cv = canvas.current;
@@ -41,16 +43,16 @@ export function MovesCanvas({ src, alt, burnSrc, doubled, state, seed = 3, class
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
     const loc = gl.getAttribLocation(prog, "aPos"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
     const u = (n: string) => gl.getUniformLocation(prog, n);
-    gl.uniform1fv(u("uOffsets"), sliceOffsets(seed));
     gl.uniform4f(u("uBox"), ...doubled.box); gl.uniform2f(u("uD"), doubled.dx, doubled.dy); gl.uniform1f(u("uScale"), doubled.scale);
     gl.uniform1i(u("uImg"), 0); gl.uniform1i(u("uLight"), 1);
 
     const textures: WebGLTexture[] = [];
-    const tex = (unit: number, url: string, onSize?: (w: number, h: number) => void) => new Promise<void>((res) => {
+    const burns: WebGLTexture[] = [];
+    const tex = (unit: number, url: string, onSize?: (w: number, h: number) => void, into?: WebGLTexture[]) => new Promise<void>((res) => {
       const im = new Image();
       im.onload = () => {
         if (gone) { res(); return; }
-        const t = gl.createTexture()!; textures.push(t); gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t);
+        const t = gl.createTexture()!; textures.push(t); into?.push(t); gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, im);
         // (mipmapped: the blowout reads its glow from the blurred levels)
         gl.generateMipmap(gl.TEXTURE_2D);
@@ -63,13 +65,19 @@ export function MovesCanvas({ src, alt, burnSrc, doubled, state, seed = 3, class
     });
 
     const t0 = performance.now();
-    let cur: MoveState = { ...OFF }, raf = 0, last = 0, ready = false, gone = false, seen = true;
+    let cur: MoveState = { ...OFF }, raf = 0, last = 0, ready = false, gone = false, seen = true, burnOn = false;
     const draw = (now: number) => {
       raf = 0;
       if (gone || !ready) return;
       const dt = last ? Math.min(0.1, (now - last) / 1000) : 0; last = now;
       cur = stepMoves(cur, target.current, dt, reduced);
-      gl.uniform1f(u("uSlice"), cur.slice); gl.uniform1f(u("uBurn"), cur.burn); gl.uniform1f(u("uDoubled"), cur.doubled); gl.uniform1f(u("uLens"), cur.lens); gl.uniform1f(u("uBlowout"), cur.blowout);
+      // (switched on: a different burn, flipped at random)
+      if (target.current.burn > 0 && !burnOn && burns.length) {
+        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, burns[Math.floor(Math.random() * burns.length)]);
+        gl.uniform2f(u("uFlip"), Math.random() < 0.5 ? 1 : 0, Math.random() < 0.5 ? 1 : 0);
+      }
+      burnOn = target.current.burn > 0;
+      gl.uniform1f(u("uBurn"), cur.burn); gl.uniform1f(u("uDoubled"), cur.doubled); gl.uniform1f(u("uLens"), cur.lens); gl.uniform1f(u("uBlowout"), cur.blowout);
       gl.uniform1f(u("uBreath"), reduced ? 0.5 : burnBreath((now - t0) / 1000));
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       // (the burn breathes while it's on, but only while the picture is on screen)
@@ -86,7 +94,8 @@ export function MovesCanvas({ src, alt, burnSrc, doubled, state, seed = 3, class
     const ro = new ResizeObserver(size); ro.observe(cv);
     const io = new IntersectionObserver(([e]) => { seen = e.isIntersecting; if (seen) schedule(); });
     io.observe(cv);
-    Promise.all([tex(0, src, (w, h) => gl.uniform2f(u("uImgSize"), w, h)), tex(1, burnSrc)]).then(() => { if (gone) return; ready = true; size(); });
+    gl.uniform2f(u("uFlip"), 0, 0);
+    Promise.all([tex(0, src, (w, h) => gl.uniform2f(u("uImgSize"), w, h)), ...burnSrcs.map((b) => tex(1, b, undefined, burns))]).then(() => { if (gone) return; ready = true; size(); });
     return () => {
       gone = true; ro.disconnect(); io.disconnect(); cancelAnimationFrame(raf); cv.removeEventListener("webglcontextlost", onLost); kick.current = () => {};
       // release everything this context holds (the context itself goes with its canvas; losing it here would break
@@ -94,7 +103,7 @@ export function MovesCanvas({ src, alt, burnSrc, doubled, state, seed = 3, class
       textures.forEach((t) => gl.deleteTexture(t)); gl.deleteBuffer(buf); gl.deleteProgram(prog); gl.deleteShader(vs); gl.deleteShader(fs);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ok, src, burnSrc, seed, dkey]);
+  }, [ok, src, bkey, dkey]);
 
   useEffect(() => { target.current = state; kick.current(); }, [state]);
 
@@ -102,7 +111,7 @@ export function MovesCanvas({ src, alt, burnSrc, doubled, state, seed = 3, class
     <div className={className} data-fallback={ok ? undefined : "true"} style={{ position: "relative" }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={src} alt={ok ? "" : alt} aria-hidden={ok ? true : undefined} style={{ display: "block", width: "100%", height: "100%", objectFit: "cover" }} />
-      {ok && <canvas key={`${src}|${burnSrc}|${seed}|${dkey}`} ref={canvas} role="img" aria-label={alt} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />}
+      {ok && <canvas key={`${src}|${bkey}|${dkey}`} ref={canvas} role="img" aria-label={alt} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />}
     </div>
   );
 }

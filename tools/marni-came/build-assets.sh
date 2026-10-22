@@ -18,19 +18,33 @@ for v in wordmark wordmark-distressed; do
   sed 's/fill="currentColor"/fill="#0A0908"/' "$OUT/logo/$v.svg" > "$OUT/logo/$v-black.svg"
 done
 
-# the hero: Drop Dead live at Lido, the solo then the drummer's view, black and white with a burn that keeps moving (lido.py);
-# the MP4 at CRF 31 keeps the grain under 2 MB
+# the loops, graded with the burn cut from real film-burn footage (lido.py, burnfx.py; Liam 10-22). New names whenever they
+# change: /case-studies and /work are cached for a day. The MP4s at CRF 31 keep the grain under 2 MB.
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
-python3 tools/marni-came/lido.py "$tmp/hero"
-scripts/encode-video.sh "$tmp/hero.mp4" "$OUT/video/hero-lido" 1440 1.5
-n="$(ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=nb_read_frames -of csv=p=0 "$tmp/hero.mp4")"
-ffmpeg -v error -y -i "$tmp/hero.mp4" -c:v libx264 -crf 31 -preset slow -profile:v high -g "$n" -keyint_min "$n" -sc_threshold 0 -pix_fmt yuv420p -movflags +faststart -an "$OUT/video/hero-lido.mp4"
+loop() {   # clip, out, width, poster second
+  python3 tools/marni-came/lido.py "$1" "$tmp/$1"
+  scripts/encode-video.sh "$tmp/$1.mp4" "$2" "$3" "$4"
+  n="$(ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=nb_read_frames -of csv=p=0 "$tmp/$1.mp4")"
+  ffmpeg -v error -y -i "$tmp/$1.mp4" -c:v libx264 -crf 31 -preset slow -profile:v high -g "$n" -keyint_min "$n" -sc_threshold 0 -pix_fmt yuv420p -movflags +faststart -an "$2.mp4"
+}
+loop hero "$OUT/video/hero-burn" 1440 1.5
+loop crowd "$OUT/video/problem-burn" 864 4.5
+# the home page's card: the Lido solo peak (H.264 only, like the other cards)
+python3 tools/marni-came/lido.py card "$tmp/card"
+ffmpeg -v error -y -i "$tmp/card.mp4" -c:v libx264 -profile:v high -pix_fmt yuv420p -b:v 700k -maxrate 950k -bufsize 1900k -preset slow -movflags +faststart -an public/work/marni-came-lido.mp4
+ffmpeg -v error -y -ss 2.6 -i public/work/marni-came-lido.mp4 -frames:v 1 -q:v 3 public/work/marni-came-lido.jpg
 
-# the Problem's half: the crowd during Dopamine at Badehaus, 4:5, graded like the hero (crowd.py)
-python3 tools/marni-came/crowd.py "$tmp/crowd"
-scripts/encode-video.sh "$tmp/crowd.mp4" "$OUT/video/problem-crowd" 864 4.5
-n="$(ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=nb_read_frames -of csv=p=0 "$tmp/crowd.mp4")"
-ffmpeg -v error -y -i "$tmp/crowd.mp4" -c:v libx264 -crf 31 -preset slow -profile:v high -g "$n" -keyint_min "$n" -sc_threshold 0 -pix_fmt yuv420p -movflags +faststart -an "$OUT/video/problem-crowd.mp4"
+# the burn on its own: over the band site's hero (960 × 540) and inside the sound toggle (320 × 88, dense, seed 75)
+python3 - "$OUT/video" <<'PY'
+import sys, subprocess; sys.path.insert(0, "tools/marni-came")
+import burnfx
+for name, size, seed, density in (("burn-loop", (960, 540), 59, 0.75), ("burn-pill", (320, 88), 75, 6.0)):
+    L = burnfx.track(12 if name == "burn-loop" else 10, 25, size, seed, density)
+    enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{size[0]}x{size[1]}", "-r", "25", "-i", "-",
+                            "-c:v", "libx264", "-crf", "26", "-preset", "slow", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-an", f"{sys.argv[1]}/{name}.mp4"], stdin=subprocess.PIPE)
+    for f in L: enc.stdin.write(burnfx.colour(f).tobytes())
+    enc.stdin.close(); enc.wait()
+PY
 
 # release week: the After Heartbreaks loop, and the full video for the lightbox (the Dopamine live video is the playground's)
 scripts/encode-video.sh public/playground/after-heartbreaks-loop.mp4 "$OUT/video/release-loop" 1280 3.0

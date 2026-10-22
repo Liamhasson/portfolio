@@ -7,17 +7,16 @@ import { OFF, type DoubledSpec, type MoveName, type MoveState } from "@/lib/marn
 import "./marni-came.css";
 
 const RULES: [MoveName, string, string][] = [
-  ["slice", "Slice", "The frame is cut into bands, each shifted up or down."],
-  ["burn", "Burn", "Light eats into the black from one edge. The dark always survives."],
-  ["doubled", "Doubled", "Part of the subject repeats, offset and larger, from one moment."],
+  ["burn", "Burn", "Film burn eats into the picture, never the same way twice."],
+  ["doubled", "Doubled", "One subject in the frame repeats, offset and larger, the rest stays single."],
   ["lens", "Lens", "The centre stays sharp; the edges smear, never evenly."],
   ["blowout", "Blowout", "The highlights blow out and bleed light, a hair of colour at the edge."],
 ];
-// the copy grows from Liam, centre stage, and lands up and to the right
-const FACE: DoubledSpec = { box: [0.42, 0.1, 0.7, 0.66], dx: 0.07, dy: -0.04, scale: 1.12 };
+// only Liam doubles (the mask), the band stays single: his copy, a little larger, lands up and to the left
+const FACE: DoubledSpec = { box: [0.4, 0.1, 0.62, 0.9], dx: -0.09, dy: -0.03, scale: 1.1 };
 
 /** Board CS 04 · Solution: the idea in one still line (Liam 10-22: no animation; the switch shows the moves), then the
- *  effects switch, the brand's five moves applied live to the Lido stage photo. */
+ *  effects switch, the brand's four moves applied live to the Lido stage photo. */
 export function MarniCameSolution({ kind, title }: { kind: "signature"; title: string }) {
   const id = useId();
   const [moves, setMoves] = useState<MoveState>(OFF);
@@ -32,9 +31,9 @@ Broken on purpose.
         <div><p className="label">The crowd</p><p className="body">The audience is part of the band, not its customer.</p></div>
       </div>
       <div className="mc-switch">
-        <MovesCanvas className="mc-switch-img" src={MC_ASSETS.switchPhoto} alt="Marni Came on stage at Lido, Liam with his arms up and the guitarist in front, with the chosen moves applied" burnSrc={MC_ASSETS.burnLight} doubled={FACE} state={moves} />
-        <div className="mc-switch-ctl" role="group" aria-label="The five moves">
-          <p className="mc-open">The brand is five moves. Try them.</p>
+        <MovesCanvas className="mc-switch-img" src={MC_ASSETS.switchPhoto} alt="Marni Came on stage at Lido, Liam with his arms up and the guitarist in front, with the chosen moves applied" burnSrcs={MC_ASSETS.burns} doubled={FACE} state={moves} />
+        <div className="mc-switch-ctl" role="group" aria-label="The four moves">
+          <p className="mc-open">The brand is four moves. Try them.</p>
           {RULES.map(([m, name, rule]) => (
             <button key={m} type="button" className="mc-move" aria-pressed={moves[m] === 1} onClick={() => setMoves((s) => ({ ...s, [m]: s[m] === 1 ? 0 : 1 }))}>
               <b>{name}</b><span>{rule}</span>

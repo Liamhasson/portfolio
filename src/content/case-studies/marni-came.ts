@@ -1,6 +1,7 @@
 import type { CaseStudy } from "@/lib/case-studies/types";
 import { STANDARD_BUDGET } from "@/lib/case-studies/budget";
-import { MC_ASSETS } from "@/lib/marni-came/assets";
+
+const R = "/case-studies/marni-came";
 
 /** Copy as approved on the board (docs/prototypes/marni-came-mockups.html, Part 2, Liam 2026-10-20); facts from Liam's BA
  *  ("Finding and Branding My Musical Persona", BIMM Berlin, May 2024) and the band's EPK
@@ -42,7 +43,8 @@ export const marniCame: CaseStudy = {
       "Played Lido, Badehaus twice and the Emergenza semi-finals.",
     ],
   },
-  peek: { src: MC_ASSETS.heroPoster, alt: "Marni Came live at Badehaus, in black and white, amber light burning in from the left", width: 1440, height: 810 },
+  // the Lido solo at its peak: the next-project peek and the share image (Liam, 2026-10-22)
+  peek: { src: `${R}/peek-lido.jpg`, alt: "Liam with his arm up in the spotlight during the guitar solo at Lido, in black and white, film burn from the top left", width: 1440, height: 810 },
   // Brand-book middle (spec §3): about 13.7 screens at 1440×900, plus the Strategy section (~1.7); Liam let the page grow
   // past the old 14.5 cap (2026-10-21).
   screenCap: 16.5,

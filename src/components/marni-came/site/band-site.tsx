@@ -58,7 +58,8 @@ export function BandSite({ className }: { className?: string }) {
 
       <section id="top" className="ms-hero" aria-label="New single">
         <LazyVideo className="rel-video" src={MC_ASSETS.releaseLoop} poster={MC_ASSETS.releasePoster} label="A loop from the After Heartbreaks music video" />
-        <div className="rel-burn" aria-hidden="true" />
+        {/* the burn: film-burn footage moving on its own, screened over the loop (Liam 10-22: never the same twice) */}
+        <LazyVideo className="rel-burn" src={MC_ASSETS.burnLoop} poster={MC_ASSETS.burns[2]} label="" />
         <div className="rel-copy">
           <p className="ms-k">New single · out now</p>
           <h1 className="rel-title">After Heartbreaks</h1>

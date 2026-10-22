@@ -19,17 +19,11 @@
 [data-world="marni-came"] .mc-sound i::after { content: ""; position: absolute; left: 3px; top: 3px; width: 10px; height: 10px; border-radius: 50%; background: var(--bone); transition: transform .2s; }
 [data-world="marni-came"] .mc-sound i[data-on]::after { transform: translateX(14px); }
 [data-world="marni-came"] .mc-sound:focus-visible { outline: 2px solid var(--bone); outline-offset: 3px; }
-/* sound on: the video's amber light breathes across the pill from its left edge, one slow swell every 8.6 s, and drifts a
-   little each time (Liam 10-20: more visible when on; off stays quiet). Captured light, screened in: no added glow. */
+/* sound on: the film burn plays inside the pill (Liam 10-20: more visible when on, off stays quiet; 10-22: real burn
+   footage, never the same twice). Captured light, screened in: no added glow. */
 [data-world="marni-came"] .mc-sound { overflow: hidden; isolation: isolate; }
-[data-world="marni-came"] .mc-sound > * { position: relative; z-index: 1; }
-[data-world="marni-came"] .mc-sound::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0;
-  background: url("/case-studies/marni-came/burn-light.jpg") 0% 50% / 180% auto no-repeat; mix-blend-mode: screen; transition: opacity .35s; }
-[data-world="marni-came"] .mc-sound[aria-pressed="true"]::before { opacity: .55; animation: mc-sound-burn 8.6s ease-in-out infinite; }
-@keyframes mc-sound-burn {
-  0%, 100% { opacity: .38; background-position: 0% 50%; background-size: 170% auto; }
-  50% { opacity: .95; background-position: 28% 40%; background-size: 230% auto; }
-}
+[data-world="marni-came"] .mc-sound > :not(.snd-burn) { position: relative; z-index: 1; }
+[data-world="marni-came"] .mc-sound .snd-burn { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; mix-blend-mode: screen; pointer-events: none; }
 /* ------------------------------ 1 hero ------------------------------ */
 [data-world="marni-came"] .hero { height: calc(var(--u) * 900); }
 [data-world="marni-came"] .mc-hero { position: absolute; inset: 0; }
@@ -117,7 +111,7 @@
 [data-world="marni-came"] .mc-colours .c-black > i { background: var(--black); box-shadow: inset 0 0 0 1px var(--hair-2); }
 [data-world="marni-came"] .mc-colours .c-bone > i { background: var(--bone); }
 [data-world="marni-came"] .mc-colours .c-red > i { background: var(--red); }
-[data-world="marni-came"] .mc-colours .c-burn > i { background: var(--black) url("/case-studies/marni-came/burn-light.jpg") 20% 50% / cover; }
+[data-world="marni-came"] .mc-colours .c-burn > i { background: var(--black) url("/case-studies/marni-came/burn/1.jpg") 50% 50% / cover; }
 [data-world="marni-came"] .mc-type { display: grid; grid-template-columns: 1.2fr 1fr; gap: calc(var(--u) * 40); margin-top: calc(var(--u) * 72); padding-top: calc(var(--u) * 24); border-top: 1px solid var(--hair-2); }
 [data-world="marni-came"] .mc-spec-serif { font: 600 calc(var(--u) * 64)/1 var(--mc-serif); color: var(--bone); margin-top: calc(var(--u) * 14); }
 [data-world="marni-came"] .mc-spec-sans { font: 500 max(15px, calc(var(--u) * 24))/1.5 var(--mc-info); letter-spacing: .06em; color: var(--bone); margin-top: calc(var(--u) * 14); }
@@ -133,7 +127,7 @@
 [data-world="marni-came"] .mc-work .r2 { display: flex; justify-content: space-between; gap: 12px; padding: calc(var(--u) * 10) 0; border-bottom: 1px solid var(--hair-2); }
 [data-world="marni-came"] .mc-work .tk .r2 { border-color: rgba(10,9,8,.16); }
 /* Imagery */
-[data-world="marni-came"] .mc-moves { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: calc(var(--u) * 12); }
+[data-world="marni-came"] .mc-moves { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: calc(var(--u) * 12); }
 [data-world="marni-came"] .mc-moves img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; display: block; }
 [data-world="marni-came"] .mc-moves figcaption { padding-top: calc(var(--u) * 10); display: flex; flex-direction: column; gap: 6px; }
 [data-world="marni-came"] .mc-moves b { font: 600 max(18px, calc(var(--u) * 26))/1 var(--mc-serif); text-transform: uppercase; color: var(--bone); }
@@ -221,7 +215,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   [data-world="marni-came"] .mc-move, [data-world="marni-came"] .mc-sound i::after { transition: none; }
-  [data-world="marni-came"] .mc-sound[aria-pressed="true"]::before { animation: none; opacity: .7; }
+  [data-world="marni-came"] .mc-sound .snd-burn { display: none; }
 }
 
 /* ------------------------------ phones and tablets (< 1100px) ------------------------------ */
@@ -261,10 +255,10 @@
   [data-world="marni-came"] .mc-two, [data-world="marni-came"] .mc-pillars, [data-world="marni-came"] .mc-switch { grid-template-columns: minmax(0, 1fr); gap: calc(var(--u) * 24); }
   [data-world="marni-came"] .mc-idea { font-size: calc(var(--u) * 58); }
   [data-world="marni-came"] .mc-switch { margin-top: calc(var(--u) * 56); }
-  [data-world="marni-came"] .mc-switch-ctl { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+  [data-world="marni-came"] .mc-switch-ctl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
   [data-world="marni-came"] .mc-switch-ctl .mc-open { grid-column: 1 / -1; }
   [data-world="marni-came"] .mc-move { display: block; text-align: center; padding: calc(var(--u) * 10) 0; margin: 0; }
-  [data-world="marni-came"] .mc-move b { font-size: 13px; }
+  [data-world="marni-came"] .mc-move b { font-size: 14px; }
   [data-world="marni-came"] .mc-move span { display: none; }
   [data-world="marni-came"] .mc-logos, [data-world="marni-came"] .mc-type, [data-world="marni-came"] .mc-work, [data-world="marni-came"] .mc-apps { grid-template-columns: minmax(0, 1fr); }
   [data-world="marni-came"] .mc-logos figure { min-height: calc(var(--u) * 200); }

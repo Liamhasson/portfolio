@@ -30,7 +30,7 @@
         0.12964
       ],
       "delay": 0.2,
-      "light": 0.01193
+      "light": 0.01288
     },
     {
       "name": "card1",
@@ -41,7 +41,7 @@
         0.76539
       ],
       "delay": 0.45,
-      "light": 0.43753
+      "light": 0.47224
     },
     {
       "name": "card2",
@@ -52,7 +52,7 @@
         0.76539
       ],
       "delay": 0.5800000000000001,
-      "light": 0.45997
+      "light": 0.49646
     },
     {
       "name": "card3",
@@ -63,7 +63,7 @@
         1.426
       ],
       "delay": 0.71,
-      "light": 0.00476
+      "light": 0.00513
     },
     {
       "name": "card4",
@@ -74,7 +74,7 @@
         1.426
       ],
       "delay": 0.8400000000000001,
-      "light": 0.07824
+      "light": 0.00514
     },
     {
       "name": "card5",
@@ -134,9 +134,9 @@
         0.964,
         1.26858
       ],
-      "src": "/work/marni-came.mp4"
+      "src": "/work/marni-came-lido.mp4"
     }
   ],
-  "background_light": 0.00756,
+  "background_light": 0.00816,
   "bg_linear": 0.0030577432355196332
 }

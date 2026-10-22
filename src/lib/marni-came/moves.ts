@@ -1,13 +1,13 @@
-/** Marni Came's five image moves (spec §3 Solution, §4.4, §5): one renderer shared by the case study's effects switch
- *  and the band site. Each move is an amount from 0 to 1; changes ease over 0.35 s (never a flash) or jump under reduced
- *  motion. */
-export type MoveName = "slice" | "burn" | "doubled" | "lens" | "blowout";
-/** Blowout joined as the fifth (Liam, 2026-10-21). */
-export const MOVES: readonly MoveName[] = ["slice", "burn", "doubled", "lens", "blowout"];
+/** Marni Came's four image moves, the ones the After Heartbreaks video uses (Liam 10-22: Slice wasn't in it, so it went;
+ *  Blowout joined 10-21): one renderer for the case study's effects switch. Each move is an amount from 0 to 1; changes
+ *  ease over 0.35 s (never a flash) or jump under reduced motion. */
+export type MoveName = "burn" | "doubled" | "lens" | "blowout";
+export const MOVES: readonly MoveName[] = ["burn", "doubled", "lens", "blowout"];
 export type MoveState = Record<MoveName, number>;
-export const OFF: MoveState = { slice: 0, burn: 0, doubled: 0, lens: 0, blowout: 0 };
+export const OFF: MoveState = { burn: 0, doubled: 0, lens: 0, blowout: 0 };
 
-/** Doubled's copy: scaled about the centre of a box (x0, y0, x1, y1 as fractions of the image) and offset. */
+/** Doubled: one subject only, the way Liam masks it in Premiere. The box (x0, y0, x1, y1 as fractions of the image) is the
+ *  mask around that subject; its copy is scaled about the box's centre, offset, and screened back over the frame. */
 export interface DoubledSpec { box: readonly [number, number, number, number]; dx: number; dy: number; scale: number }
 
 /** Seconds for a move to go fully on or off. */
@@ -30,13 +30,6 @@ export function settled(a: MoveState, b: MoveState): boolean {
   return MOVES.every((m) => a[m] === b[m]);
 }
 
-/** The slice's band offsets (fractions of the height), the same for the same seed. */
-export function sliceOffsets(seed: number, bands = 5): number[] {
-  let s = (seed * 2654435761) >>> 0;
-  const rand = () => { s = (s + 0x6d2b79f5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-  return Array.from({ length: bands }, (_, i) => (i === 0 ? 0 : (rand() * 2 - 1) * 0.07));
-}
-
 export function burnBreath(tSec: number): number {
   return 0.5 - 0.5 * Math.cos((2 * Math.PI * tSec) / BREATH_SECONDS);
 }
@@ -45,8 +38,8 @@ export const MOVES_VERT = `#version 300 es
 in vec2 aPos; out vec2 vUv;
 void main() { vUv = vec2(aPos.x * 0.5 + 0.5, 0.5 - aPos.y * 0.5); gl_Position = vec4(aPos, 0.0, 1.0); }`;
 
-/** Lens, then slice and doubled, then burn, then blowout, then static grain (Liam, 2026-10-21).
- *  Doubled: the same frame screened back over itself, larger and offset, so only its highlights show.
+/** Lens, then doubled, then burn, then blowout, then static grain (Liam, 2026-10-21 and 10-22).
+ *  Doubled: one subject, masked, its copy offset and larger, screened back over the frame.
  *  Lens: the centre stays sharp; the edges smear, unevenly, some sides more than others (not a fisheye, not a vignette).
  *  Blowout: only the highlights blow out and bleed light around themselves, with a faint RGB split at their edges. Pictures
  *  only, never type. */
@@ -55,8 +48,8 @@ precision highp float;
 in vec2 vUv; out vec4 outColor;
 uniform sampler2D uImg; uniform sampler2D uLight;
 uniform vec2 uRes; uniform vec2 uImgSize;
-uniform float uSlice; uniform float uBurn; uniform float uDoubled; uniform float uLens; uniform float uBlowout; uniform float uBreath;
-uniform float uOffsets[5];
+uniform float uBurn; uniform float uDoubled; uniform float uLens; uniform float uBlowout; uniform float uBreath;
+uniform vec2 uFlip;
 uniform vec4 uBox; uniform vec2 uD; uniform float uScale;
 vec2 cover(vec2 uv) {
   float ra = uRes.x / uRes.y, ia = uImgSize.x / uImgSize.y;
@@ -66,18 +59,17 @@ vec2 cover(vec2 uv) {
 vec3 screenB(vec3 a, vec3 b) { return 1.0 - (1.0 - a) * (1.0 - b); }
 float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
-// slice and doubled, at one point of the screen
+// doubled, at one point of the screen: only the masked subject repeats, offset and larger, screened over the frame
 vec3 base(vec2 v) {
   vec2 uv = cover(v);
-  int band = int(clamp(floor(uv.x * 5.0), 0.0, 4.0));
-  vec2 suv = vec2(uv.x, fract(uv.y + uOffsets[band] * uSlice));
-  vec3 col = texture(uImg, suv).rgb;
-  vec2 c = (uBox.xy + uBox.zw) * 0.5;
-  vec2 duv = (suv - uD - c) / uScale + c;
-  float inside = step(0.0, duv.x) * step(duv.x, 1.0) * step(0.0, duv.y) * step(duv.y, 1.0);
+  vec3 col = texture(uImg, uv).rgb;
+  vec2 c = (uBox.xy + uBox.zw) * 0.5, r = (uBox.zw - uBox.xy) * 0.5;
+  vec2 duv = (uv - uD - c) / uScale + c;
+  // the mask follows the copy: a soft oval around the subject, wherever the copy lands
+  float e = length((duv - c) / r);
+  float m = (1.0 - smoothstep(0.62, 1.0, e)) * step(0.0, duv.x) * step(duv.x, 1.0) * step(0.0, duv.y) * step(duv.y, 1.0);
   vec3 copy = texture(uImg, duv).rgb;
-  copy *= smoothstep(0.3, 0.85, luma(copy)) * inside;
-  return mix(col, screenB(col, copy), uDoubled);
+  return mix(col, screenB(col, copy), m * uDoubled);
 }
 // the highlights of the picture blurred to a mip level (the image is mipmapped): the blowout's smooth bleed
 vec3 hi(vec2 v, float lod) { vec3 c = textureLod(uImg, cover(v), lod).rgb; return c * smoothstep(0.5, 0.9, luma(c)); }
@@ -97,10 +89,11 @@ void main() {
     col += base(vUv + dir * o) * w; wsum += w;
   }
   col /= wsum;
-  float reach = 0.34 + 0.24 * uBreath;
-  float ramp = pow(max(0.0, 1.0 - vUv.x / reach), 1.6);
-  vec3 light = pow(texture(uLight, vUv).rgb, vec3(1.3));
-  col = mix(col, screenB(col, light), ramp * uBurn);
+  // burn: one moment of real film-burn footage (a different one each time it's switched on, flipped at random), drifting
+  // slightly with the breath, screened in
+  vec2 luv = mix(vUv, 1.0 - vUv, uFlip) + (uBreath - 0.5) * 0.03;
+  vec3 light = texture(uLight, clamp(luv, 0.0, 1.0)).rgb;
+  col = screenB(col, light * uBurn * (0.85 + 0.15 * uBreath));
   if (uBlowout > 0.0) {
     // the highlights blow out, then their light spills around them, wider the brighter; red and blue split a hair apart
     vec3 bleed = hi(vUv, 3.0) * 0.35 + hi(vUv, 4.5) * 0.4 + hi(vUv, 6.0) * 0.45;

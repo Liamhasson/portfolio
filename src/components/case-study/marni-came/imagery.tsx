@@ -4,7 +4,6 @@ import { MC_ASSETS } from "@/lib/marni-came/assets";
 
 const D = MC_ASSETS.doubled;
 const MOVES = [
-  { name: "Slice", src: MC_ASSETS.moves.slice, alt: "Liam from the After Heartbreaks video, cut into vertical bands and shifted" },
   { name: "Burn", src: MC_ASSETS.moves.burn, alt: "Liam half lit in the After Heartbreaks video, the light eating into the black" },
   { name: "Doubled", src: MC_ASSETS.moves.doubled, alt: "The bassist at the After Heartbreaks shoot, his head echoed from the next frame of the same moment" },
   { name: "Lens", src: MC_ASSETS.moves.lens, alt: "The drummer in the After Heartbreaks video, sharp in the middle, the frame's edges smeared" },
@@ -27,7 +26,7 @@ const MOOD: { src: string; alt: string; cls?: string }[] = [
   { src: D["10"], alt: "The guitarist with his strap doubled, the video at 1:56" },
 ];
 
-/** Board CS 06 · Imagery: the five moves (Blowout, the picture-only glow, joined 10-21), then Doubled as a moodboard with its rule. */
+/** Board CS 06 · Imagery: the four moves (Blowout, the picture-only glow, joined 10-21), then Doubled as a moodboard with its rule. */
 export function MarniCameImagery({ kind, title }: { kind: "supporting"; title: string }) {
   const id = useId();
   return (

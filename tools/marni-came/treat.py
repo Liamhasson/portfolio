@@ -1,8 +1,8 @@
 """Marni Came's image treatments (board docs/prototypes/marni-came-mockups.html; spec
 docs/superpowers/specs/2026-10-20-marni-came-case-study-design.md §4.3). Pillow only.
 
-The brand grade, grain, the round lens, the burn (pure light from no-subject frames of the After Heartbreaks video,
-screened in from one edge), slice, and doubled (one moment only). `python3 tools/marni-came/treat.py <out_dir>` writes
+The brand grade, grain, the round lens, the burn (cut from real film-burn footage: burnfx.py, Liam 10-22) and doubled
+(one moment only). `python3 tools/marni-came/treat.py <out_dir>` writes
 every still the case study and the band site use.
 
 Sources: MC_ARCHIVE (default ~/Documents/Marni Came), MC_VIDEO (the After Heartbreaks music video), and two stills
@@ -65,16 +65,13 @@ def slices(im, n, shifts):
     return out
 
 
-def burn(im, light, pos=(0.5, 0.5), edge="l", reach=0.5, gamma=1.3):
-    """Screen in pure light from the video, confined to one edge (l, r, t, b), fading over `reach` of the frame."""
-    b = ImageOps.fit(Image.open(light).convert("RGB"), im.size, Image.LANCZOS, centering=pos)
-    b = b.point([int(255 * (v / 255) ** gamma) for v in range(256)] * 3)
-    out = ImageChops.screen(im, b)
-    horiz = edge in "lr"
-    ramp = [int(255 * max(0.0, 1 - (i / 255) / reach) ** 1.6) for i in range(256)]
-    if edge in "rb": ramp = ramp[::-1]
-    m = Image.new("L", (256, 1) if horiz else (1, 256)); m.putdata(ramp)
-    return Image.composite(out, im, m.resize(im.size, Image.BILINEAR))
+def burn(im, light=None, pos=(0.5, 0.5), edge="l", reach=0.5, gamma=1.3, seed=None):
+    """The burn on a still: one moment (or two) of real film-burn footage, placed and turned at random, in the brand's
+    amber, screened in (burnfx.py; Liam 10-22: never the same burn twice). The old arguments only seed the choice now,
+    so each picture keeps its own burn from one build to the next."""
+    import hashlib, burnfx
+    key = seed if seed is not None else int(hashlib.md5(f"{im.size}{pos}{edge}{reach}".encode()).hexdigest()[:8], 16)
+    return burnfx.apply(im, burnfx.still(im.size, key))
 
 
 def doubled(base, other, box, dx=0.0, dy=0.0, scale=1.0, amt=0.9, feather=0.05):
@@ -96,13 +93,16 @@ def build(out):
     os.makedirs(out, exist_ok=True)
     def save(im, name, q=86):
         p = os.path.join(out, name); os.makedirs(os.path.dirname(p), exist_ok=True); im.save(p, quality=q); print(name, im.size)
-    light = frame(62.4)                      # pure amber light, no subject (the video at 1:02)
-    save(load(light, (1280, 720)), "burn-light.jpg")
+    light = None   # (the burn comes from the film-burn footage now: burnfx.py)
+    # the burn as a swatch and as the band site's light: a few moments of the footage in the brand's amber
+    import burnfx
+    for i in range(6):
+        save(burnfx.colour(burnfx.still((1280, 720), 100 + i, layers=1)), f"burn/{i}.jpg", q=82)
     face = os.path.join(SRC, "after-heartbreaks-still-face.jpg")
     lido = os.path.join(G, "Lido pictures BIMM")
     shoot = os.path.join(G, "12th March photoshoot edits")
     # the four moves
-    save(grain(lens(slices(grade(load(frame(161), (1600, 1200)), lo=10, hi=215), 5, [0, -61, 29, -24, 53]), .34, .74)), "moves/slice.jpg")
+    # (Slice went, Liam 10-22: the video never used it)
     save(load(face, (1600, 1200), (0.5, 0.45)), "moves/burn.jpg")
     a = grade(load(os.path.join(G, "Pictures from After Heartbreaks photoshoot/C0020T01.JPG"), (1600, 1200)), lo=6, hi=170)
     b = grade(load(os.path.join(G, "Pictures from After Heartbreaks photoshoot/C0019T01.JPG"), (1600, 1200)), lo=6, hi=170)

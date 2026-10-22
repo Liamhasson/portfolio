@@ -33,7 +33,7 @@ def build(out):
 
     # A3 with bleed (the posters' 1200:1700 is A3's own shape)
     A3 = (px(297 + 2 * BLEED), px(420 + 2 * BLEED))
-    light = frame(62.4)   # pure amber light, no subject (the video at 1:02)
+    light = None   # (the burn comes from the film-burn footage now: burnfx.py)
     lido = os.path.join(G, "Lido pictures BIMM")
     bh23 = os.path.join(G, "Badehaus 2023")
     sources = {
@@ -66,7 +66,7 @@ def build(out):
     tw, th = px(204), px(128)
     tile = Image.new("RGB", (tw, th), (10, 9, 8)); lw = round(tw * 0.69); l = logo.resize((lw, round(lw * logo.height / logo.width)), Image.LANCZOS)
     tile.paste(Image.new("RGB", l.size, (238, 234, 226)), ((tw - lw) // 2, (th - l.height) // 2), l)
-    save(print_grain(burn(tile, frame(62.4), (0, 0.5), "l", .85, 1.0), .12, web_width=1600), "burned.jpg")
+    save(print_grain(burn(tile, None, (0, 0.5), "l", .85, 1.0), .12, web_width=1600), "burned.jpg")
     # the shirt's back: the single's cut faces as one-colour bone ink (alpha from light), fading out at the edges
     from PIL import ImageOps, ImageDraw
     g = ImageOps.autocontrast(ImageOps.grayscale(Image.open(os.path.join(G, "After Heartbreaks/After Heartbreaks cover art design.jpg"))), cutoff=1)

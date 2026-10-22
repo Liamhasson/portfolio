@@ -3,8 +3,8 @@ const R = "/case-studies/marni-came";
 
 export const MC_ASSETS = {
   /** Drop Dead live at Lido: the solo, then the drummer's view (Liam, 2026-10-20). */
-  heroLoop: `${R}/video/hero-lido.mp4`,
-  heroPoster: `${R}/video/hero-lido.jpg`,
+  heroLoop: `${R}/video/hero-burn.mp4`,
+  heroPoster: `${R}/video/hero-burn.jpg`,
   releaseLoop: `${R}/video/release-loop.mp4`,
   releasePoster: `${R}/video/release-loop.jpg`,
   releaseVideo: `${R}/video/after-heartbreaks.mp4`,
@@ -22,12 +22,17 @@ export const MC_ASSETS = {
   /** The crowd shirt's back: the cut faces and the chorus (docs/marni-came/print/shirt-back.png on black). */
   shirtBack: `${R}/merch/shirt-back.jpg`,
   posters: { lido: `${R}/posters/lido.jpg`, badehaus24: `${R}/posters/badehaus-2024.jpg`, badehaus23: `${R}/posters/badehaus-2023.jpg`, endOfTerm: `${R}/posters/end-of-term.jpg` },
-  moves: { slice: `${R}/moves/slice.jpg`, burn: `${R}/moves/burn.jpg`, doubled: `${R}/moves/doubled.jpg`, lens: `${R}/moves/lens.jpg`, blowout: `${R}/moves/blowout.jpg` },
+  moves: { burn: `${R}/moves/burn.jpg`, doubled: `${R}/moves/doubled.jpg`, lens: `${R}/moves/lens.jpg`, blowout: `${R}/moves/blowout.jpg` },
   switchPhoto: `${R}/switch.jpg`,
-  burnLight: `${R}/burn-light.jpg`,
+  /** Moments of the film-burn footage in the brand's amber (burnfx.py), for the switch's Burn and the Burn swatch. */
+  burns: [0, 1, 2, 3, 4, 5].map((i) => `${R}/burn/${i}.jpg`),
+  /** The burn moving on its own, screened over the band site's hero and the sound toggle. */
+  burnLoop: `${R}/video/burn-loop.mp4`,
+  /** A denser burn for the small sound toggle (its gaps are short, so 'on' always shows). */
+  burnPill: `${R}/video/burn-pill.mp4`,
   /** The crowd during Dopamine at Badehaus, 4:5, for the Problem's half (Liam, 2026-10-21). */
-  problemLoop: `${R}/video/problem-crowd.mp4`,
-  problemPoster: `${R}/video/problem-crowd.jpg`,
+  problemLoop: `${R}/video/problem-burn.mp4`,
+  problemPoster: `${R}/video/problem-burn.jpg`,
   fanPhoto: `${R}/fan-lido.jpg`,
   glowAllowed: `${R}/glow-allowed.jpg`,
   /** The four of you in 'b&w clothes 2': Pedro, Sami, Liam, Rikki, left to right. */
