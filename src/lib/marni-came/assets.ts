@@ -41,6 +41,8 @@ export const MC_ASSETS = {
   bandGroup: `${R}/band/group.jpg`,
   /** The Strategy section's references: Wikimedia Commons photos, graded (credits in tools/marni-came/sources/refs). */
   refs: { bowie: `${R}/refs/bowie.jpg`, cobain: `${R}/refs/cobain.jpg`, grohl: `${R}/refs/grohl.jpg`, maneskin: `${R}/refs/maneskin.jpg` },
+  /** Liam handing a beer to the crowd mid-song, for the USP (Liam, 2026-10-25). */
+  cheers: `${R}/cheers.jpg`,
   /** The meet-up before Badehaus 2024, for the moodboard. */
   backstage: `${R}/backstage.jpg`,
   /** The video's own doubles, by file; the moodboard's order and credits live with the component. */

@@ -32,6 +32,10 @@ export function MarniCameStrategy({ kind, title }: { kind: "supporting"; title: 
         <div className="mc-st-card">
           <p className="label">USP</p>
           <p className="mc-open mc-st-usp">A modern grunge sound that keeps its mistakes, and a show the crowd plays in.</p>
+          <figure className="mc-st-usp-ph">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={MC_ASSETS.cheers} alt="Liam mid-song at Badehaus, reaching from the stage to clink his beer with someone's glass in the crowd" loading="lazy" />
+          </figure>
         </div>
       </div>
       <div className="mc-st-block">

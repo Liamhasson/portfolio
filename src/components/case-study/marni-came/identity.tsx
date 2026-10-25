@@ -6,7 +6,7 @@ const COLOURS = [
   { name: "Blackout", hex: "0A0908", share: 6.5, cls: "c-black" },
   { name: "Bone", hex: "EEEAE2", share: 2.2, cls: "c-bone" },
   { name: "Red", hex: "EC1302", share: 0.6, cls: "c-red" },
-  { name: "Burn", hex: "Screen", share: 1.4, cls: "c-burn" },
+  { name: "Burn", hex: "Screen blend mode", share: 1.4, cls: "c-burn" },
 ] as const;
 
 /** Board CS 05 · Identity: the mark (master, burned, print, and at 64 px), the colours in proportion, the type, and the

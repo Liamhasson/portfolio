@@ -77,7 +77,7 @@ test("every colour shows its name and code the same way, fitting its column down
     await page.setViewportSize({ width, height: 844 });
     await page.goto(URL);
     const cols = page.locator(".mc-colours li");
-    await expect(cols.locator("span")).toHaveText(["0A0908", "EEEAE2", "EC1302", "Screen"]);
+    await expect(cols.locator("span")).toHaveText(["0A0908", "EEEAE2", "EC1302", "Screen blend mode"]);
     for (const el of await cols.locator("b, span").all()) await expect(el).toBeVisible();
     const clipped = await cols.evaluateAll((lis) =>
       lis.filter((li) => [...li.querySelectorAll("b, span")].some((t) => t.getBoundingClientRect().right > li.getBoundingClientRect().right + 1)).map((li) => li.textContent));
@@ -120,11 +120,19 @@ test("identity: three logo versions, none of them red; the specimen has no words
   for (const t of await page.locator(".mc-spec-serif, .mc-spec-sans").allInnerTexts()) expect(t.replace(/\s/g, "")).toMatch(/^[A-Z0-9·/—&]+$/);
 });
 
-test("imagery: the four moves with Blowout's note, the moodboard of the video's doubles", async ({ page }) => {
+test("imagery: twelve pictures at most, every move among them, each tagged (Liam, 2026-10-25)", async ({ page }) => {
   await page.goto(URL);
-  await expect(page.locator(".mc-moves figure")).toHaveCount(4);
-  await expect(page.locator(".mc-moves")).toContainText("On pictures only, never on type");
-  await expect(page.locator(".mc-mood img")).toHaveCount(13);
+  const figs = page.locator(".mc-grid figure");
+  expect(await figs.count()).toBeLessThanOrEqual(12);
+  const tags = new Set(await page.locator(".mc-grid figcaption").allInnerTexts());
+  for (const m of ["BURN", "DOUBLED", "LENS", "BLOWOUT"]) expect([...tags].map((t) => t.toUpperCase())).toContain(m);
+  await expect(page.locator("section.imagery")).toContainText("never on type");
+});
+
+test("pictures have rounded corners; the edge-to-edge hero stays square", async ({ page }) => {
+  await page.goto(URL);
+  expect(await page.locator(".mc-grid figure").first().evaluate((el) => parseFloat(getComputedStyle(el).borderTopLeftRadius))).toBeGreaterThan(0);
+  expect(await page.locator(".mc-hero-video").evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe("0px");
 });
 
 test("applications: the cover and four posters, dated exactly as the files prove", async ({ page }) => {

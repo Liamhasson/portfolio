@@ -148,6 +148,15 @@
 [data-world="marni-came"] .mc-moves img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; display: block; }
 [data-world="marni-came"] .mc-moves figcaption { padding-top: calc(var(--u) * 10); display: flex; flex-direction: column; gap: 6px; }
 [data-world="marni-came"] .mc-moves b { font: 600 max(18px, calc(var(--u) * 26))/1 var(--mc-serif); text-transform: uppercase; color: var(--bone); }
+/* Imagery: one bento of the twelve strongest pictures, each tagged with its move (Liam 10-25) */
+[data-world="marni-came"] .mc-grid { display: grid; grid-auto-flow: row dense; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: calc(var(--u) * 230); gap: calc(var(--u) * 10); }
+[data-world="marni-came"] .mc-grid figure { position: relative; margin: 0; overflow: hidden; }
+[data-world="marni-came"] .mc-grid img { display: block; width: 100%; height: 100%; object-fit: cover; }
+[data-world="marni-came"] .mc-grid .w2 { grid-column: span 2; }
+[data-world="marni-came"] .mc-grid .h2 { grid-row: span 2; }
+[data-world="marni-came"] .mc-grid figcaption { position: absolute; left: 10px; bottom: 9px; padding: 4px 8px; border-radius: 999px; background: rgba(10,9,8,.72); color: var(--bone); }
+[data-world="marni-came"] .mc-st-usp-ph { margin: calc(var(--u) * 24) 0 0; }
+[data-world="marni-came"] .mc-st-usp-ph img { display: block; width: 100%; aspect-ratio: 3 / 2; object-fit: cover; }
 [data-world="marni-came"] .mc-burned { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(var(--u) * 8); margin-top: calc(var(--u) * 48); }
 [data-world="marni-came"] .mc-burned img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
 [data-world="marni-came"] .mc-mood { display: grid; grid-auto-flow: row dense; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: calc(var(--u) * 200); gap: calc(var(--u) * 8); margin-top: calc(var(--u) * 48); }
@@ -282,6 +291,7 @@
   [data-world="marni-came"] .mc-spec-serif { font-size: calc(var(--u) * 34); }
   [data-world="marni-came"] .mc-moves { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   [data-world="marni-came"] .mc-burned { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  [data-world="marni-came"] .mc-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-auto-rows: calc(var(--u) * 140); }
   [data-world="marni-came"] .mc-mood { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-auto-rows: calc(var(--u) * 130); }
   [data-world="marni-came"] .mc-app-posters { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   [data-world="marni-came"] .mc-collage { height: auto; display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--u) * 8); }
@@ -301,3 +311,11 @@
   [data-world="marni-came"] .pu-line { margin-top: calc(var(--u) * 16); }
   [data-world="marni-came"] .pu-phone { position: relative; left: auto; top: auto; width: calc(var(--u) * 200); margin: calc(var(--u) * 28) auto 0; }
 }
+
+/* rounded corners on every picture and video (Liam 10-25: sharp corners are hard on the eye). The hero and the Problem's
+   video run to the screen's edges, so they stay square. */
+[data-world="marni-came"] :is(img, video, canvas) { border-radius: 10px; }
+[data-world="marni-came"] :is(.mc-switch-img, .mc-grid figure, .mc-logos > figure, .mc-cover, .mc-poster, .mc-collage figure, .mc-site, .mc-work .wk) { border-radius: 10px; }
+[data-world="marni-came"] :is(.mc-switch-img, .mc-grid figure, .mc-logos > figure, .mc-cover, .mc-poster, .mc-site) { overflow: hidden; }
+[data-world="marni-came"] :is(.mc-hero, .mc-split-media) :is(img, video) { border-radius: 0; }
+[data-world="marni-came"] :is(.mc-poster, .mc-cover, .mc-logos > figure, .mc-grid figure) img { border-radius: 0; }
