@@ -29,8 +29,13 @@ export function MarniCameApplications({ kind, title }: { kind: "supporting"; tit
         </figure>
         <figure className="a2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={MC_ASSETS.shirtsWorn} alt="Two people in the crowd shirts: one wears the small Marni Came wordmark, the other the single's cut faces, in black and white" loading="lazy" />
-          <figcaption className="label">Crowd shirts · wordmark and faces</figcaption>
+          <img src={MC_ASSETS.shirtFaces} alt="The crowd shirt with the single's cut faces printed large, worn with a white long-sleeve underneath" loading="lazy" />
+          <figcaption className="label">Crowd shirt · faces</figcaption>
+        </figure>
+        <figure className="a3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={MC_ASSETS.shirtWordmark} alt="The crowd shirt with the small Marni Came wordmark on the chest" loading="lazy" />
+          <figcaption className="label">Crowd shirt · wordmark</figcaption>
         </figure>
       </div>
     </section>

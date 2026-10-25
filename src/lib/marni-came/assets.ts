@@ -19,10 +19,9 @@ export const MC_ASSETS = {
   wordmarkDistressedBone: `${R}/logo/wordmark-distressed-bone.svg`,
   logoBurned: `${R}/logo/burned.jpg`,
   cover: `${R}/cover-after-heartbreaks.jpg`,
-  /** The crowd shirt's back: the cut faces and the chorus (docs/marni-came/print/shirt-back.png on black). */
-  shirtBack: `${R}/merch/shirt-back.jpg`,
-  /** The shirt photographed: both prints worn (Liam's shoot, 2026-10-25). */
-  shirtsWorn: `${R}/merch/shirts-worn.jpg`,
+  /** The crowd shirts as photographed (Liam's shoot, 2026-10-25): the faces print and the wordmark print. */
+  shirtFaces: `${R}/merch/shirt-faces.jpg`,
+  shirtWordmark: `${R}/merch/shirt-wordmark.jpg`,
   posters: { lido: `${R}/posters/lido.jpg`, badehaus24: `${R}/posters/badehaus-2024.jpg`, badehaus23: `${R}/posters/badehaus-2023.jpg`, endOfTerm: `${R}/posters/end-of-term.jpg` },
   moves: { burn: `${R}/moves/burn.jpg`, doubled: `${R}/moves/doubled.jpg`, lens: `${R}/moves/lens.jpg`, blowout: `${R}/moves/blowout.jpg` },
   switchPhoto: `${R}/switch.jpg`,

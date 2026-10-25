@@ -152,14 +152,13 @@ def build(out):
     keep = Image.new("L", (W, H), 255); ImageDraw.Draw(keep).ellipse((int(W * .28), int(H * .42), int(W * .62), int(H * .82)), fill=110)
     L = ImageChops.multiply(L, keep.filter(ImageFilter.GaussianBlur(120)))
     save(grain(burnfx.apply(im, L), .12).resize((1100, 733), Image.LANCZOS), "cheers.jpg", q=74)
-    # the merch: Liam's shot of the two prints worn (10-25), graded to black and white, a stage vignette, a burn from the top
-    src = load(os.path.join(SRC, "merch-shirts.webp")); W, H = src.size
-    g = grade(src, lo=6, hi=255, gamma=1.22, contrast=1.12)
-    vig = Image.new("L", (W, H), 0); ImageDraw.Draw(vig).ellipse((-W * .15, 0, W * 1.15, H * 1.1), fill=255)
-    g = Image.composite(g, ImageEnhance.Brightness(g).enhance(0.55), vig.filter(ImageFilter.GaussianBlur(220)))
-    top = Image.new("L", (1, 256)); top.putdata([int(255 * max(0, 1 - i / 255 / 0.55) ** 1.8) for i in range(256)])
-    L = ImageChops.multiply(burnfx.still((W, H), 602, layers=2, wash=0).filter(ImageFilter.GaussianBlur(60)), top.resize((W, H)))
-    save(grain(burnfx.apply(g, L), .12).resize((1000, 1500), Image.LANCZOS), "merch/shirts-worn.jpg", q=78)
+    # the merch: Liam's two shirt shots (10-25), each print on its own, black and white with a stage vignette, no burn
+    for name in ("faces", "wordmark"):
+        src = load(os.path.join(SRC, f"merch-{name}.webp")); W, H = src.size
+        g = grade(src, lo=6, hi=255, gamma=1.22, contrast=1.12)
+        vig = Image.new("L", (W, H), 0); ImageDraw.Draw(vig).ellipse((-W * .15, -H * .1, W * 1.15, H * 1.1), fill=255)
+        g = Image.composite(g, ImageEnhance.Brightness(g).enhance(0.55), vig.filter(ImageFilter.GaussianBlur(220)))
+        g = grain(g, .12); save(g.resize((1100, round(1100 * H / W)), Image.LANCZOS), f"merch/shirt-{name}.jpg", q=76)
     # the Doubled moodboard: the video's own doubles (timestamps in seconds)
     for i, t in enumerate((117.5, 150.24, 109.5, 21.26, 194.1, 112.24, 191.24, 21.74, 108.24, 116.5)):
         save(load(frame(t)).resize((1600, 900), Image.LANCZOS), f"doubled/{i + 1:02d}.jpg")

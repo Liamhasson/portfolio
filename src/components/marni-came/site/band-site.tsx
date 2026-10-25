@@ -97,8 +97,13 @@ export function BandSite({ className }: { className?: string }) {
         <div className="ms-merch">
           <figure className="ms-art ms-shirt">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={MC_ASSETS.shirtsWorn} alt="Two people in the crowd shirts: one wears the small Marni Came wordmark, the other the single's cut faces" className="ms-fill" />
-            <figcaption className="ms-k">Crowd shirts</figcaption>
+            <img src={MC_ASSETS.shirtFaces} alt="The crowd shirt with the single's cut faces printed large" className="ms-fill" />
+            <figcaption className="ms-k">Crowd shirt · faces</figcaption>
+          </figure>
+          <figure className="ms-art ms-shirt">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={MC_ASSETS.shirtWordmark} alt="The crowd shirt with the small Marni Came wordmark on the chest" className="ms-fill" />
+            <figcaption className="ms-k">Crowd shirt · wordmark</figcaption>
           </figure>
           <figure className="ms-art">
             {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -182,7 +182,7 @@ test.describe("applications on a 390 px phone", () => {
   test("the collage stacks: every piece at least half the column wide", async ({ page }) => {
     await page.goto(URL);
     const widths = await page.locator(".mc-collage figure").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().width));
-    expect(widths.length).toBe(2);   // the flag and the shirt (the wheatpaste went, Liam 2026-10-21)
+    expect(widths.length).toBe(3);   // the flag and the two shirts (Liam 2026-10-25)
     for (const w of widths) expect(w).toBeGreaterThan(150);
   });
 });

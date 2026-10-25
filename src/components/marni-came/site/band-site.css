@@ -78,12 +78,13 @@
 .ms-list i, .ms-list time { font-style: normal; color: var(--ash); }
 .ms-list em { display: block; font-style: normal; color: var(--ash); }
 .ms-posters { display: grid; grid-template-columns: repeat(4, 1fr); gap: max(8px, calc(var(--u) * 10)); }
-.ms-merch { display: grid; grid-template-columns: 1fr 1fr; gap: max(10px, calc(var(--u) * 16)); }
+.ms-merch { display: grid; grid-template-columns: 1fr 1fr 1.6fr; gap: max(10px, calc(var(--u) * 16)); }
+.ms-merch .ms-art { aspect-ratio: auto; height: max(220px, calc(var(--u) * 400)); }
 .ms-art { position: relative; margin: 0; aspect-ratio: 16 / 10; background: #141210; display: grid; place-items: center; overflow: hidden; }
 .ms-art > img { width: 46%; }
-.ms-shirt > img.ms-fill { object-position: 50% 30%; }
+.ms-shirt > img.ms-fill { object-position: 50% 40%; }
 .ms-art > img.ms-fill { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.ms-art figcaption { position: absolute; left: 16px; bottom: 14px; z-index: 1; }
+.ms-art figcaption { position: absolute; left: 12px; bottom: 12px; z-index: 1; padding: 5px 9px; border-radius: 999px; background: rgba(10,9,8,.72); color: var(--bone); }
 .ms-group { margin: 0; }
 .ms-group img { display: block; width: 100%; height: auto; }
 .ms-names { position: relative; height: max(36px, calc(var(--u) * 52)); }
@@ -122,7 +123,10 @@
   .rel-buttons { flex-direction: column; align-items: center; }
   .ms-track { grid-template-columns: 44px minmax(0, 1fr) auto; grid-template-areas: "play meta time" "wave wave wave"; row-gap: 12px; }
   .ms-play { grid-area: play; } .ms-tmeta { grid-area: meta; } .ms-time { grid-area: time; } .ms-wave { grid-area: wave; }
-  .ms-videos, .ms-shows, .ms-merch { grid-template-columns: 1fr; }
+  .ms-videos, .ms-shows { grid-template-columns: 1fr; }
+  .ms-merch { grid-template-columns: 1fr 1fr; }
+  .ms-merch .ms-art:last-child { grid-column: 1 / -1; }
+  .ms-merch .ms-shirt { height: auto; aspect-ratio: 1; }
   .ms-posters { grid-template-columns: 1fr 1fr; }
 }
 @media (prefers-reduced-motion: reduce) {
