@@ -168,23 +168,26 @@
 [data-world="marni-came"] .mc-mood .h2 { grid-row: span 2; }
 [data-world="marni-came"] .mc-rule { margin-top: calc(var(--u) * 24); max-width: 70ch; }
 /* Applications */
-[data-world="marni-came"] .mc-apps { display: grid; grid-template-columns: 1fr 1.6fr; gap: calc(var(--u) * 16); }
 [data-world="marni-came"] .mc-cover { position: relative; aspect-ratio: 1; overflow: hidden; container-type: inline-size; }
 [data-world="marni-came"] .mc-cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 [data-world="marni-came"] .mc-cover .by { position: absolute; left: 0; right: 0; top: 6.5%; text-align: center; font: 500 2.4cqw/1 var(--mc-info); letter-spacing: .34em; text-transform: uppercase; color: var(--bone); }
 [data-world="marni-came"] .mc-cover .t { position: absolute; left: 0; right: 0; bottom: 9%; text-align: center; white-space: nowrap; font: 600 7.4cqw/1 var(--mc-serif); letter-spacing: .04em; text-transform: uppercase; color: var(--bone); }
 [data-world="marni-came"] .mc-cover .cr { position: absolute; left: 0; right: 0; bottom: 5%; text-align: center; font: 500 1.6cqw/1 var(--mc-info); letter-spacing: .24em; text-transform: uppercase; color: var(--ash); }
 [data-world="marni-came"] .mc-app-posters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: calc(var(--u) * 10); align-content: start; }
-[data-world="marni-came"] .mc-collage { position: relative; height: calc(var(--u) * 420); margin-top: calc(var(--u) * 32); }
+[data-world="marni-came"] .mc-collage { position: relative; height: calc(var(--u) * 420); margin: calc(var(--u) * 40) 0 36px; }
 [data-world="marni-came"] .mc-collage figure { position: absolute; background: var(--panel); overflow: hidden; display: grid; place-items: center; }
-[data-world="marni-came"] .mc-collage img { width: 100%; height: 100%; object-fit: cover; }
-[data-world="marni-came"] .mc-collage figcaption { position: absolute; left: 10px; bottom: 9px; padding: 4px 8px; border-radius: 999px; background: rgba(10,9,8,.72); color: var(--bone); }
-[data-world="marni-came"] .mc-collage .a1 { left: 0; top: 24px; width: 50%; height: 82%; transform: rotate(-1.5deg); }
+/* (absolute, so the picture takes the tile's size and not its own: a grid item's 100% height doesn't hold, and the flag overflowed) */
+[data-world="marni-came"] .mc-collage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* (the labels sit under the tiles: "Shirt · After Heartbreaks release" is wider than a pill over a shirt's tile on most screens; under it, it wraps if it must) */
+[data-world="marni-came"] .mc-collage :is(.a1, .a2, .a3) { overflow: visible; }
+[data-world="marni-came"] .mc-collage figcaption { position: absolute; left: 0; right: 0; top: calc(100% + 8px); color: var(--bone); }
+[data-world="marni-came"] .mc-collage .a0 { left: 0; top: 8%; width: 22.5%; height: auto; aspect-ratio: 1; transform: rotate(1deg); }
+[data-world="marni-came"] .mc-collage .a1 { left: 24%; top: 14%; width: 32%; height: 66%; transform: rotate(-1.5deg); }
 /* the flag is shown whole, on its own tile colour (merch/stage-flag.jpg is set on #141210) */
 [data-world="marni-came"] .mc-collage .a1 { background: #141210; }
 [data-world="marni-came"] .mc-collage .a1 img { object-fit: contain; }
-[data-world="marni-came"] .mc-collage .a2 { left: 52.5%; top: 0; width: 23%; height: 78%; transform: rotate(1.2deg); }
-[data-world="marni-came"] .mc-collage .a3 { left: 77%; top: 18%; width: 23%; height: 78%; transform: rotate(-1deg); }
+[data-world="marni-came"] .mc-collage .a2 { left: 57.5%; top: 0; width: 20%; height: 80%; transform: rotate(1.2deg); }
+[data-world="marni-came"] .mc-collage .a3 { left: 79%; top: 16%; width: 20%; height: 80%; transform: rotate(-1deg); }
 /* Website */
 [data-world="marni-came"] .mc-site { border: 1px solid var(--hair-2); }
 [data-world="marni-came"] .mc-site .bar { display: flex; align-items: center; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--hair-2); }
@@ -253,6 +256,22 @@
 }
 
 /* ------------------------------ phones and tablets (< 1100px) ------------------------------ */
+/* Liam 10-25: the imagery and the references float like the shirts in the collage, a slight tilt and lift each (desktop only,
+   as the collage lies flat on phones) */
+@media (min-width: 901px) {
+  [data-world="marni-came"] .mc-grid { gap: calc(var(--u) * 20); }
+  [data-world="marni-came"] .mc-grid figure:nth-child(5n + 1) { transform: rotate(-1.2deg); }
+  [data-world="marni-came"] .mc-grid figure:nth-child(5n + 2) { transform: rotate(0.9deg) translateY(calc(var(--u) * -6)); }
+  [data-world="marni-came"] .mc-grid figure:nth-child(5n + 3) { transform: rotate(-0.7deg) translateY(calc(var(--u) * 5)); }
+  [data-world="marni-came"] .mc-grid figure:nth-child(5n + 4) { transform: rotate(1.1deg) translateY(calc(var(--u) * -3)); }
+  [data-world="marni-came"] .mc-grid figure:nth-child(5n + 5) { transform: rotate(-0.9deg) translateY(calc(var(--u) * 4)); }
+  [data-world="marni-came"] .mc-st-refs { margin-top: calc(var(--u) * 30); }
+  [data-world="marni-came"] .mc-st-refs li:nth-child(4n + 1) figure { transform: rotate(-1.5deg); }
+  [data-world="marni-came"] .mc-st-refs li:nth-child(4n + 2) figure { transform: rotate(1.2deg) translateY(calc(var(--u) * -12)); }
+  [data-world="marni-came"] .mc-st-refs li:nth-child(4n + 3) figure { transform: rotate(-1deg) translateY(calc(var(--u) * -4)); }
+  [data-world="marni-came"] .mc-st-refs li:nth-child(4n + 4) figure { transform: rotate(1deg) translateY(calc(var(--u) * -16)); }
+}
+
 @media (max-width: 900px) {
   /* phones: the burger takes the top right; the sound control sits at the bottom, clear of the text column */
   [data-world="marni-came"] .mc-sound { top: auto; bottom: 16px; right: 16px; }
@@ -290,7 +309,7 @@
   [data-world="marni-came"] .mc-move { min-height: 0; padding: 14px; }
   [data-world="marni-came"] .mc-move b { font-size: 17px; }
   [data-world="marni-came"] .mc-move-rule { font-size: 13px; }
-  [data-world="marni-came"] .mc-logos, [data-world="marni-came"] .mc-type, [data-world="marni-came"] .mc-work, [data-world="marni-came"] .mc-apps { grid-template-columns: minmax(0, 1fr); }
+  [data-world="marni-came"] .mc-logos, [data-world="marni-came"] .mc-type, [data-world="marni-came"] .mc-work { grid-template-columns: minmax(0, 1fr); }
   [data-world="marni-came"] .mc-logos figure { min-height: calc(var(--u) * 200); }
   [data-world="marni-came"] .mc-colours li > i { height: calc(var(--u) * 90); }
   [data-world="marni-came"] .mc-spec-serif { font-size: calc(var(--u) * 34); }
@@ -300,12 +319,12 @@
   [data-world="marni-came"] .mc-mood { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-auto-rows: calc(var(--u) * 130); }
   [data-world="marni-came"] .mc-app-posters { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   [data-world="marni-came"] .mc-collage { height: auto; display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--u) * 8); }
-  [data-world="marni-came"] .mc-collage :is(.a1, .a2, .a3) { position: relative; left: auto; top: auto; width: auto; height: auto; aspect-ratio: 4 / 5; transform: none; }
+  [data-world="marni-came"] .mc-collage :is(.a0, .a1, .a2, .a3) { position: relative; left: auto; top: auto; width: auto; height: auto; aspect-ratio: 4 / 5; transform: none; }
+  [data-world="marni-came"] .mc-collage .a0.a0 { grid-column: 1 / -1; aspect-ratio: 1; }
   [data-world="marni-came"] .mc-collage .a1.a1 { grid-column: 1 / -1; aspect-ratio: 16 / 10; }
   [data-world="marni-came"] .mc-collage :is(.a2, .a3) { aspect-ratio: 1; }
-  /* (the shirts' names are too long for a pill over a half-width tile: on phones they sit under it) */
-  [data-world="marni-came"] .mc-collage :is(.a2, .a3) { overflow: visible; margin-bottom: 44px; }
-  [data-world="marni-came"] .mc-collage :is(.a2, .a3) figcaption { top: calc(100% + 8px); bottom: auto; left: 0; padding: 0; background: none; }
+  [data-world="marni-came"] .mc-collage { margin-bottom: 0; }
+  [data-world="marni-came"] .mc-collage :is(.a1, .a2, .a3) { margin-bottom: 44px; }
   [data-world="marni-came"] .chal { grid-template-columns: minmax(0, 1fr); padding: calc(var(--u) * 56) 0; }
   [data-world="marni-came"] .chs { margin: calc(var(--u) * 24) calc(var(--u) * 16) 0; }
   [data-world="marni-came"] .mc-crowd { grid-column: 1; grid-row: auto; margin: calc(var(--u) * 24) calc(var(--u) * 16) 0; }

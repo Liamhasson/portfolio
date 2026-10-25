@@ -135,11 +135,21 @@ test("pictures have rounded corners; the edge-to-edge hero stays square", async 
   expect(await page.locator(".mc-hero-video").evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe("0px");
 });
 
-test("applications: the cover and four posters, dated exactly as the files prove", async ({ page }) => {
+test("applications: the cover, and no posters until Liam's own are ready (10-25)", async ({ page }) => {
   await page.goto(URL);
   await expect(page.locator(".mc-cover")).toBeVisible();
-  const dates = await page.locator(".applications .mc-poster-info span:last-child").evaluateAll((els) => els.map((e) => e.firstChild!.textContent!.trim()));
-  expect(dates).toEqual(["12.2023", "09.02.2024", "02.2023", "03.2022"]);
+  await expect(page.locator(".applications .mc-poster")).toHaveCount(0);
+});
+
+test("the stage flag is shown whole: its picture never outgrows its tile", async ({ page }) => {
+  for (const width of [1000, 1440, 390]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto(URL);
+    const tile = page.locator(".mc-collage .a1");
+    await tile.scrollIntoViewIfNeeded();
+    const [f, i] = await tile.evaluate((el) => [el, el.querySelector("img")!].map((e) => e.getBoundingClientRect().height));
+    expect(i).toBeLessThanOrEqual(f + 1);
+  }
 });
 
 test("website at 1440: the site live in the page, and Listen inside it turns the page's sound on", async ({ page }) => {
@@ -182,7 +192,7 @@ test.describe("applications on a 390 px phone", () => {
   test("the collage stacks: every piece at least half the column wide", async ({ page }) => {
     await page.goto(URL);
     const widths = await page.locator(".mc-collage figure").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().width));
-    expect(widths.length).toBe(3);   // the flag and the two shirts (Liam 2026-10-25)
+    expect(widths.length).toBe(4);   // the cover, the flag and the two shirts (Liam 2026-10-25)
     for (const w of widths) expect(w).toBeGreaterThan(150);
   });
 });
