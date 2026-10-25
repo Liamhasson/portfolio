@@ -81,7 +81,7 @@
 .ms-merch { display: grid; grid-template-columns: 1fr 1fr; gap: max(10px, calc(var(--u) * 16)); }
 .ms-art { position: relative; margin: 0; aspect-ratio: 16 / 10; background: #141210; display: grid; place-items: center; overflow: hidden; }
 .ms-art > img { width: 46%; }
-.ms-shirt > img { width: auto; height: 100%; }
+.ms-shirt > img.ms-fill { object-position: 50% 30%; }
 .ms-art > img.ms-fill { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .ms-art figcaption { position: absolute; left: 16px; bottom: 14px; z-index: 1; }
 .ms-group { margin: 0; }

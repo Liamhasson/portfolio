@@ -29,8 +29,8 @@ export function MarniCameApplications({ kind, title }: { kind: "supporting"; tit
         </figure>
         <figure className="a2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={MC_ASSETS.shirtBack} alt="The crowd shirt's back: the single's cut faces in bone ink, and under them the chorus, I need it, I want it, I'm after (its front carries the wordmark, small)" loading="lazy" />
-          <figcaption className="label">Crowd shirt · back · artwork</figcaption>
+          <img src={MC_ASSETS.shirtsWorn} alt="Two people in the crowd shirts: one wears the small Marni Came wordmark, the other the single's cut faces, in black and white" loading="lazy" />
+          <figcaption className="label">Crowd shirts · wordmark and faces</figcaption>
         </figure>
       </div>
     </section>

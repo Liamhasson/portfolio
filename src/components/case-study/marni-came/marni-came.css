@@ -181,7 +181,7 @@
 [data-world="marni-came"] .mc-collage figcaption { position: absolute; left: 12px; bottom: 10px; }
 [data-world="marni-came"] .mc-collage .a1 { left: 0; top: 20px; width: 62%; height: 86%; transform: rotate(-1.5deg); }
 [data-world="marni-came"] .mc-collage .a2 { left: 66%; top: 0; width: 30%; height: 100%; transform: rotate(1.2deg); background: var(--black); }
-[data-world="marni-came"] .mc-collage .a2 img { object-fit: contain; }
+[data-world="marni-came"] .mc-collage .a2 img { object-fit: cover; object-position: 50% 62%; }
 /* Website */
 [data-world="marni-came"] .mc-site { border: 1px solid var(--hair-2); }
 [data-world="marni-came"] .mc-site .bar { display: flex; align-items: center; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--hair-2); }
