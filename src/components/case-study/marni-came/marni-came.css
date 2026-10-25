@@ -54,7 +54,7 @@
 [data-world="marni-came"] .mc-head .mc-open { margin: 0; }
 /* the one title style (Liam 10-22): each section's headline in the brand's serif capitals, its key words in the title red
    (large text: the red passes 3:1 on Blackout). Under it, statements share one size (.mc-open), and labels stay small. */
-[data-world="marni-came"] .mc-headline { font: 600 calc(var(--u) * 72)/.92 var(--mc-serif); text-transform: uppercase; letter-spacing: .005em; color: var(--bone); margin: 0 0 calc(var(--u) * 56); max-width: 17em; }
+[data-world="marni-came"] .mc-headline { font: 600 calc(var(--u) * 52)/.95 var(--mc-serif); text-transform: uppercase; letter-spacing: .005em; color: var(--bone); margin: 0 0 calc(var(--u) * 56); max-width: 17em; }
 [data-world="marni-came"] .mc-headline .mc-red { font-style: normal; color: var(--red); }
 [data-world="marni-came"] .mc-two { display: grid; grid-template-columns: 1fr 1.3fr; gap: calc(var(--u) * 56); align-items: end; }
 [data-world="marni-came"] .mc-ph img { display: block; width: 100%; height: auto; }
@@ -148,6 +148,8 @@
 [data-world="marni-came"] .mc-moves img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; display: block; }
 [data-world="marni-came"] .mc-moves figcaption { padding-top: calc(var(--u) * 10); display: flex; flex-direction: column; gap: 6px; }
 [data-world="marni-came"] .mc-moves b { font: 600 max(18px, calc(var(--u) * 26))/1 var(--mc-serif); text-transform: uppercase; color: var(--bone); }
+[data-world="marni-came"] .mc-burned { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(var(--u) * 8); margin-top: calc(var(--u) * 48); }
+[data-world="marni-came"] .mc-burned img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
 [data-world="marni-came"] .mc-mood { display: grid; grid-auto-flow: row dense; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: calc(var(--u) * 200); gap: calc(var(--u) * 8); margin-top: calc(var(--u) * 48); }
 [data-world="marni-came"] .mc-mood > div { overflow: hidden; }
 [data-world="marni-came"] .mc-mood img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -264,7 +266,7 @@
   [data-world="marni-came"] .mc-split { grid-template-columns: minmax(0, 1fr); min-height: 0; }
   [data-world="marni-came"] .mc-split-text { padding: calc(var(--u) * 56) calc(var(--u) * 16) calc(var(--u) * 28); }
   [data-world="marni-came"] .mc-split-media { aspect-ratio: 4 / 5; }
-  [data-world="marni-came"] .mc-headline { font-size: calc(var(--u) * 34); margin-bottom: calc(var(--u) * 28); }
+  [data-world="marni-came"] .mc-headline { font-size: calc(var(--u) * 28); margin-bottom: calc(var(--u) * 24); }
   [data-world="marni-came"] .mc-st-row, [data-world="marni-came"] .mc-st-refs { grid-template-columns: minmax(0, 1fr); gap: calc(var(--u) * 24); margin-top: calc(var(--u) * 40); }
   [data-world="marni-came"] .mc-st-refs { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: calc(var(--u) * 16); margin-top: calc(var(--u) * 12); }
   [data-world="marni-came"] .mc-st-block { margin-top: calc(var(--u) * 40); }
@@ -279,6 +281,7 @@
   [data-world="marni-came"] .mc-colours li > i { height: calc(var(--u) * 90); }
   [data-world="marni-came"] .mc-spec-serif { font-size: calc(var(--u) * 34); }
   [data-world="marni-came"] .mc-moves { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  [data-world="marni-came"] .mc-burned { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   [data-world="marni-came"] .mc-mood { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-auto-rows: calc(var(--u) * 130); }
   [data-world="marni-came"] .mc-app-posters { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   [data-world="marni-came"] .mc-collage { height: auto; display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--u) * 8); }

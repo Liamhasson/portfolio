@@ -26,6 +26,16 @@ const MOOD: { src: string; alt: string; cls?: string }[] = [
   { src: D["10"], alt: "The guitarist with his strap doubled, the video at 1:56" },
 ];
 
+/** The video's own burns (Liam 10-25: the section needed them), the subject still readable through the light. */
+const BURNED: { src: string; alt: string }[] = [
+  { src: MC_ASSETS.burned[0], alt: "Sami at the drums, the frame washed amber, his face and the cymbals burned white, the After Heartbreaks video" },
+  { src: MC_ASSETS.burned[1], alt: "Liam singing, film burn flaring in from the right, the After Heartbreaks video at 1:00" },
+  { src: MC_ASSETS.burned[2], alt: "Liam looking down, the burn closing in from both edges, the video at 0:35" },
+  { src: MC_ASSETS.burned[3], alt: "Liam screaming beside a bandmate, a pale burn washing over half the frame, the video at 1:06" },
+  { src: MC_ASSETS.burned[4], alt: "Liam's face surfacing through a deep amber burn, the video at 1:23" },
+  { src: MC_ASSETS.burned[5], alt: "Liam with his guitar, a band of amber light across the frame, the video at 2:00" },
+];
+
 /** Board CS 06 · Imagery: the four moves (Blowout, the picture-only glow, joined 10-21), then Doubled as a moodboard with its rule. */
 export function MarniCameImagery({ kind, title }: { kind: "supporting"; title: string }) {
   const id = useId();
@@ -42,6 +52,13 @@ export function MarniCameImagery({ kind, title }: { kind: "supporting"; title: s
           </figure>
         ))}
       </div>
+      <div className="mc-burned">
+        {BURNED.map((b) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img key={b.src} src={b.src} alt={b.alt} loading="lazy" />
+        ))}
+      </div>
+      <p className="body mc-rule">Burn is never the same twice: from one edge or several, sometimes the whole frame for a moment, then gone.</p>
       <div className="mc-mood">
         {MOOD.map((m) => (
           <div key={m.src + m.alt} className={m.cls}>
