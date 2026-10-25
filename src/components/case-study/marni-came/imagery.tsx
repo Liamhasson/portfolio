@@ -42,7 +42,7 @@ export function MarniCameImagery({ kind, title }: { kind: "supporting"; title: s
   return (
     <section aria-labelledby={id} data-block={kind} className={`f mc-sec imagery ${marniFonts}`}>
       <div className="mc-head"><h2 id={id} className="title">{title}</h2></div>
-      <p className="mc-headline">Real photographs and footage, <em className="mc-red">broken by hand.</em></p>
+      <p className="mc-headline">Real photographs and footage. <em className="mc-red">Burned, doubled, never staged.</em></p>
       <div className="mc-moves">
         {MOVES.map((m) => (
           <figure key={m.name}>

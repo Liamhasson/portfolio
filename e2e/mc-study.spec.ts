@@ -29,12 +29,26 @@ test("the switch: four moves, off at load, each one toggles and changes the pict
   expect(after.equals(before)).toBe(false);
 });
 
+test("every headline puts its red words on their own line, below the white (Liam, 2026-10-25)", async ({ page }) => {
+  await page.goto(URL);
+  for (const h of await page.locator(".mc-headline").all()) {
+    const r = await h.evaluate((el) => {
+      const red = el.querySelector(".mc-red")!.getBoundingClientRect();
+      const range = document.createRange(); range.setStart(el.firstChild!, 0); range.setEnd(el.firstChild!, 1);
+      const w = range.getBoundingClientRect();
+      return { redTop: red.top, whiteTop: w.top, lineH: w.height, redLeft: red.left, left: el.getBoundingClientRect().left };
+    });
+    expect(r.redTop - r.whiteTop).toBeGreaterThan(r.lineH * 0.6);   // (a line below, not beside)
+    expect(Math.abs(r.redLeft - r.left)).toBeLessThanOrEqual(2);
+  }
+});
+
 test("the idea is one still line: no typing, no swapping (Liam, 2026-10-22)", async ({ page }) => {
   await page.goto(URL);
   const idea = page.locator(".mc-idea");
-  await expect(idea).toHaveText("Broken on purpose.");
+  await expect(idea).toHaveText("Nothing polished. Broken on purpose.");
   await page.waitForTimeout(2000);
-  await expect(idea).toHaveText("Broken on purpose.");
+  await expect(idea).toHaveText("Nothing polished. Broken on purpose.");
 });
 
 test("sound starts off, nothing plays, the hero video is muted", async ({ page }) => {
@@ -84,7 +98,7 @@ test.describe("reduced motion", () => {
   test("the word stays on Broken", async ({ page }) => {
     await page.goto(URL);
     await page.waitForTimeout(2200);
-    await expect(page.locator(".mc-idea")).toHaveText("Broken on purpose.");
+    await expect(page.locator(".mc-idea")).toHaveText("Nothing polished. Broken on purpose.");
   });
 });
 

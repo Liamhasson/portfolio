@@ -52,10 +52,10 @@
 [data-world="marni-came"] .mc-head { display: grid; grid-template-columns: calc(var(--u) * 520) 1fr; align-items: baseline; gap: calc(var(--u) * 40); margin-bottom: calc(var(--u) * 20); }
 [data-world="marni-came"] .mc-open { font-size: max(19px, calc(var(--u) * 28)); line-height: 1.25; letter-spacing: -.01em; color: var(--ink); margin-bottom: calc(var(--u) * 18); }
 [data-world="marni-came"] .mc-head .mc-open { margin: 0; }
-/* the one title style (Liam 10-22): each section's headline in the brand's serif capitals, its key words in the title red
+/* the one title style (Liam 10-22, 10-25): each section's headline in Geist, sentence case, its key words in the title red
    (large text: the red passes 3:1 on Blackout). Under it, statements share one size (.mc-open), and labels stay small. */
-[data-world="marni-came"] .mc-headline { font: 600 calc(var(--u) * 52)/.95 var(--mc-serif); text-transform: uppercase; letter-spacing: .005em; color: var(--bone); margin: 0 0 calc(var(--u) * 56); max-width: 17em; }
-[data-world="marni-came"] .mc-headline .mc-red { font-style: normal; color: var(--red); }
+[data-world="marni-came"] .mc-headline { font: 400 calc(var(--u) * 52)/1.02 var(--font-sans); letter-spacing: -.025em; color: var(--bone); margin: 0 0 calc(var(--u) * 56); max-width: 17em; }
+[data-world="marni-came"] .mc-headline .mc-red { font-style: normal; color: var(--red); display: block; }   /* (its own line: Liam 10-25) */
 [data-world="marni-came"] .mc-two { display: grid; grid-template-columns: 1fr 1.3fr; gap: calc(var(--u) * 56); align-items: end; }
 [data-world="marni-came"] .mc-ph img { display: block; width: 100%; height: auto; }
 [data-world="marni-came"] .mc-ph figcaption { margin-top: calc(var(--u) * 10); }

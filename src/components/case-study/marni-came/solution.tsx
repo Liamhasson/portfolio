@@ -23,7 +23,7 @@ export function MarniCameSolution({ kind, title }: { kind: "signature"; title: s
   return (
     <section aria-labelledby={id} data-block={kind} className={`f mc-sec solution ${marniFonts}`}>
       <div className="mc-head"><h2 id={id} className="title">{title}</h2></div>
-      <p className="mc-headline mc-idea"><em className="mc-red">Broken</em> on purpose.</p>
+      <p className="mc-headline mc-idea">Nothing polished. <em className="mc-red">Broken on purpose.</em></p>
       <div className="mc-two mc-pillars">
         <div><p className="label">The sound</p><p className="body">Not overproduced. We kept the mistakes, the inaccuracies and the vocals that aren&rsquo;t pitch perfect, so the record sounds like the room.</p></div>
         <div><p className="label">The crowd</p><p className="body">The audience is part of the band, not its customer.</p></div>

@@ -16,7 +16,7 @@ export function MarniCameIdentity({ kind, title }: { kind: "supporting"; title: 
   return (
     <section aria-labelledby={id} data-block={kind} className={`f mc-sec identity ${marniFonts}`}>
       <div className="mc-head"><h2 id={id} className="title">{title}</h2></div>
-      <p className="mc-headline">One mark, typed in Elephant and <em className="mc-red">cut by hand.</em></p>
+      <p className="mc-headline">One mark, typed in Elephant. <em className="mc-red">Cut by hand.</em></p>
       <div className="mc-logos">
         <figure className="lg-master">
           {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -35,7 +35,7 @@ export function MarniCameWebsite({ kind, title }: { kind: "supporting"; title: s
   return (
     <section aria-labelledby={id} data-block={kind} className={`f mc-sec website ${marniFonts}`}>
       <div className="mc-head"><h2 id={id} className="title">{title}</h2></div>
-      <p className="mc-headline">Release week, as <em className="mc-red">the band&rsquo;s own site.</em></p>
+      <p className="mc-headline">Release week. <em className="mc-red">The band&rsquo;s own site.</em></p>
       {wide ? (
         <div className="mc-site">
           <div className="bar" aria-hidden="true"><span /><span /><span /></div>

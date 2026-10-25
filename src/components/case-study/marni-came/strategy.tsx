@@ -18,7 +18,7 @@ export function MarniCameStrategy({ kind, title }: { kind: "supporting"; title: 
   return (
     <section aria-labelledby={id} data-block={kind} className={`f mc-sec strategy ${marniFonts}`}>
       <div className="mc-head"><h2 id={id} className="title">{title}</h2></div>
-      <p className="mc-headline mc-mission">Nobody watches<br /> a Marni Came show.<br /> <em className="mc-red">Everyone&rsquo;s in it.</em></p>
+      <p className="mc-headline mc-mission">Nobody watches a Marni Came show. <em className="mc-red">Everyone&rsquo;s in it.</em></p>
       <div className="mc-st-row">
         <div className="mc-st-card">
           <p className="label">Target audience</p>
