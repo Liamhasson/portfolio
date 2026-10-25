@@ -113,7 +113,7 @@ def build(out):
     save(load(os.path.join(SRC, "after-heartbreaks-still-blowout.jpg"), (1600, 1200), (0.5, 0.5)), "moves/blowout.jpg", q=84)
     # the switch: the face, graded, with nothing applied (the page applies the moves live)
     # (Liam 10-20: the Lido stage photo, arms up, the guitarist in front, in the brand's black and white)
-    save(grain(grade(load(os.path.join(lido, "416742665_926263899302184_7215614059312349568_n.jpg"), (1600, 900), (0.5, 0.4)), lo=6, hi=230, gamma=1.05, contrast=1.15), .12), "switch.jpg", q=72)
+    save(grain(grade(load(os.path.join(lido, "416742665_926263899302184_7215614059312349568_n.jpg"), (1600, 900), (0.5, 0.4)), lo=6, hi=230, gamma=1.05, contrast=1.15), .12), "switch.jpg", q=64)
     # problem: the Badehaus 2023 crowd (video still)
     bh23 = os.path.join(G, "Badehaus 2023")
     # (the Problem is now a video: crowd.py, Liam 10-21)
