@@ -17,7 +17,7 @@ const GRID: { src: string; move: string; alt: string; cls?: string }[] = [
   { src: B[1], move: "Burn", alt: "Liam singing, film burn flaring in from the right, the After Heartbreaks video at 1:00", cls: "w2" },
   { src: D["07"], move: "Doubled", alt: "The singer and a bandmate face to face, one laid over the other, the video at 3:11" },
   { src: D["03"], move: "Lens", alt: "The drummer over the kit, the edges of the frame smeared, the video at 1:49" },
-  { src: B[3], move: "Burn", alt: "Liam screaming beside a bandmate, a pale burn washing over half the frame, the video at 1:06", cls: "w2" },
+  { src: B[6], move: "Burn", alt: "Sami at the drums in profile, film burn flaring in from the right, the After Heartbreaks video at 1:25", cls: "w2" },
   { src: D.sameFrame, move: "Blowout", alt: "Liam with his guitar, the light behind his head blown out, the same frame screened back over itself" },
 ];
 

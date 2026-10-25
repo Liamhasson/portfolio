@@ -27,7 +27,7 @@ export const MC_ASSETS = {
   /** Moments of the film-burn footage in the brand's amber (burnfx.py), for the switch's Burn and the Burn swatch. */
   burns: [0, 1, 2, 3, 4, 5].map((i) => `${R}/burn/${i}.jpg`),
   /** The After Heartbreaks video's own burned frames, for Imagery (sources in tools/marni-came/sources/burned). */
-  burned: [0, 1, 2, 3, 4, 5].map((i) => `${R}/burned/${i}.jpg`),
+  burned: [0, 1, 2, 3, 4, 5, 6].map((i) => `${R}/burned/${i}.jpg`),
   /** The burn moving on its own, screened over the band site's hero and the sound toggle. */
   burnLoop: `${R}/video/burn-loop.mp4`,
   /** A denser burn for the small sound toggle (its gaps are short, so 'on' always shows). */
