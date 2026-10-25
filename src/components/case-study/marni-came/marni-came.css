@@ -180,6 +180,9 @@
 [data-world="marni-came"] .mc-collage img { width: 100%; height: 100%; object-fit: cover; }
 [data-world="marni-came"] .mc-collage figcaption { position: absolute; left: 10px; bottom: 9px; padding: 4px 8px; border-radius: 999px; background: rgba(10,9,8,.72); color: var(--bone); }
 [data-world="marni-came"] .mc-collage .a1 { left: 0; top: 24px; width: 50%; height: 82%; transform: rotate(-1.5deg); }
+/* the flag is shown whole, on its own tile colour (merch/stage-flag.jpg is set on #141210) */
+[data-world="marni-came"] .mc-collage .a1 { background: #141210; }
+[data-world="marni-came"] .mc-collage .a1 img { object-fit: contain; }
 [data-world="marni-came"] .mc-collage .a2 { left: 52.5%; top: 0; width: 23%; height: 78%; transform: rotate(1.2deg); }
 [data-world="marni-came"] .mc-collage .a3 { left: 77%; top: 18%; width: 23%; height: 78%; transform: rotate(-1deg); }
 /* Website */
@@ -300,6 +303,9 @@
   [data-world="marni-came"] .mc-collage :is(.a1, .a2, .a3) { position: relative; left: auto; top: auto; width: auto; height: auto; aspect-ratio: 4 / 5; transform: none; }
   [data-world="marni-came"] .mc-collage .a1.a1 { grid-column: 1 / -1; aspect-ratio: 16 / 10; }
   [data-world="marni-came"] .mc-collage :is(.a2, .a3) { aspect-ratio: 1; }
+  /* (the shirts' names are too long for a pill over a half-width tile: on phones they sit under it) */
+  [data-world="marni-came"] .mc-collage :is(.a2, .a3) { overflow: visible; margin-bottom: 44px; }
+  [data-world="marni-came"] .mc-collage :is(.a2, .a3) figcaption { top: calc(100% + 8px); bottom: auto; left: 0; padding: 0; background: none; }
   [data-world="marni-came"] .chal { grid-template-columns: minmax(0, 1fr); padding: calc(var(--u) * 56) 0; }
   [data-world="marni-came"] .chs { margin: calc(var(--u) * 24) calc(var(--u) * 16) 0; }
   [data-world="marni-came"] .mc-crowd { grid-column: 1; grid-row: auto; margin: calc(var(--u) * 24) calc(var(--u) * 16) 0; }

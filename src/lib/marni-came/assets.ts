@@ -19,7 +19,9 @@ export const MC_ASSETS = {
   wordmarkDistressedBone: `${R}/logo/wordmark-distressed-bone.svg`,
   logoBurned: `${R}/logo/burned.jpg`,
   cover: `${R}/cover-after-heartbreaks.jpg`,
-  /** The crowd shirts as photographed (Liam's shoot, 2026-10-25): the faces print and the wordmark print. */
+  /** The stage flag as Liam mocked it up (2026-10-25), set on a dark tile (sources/stage-flag-mockup.webp). */
+  flag: `${R}/merch/stage-flag.jpg`,
+  /** The shirts as photographed (Liam's shoot, 2026-10-25): the faces print and the wordmark print. */
   shirtFaces: `${R}/merch/shirt-faces.jpg`,
   shirtWordmark: `${R}/merch/shirt-wordmark.jpg`,
   posters: { lido: `${R}/posters/lido.jpg`, badehaus24: `${R}/posters/badehaus-2024.jpg`, badehaus23: `${R}/posters/badehaus-2023.jpg`, endOfTerm: `${R}/posters/end-of-term.jpg` },

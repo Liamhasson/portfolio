@@ -97,18 +97,18 @@ export function BandSite({ className }: { className?: string }) {
         <div className="ms-merch">
           <figure className="ms-art ms-shirt">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={MC_ASSETS.shirtFaces} alt="The crowd shirt with the single's cut faces printed large" className="ms-fill" />
-            <figcaption className="ms-k">Crowd shirt · faces</figcaption>
+            <img src={MC_ASSETS.shirtFaces} alt="The shirt with the single's cut faces printed large" className="ms-fill" />
+            <figcaption className="ms-k">Shirt · After Heartbreaks release</figcaption>
           </figure>
           <figure className="ms-art ms-shirt">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={MC_ASSETS.shirtWordmark} alt="The crowd shirt with the small Marni Came wordmark on the chest" className="ms-fill" />
-            <figcaption className="ms-k">Crowd shirt · wordmark</figcaption>
+            <img src={MC_ASSETS.shirtWordmark} alt="The shirt with the small Marni Came wordmark on the chest" className="ms-fill" />
+            <figcaption className="ms-k">Shirt · Wordmark</figcaption>
           </figure>
-          <figure className="ms-art">
+          <figure className="ms-art ms-flag">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={MC_ASSETS.logoBurned} alt="The stage flag: the wordmark on black cloth, light burning in from the left" className="ms-fill" />
-            <figcaption className="ms-k">Stage flag · artwork</figcaption>
+            <img src={MC_ASSETS.flag} alt="The stage flag: the distressed wordmark in bone on cloth that burns from amber at the left to black at the right, hung by brass grommets" className="ms-fill" />
+            <figcaption className="ms-k">Stage flag</figcaption>
           </figure>
         </div>
       </section>

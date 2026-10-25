@@ -83,6 +83,7 @@
 .ms-art { position: relative; margin: 0; aspect-ratio: 16 / 10; background: #141210; display: grid; place-items: center; overflow: hidden; }
 .ms-art > img { width: 46%; }
 .ms-shirt > img.ms-fill { object-position: 50% 40%; }
+.ms-art.ms-flag > img.ms-fill { object-fit: contain; }   /* the flag whole, on the tile's own colour */
 .ms-art > img.ms-fill { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .ms-art figcaption { position: absolute; left: 12px; bottom: 12px; z-index: 1; padding: 5px 9px; border-radius: 999px; background: rgba(10,9,8,.72); color: var(--bone); }
 .ms-group { margin: 0; }
@@ -127,6 +128,9 @@
   .ms-merch { grid-template-columns: 1fr 1fr; }
   .ms-merch .ms-art:last-child { grid-column: 1 / -1; }
   .ms-merch .ms-shirt { height: auto; aspect-ratio: 1; }
+  /* (the shirts' names are too long for a pill over a half-width tile: on phones they sit under it) */
+  .ms-merch .ms-shirt { overflow: visible; margin-bottom: 58px; }
+  .ms-merch .ms-shirt figcaption { top: calc(100% + 8px); bottom: auto; left: 0; padding: 0; background: none; }
   .ms-posters { grid-template-columns: 1fr 1fr; }
 }
 @media (prefers-reduced-motion: reduce) {
