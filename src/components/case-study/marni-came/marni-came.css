@@ -256,22 +256,6 @@
 }
 
 /* ------------------------------ phones and tablets (< 1100px) ------------------------------ */
-/* Liam 10-25: the imagery and the references float like the shirts in the collage, a slight tilt and lift each (desktop only,
-   as the collage lies flat on phones) */
-@media (min-width: 901px) {
-  [data-world="marni-came"] .mc-grid { gap: calc(var(--u) * 20); }
-  [data-world="marni-came"] .mc-grid figure:nth-child(5n + 1) { transform: rotate(-1.2deg); }
-  [data-world="marni-came"] .mc-grid figure:nth-child(5n + 2) { transform: rotate(0.9deg) translateY(calc(var(--u) * -6)); }
-  [data-world="marni-came"] .mc-grid figure:nth-child(5n + 3) { transform: rotate(-0.7deg) translateY(calc(var(--u) * 5)); }
-  [data-world="marni-came"] .mc-grid figure:nth-child(5n + 4) { transform: rotate(1.1deg) translateY(calc(var(--u) * -3)); }
-  [data-world="marni-came"] .mc-grid figure:nth-child(5n + 5) { transform: rotate(-0.9deg) translateY(calc(var(--u) * 4)); }
-  [data-world="marni-came"] .mc-st-refs { margin-top: calc(var(--u) * 30); }
-  [data-world="marni-came"] .mc-st-refs li:nth-child(4n + 1) figure { transform: rotate(-1.5deg); }
-  [data-world="marni-came"] .mc-st-refs li:nth-child(4n + 2) figure { transform: rotate(1.2deg) translateY(calc(var(--u) * -12)); }
-  [data-world="marni-came"] .mc-st-refs li:nth-child(4n + 3) figure { transform: rotate(-1deg) translateY(calc(var(--u) * -4)); }
-  [data-world="marni-came"] .mc-st-refs li:nth-child(4n + 4) figure { transform: rotate(1deg) translateY(calc(var(--u) * -16)); }
-}
-
 @media (max-width: 900px) {
   /* phones: the burger takes the top right; the sound control sits at the bottom, clear of the text column */
   [data-world="marni-came"] .mc-sound { top: auto; bottom: 16px; right: 16px; }
