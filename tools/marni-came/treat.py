@@ -142,8 +142,16 @@ def build(out):
     save(grain(grade(load(os.path.join(SRC, "refs", "maneskin.png"), (452, 565), (0.5, 0.45)), lo=6, hi=232, gamma=1.05, contrast=1.12), .12), "refs/maneskin.jpg", q=80)
     # the USP's picture: Liam handing a beer to someone in the crowd mid-song, Badehaus (Liam 10-25), burned behind him
     import burnfx
+    # (Liam picked option F, 10-25: a wide soft wash from the top left, the toast kept readable)
+    import random
     im = grade(load(os.path.join(SRC, "cheers-badehaus.jpg"), (1600, 1067), (0.5, 0.45)), lo=6, hi=230, gamma=1.05, contrast=1.12)
-    save(grain(burnfx.apply(im, burnfx.still(im.size, 302, wash=0)), .12).resize((1100, 733), Image.LANCZOS), "cheers.jpg", q=74)
+    W, H = im.size; rng = random.Random(414); n = rng.choice([2, 2, 3])
+    L = Image.new("L", (W, H), 0)
+    for k in range(n): L = ImageChops.lighter(L, burnfx.still((W, H), 4140 + k, layers=1, wash=0))
+    L = L.filter(ImageFilter.GaussianBlur(rng.uniform(40, 90)))
+    keep = Image.new("L", (W, H), 255); ImageDraw.Draw(keep).ellipse((int(W * .28), int(H * .42), int(W * .62), int(H * .82)), fill=110)
+    L = ImageChops.multiply(L, keep.filter(ImageFilter.GaussianBlur(120)))
+    save(grain(burnfx.apply(im, L), .12).resize((1100, 733), Image.LANCZOS), "cheers.jpg", q=74)
     # the Doubled moodboard: the video's own doubles (timestamps in seconds)
     for i, t in enumerate((117.5, 150.24, 109.5, 21.26, 194.1, 112.24, 191.24, 21.74, 108.24, 116.5)):
         save(load(frame(t)).resize((1600, 900), Image.LANCZOS), f"doubled/{i + 1:02d}.jpg")
