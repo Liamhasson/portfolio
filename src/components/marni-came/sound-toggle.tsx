@@ -3,7 +3,7 @@ import { useSyncExternalStore } from "react";
 import type { AudioController } from "@/lib/marni-came/audio";
 
 /** "Sound off / Sound on": the one control for the page's music (off until clicked). */
-/** (The burn left the pill for the screen's edges, where it plays with the music: Liam, 2026-10-26.) */
+/** (The band site's pill. The case study has its own round audio button: case-study/marni-came/audio-button.tsx.) */
 export function SoundToggle({ ctrl, className }: { ctrl: AudioController; className?: string }) {
   const on = useSyncExternalStore(ctrl.subscribe, () => ctrl.state().on, () => false);
   return (

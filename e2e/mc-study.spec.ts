@@ -53,12 +53,12 @@ test("the idea is one still line: no typing, no swapping (Liam, 2026-10-22)", as
 
 test("sound starts off, nothing plays, the hero video is muted", async ({ page }) => {
   await page.goto(URL);
-  await expect(page.getByRole("button", { name: /sound off/i })).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByRole("button", { name: "Audio" })).toHaveAttribute("aria-pressed", "false");
   expect(await page.evaluate(() => [...document.querySelectorAll("audio")].some((a) => !a.paused))).toBe(false);
   expect(await page.locator(".mc-hero-video").evaluate((v: HTMLVideoElement) => v.muted)).toBe(true);
 });
 
-test("the sound toggle clears the nav's pills, at 1440 and 1024", async ({ page }) => {
+test("the audio button clears the nav's pills, at 1440 and 1024", async ({ page }) => {
   for (const width of [1440, 1024]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto(URL);
@@ -165,7 +165,7 @@ test("website at 1440: the site live in the page, and Listen inside it turns the
   const inner = page.frames().find((f) => f.url().includes("/marni-came/site"))!;
   expect(await inner.evaluate(() => document.documentElement.classList.contains("lenis"))).toBe(false);
   await site.getByRole("button", { name: /^listen$/i }).click();
-  await expect(page.getByRole("button", { name: /sound on/i })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Audio" })).toHaveAttribute("aria-pressed", "true");
   const playing = await page.evaluate(() => (window as unknown as { __mcPlaying?: number }).__mcPlaying ?? null);
   expect(playing === null || playing <= 1).toBe(true);
 });
@@ -197,23 +197,41 @@ test.describe("applications on a 390 px phone", () => {
   });
 });
 
-test.describe("the burn that plays with the music (Liam 2026-10-26)", () => {
-  test("nothing loads until the sound is on; then it burns behind the page, and stops when the sound does", async ({ page }) => {
+test.describe("the audio button (Liam 2026-10-26, after lusion.co)", () => {
+  test("off: a flat line and the word Audio at the bottom centre; nothing loads until it's clicked", async ({ page }) => {
     const asked: string[] = [];
-    page.on("request", (r) => { if (/burn-edges\.png|\.energy\.json/.test(r.url())) asked.push(r.url()); });
+    page.on("request", (r) => { if (/\.energy\.json/.test(r.url())) asked.push(r.url()); });
+    for (const [w, h, gap] of [[1440, 900, 24], [390, 844, 16]] as const) {
+      await page.setViewportSize({ width: w, height: h });
+      await page.goto(URL);
+      const b = (await page.locator(".mc-audio").boundingBox())!;
+      expect(Math.abs(b.x + b.width / 2 - w / 2)).toBeLessThan(2);
+      expect(Math.abs(h - (b.y + b.height) - gap)).toBeLessThan(2);
+      await expect(page.locator(".mc-audio-w")).toHaveText("Audio");
+      await expect(page.locator(".mc-audio-w")).toBeVisible();
+      expect(await page.locator(".mc-audio path").getAttribute("d")).toBe("M17,24 H31");
+    }
+    await page.waitForTimeout(400);
+    expect(asked).toHaveLength(0);
+  });
+
+  test("on: the word goes, the circle takes the burn colour and its line draws the waveform; off brings the flat line back", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(URL);
-    await expect(page.locator(".mc-sound video")).toHaveCount(0);   // the pill has no burn of its own any more
-    const canvas = page.locator("[data-burn-edges]");
-    expect(await canvas.evaluate((c) => getComputedStyle(c).zIndex)).toBe("-1");
-    expect(await page.locator("section.f").first().evaluate((s) => getComputedStyle(s).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
-    await page.waitForTimeout(500);
-    expect(asked).toHaveLength(0);
-    const lit = () => canvas.evaluate((c: HTMLCanvasElement) => { const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 8) n++; return n; });
-    await page.locator("[data-sound-toggle]").click();
-    await expect.poll(lit, { timeout: 8000 }).toBeGreaterThan(200);
-    expect(asked.some((u) => u.endsWith("after-heartbreaks.energy.json"))).toBe(true);
-    await page.locator("[data-sound-toggle]").click();
-    await expect.poll(lit, { timeout: 4000 }).toBe(0);
+    const btn = page.locator(".mc-audio");
+    await btn.click();
+    await expect(btn).toHaveAttribute("aria-pressed", "true");
+    await expect.poll(() => page.locator(".mc-audio-w").evaluate((e) => e.getBoundingClientRect().width)).toBeLessThan(1);
+    const fill = () => page.locator(".mc-audio-c").evaluate((e) => getComputedStyle(e).backgroundColor);
+    await expect.poll(fill, { timeout: 8000 }).toMatch(/^rgba?\((1[3-9]\d|2\d\d), /);   // a burn amber, not the dark off state
+    const d1 = await page.locator(".mc-audio path").getAttribute("d");
+    expect(d1).toContain("C");
+    await page.waitForTimeout(600);
+    expect(await page.locator(".mc-audio path").getAttribute("d")).not.toBe(d1);   // it scrolls as the song plays
+    const b = (await btn.boundingBox())!;
+    expect(Math.abs(b.x + b.width / 2 - 720)).toBeLessThan(2);   // the circle alone, still centred
+    await btn.click();
+    await expect.poll(() => page.locator(".mc-audio path").getAttribute("d"), { timeout: 3000 }).toBe("M17,24 H31");
+    await expect(page.locator(".mc-audio-w")).toBeVisible();
   });
 });

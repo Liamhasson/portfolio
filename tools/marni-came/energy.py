@@ -1,13 +1,16 @@
-"""How loud each track is, and where it hits, for the burn along the bottom of the case study (Liam, 2026-10-26).
+"""How loud each track is, and the shape of its waveform, for the case study's audio button (Liam, 2026-10-26: a round
+button like lusion.co's, its fill in the burn colours following the loudness, its line drawing the track's waveform).
 
 Measured once here rather than live in the browser: routing the page's <audio> through Web Audio can leave it silent
 on some phones, so the page reads these numbers at the song's current time instead.
 
-    level   the loudness, 0..1 within the track's own range (10th to 99th percentile of its frames)
-    hit     how sharply it rises at that moment (bass and full band), 0..1
+    level   the loudness, 0..1 within the track's own range (10th to 99th percentile of its frames), 20 a second
+    hit     how sharply it rises at that moment (bass and full band), 0..1, 20 a second
+    wave    the waveform's height, 100 a second: the RMS of each 10 ms over the track's loudest moments (99.9th
+            percentile), not its peaks, which a loud mix clips flat
 
-Both are 20 values a second, written as base64 letters (0..63), so a four-minute track is two strings of ~4,800
-letters. `python3 tools/marni-came/energy.py <audio> <out.json>`
+Each is written as base64 letters (0..63): a four-minute track is two strings of ~4,800 letters and one of ~24,000.
+`python3 tools/marni-came/energy.py <audio> <out.json>`
 """
 import array, json, math, subprocess, sys
 
@@ -15,11 +18,14 @@ FPS, RATE = 20, 11025
 B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
 
-def rms(src, filt=None):
+WAVE_FPS = 100
+
+
+def rms(src, filt=None, fps=FPS):
     vf = ["-af", filt] if filt else []
     raw = subprocess.run(["ffmpeg", "-v", "error", "-i", src, *vf, "-ac", "1", "-ar", str(RATE), "-f", "s16le", "-"], capture_output=True, check=True).stdout
     s = array.array("h"); s.frombytes(raw)
-    n = RATE // FPS
+    n = RATE // fps
     return [math.sqrt(sum(v * v for v in s[i:i + n]) / n) for i in range(0, len(s) - n + 1, n)]
 
 
@@ -48,5 +54,7 @@ if __name__ == "__main__":
     full, low = rms(src), rms(src, "lowpass=f=180")
     n = min(len(full), len(low))
     hit = [max(a, .8 * b) for a, b in zip(flux(low[:n]), flux(full[:n]))]
-    json.dump({"fps": FPS, "level": enc(level(full[:n])), "hit": enc(hit)}, open(out, "w"), separators=(",", ":"))
+    w = rms(src, fps=WAVE_FPS); top = pct(w, .999) or 1
+    wave = [min(1, v / top) for v in w]
+    json.dump({"fps": FPS, "level": enc(level(full[:n])), "hit": enc(hit), "waveFps": WAVE_FPS, "wave": enc(wave)}, open(out, "w"), separators=(",", ":"))
     print(out, n, "frames", f"{n / FPS:.1f}s")
