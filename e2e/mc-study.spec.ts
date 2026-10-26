@@ -196,3 +196,24 @@ test.describe("applications on a 390 px phone", () => {
     for (const w of widths) expect(w).toBeGreaterThan(150);
   });
 });
+
+test.describe("the burn that plays with the music (Liam 2026-10-26)", () => {
+  test("nothing loads until the sound is on; then it burns behind the page, and stops when the sound does", async ({ page }) => {
+    const asked: string[] = [];
+    page.on("request", (r) => { if (/burn-edges\.png|\.energy\.json/.test(r.url())) asked.push(r.url()); });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(URL);
+    await expect(page.locator(".mc-sound video")).toHaveCount(0);   // the pill has no burn of its own any more
+    const canvas = page.locator("[data-burn-edges]");
+    expect(await canvas.evaluate((c) => getComputedStyle(c).zIndex)).toBe("-1");
+    expect(await page.locator("section.f").first().evaluate((s) => getComputedStyle(s).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
+    await page.waitForTimeout(500);
+    expect(asked).toHaveLength(0);
+    const lit = () => canvas.evaluate((c: HTMLCanvasElement) => { const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 8) n++; return n; });
+    await page.locator("[data-sound-toggle]").click();
+    await expect.poll(lit, { timeout: 8000 }).toBeGreaterThan(200);
+    expect(asked.some((u) => u.endsWith("after-heartbreaks.energy.json"))).toBe(true);
+    await page.locator("[data-sound-toggle]").click();
+    await expect.poll(lit, { timeout: 4000 }).toBe(0);
+  });
+});

@@ -34,17 +34,18 @@ python3 tools/marni-came/lido.py card "$tmp/card"
 ffmpeg -v error -y -i "$tmp/card.mp4" -c:v libx264 -profile:v high -pix_fmt yuv420p -b:v 700k -maxrate 950k -bufsize 1900k -preset slow -movflags +faststart -an public/work/marni-came-lido.mp4
 ffmpeg -v error -y -ss 2.6 -i public/work/marni-came-lido.mp4 -frames:v 1 -q:v 3 public/work/marni-came-lido.jpg
 
-# the burn on its own: over the band site's hero (960 × 540) and inside the sound toggle (320 × 88, dense, seed 75)
+# the burn on its own, over the band site's hero (960 × 540); and the shapes for the burn along the study's edges
 python3 - "$OUT/video" <<'PY'
 import sys, subprocess; sys.path.insert(0, "tools/marni-came")
 import burnfx
-for name, size, seed, density in (("burn-loop", (960, 540), 59, 0.75), ("burn-pill", (320, 88), 75, 6.0)):
-    L = burnfx.track(12 if name == "burn-loop" else 10, 25, size, seed, density)
+for name, size, seed, density in (("burn-loop", (960, 540), 59, 0.75),):
+    L = burnfx.track(12, 25, size, seed, density)
     enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{size[0]}x{size[1]}", "-r", "25", "-i", "-",
                             "-c:v", "libx264", "-crf", "26", "-preset", "slow", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-an", f"{sys.argv[1]}/{name}.mp4"], stdin=subprocess.PIPE)
     for f in L: enc.stdin.write(burnfx.colour(f).tobytes())
     enc.stdin.close(); enc.wait()
 PY
+python3 tools/marni-came/burn_edges.py "$OUT/video/burn-edges.png"
 
 # release week: the After Heartbreaks loop, and the full video for the lightbox (the Dopamine live video is the playground's)
 scripts/encode-video.sh public/playground/after-heartbreaks-loop.mp4 "$OUT/video/release-loop" 1280 3.0
@@ -58,4 +59,8 @@ ffmpeg -v error -y -i "$ARCHIVE/Masters/Marni Came - After Heartbreaks.wav" -c:a
 ffmpeg -v error -y -i "$ARCHIVE/Masters/Marni Came - Dopamine.wav" -c:a aac -b:a 128k -movflags +faststart "$OUT/audio/dopamine.m4a"
 python3 tools/marni-came/peaks.py "$OUT/audio/after-heartbreaks.m4a" "$OUT/audio/after-heartbreaks.peaks.json"
 python3 tools/marni-came/peaks.py "$OUT/audio/dopamine.m4a" "$OUT/audio/dopamine.peaks.json"
+# how loud each moment is and where it hits, for the burn along the edges
+python3 tools/marni-came/energy.py "$OUT/audio/after-heartbreaks.m4a" "$OUT/audio/after-heartbreaks.energy.json"
+python3 tools/marni-came/energy.py "$OUT/audio/dopamine.m4a" "$OUT/audio/dopamine.energy.json"
+python3 tools/marni-came/energy.py public/playground/youll-be-you.m4a "$OUT/audio/youll-be-you.energy.json"
 echo "done: $(du -sh "$OUT" | cut -f1)"
