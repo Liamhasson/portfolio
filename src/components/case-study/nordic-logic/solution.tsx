@@ -1,4 +1,5 @@
 import { useId } from "react";
+import { LazyVideo } from "../lazy-video";
 import { FirstAudit } from "./first-audit";
 import { nordicFonts } from "./fonts";
 
@@ -25,8 +26,8 @@ function Row({ k, them, us, diff }: { k: string; them: React.ReactNode; us: Reac
   );
 }
 
-/** Board frame 04 · Solution: the comparison (Level on price. Different on the first step.), then the site's first
- *  audit, working. */
+/** Board frame 04 · Solution: the comparison (Level on price. Different on the first step.), the site's own "What this
+ *  costs" in use (recorded 2026-10-26, scripts/capture/nordic-logic-site.mjs), then the site's first audit, working. */
 export function NordicLogicSolution({ kind, title }: { kind: "signature"; title: string }) {
   const id = useId();
   return (
@@ -60,9 +61,22 @@ export function NordicLogicSolution({ kind, title }: { kind: "signature"; title:
       </div>
       <p className="label cmp-src">Source: LateShipment’s pricing and DHL claims pages, checked 13 Oct 2026 · nine G2 reviews collected 6 Sep</p>
 
+      <div className="g12 cost-row">
+        <LazyVideo
+          src="/case-studies/nordic-logic/what-it-costs.mp4"
+          poster="/case-studies/nordic-logic/what-it-costs.jpg"
+          label="What this costs, on the live site: a cursor drags the delivery spend and the estimated recovery moves as a 1–3% range; below it, a $1,000 recovery splits into $650 kept and a $350 fee"
+        />
+        <div className="side">
+          <p className="label">Pricing · live on the site</p>
+          <h3 className="w-title">What this costs.</h3>
+          <p className="body">The fee is stated, not argued. Drag your delivery spend and the estimate moves as a 1–3% range; under it, a sample $1,000 recovery shows what you keep and what the one invoice is for.</p>
+        </div>
+      </div>
+
       <div className="g12 fa-head">
         <h3 className="w-title">The first step, working</h3>
-        <p className="body">The site’s first audit has a real decision in it. After the breakdown, you go ahead or you don’t. Pick a branch.</p>
+        <p className="body">The site’s first audit has a real decision in it. After the breakdown, you go ahead or you don’t. It plays both.</p>
       </div>
       <div className="fa-tray">
         <p className="fa-q" aria-hidden="true">Your first audit.<span>Free, with nothing to connect.</span></p>

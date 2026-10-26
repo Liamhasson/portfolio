@@ -9,8 +9,9 @@ const CARDS = [
   { n: 4, label: "No minimum: parcels of every size pass through the same gate" },
 ] as const;
 
-/** Board frame 05 · How it works: the site's dark chapter. The four 3D cards from its How it works page (recorded from the
- *  live site at 2×, seamless loops) and the denial chapter. The system strip moved to 05b · Brand (brand.tsx). */
+/** Board frame 05 · How it works: the site's dark chapter. "Where the money hides" from its home page, used by a cursor
+ *  (recorded 2026-10-26, scripts/capture/nordic-logic-site.mjs), the four 3D cards from its How it works page (recorded
+ *  from the live site at 2×, seamless loops) and the denial chapter. The system strip moved to 05b · Brand (brand.tsx). */
 export function NordicLogicHowItWorks({ kind, title }: { kind: "supporting"; title: string }) {
   const id = useId();
   return (
@@ -18,6 +19,20 @@ export function NordicLogicHowItWorks({ kind, title }: { kind: "supporting"; tit
       <div className="g12" style={{ alignItems: "start" }}>
         <div className="how-left">
           <h2 id={id} className="title" style={{ marginLeft: "calc(var(--u) * -3)" }}>{title}</h2>
+          <p className="body">
+            <span className="lead">Where the money hides.</span> The home page names five billing errors a shipper will recognise from their own invoices. Each one opens on the invoice line it hides in, marked as sample data.
+          </p>
+        </div>
+        <LazyVideo
+          className="money"
+          src="/case-studies/nordic-logic/money-hides.mp4"
+          poster="/case-studies/nordic-logic/money-hides.jpg"
+          label="Where the money hides, on the live site: a cursor opens dimensional weight, fuel surcharge, duplicate charges, address correction and residential surcharge in turn, each beside the invoice line it hides in"
+        />
+      </div>
+
+      <div className="g12 cards-row" style={{ alignItems: "start" }}>
+        <div className="how-left">
           <p className="body">
             <span className="lead">Four things worth knowing.</span> After the first audit, the service runs month to month: every invoice is checked as it’s issued, and disputes are filed as errors turn up. The site explains it in four cards, each a small 3D scene that never stops moving.
           </p>

@@ -86,6 +86,8 @@ export interface CaseStudyEntry {
   ChallengeExtras: ComponentType<{ index: number }>;
   /** Under the challenges, where a board shows something that belongs to all of them (Nordic Logic: the Claude Code exchanges). */
   ChallengesAfter?: ComponentType;
+  /** In Impact, between the lines and the link (Nordic Logic: the site on a phone). */
+  OutcomeVisual?: ComponentType;
   /** Page-wide controls a study adds to the shell, after Back (Marni Came: its sound toggle). */
   Shell?: ComponentType;
 }

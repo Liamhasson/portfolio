@@ -31,12 +31,13 @@
 [data-world="nordic-logic"] .onyx .body .lead { color: #fff; }
 
 /* ------------------------------ 1 hero ------------------------------ */
-[data-world="nordic-logic"] .hero { height: calc(var(--u) * 900); }
+/* Taller than the other studies' heroes (Liam, 2026-10-26): the film needs the whole portal it lands on in frame. */
+[data-world="nordic-logic"] .hero { height: calc(var(--u) * 1481); }
 [data-world="nordic-logic"] .hero-head { position: absolute; left: calc(var(--u) * 72); right: calc(var(--u) * 72); top: calc(var(--u) * 132); display: flex; justify-content: space-between; align-items: flex-end; }
 [data-world="nordic-logic"] .hero-right { display: flex; align-items: center; gap: calc(var(--u) * 36); padding-bottom: calc(var(--u) * 6); }
 [data-world="nordic-logic"] .hero-line { font-size: calc(var(--u) * 28); line-height: 1.2; letter-spacing: -.01em; color: var(--ink-2); max-width: 24ch; }
-[data-world="nordic-logic"] .tray { position: absolute; left: calc(var(--u) * 72); top: calc(var(--u) * 276); width: calc(var(--u) * 1296); height: calc(var(--u) * 596); border-radius: calc(var(--u) * 24); background: var(--mist); overflow: hidden; }
-[data-world="nordic-logic"] .tray img { position: absolute; left: calc(var(--u) * 40); top: calc(var(--u) * 40); width: calc(var(--u) * 1216); height: auto; border-radius: calc(var(--u) * 12); box-shadow: 0 0 0 calc(var(--u) * 1) var(--hair); }
+[data-world="nordic-logic"] .tray { position: absolute; left: calc(var(--u) * 72); top: calc(var(--u) * 276); width: calc(var(--u) * 1296); height: calc(var(--u) * 1177); border-radius: calc(var(--u) * 24); background: var(--mist); overflow: hidden; }
+[data-world="nordic-logic"] .tray video { position: absolute; left: calc(var(--u) * 40); top: calc(var(--u) * 40); display: block; width: calc(var(--u) * 1216); height: auto; aspect-ratio: 2400 / 2166; border-radius: calc(var(--u) * 12); background: var(--canvas); box-shadow: 0 0 0 calc(var(--u) * 1) var(--hair); }
 
 /* ------------------------------ 2 at a glance ------------------------------ */
 [data-world="nordic-logic"] .glance { height: calc(var(--u) * 270); padding-top: calc(var(--u) * 56); }
@@ -106,17 +107,10 @@
 [data-world="nordic-logic"] .fa-node[data-n="walk"] { left: calc(var(--u) * 710); }
 [data-world="nordic-logic"] .fa-node[data-n="file"] { top: calc(var(--u) * 376); }
 [data-world="nordic-logic"] .fa-node[data-n="credit"] { top: calc(var(--u) * 470); }
-/* the fork: both branches are buttons, drawn the same */
-[data-world="nordic-logic"] button.fa-node { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
-[data-world="nordic-logic"] button.fa-node .choose { margin-left: auto; font: 500 max(11px, calc(var(--u) * 11))/1 var(--nl-mono); letter-spacing: .08em; text-transform: uppercase; color: #6f7b88; transition: opacity 200ms; }
-[data-world="nordic-logic"] .fa.chosen button.fa-node { cursor: default; }
-[data-world="nordic-logic"] .fa.chosen button.fa-node .choose { opacity: 0; }
-@media (hover: hover) { [data-world="nordic-logic"] .fa:not(.chosen) button.fa-node:hover { box-shadow: 0 0 0 calc(var(--u) * 1) #7c8b9c, 0 1px 2px rgba(12,17,22,.04); } }
-[data-world="nordic-logic"] button.fa-node:focus-visible, [data-world="nordic-logic"] .fa-again:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }
-[data-world="nordic-logic"] .fa:not(.chosen) button.fa-node:active { transform: scale(.985); }
 [data-world="nordic-logic"] .fa-out { position: absolute; left: calc(var(--u) * 710); top: calc(var(--u) * 376); width: calc(var(--u) * 420); font: 400 max(15px, calc(var(--u) * 15))/1.45 var(--nl-body); color: var(--ink-3); opacity: 0; transition: opacity 400ms var(--settle); }
 [data-world="nordic-logic"] .fa-out.on { opacity: 1; }
-[data-world="nordic-logic"] .fa-again { position: absolute; left: calc(var(--u) * 710); top: calc(var(--u) * 482); height: max(36px, calc(var(--u) * 36)); padding: 0 calc(var(--u) * 16); border: 0; border-radius: 999px; background: var(--ink); color: #fff; font: 500 max(13px, calc(var(--u) * 13))/1 var(--sans); cursor: pointer; animation: nl-fade 300ms var(--settle) both; }
+/* the nodes sit in one aria-hidden wrapper (the flow is read once, as text) that takes no part in the layout */
+[data-world="nordic-logic"] .fa-nodes { display: contents; }
 @keyframes nl-fade { from { opacity: 0; } }
 [data-world="nordic-logic"] .sol-foot { margin-top: calc(var(--u) * 96); align-items: end; }
 [data-world="nordic-logic"] .sol-foot .display { grid-column: 1 / 12; font-size: calc(var(--u) * 52); }
@@ -127,11 +121,18 @@
 [data-world="nordic-logic"] .how-left { grid-column: 1 / 5; display: flex; flex-direction: column; gap: calc(var(--u) * 36); }
 [data-world="nordic-logic"] .how-left .body { max-width: 34ch; }
 [data-world="nordic-logic"] .cards { grid-column: 5 / 13; display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--u) * 24); }
+/* Where the money hides: the site's light section, set in the dark chapter like the denial clip */
+[data-world="nordic-logic"] .how video.money { grid-column: 5 / 13; display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; border-radius: calc(var(--u) * 20); background: var(--canvas); box-shadow: 0 0 0 calc(var(--u) * 1) var(--onyx-line); }
+[data-world="nordic-logic"] .cards-row { margin-top: calc(var(--u) * 120); }
 [data-world="nordic-logic"] .cards video, [data-world="nordic-logic"] .denied-row video { display: block; width: 100%; height: auto; background: var(--onyx-card); }
 [data-world="nordic-logic"] .cards video { aspect-ratio: 1; border-radius: calc(var(--u) * 20); }
 [data-world="nordic-logic"] .denied-row { margin-top: calc(var(--u) * 120); align-items: end; }
 [data-world="nordic-logic"] .denied-row video { grid-column: 1 / 9; aspect-ratio: 16 / 10; border-radius: calc(var(--u) * 20); box-shadow: 0 0 0 calc(var(--u) * 1) var(--onyx-line); }
 [data-world="nordic-logic"] .denied-row .side { grid-column: 9 / 13; display: flex; flex-direction: column; gap: calc(var(--u) * 18); padding-bottom: calc(var(--u) * 8); }
+/* What this costs: the denial row's layout, in the light Solution */
+[data-world="nordic-logic"] .cost-row { margin-top: calc(var(--u) * 112); align-items: end; }
+[data-world="nordic-logic"] .cost-row video { grid-column: 1 / 9; display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; border-radius: calc(var(--u) * 20); background: var(--canvas); box-shadow: 0 0 0 calc(var(--u) * 1) var(--hair); }
+[data-world="nordic-logic"] .cost-row .side { grid-column: 9 / 13; display: flex; flex-direction: column; gap: calc(var(--u) * 18); padding-bottom: calc(var(--u) * 8); }
 
 /* ------------------------------ 6 challenges ------------------------------ */
 [data-world="nordic-logic"] .chal { padding: calc(var(--u) * 112) 0 calc(var(--u) * 104); }
@@ -170,6 +171,10 @@
 [data-world="nordic-logic"] .outcome .display { margin-top: calc(var(--u) * 32); font-size: calc(var(--u) * 52); }
 [data-world="nordic-logic"] .outcome .display a { background-image: linear-gradient(currentColor, currentColor); background-size: 100% calc(var(--u) * 1.5); background-repeat: no-repeat; background-position: 0 92%; }
 [data-world="nordic-logic"] .outcome .row-cta { margin-top: calc(var(--u) * 44); }
+/* the site on a phone, in the hero's tray */
+[data-world="nordic-logic"] .phones { width: calc(var(--u) * 1296); display: flex; justify-content: center; gap: calc(var(--u) * 48); margin-top: calc(var(--u) * 56); padding: calc(var(--u) * 56) 0; border-radius: calc(var(--u) * 24); background: var(--mist); }
+[data-world="nordic-logic"] .phones:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }
+[data-world="nordic-logic"] .phones img { display: block; width: calc(var(--u) * 276); height: auto; border-radius: calc(var(--u) * 36); box-shadow: 0 0 0 calc(var(--u) * 1) var(--hair); }
 
 /* ------------------------------ 8 next: Eventread peeks in, on Mist so its light page reads ------------------------------ */
 [data-world="nordic-logic"] .f.next { height: calc(var(--u) * 630); background: var(--mist); }
@@ -186,8 +191,6 @@
 
 /* ------------------------------ 05b · Brand, option A "Show the working" (Liam, 2026-10-20; board frame 05b) ------------------------------ */
 [data-world="nordic-logic"] .brand { padding: calc(var(--u) * 104) 0 calc(var(--u) * 88); }
-[data-world="nordic-logic"] .b3-idea { margin: 0 0 calc(var(--u) * 16); font: 500 calc(var(--u) * 46)/1.05 var(--nl-display); letter-spacing: -.028em; color: var(--ink); }
-[data-world="nordic-logic"] .b3-support { max-width: 56ch; margin: 0; }
 [data-world="nordic-logic"] .b3-origin { display: grid; grid-template-columns: 1fr 1fr; column-gap: calc(var(--u) * 48); margin: calc(var(--u) * 44) calc(var(--u) * 72) 0; }
 [data-world="nordic-logic"] .b3-origin > div { display: flex; flex-direction: column; gap: calc(var(--u) * 10); }
 [data-world="nordic-logic"] .b3-origin p, [data-world="nordic-logic"] .b3-origin dl, [data-world="nordic-logic"] .b3-origin dd { margin: 0; }
@@ -275,14 +278,14 @@
 [data-world="nordic-logic"] .b3-prod img { display: block; width: 100%; height: auto; border-radius: calc(var(--u) * 5); }
 
 @media (prefers-reduced-motion: reduce) {
-  [data-world="nordic-logic"] :is(.fa .w, .fa-node, .fa-out, .fa-again) { transition: none; }
+  [data-world="nordic-logic"] :is(.fa .w, .fa-node, .fa-out) { transition: none; }
 }
 
 /* ------------------------------ phones and tablets (< 1100px): the board's phone frame ------------------------------ */
 @container (max-width: 1099px) {
   /* Brand: one column; the construction keeps its drawing with nothing named on it (the caption under it names the error); the suite in two columns; the bento stacked */
   [data-world="nordic-logic"] .brand { padding: calc(var(--u) * 64) 0 calc(var(--u) * 56); }
-  [data-world="nordic-logic"] .b3-idea { font-size: calc(var(--u) * 32); margin-top: calc(var(--u) * 14); }
+  [data-world="nordic-logic"] .brand > .g12:first-child .body { margin-top: calc(var(--u) * 18); }
   [data-world="nordic-logic"] .b3-origin { grid-template-columns: minmax(0, 1fr); row-gap: calc(var(--u) * 28); margin: calc(var(--u) * 32) calc(var(--u) * 16) 0; }
   [data-world="nordic-logic"] .b3-row { grid-template-columns: calc(var(--u) * 118) 1fr; gap: calc(var(--u) * 12); }
   [data-world="nordic-logic"] .b3-hero { display: block; height: auto; margin: calc(var(--u) * 28) calc(var(--u) * 16) 0; }
@@ -312,8 +315,8 @@
   [data-world="nordic-logic"] .hero-right { display: block; padding: 0; }
   [data-world="nordic-logic"] .hero-line { font-size: max(15px, calc(var(--u) * 22)); margin-top: calc(var(--u) * 14); max-width: none; }
   [data-world="nordic-logic"] .hero-right .btn { margin-top: calc(var(--u) * 22); }
-  [data-world="nordic-logic"] .tray { position: relative; left: auto; top: auto; width: auto; height: calc(var(--u) * 330); margin-top: calc(var(--u) * 32); border-radius: calc(var(--u) * 20); }
-  [data-world="nordic-logic"] .tray img { left: calc(var(--u) * -101); top: calc(var(--u) * 20); width: calc(var(--u) * 560); border-radius: calc(var(--u) * 10); }
+  [data-world="nordic-logic"] .tray { position: relative; left: auto; top: auto; width: auto; height: auto; margin-top: calc(var(--u) * 32); padding: calc(var(--u) * 12); border-radius: calc(var(--u) * 20); }
+  [data-world="nordic-logic"] .tray video { position: static; width: 100%; border-radius: calc(var(--u) * 10); }
   [data-world="nordic-logic"] .glance { height: auto; padding: calc(var(--u) * 24) calc(var(--u) * 16); }
   [data-world="nordic-logic"] .strip { margin: 0; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   [data-world="nordic-logic"] .strip > div { padding: calc(var(--u) * 18) calc(var(--u) * 12) calc(var(--u) * 18) 0; border-left: 0; border-top: calc(var(--u) * 1) solid var(--hair); }
@@ -348,22 +351,25 @@
   [data-world="nordic-logic"] .fa-q { font-size: calc(var(--u) * 24); }
   [data-world="nordic-logic"] .fa { width: auto; height: auto; margin-top: calc(var(--u) * 20); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: calc(var(--u) * 12) calc(var(--u) * 10); }
   [data-world="nordic-logic"] .fa svg.wires { display: none; }
-  [data-world="nordic-logic"] .fa-node, [data-world="nordic-logic"] .fa-out, [data-world="nordic-logic"] .fa-again { position: static; width: auto; }
+  [data-world="nordic-logic"] .fa-node, [data-world="nordic-logic"] .fa-out { position: static; width: auto; }
   [data-world="nordic-logic"] .fa-node { grid-column: 1 / -1; height: auto; min-height: 46px; padding: calc(var(--u) * 10) calc(var(--u) * 14); font-size: 15px; }
   [data-world="nordic-logic"] .fa-node svg { width: 18px; height: 18px; }
   [data-world="nordic-logic"] .fa-node[data-n="sign"] { grid-column: 1; }
   [data-world="nordic-logic"] .fa-node[data-n="walk"] { grid-column: 2; }
-  [data-world="nordic-logic"] button.fa-node { min-height: 56px; line-height: 1.25; }
-  [data-world="nordic-logic"] button.fa-node .choose { display: none; }
-  [data-world="nordic-logic"] .fa-node:not(.on), [data-world="nordic-logic"] .fa-out:not(.on) { display: none; }
-  [data-world="nordic-logic"] .fa-out { grid-column: 1 / -1; padding: calc(var(--u) * 4) calc(var(--u) * 2) 0; }
-  [data-world="nordic-logic"] .fa-again { grid-column: 1 / -1; justify-self: start; }
+  /* every step keeps its place while hidden, so the page doesn't jump as the loop runs */
+  [data-world="nordic-logic"] .fa-out { grid-column: 1 / -1; min-height: calc(1.45em * 3); padding: calc(var(--u) * 4) calc(var(--u) * 2) 0; }
   [data-world="nordic-logic"] .sol-foot { margin-top: calc(var(--u) * 48); }
   /* How it works: the four cards one per row, then the denial clip */
   [data-world="nordic-logic"] .how { padding: calc(var(--u) * 64) 0 calc(var(--u) * 56); }
   [data-world="nordic-logic"] .how-left { gap: calc(var(--u) * 18); }
   [data-world="nordic-logic"] .how-left .body { font-size: max(15px, calc(var(--u) * 16)); max-width: none; }
   [data-world="nordic-logic"] .cards { grid-template-columns: minmax(0, 1fr); gap: calc(var(--u) * 16); margin-top: calc(var(--u) * 28); }
+  [data-world="nordic-logic"] .how video.money { margin-top: calc(var(--u) * 28); border-radius: calc(var(--u) * 14); }
+  [data-world="nordic-logic"] .cards-row { margin-top: calc(var(--u) * 48); }
+  [data-world="nordic-logic"] .cost-row { margin-top: calc(var(--u) * 48); row-gap: calc(var(--u) * 20); }
+  [data-world="nordic-logic"] .cost-row video { border-radius: calc(var(--u) * 14); }
+  [data-world="nordic-logic"] .cost-row .w-title { font-size: calc(var(--u) * 24); }
+  [data-world="nordic-logic"] .cost-row .body { font-size: max(15px, calc(var(--u) * 16)); }
   [data-world="nordic-logic"] .denied-row { margin-top: calc(var(--u) * 48); row-gap: calc(var(--u) * 20); }
   [data-world="nordic-logic"] .denied-row .w-title { font-size: calc(var(--u) * 24); }
   [data-world="nordic-logic"] .denied-row .body { font-size: max(15px, calc(var(--u) * 16)); }
@@ -377,6 +383,9 @@
 [data-world="nordic-logic"] .ex-line { grid-template-columns: minmax(0, 1fr); gap: calc(var(--u) * 4); }
   [data-world="nordic-logic"] .outcome { padding: calc(var(--u) * 64) 0; }
   [data-world="nordic-logic"] .outcome .display { font-size: calc(var(--u) * 30); }
+  /* the three phones as a swipeable row, the first whole and the next peeking */
+  [data-world="nordic-logic"] .phones { width: auto; justify-content: flex-start; gap: calc(var(--u) * 12); margin-top: calc(var(--u) * 32); padding: calc(var(--u) * 16); border-radius: calc(var(--u) * 20); overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+  [data-world="nordic-logic"] .phones img { flex: none; width: calc(var(--u) * 220); border-radius: calc(var(--u) * 28); scroll-snap-align: start; }
   [data-world="nordic-logic"] .f.next { height: auto; padding-bottom: calc(var(--u) * 40); }
   [data-world="nordic-logic"] .er { position: relative; inset: auto; display: block; padding: calc(var(--u) * 40) calc(var(--u) * 16) calc(var(--u) * 24); margin-top: calc(var(--u) * 24); }
   [data-world="nordic-logic"] .er-text { position: static; width: auto; }

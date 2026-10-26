@@ -1,7 +1,5 @@
-import Image from "next/image";
-
-/** Board frame 06: each challenge's evidence. 01 what was checked, 02 the calculator as it is now (1–3%, a range),
- *  03 the path a file takes. */
+/** Board frame 06: each challenge's evidence. 01 what was checked, 02 how the calculator's range was narrowed (the
+ *  calculator itself plays in the Solution), 03 the path a file takes. */
 export function NordicLogicChallengeExtras({ index }: { index: number }) {
   if (index === 0) {
     return (
@@ -15,7 +13,10 @@ export function NordicLogicChallengeExtras({ index }: { index: number }) {
   if (index === 1) {
     return (
       <div className="ch-chips">
-        <Image className="ch-shot" src="/case-studies/nordic-logic/calculator.jpg" alt="The live calculator: $500,000 a year in delivery spend, an estimated recovery of $5,000 to $15,000" width={1600} height={417} sizes="(min-width: 1100px) 400px, 90vw" />
+        <span className="sr-only">Published rates run from 1% to 20%; the lowest range, narrowed to Emil's estimate: 1–3%.</span>
+        <span className="chip" aria-hidden="true">Published <b>1–20%</b></span>
+        <span className="seq" aria-hidden="true"><span className="arrow">→</span><span className="chip">Lowest range</span></span>
+        <span className="seq" aria-hidden="true"><span className="arrow">→</span><span className="chip sig">Emil’s estimate <b>1–3%</b></span></span>
       </div>
     );
   }

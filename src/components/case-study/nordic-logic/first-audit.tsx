@@ -28,87 +28,89 @@ const OUTCOME: Record<Branch, string> = {
 };
 /** The site's beat (FirstAudit.module.css): a card opens, the wire leaving it draws, the next card opens. */
 const BEAT_MS = 420;
+/** How long each ending stays on screen before the next one, and the pause before the loop starts over. */
+const HOLD_MS = 3200;
+const GAP_MS = 700;
 const TRUNK = ["send", "t1", "breakdown", "t2", "decide"];
 const FORK = ["fl", "fr", "sign", "walk"];
 const SIGN_RUN = ["l1", "file", "l2", "credit"];
-const DRAWN = new Set([...TRUNK, ...FORK]);
+const ALL = new Set([...TRUNK, ...FORK, ...SIGN_RUN]);
 
-/** Board frame 04 · the first audit, working. Both branches are buttons drawn the same; the chosen one runs to its end
- *  and the other quiets. Before the script runs (or with reduced motion) it shows drawn: trunk and fork. */
+/** Board frame 04 · the first audit, working. It plays itself (Liam, 2026-10-26: a visitor who never picks a branch
+ *  would miss half of it): the trunk draws, signing runs to the carrier's credit and its line, then walking away and
+ *  its line, and it starts over, for as long as it's on screen. Off screen it stops and clears. Reduced motion, or
+ *  before the script runs: the whole flow drawn, at rest. */
 export function FirstAudit() {
   const ref = useRef<HTMLDivElement>(null);
-  const first = useRef<HTMLButtonElement>(null);
   const timers = useRef<number[]>([]);
-  const [armed, setArmed] = useState(false);
-  const [on, setOn] = useState<Set<string>>(DRAWN);
+  const [on, setOn] = useState<Set<string>>(ALL);
   const [pulse, setPulse] = useState<Set<string>>(new Set());
-  const [choice, setChoice] = useState<Branch | null>(null);
+  const [branch, setBranch] = useState<Branch | null>(null);
   const [ended, setEnded] = useState(false);
 
-  const reduce = () => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
   const at = useCallback((ms: number, fn: () => void) => { timers.current.push(window.setTimeout(fn, ms)); }, []);
-  const clear = () => { timers.current.forEach(clearTimeout); timers.current = []; };
-  const add = (k: string) => setOn((s) => new Set(s).add(k));
-  const flash = useCallback((k: string, beat: number) => {
-    if (!beat) return;
+  const flash = useCallback((k: string) => {
     setPulse((s) => new Set(s).add(k));
-    at(beat * 2, () => setPulse((s) => { const n = new Set(s); n.delete(k); return n; }));
+    at(BEAT_MS * 2, () => setPulse((s) => { const n = new Set(s); n.delete(k); return n; }));
   }, [at]);
-  const show = useCallback((keys: string[], t0: number, beat: number) => {
-    keys.forEach((k, i) => at(t0 + i * beat, () => { add(k); if (k in LABEL) flash(k, beat); }));
+  const show = useCallback((keys: string[], t0: number) => {
+    keys.forEach((k, i) => at(t0 + i * BEAT_MS, () => { setOn((s) => new Set(s).add(k)); if (k in LABEL) flash(k); }));
   }, [at, flash]);
 
-  // Offscreen at load: hide it, then draw it in when it's reached. On screen already (or reduced motion): stays drawn.
   useEffect(() => {
     const el = ref.current;
-    if (!el || reduce() || typeof IntersectionObserver === "undefined") return;
-    if (el.getBoundingClientRect().top < window.innerHeight) return;
-    setArmed(true);
-    setOn(new Set());
-    const io = new IntersectionObserver((es) => {
-      if (!es.some((e) => e.isIntersecting)) return;
-      io.disconnect();
-      show([...TRUNK], 0, BEAT_MS);
-      at(TRUNK.length * BEAT_MS, () => setOn((s) => new Set([...s, ...FORK])));
+    if (!el || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches || typeof IntersectionObserver === "undefined") return;
+    const stop = () => { timers.current.forEach(clearTimeout); timers.current = []; };
+    const reset = () => { setOn(new Set()); setPulse(new Set()); setBranch(null); setEnded(false); };
+    const loop = () => {
+      reset();
+      show(TRUNK, GAP_MS);
+      let t = GAP_MS + TRUNK.length * BEAT_MS;
+      at(t, () => setOn((s) => new Set([...s, ...FORK])));
+      // signing: the other branch quiets, the disputes are filed, the carrier credits, then our invoice
+      t += BEAT_MS * 2;
+      at(t, () => { setBranch("sign"); flash("sign"); });
+      show(SIGN_RUN, t + BEAT_MS);
+      t += BEAT_MS * (SIGN_RUN.length + 1);
+      at(t, () => setEnded(true));
+      // walking away: the signing run clears, nothing more happens, nothing owed
+      t += HOLD_MS;
+      at(t, () => {
+        setEnded(false);
+        setOn((s) => { const n = new Set(s); SIGN_RUN.forEach((k) => n.delete(k)); return n; });
+        setBranch("walk");
+        flash("walk");
+      });
+      t += BEAT_MS;
+      at(t, () => setEnded(true));
+      at(t + HOLD_MS, loop);
+    };
+    reset();
+    const io = new IntersectionObserver(([e]) => {
+      stop();
+      if (e.isIntersecting) loop();
+      else reset();
     }, { threshold: 0.35 });
     io.observe(el);
-    return () => { io.disconnect(); clear(); };
-  }, [at, show]);
-
-  const choose = (b: Branch) => {
-    if (choice) return;
-    const beat = reduce() ? 0 : BEAT_MS;
-    setChoice(b);
-    setOn((s) => new Set([...s, ...DRAWN]));
-    flash(b, beat);
-    const run = b === "sign" ? SIGN_RUN : [];
-    show(run, beat, beat);
-    at(beat * (run.length + 1), () => setEnded(true));
-  };
-  const again = () => {
-    clear();
-    setChoice(null);
-    setEnded(false);
-    setPulse(new Set());
-    setOn(new Set(DRAWN));
-    first.current?.focus({ preventScroll: true });
-  };
+    return () => { io.disconnect(); stop(); };
+  }, [at, flash, show]);
 
   const cls = (k: string, base: string) => {
-    const rest = choice && ((choice === "sign" && (k === "walk" || k === "fr")) || (choice === "walk" && (k === "sign" || k === "fl")));
-    const end = ended && ((choice === "sign" && k === "credit") || (choice === "walk" && k === "walk"));
+    const rest = (branch === "sign" && (k === "walk" || k === "fr")) || (branch === "walk" && (k === "sign" || k === "fl"));
+    const end = ended && ((branch === "sign" && k === "credit") || (branch === "walk" && k === "walk"));
     return [base, on.has(k) && "on", pulse.has(k) && "pulse", rest && "rest", end && "end"].filter(Boolean).join(" ");
   };
   const node = (k: Node) => (
-    <>
+    <div key={k} className={cls(k, "fa-node")} data-n={k}>
       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">{MARK[k]}</svg>
       {LABEL[k]}
-    </>
+    </div>
   );
   const wire = (k: string, d: string) => <path className={cls(k, "w")} data-w={k} pathLength={1} d={d} />;
 
   return (
-    <div ref={ref} className={choice ? "fa chosen" : "fa"} data-armed={armed ? "" : undefined} role="group" aria-label="Your first audit, working: choose a branch">
+    <div ref={ref} className="fa" role="group" aria-label="Your first audit, working">
+      <p className="sr-only">Send your invoices, get a full breakdown, then you decide. Sign a power of attorney: we file the disputes, carriers credit your account, and {OUTCOME.sign.charAt(0).toLowerCase() + OUTCOME.sign.slice(1)} Or you walk away: {OUTCOME.walk.charAt(0).toLowerCase() + OUTCOME.walk.slice(1)}</p>
       <svg className="wires" viewBox="0 0 1296 530" preserveAspectRatio="none" aria-hidden="true">
         {wire("t1", "M648 60 L648 94")}
         {wire("t2", "M648 154 L648 188")}
@@ -117,16 +119,10 @@ export function FirstAudit() {
         {wire("l1", "M376 342 L376 376")}
         {wire("l2", "M376 436 L376 470")}
       </svg>
-      {(["send", "breakdown", "decide"] as const).map((k) => <div key={k} className={cls(k, "fa-node")} data-n={k}>{node(k)}</div>)}
-      {(["sign", "walk"] as const).map((k, i) => (
-        <button key={k} ref={i === 0 ? first : undefined} type="button" className={cls(k, "fa-node")} data-n={k} aria-pressed={choice === k} aria-disabled={!!choice && choice !== k} onClick={() => choose(k)}>
-          {node(k)}
-          <span className="choose" aria-hidden="true">Choose</span>
-        </button>
-      ))}
-      {(["file", "credit"] as const).map((k) => <div key={k} className={cls(k, "fa-node")} data-n={k}>{node(k)}</div>)}
-      <p className={ended ? "fa-out on" : "fa-out"} aria-live="polite">{ended && choice ? OUTCOME[choice] : ""}</p>
-      {ended && <button type="button" className="fa-again on" onClick={again}>Choose again</button>}
+      <div className="fa-nodes" aria-hidden="true">
+        {(["send", "breakdown", "decide", "sign", "walk", "file", "credit"] as const).map(node)}
+        <p className={ended ? "fa-out on" : "fa-out"}>{branch ? OUTCOME[branch] : ""}</p>
+      </div>
     </div>
   );
 }

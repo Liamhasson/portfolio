@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, type ComponentType } from "react";
 import type { Outcome as Data } from "@/lib/case-studies/types";
 import { Icon } from "./icons";
 
@@ -18,8 +18,9 @@ function LinkedLine({ line, href }: { line: string; href: string }) {
   );
 }
 
-/** Board frame 07 · Impact: the lines large (the second quieter); Cyvore adds the quote, Eventread the way in. */
-export function Outcome({ outcome }: { outcome: Data }) {
+/** Board frame 07 · Impact: the lines large (the second quieter); Cyvore adds the quote, Eventread the way in, Nordic
+ *  Logic its phone screens above the link. */
+export function Outcome({ outcome, Visual }: { outcome: Data; Visual?: ComponentType }) {
   const headingId = useId();
   const [first, ...rest] = outcome.lines;
   return (
@@ -37,6 +38,7 @@ export function Outcome({ outcome }: { outcome: Data }) {
                   <span key={line} className="quiet"><br />{line}</span>
                 ))}
               </p>
+              {Visual && <Visual />}
               <div className="row-cta">
                 <a href={outcome.link.href} target="_blank" rel="noreferrer" className="btn btn-ink">
                   {outcome.link.label}<span className="sr-only"> (opens in a new tab)</span>

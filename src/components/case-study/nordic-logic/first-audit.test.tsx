@@ -1,48 +1,53 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { FirstAudit } from "./first-audit";
 
-beforeEach(() => vi.useFakeTimers());
-afterEach(() => vi.useRealTimers());
+/** A stand-in IntersectionObserver the test drives: `seen(true)` puts the flow on screen, `seen(false)` takes it off. */
+let fire: (visible: boolean) => void = () => {};
+class IO {
+  constructor(private cb: IntersectionObserverCallback) { fire = (v) => this.cb([{ isIntersecting: v } as IntersectionObserverEntry], this as unknown as IntersectionObserver); }
+  observe() {}
+  disconnect() {}
+}
+const seen = (v: boolean) => act(() => fire(v));
+const wait = (ms: number) => act(() => { vi.advanceTimersByTime(ms); });
+const node = (c: HTMLElement, n: string) => c.querySelector(`[data-n="${n}"]`)!.className;
 
-const run = () => act(() => { vi.runAllTimers(); });
+beforeEach(() => { vi.useFakeTimers(); vi.stubGlobal("IntersectionObserver", IO); });
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
-test("before anything runs, the trunk and the fork show drawn, both branches as equal buttons", () => {
+test("without the observer (or with reduced motion) the whole flow shows drawn, at rest, and nothing is a button", () => {
+  vi.unstubAllGlobals();
+  vi.stubGlobal("IntersectionObserver", undefined);
   const { container } = render(<FirstAudit />);
-  const fa = container.querySelector(".fa")!;
-  expect(fa.hasAttribute("data-armed")).toBe(false);
-  const sign = screen.getByRole("button", { name: /Sign a power of attorney/ });
-  const walk = screen.getByRole("button", { name: /You walk away/ });
-  expect(sign.className).toBe(walk.className);
-  expect(screen.queryByRole("button", { name: "Choose again" })).toBeNull();
+  for (const n of ["send", "breakdown", "decide", "sign", "walk", "file", "credit"]) expect(node(container, n)).toContain("on");
+  expect(screen.queryAllByRole("button")).toHaveLength(0);
+  expect(screen.getByText(/Or you walk away/)).toBeTruthy();
 });
 
-test("signing runs to its end: the disputes are filed, the carrier credits, then our invoice", () => {
+test("on screen it plays itself: signing runs to the carrier's credit, then walking away, with each one's line", () => {
   const { container } = render(<FirstAudit />);
-  fireEvent.click(screen.getByRole("button", { name: /Sign a power of attorney/ }));
-  run();
-  expect(container.querySelector('[data-n="credit"]')!.className).toContain("on");
-  expect(container.querySelector('[data-n="walk"]')!.className).toContain("rest");
-  expect(screen.getByText(/Your carrier account is credited first/).className).toContain("on");
-  expect(screen.getByRole("button", { name: /Sign a power of attorney/ })).toHaveAttribute("aria-pressed", "true");
+  expect(node(container, "send")).not.toContain("on");
+  seen(true);
+  wait(6000);
+  expect(node(container, "credit")).toContain("end");
+  expect(node(container, "walk")).toContain("rest");
+  expect(container.querySelector(".fa-out")!.textContent).toMatch(/Your carrier account is credited first/);
+  wait(4000);
+  expect(node(container, "file")).not.toContain("on");
+  expect(node(container, "walk")).toContain("end");
+  expect(node(container, "sign")).toContain("rest");
+  expect(container.querySelector(".fa-out")!.textContent).toBe("The breakdown was free. Nothing signed, nothing owed.");
 });
 
-test("walking away ends at once, nothing owed; choosing again resets the fork and hands focus back", () => {
+test("it starts over after the second ending, and clears when it leaves the screen", () => {
   const { container } = render(<FirstAudit />);
-  fireEvent.click(screen.getByRole("button", { name: /You walk away/ }));
-  run();
-  expect(screen.getByText("The breakdown was free. Nothing signed, nothing owed.").className).toContain("on");
-  expect(container.querySelector('[data-n="file"]')!.className).not.toContain("on");
-  fireEvent.click(screen.getByRole("button", { name: "Choose again" }));
-  run();
-  expect(container.querySelector(".fa")!.className).not.toContain("chosen");
-  expect(document.activeElement).toBe(screen.getByRole("button", { name: /Sign a power of attorney/ }));
-});
-
-test("a second click after choosing changes nothing", () => {
-  const { container } = render(<FirstAudit />);
-  fireEvent.click(screen.getByRole("button", { name: /You walk away/ }));
-  fireEvent.click(screen.getByRole("button", { name: /Sign a power of attorney/ }));
-  run();
-  expect(container.querySelector('[data-n="file"]')!.className).not.toContain("on");
+  seen(true);
+  wait(13600);
+  expect(node(container, "decide")).not.toContain("on");
+  wait(3000);
+  expect(node(container, "decide")).toContain("on");
+  seen(false);
+  wait(20000);
+  expect(container.querySelectorAll(".fa-node.on")).toHaveLength(0);
 });

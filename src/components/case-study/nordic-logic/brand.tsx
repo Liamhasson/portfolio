@@ -36,11 +36,12 @@ export function NordicLogicBrand({ kind, title }: { kind: "supporting"; title: s
   return (
     <section aria-labelledby={id} data-block={kind} className={`f brand ${nordicFonts}`}>
       <div className="g12" style={{ alignItems: "end" }}>
-        <h2 id={id} className="title" style={{ gridColumn: "1 / 6", marginLeft: "calc(var(--u) * -3)" }}>{title}</h2>
-        <div style={{ gridColumn: "6 / 13" }}>
-          <p className="b3-idea">Show the working.</p>
-          <p className="body b3-support">Nordic Logic’s buyer expects to be sold to, so the brand never asks for trust. It shows its working: every number sourced, every finding left on the page where you can check it.</p>
-        </div>
+        <h2 id={id} className="title" style={{ gridColumn: "1 / 7", marginLeft: "calc(var(--u) * -3)" }}>{title}</h2>
+        {/* The idea as the text's lead line, as Solution and How it works open (Liam, 2026-10-26: set apart as its own
+            headline it read as unconnected to Brand). */}
+        <p className="body" style={{ gridColumn: "8 / 13" }}>
+          <span className="lead">Show the working.</span> That’s the idea the brand is built on. Nordic Logic’s buyer expects to be sold to, so it never asks for trust: every number is sourced, every finding stays on the page. The brief’s seven words and five nevers each became a decision.
+        </p>
       </div>
 
       <div className="b3-origin">
