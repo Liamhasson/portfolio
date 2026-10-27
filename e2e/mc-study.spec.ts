@@ -109,6 +109,38 @@ test.describe("a 390 px phone", () => {
     await expectNoHorizontalScroll(page);
     await expectTextFloors(page);
   });
+  test("at a glance: role | timeline, team | impact, then the tools across, as on Nordic Logic (Liam, 2026-10-27)", async ({ page }) => {
+    await page.goto(URL);
+    const box = async (name: string) => (await page.locator(".strip > div").filter({ has: page.locator("dt", { hasText: new RegExp(`^${name}$`) }) }).boundingBox())!;
+    const [role, timeline, team, impact, tools] = await Promise.all(["Role", "Timeline", "Team", "Impact", "Tools"].map(box));
+    expect(timeline.y).toBeCloseTo(role.y, 0);
+    expect(impact.y).toBeCloseTo(team.y, 0);
+    expect(team.y).toBeGreaterThan(role.y);
+    expect(tools.y).toBeGreaterThan(team.y);
+    expect(tools.width).toBeGreaterThan(300);
+  });
+  test("the Problem's words sit on the same gutter as the other sections", async ({ page }) => {
+    await page.goto(URL);
+    const left = (sel: string) => page.locator(sel).first().evaluate((el) => Math.round(el.getBoundingClientRect().left));
+    expect(await left(".problem h2")).toBe(await left(".strategy h2"));
+  });
+});
+
+test("nothing in the study is cut off at the screen's edges, from 320 to 1099 (Liam, 2026-10-27)", async ({ page }) => {
+  for (const width of [320, 390, 768, 1099]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto(URL);
+    const cut = await page.evaluate((W) => {
+      const out: string[] = [];
+      for (const el of document.querySelectorAll("article[data-world='marni-came'] *")) {
+        const r = el.getBoundingClientRect();
+        if (!r.width || !r.height || getComputedStyle(el).position === "fixed") continue;
+        if (r.right > W + 1 || r.left < -1) out.push(`${el.tagName}.${el.className} "${(el.textContent ?? "").trim().slice(0, 30)}"`);
+      }
+      return out;
+    }, width);
+    expect(cut, `${width}`).toEqual([]);
+  }
 });
 
 test("identity: three logo versions, none of them red; the specimen has no words", async ({ page }) => {
