@@ -86,3 +86,11 @@ test("Eventread's design system is its own section: three references, the core c
   const order = await page.evaluate(() => [...document.querySelectorAll("article.cs section h2")].map((h) => h.textContent));
   expect(order.indexOf("Design system")).toBe(order.indexOf("How it works") + 1);
 });
+
+test("on a phone the challenges stack in one column (Liam, 2026-10-27)", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/eventread");
+  const [a, b] = await page.locator(".chs.two > li").evaluateAll((els) => els.map((el) => { const r = el.getBoundingClientRect(); return { y: r.top, w: r.width }; }));
+  expect(b.y).toBeGreaterThan(a.y);
+  expect(a.w).toBeGreaterThan(300);
+});

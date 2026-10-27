@@ -353,6 +353,9 @@
   [data-world="cyvore"] .ds > div { padding: calc(var(--u) * 20); }
   [data-world="cyvore"] .spec-a { font-size: calc(var(--u) * 30); }
   [data-world="cyvore"] .spec-b { font-size: calc(var(--u) * 34); }
+  /* (Liam 10-27: two buttons a row ran past the card on phones; the seven tokens' codes ran into each other at 320) */
+  [data-world="cyvore"] .states { grid-template-columns: minmax(0, 1fr); }
+  [data-world="cyvore"] .swatches { grid-template-columns: repeat(4, minmax(0, 1fr)); row-gap: calc(var(--u) * 12); }
 }
 /* the annotations above the replica are Liam's words: floored like every label */
 [data-world="cyvore"] .rep-anno span { font-size: max(11px, calc(var(--u) * 12)); }

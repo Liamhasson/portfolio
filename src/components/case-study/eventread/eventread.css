@@ -343,5 +343,6 @@
   [data-world="eventread"] .ds-comps { margin: calc(var(--u) * 16) calc(var(--u) * 16) 0; padding: calc(var(--u) * 20); }
   [data-world="eventread"] .ds-foot { margin-top: calc(var(--u) * 40); }
   [data-world="eventread"] .ds-foot .display { font-size: calc(var(--u) * 28); }
-  [data-world="eventread"] .chs.two { grid-template-columns: minmax(0, 1fr); }
+  /* (as specific as the desktop rule, which otherwise kept two narrow columns on phones, Liam 10-27) */
+  [data-world="eventread"] .f.chal .chs.two { grid-template-columns: minmax(0, 1fr); }
 }

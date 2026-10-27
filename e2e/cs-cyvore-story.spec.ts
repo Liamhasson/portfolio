@@ -516,3 +516,17 @@ test.describe("page", () => {
     expect(errors).toEqual([]);
   });
 });
+
+test("on a phone the design system's states and colour codes stay inside their cards, down to 320 (Liam, 2026-10-27)", async ({ page }) => {
+  for (const width of [320, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto("/cyvore");
+    const out = await page.locator(".ds > div").evaluateAll((cards) => cards.flatMap((card) => {
+      const c = card.getBoundingClientRect();
+      return [...card.querySelectorAll(".state > *, .sw span")].filter((el) => el.getBoundingClientRect().right > c.right + 1).map((el) => el.textContent);
+    }));
+    expect(out, `${width}`).toEqual([]);
+    const codes = await page.locator(".swatches .sw span").evaluateAll((s) => s.map((el) => el.getBoundingClientRect()));
+    for (let i = 1; i < codes.length; i++) if (Math.abs(codes[i].top - codes[i - 1].top) < 1) expect(codes[i].left, `${width}`).toBeGreaterThanOrEqual(codes[i - 1].right);
+  }
+});
