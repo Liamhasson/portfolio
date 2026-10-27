@@ -31,10 +31,8 @@ export const MC_ASSETS = {
   burns: [0, 1, 2, 3, 4, 5].map((i) => `${R}/burn/${i}.jpg`),
   /** The After Heartbreaks video's own burned frames, for Imagery (sources in tools/marni-came/sources/burned). */
   burned: [0, 1, 2, 3, 4, 5, 6].map((i) => `${R}/burned/${i}.jpg`),
-  /** The burn moving on its own, screened over the band site's hero and the sound toggle. */
+  /** The burn moving on its own, screened over the band site's hero. */
   burnLoop: `${R}/video/burn-loop.mp4`,
-  /** A denser burn for the small sound toggle (its gaps are short, so 'on' always shows). */
-  burnPill: `${R}/video/burn-pill.mp4`,
   /** The crowd during Dopamine at Badehaus, 4:5, for the Problem's half (Liam, 2026-10-21). */
   problemLoop: `${R}/video/problem-burn.mp4`,
   problemPoster: `${R}/video/problem-burn.jpg`,
@@ -55,10 +53,11 @@ export const MC_ASSETS = {
     tall: `${R}/doubled/tall.jpg`, sameFrame: `${R}/doubled/same-frame.jpg`,
   },
   tracks: {
-    afterHeartbreaks: { src: `${R}/audio/after-heartbreaks.m4a`, peaks: `${R}/audio/after-heartbreaks.peaks.json` },
-    dopamine: { src: `${R}/audio/dopamine.m4a`, peaks: `${R}/audio/dopamine.peaks.json` },
-    /** The playground's own files. */
-    youllBeYou: { src: "/playground/youll-be-you.m4a", peaks: "/playground/youll-be-you.peaks.json" },
+    // (energy: how loud each moment is, where it hits and its waveform, for the audio button: tools/marni-came/energy.py)
+    afterHeartbreaks: { src: `${R}/audio/after-heartbreaks.m4a`, peaks: `${R}/audio/after-heartbreaks.peaks.json`, energy: `${R}/audio/after-heartbreaks.energy.json` },
+    dopamine: { src: `${R}/audio/dopamine.m4a`, peaks: `${R}/audio/dopamine.peaks.json`, energy: `${R}/audio/dopamine.energy.json` },
+    /** The playground's own files (its energy lives with the study's). */
+    youllBeYou: { src: "/playground/youll-be-you.m4a", peaks: "/playground/youll-be-you.peaks.json", energy: `${R}/audio/youll-be-you.energy.json` },
   },
 } as const;
 

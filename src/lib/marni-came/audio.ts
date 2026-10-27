@@ -3,7 +3,7 @@ import { MC_ASSETS } from "./assets";
 /** One audio state for the case study and the band site inside it (spec §4.5): off by default, one track at a time,
  *  paused when the tab is hidden. The site in its iframe asks the page to play (postMessage) instead of playing itself. */
 export type TrackId = "after-heartbreaks" | "dopamine" | "youll-be-you";
-export const TRACKS: Record<TrackId, { src: string; peaks: string; title: string }> = {
+export const TRACKS: Record<TrackId, { src: string; peaks: string; energy: string; title: string }> = {
   "after-heartbreaks": { ...MC_ASSETS.tracks.afterHeartbreaks, title: "After Heartbreaks" },
   dopamine: { ...MC_ASSETS.tracks.dopamine, title: "Dopamine" },
   "youll-be-you": { ...MC_ASSETS.tracks.youllBeYou, title: "You'll Be You" },
