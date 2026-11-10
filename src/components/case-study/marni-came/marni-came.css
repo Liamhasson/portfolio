@@ -19,6 +19,8 @@
 /* Liam 10-26, after lusion.co: a round button at the bottom centre. Off, a flat line and the word Audio in one dark pill
    (the word says what it is). On, just the circle: its fill follows the loudness in the burn colours and its line draws
    the track's waveform (audio-button.tsx writes both). No glow: a flat fill. */
+[data-world="marni-came"] .mc-lesson { margin-top: calc(var(--u) * 48); max-width: 62ch; }
+[data-world="marni-came"] .mc-lesson .label { margin: 0 0 calc(var(--u) * 12); }
 [data-world="marni-came"] .mc-audio { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 50; display: inline-flex; align-items: center; gap: 4px;
   height: 50px; padding: 0 18px 0 0; border-radius: 26px; background: rgba(10,9,8,.72); border: 1px solid var(--hair-2); color: var(--bone);
   font: 400 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; cursor: pointer;

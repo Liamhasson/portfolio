@@ -47,9 +47,12 @@ export function Outcome({ outcome, Visual }: { outcome: Data; Visual?: Component
               </div>
             </>
           ) : (
-            <p className="out-lines">
-              {outcome.lines.map((line) => <span key={line}>{line}</span>)}
-            </p>
+            <>
+              <p className="out-lines">
+                {outcome.lines.map((line) => <span key={line}>{line}</span>)}
+              </p>
+              {Visual && <Visual />}
+            </>
           )}
           {outcome.quote && (
             <figure className="quote">
