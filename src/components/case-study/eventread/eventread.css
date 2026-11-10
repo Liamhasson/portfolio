@@ -84,13 +84,23 @@
 [data-world="eventread"] .slider .thumb { position: absolute; left: 50%; top: 0; width: calc(var(--u) * 24); height: calc(var(--u) * 24); margin-left: calc(var(--u) * -12); border-radius: 50%; background: #fff; border: calc(var(--u) * 2) solid var(--ink); box-shadow: 0 0 0 calc(var(--u) * 6) rgba(26,26,46,.12); }
 [data-world="eventread"] .ticks { display: flex; justify-content: space-between; font: 400 calc(var(--u) * 11)/1 var(--mono); color: var(--ink-3); margin-top: calc(var(--u) * 10); }
 [data-world="eventread"] .seg { display: flex; flex-wrap: wrap; gap: calc(var(--u) * 6); }
-[data-world="eventread"] .seg span { height: calc(var(--u) * 32); padding: 0 calc(var(--u) * 12); display: inline-flex; align-items: center; border-radius: calc(var(--u) * 6); border: calc(var(--u) * 1) solid var(--hair-2); background: #fff; font-size: calc(var(--u) * 13); color: var(--ink-2); }
-[data-world="eventread"] .seg span.on { background: var(--ink); border-color: var(--ink); color: #fff; font-weight: 500; }
+[data-world="eventread"] .seg :is(span, button) { height: calc(var(--u) * 32); padding: 0 calc(var(--u) * 12); display: inline-flex; align-items: center; border-radius: calc(var(--u) * 6); border: calc(var(--u) * 1) solid var(--hair-2); background: #fff; font-size: calc(var(--u) * 13); color: var(--ink-2); }
+[data-world="eventread"] .seg :is(span, button).on { background: var(--ink); border-color: var(--ink); color: #fff; font-weight: 500; }
 [data-world="eventread"] .time { display: flex; align-items: center; height: calc(var(--u) * 44); border: calc(var(--u) * 1) solid var(--hair-2); border-radius: calc(var(--u) * 6); background: #fff; overflow: hidden; }
 [data-world="eventread"] .time span { flex: 1; text-align: center; font: 500 calc(var(--u) * 18)/1 var(--mono); }
-[data-world="eventread"] .time b { width: calc(var(--u) * 44); height: 100%; display: grid; place-items: center; color: var(--ink-2); border-left: calc(var(--u) * 1) solid var(--hair-2); }
-[data-world="eventread"] .time b:first-child { border-left: 0; border-right: calc(var(--u) * 1) solid var(--hair-2); }
+[data-world="eventread"] .time :is(b, button) { width: calc(var(--u) * 44); height: 100%; display: grid; place-items: center; color: var(--ink-2); border-left: calc(var(--u) * 1) solid var(--hair-2); }
+[data-world="eventread"] .time :is(b, button):first-child { border-left: 0; border-right: calc(var(--u) * 1) solid var(--hair-2); }
 [data-world="eventread"] .time-help { font: 400 calc(var(--u) * 11)/1.5 var(--mono); color: var(--ink-3); margin-top: calc(var(--u) * 10); }
+/* the running demo: a real range input laid over the drawn slider; real buttons in place of the drawn chips and stepper,
+   each with a 44px touch area */
+[data-world="eventread"] .slider-input { position: absolute; left: 0; right: 0; top: -10px; width: 100%; height: calc(100% + 20px); margin: 0; opacity: 0; cursor: grab; }
+[data-world="eventread"] .slider-input:active { cursor: grabbing; }
+[data-world="eventread"] .slider:has(.slider-input:focus-visible) .thumb { outline: 2px solid var(--ink); outline-offset: 2px; }
+[data-world="eventread"] .calc .seg button { position: relative; cursor: pointer; font-family: inherit; }
+[data-world="eventread"] .calc .seg button::after { content: ""; position: absolute; inset: -6px -3px; }
+[data-world="eventread"] .calc .seg button:focus-visible, [data-world="eventread"] .calc .time button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+[data-world="eventread"] .calc .time button { padding: 0; background: none; border-top: 0; border-bottom: 0; border-right: 0; cursor: pointer; }
+[data-world="eventread"] .calc .time button:disabled { opacity: .35; cursor: default; }
 [data-world="eventread"] .rows { display: flex; flex-direction: column; }
 [data-world="eventread"] .row { padding: calc(var(--u) * 26) calc(var(--u) * 32) calc(var(--u) * 28); border-top: calc(var(--u) * 1) solid var(--hair); position: relative; }
 [data-world="eventread"] .row:first-child { border-top: 0; }
@@ -121,7 +131,6 @@
 [data-world="eventread"] .counter { display: inline-flex; align-items: center; gap: calc(var(--u) * 8); font: 400 calc(var(--u) * 11)/1 var(--mono); letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); }
 [data-world="eventread"] .counter b { font-weight: 500; letter-spacing: 0; color: var(--ink); min-width: calc(var(--u) * 22); height: calc(var(--u) * 22); padding: 0 calc(var(--u) * 5); display: inline-grid; place-items: center; border: calc(var(--u) * 1) solid var(--hair-2); border-radius: calc(var(--u) * 4); background: #fff; }
 [data-world="eventread"] .counter.crit b { color: var(--critical); }
-[data-world="eventread"] .cursor { position: absolute; width: calc(var(--u) * 22); height: calc(var(--u) * 22); z-index: 4; filter: drop-shadow(0 calc(var(--u) * 2) calc(var(--u) * 3) rgba(0,0,0,.25)); }
 /* ------------------------------ 5 how it works ------------------------------ */
 [data-world="eventread"] .support { padding: calc(var(--u) * 128) 0 calc(var(--u) * 120); }
 [data-world="eventread"] .support .g12 { align-items: stretch; }
