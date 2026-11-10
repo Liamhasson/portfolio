@@ -131,6 +131,9 @@ export function EventreadSolution({ kind, title }: { kind: "signature"; title: s
           <p className="body">
             On the live product&apos;s own example, a 1,000-cap rock show in Berlin on 18 November 2026, Muse at the Uber Arena is Critical, Horse Lords in a 532-cap room is a Threat because it&apos;s the same genre, and TAEMIN at 3,638 is Safe. Change the show above and those three rows re-score with the product&apos;s own weights.
           </p>
+          <p className="body" style={{ marginTop: "calc(var(--u) * 16)" }}>
+            On top of the three weights sits a city-impact rule, because genre alone can make a stadium look harmless. Today only its capacity rule runs, so an event of 50,000 or more can&apos;t score below Threat. The ranking meant to drive the rest isn&apos;t in the live listings yet.
+          </p>
         </div>
         <p className="display" style={{ gridColumn: "7/13" }}>Size isn&apos;t danger; <em>relevance is.</em></p>
       </div>
