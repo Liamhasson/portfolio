@@ -157,7 +157,7 @@
 /* ------------------------------ the prototype overlay (real px: it sits over the whole page) ------------------------------ */
 [data-world="pulse"] .proto { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; font-family: var(--sans); color: var(--ink); }
 [data-world="pulse"] .proto[hidden] { display: none; }
-[data-world="pulse"] .proto-backdrop { position: absolute; inset: 0; background: rgba(3,6,12,.84); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+[data-world="pulse"] .proto-backdrop { position: absolute; inset: 0; background: #03060c; } /* opaque: the page's own headline showed through behind the overlay's */
 [data-world="pulse"] .proto-body { --ph: min(84vh, 780px); position: relative; display: flex; align-items: center; gap: 64px; padding: 24px; }
 [data-world="pulse"] .proto-side { width: 300px; display: flex; flex-direction: column; gap: 18px; }
 [data-world="pulse"] .proto-eyebrow { margin: 0; font: 400 12px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }

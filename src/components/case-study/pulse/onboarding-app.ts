@@ -107,6 +107,7 @@ export const screensHTML = (id: string): string[] => [
     ${head("What brings you here?", "Pick the goals that matter most to you")}
     <div class="pa-list" role="group" aria-label="Goals">${GOALS.map((g) =>
       `<button type="button" class="pa-goal pa-hit" data-act="goal" data-goal="${esc(g)}" aria-pressed="false"><span>${esc(g)}</span><span class="pa-tick" aria-hidden="true">${img("ic-check.svg")}</span></button>`).join("")}</div>
+    <p class="pa-msg" role="status" data-msg="goals"></p>
     ${cta("Continue", 3, { extra: ' data-need="goals"' })}
     ${home()}`),
 
@@ -123,6 +124,7 @@ export const screensHTML = (id: string): string[] => [
           <div class="pa-chips">${c.chips.map((ch) => `<button type="button" class="pa-chip pa-hit" data-act="chip" data-chip="${esc(ch)}" aria-pressed="false"><span>${esc(ch)}</span></button>`).join("")}</div>
         </div>
       </div>`).join("")}</div>
+    <p class="pa-msg" role="status" data-msg="activities"></p>
     ${cta("Continue", 4, { extra: ' data-need="activities"' })}
     ${home()}`),
 
@@ -157,6 +159,7 @@ export const screensHTML = (id: string): string[] => [
     ${head("Pick a time", "Burn Club · HIIT", 128, "studioWorkout")}
     <div class="pa-days" role="group" aria-label="Day"><span class="pa-days-ring" aria-hidden="true"></span>${DAYS.map((d) =>
       `<button type="button" class="pa-day pa-hit" data-act="day" data-day="${esc(d.date)}" aria-pressed="false"><span class="d">${d.d}</span>${d.n ? `<span class="n">${d.n}</span>` : ""}</button>`).join("")}</div>
+    <p class="pa-msg is-days" role="status" data-msg="day"></p>
     <div class="pa-slots" role="group" aria-label="Classes">${SLOTS.map(([who, time, st], i) =>
       `<button type="button" class="pa-slot pa-glass pa-hit" data-act="slot" data-slot="${i}" aria-disabled="true" tabindex="-1"><span class="who"><b>${esc(who)}</b><span>${time}</span></span><span class="state"><span class="pa-badge ${st}">${BADGE[st]}</span></span></button>`).join("")}</div>
     `),
@@ -218,6 +221,7 @@ function reflect(root: ParentNode, s: Choices) {
   pressedIf(all("[data-day]"), (b) => s.day === b.dataset.day);
   // Continue holds until its screen has a pick (02: a goal, 03: an activity).
   all("[data-need]").forEach((b) => { if (s[b.dataset.need as "goals" | "activities"].length) b.removeAttribute("aria-disabled"); else b.setAttribute("aria-disabled", "true"); });
+  all("[data-msg]").forEach((m) => { const k = m.dataset.msg!; if (k === "day" ? s.day : s[k as "goals" | "activities"].length) m.textContent = ""; });
   // The class times wait for a day: dimmed and out of reach until one is picked; fully booked ones stay out.
   all(".pa-slots").forEach((el) => el.toggleAttribute("data-wait", !s.day));
   all("[data-slot]").forEach((b) => {
@@ -424,7 +428,9 @@ export function createApp(root: HTMLElement, shell: AppShell): AppApi {
   /* 07 before a day is picked: a tap on a class time points at the days, not at every control. */
   const days = $(".pa-days", 7);
   let nudgeT: ReturnType<typeof setTimeout> | undefined;
+  const say = (key: string, text: string) => { const m = root.querySelector<HTMLElement>(`[data-msg="${key}"]`); if (m) m.textContent = text; };
   const nudge = () => {
+    say("day", "Pick a day first to see the open times.");
     clearTimeout(nudgeT);
     days.classList.remove("is-nudge");
     void days.offsetWidth; // replay from the start on a second tap
@@ -436,6 +442,11 @@ export function createApp(root: HTMLElement, shell: AppShell): AppApi {
     const el = (e.target as Element).closest<HTMLElement>("[data-act]");
     if (!el || !root.contains(el)) return;
     if (el.dataset.act === "slot" && !s.day) { e.stopPropagation(); nudge(); return; } // the shell's misclick hint stays off
+    if (el.dataset.need && el.getAttribute("aria-disabled") === "true") {
+      e.stopPropagation(); // says why itself, so the shell's misclick hint stays off
+      say(el.dataset.need, el.dataset.need === "goals" ? "Pick at least one goal to continue." : "Pick at least one activity to continue.");
+      return;
+    }
     if (el.getAttribute("aria-disabled") === "true") return;
     const { act } = el.dataset;
     if (act === "go") { shell.navigate(Number(el.dataset.to)); return; }

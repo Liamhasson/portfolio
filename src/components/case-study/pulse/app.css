@@ -63,6 +63,10 @@
 [data-world="pulse"] .pa-cta.is-glow { filter: none; box-shadow: var(--glow); overflow: hidden; }
 [data-world="pulse"] .pa-cta:active:not([aria-disabled="true"]) { transform: scale(.98); }
 [data-world="pulse"] .pa-cta[aria-disabled="true"] { opacity: .4; cursor: default; } /* Button · Primary · Disabled */
+/* says why a held control is held (review, 2026-11-10: screens 3 and 7 did nothing, silently) */
+[data-world="pulse"] .pa-msg { position: absolute; left: 24px; right: 24px; top: 690px; margin: 0; text-align: center; font: 600 13px/18px var(--mr); color: #7fdcea; }
+[data-world="pulse"] .pa-msg:empty { display: none; }
+[data-world="pulse"] .pa-msg.is-days { top: 290px; left: 50%; right: auto; transform: translateX(-50%); width: max-content; padding: 8px 14px; border-radius: 999px; background: #0b2230; border: 1px solid rgba(127,220,234,.4); z-index: 3; }
 [data-world="pulse"] .pa-pill { position: absolute; left: 24px; width: 345px; height: 56px; border-radius: 999px; display: flex; align-items: center; justify-content: center;
   font: 700 16px/20px var(--mr); letter-spacing: .2px; white-space: nowrap; }
 /* the fixed layer over the screens (Back, Skip, the bar): it holds still while the screens slide beneath it */
