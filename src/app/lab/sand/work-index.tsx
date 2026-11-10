@@ -60,7 +60,8 @@ const CSS = `
   position:fixed; left:0; top:0; transform-origin:0 0; background:var(--bg); color:var(--ink); font-family:var(--font-sans);
   overflow:hidden; container-type:inline-size; will-change:transform,opacity; line-height:normal; }
 .wi .page { position:absolute; inset:0; overflow:hidden; }
-.wi .top { padding:3.4cqw 3.6cqw 0; }
+/* the fixed name (nav-name.tsx) ends about 92px down at 1440: the title sits clear below it */
+.wi .top { padding:calc(clamp(12px,3.6vw,48px) + 56px) 3.6cqw 0; }
 .wi .title { font-size:4.8cqw; font-weight:400; line-height:.98; letter-spacing:-.02em; margin:0; }
 .wi .grid { display:grid; grid-template-columns:1fr 1fr; gap:3.2cqw 2.4cqw; padding:3.4cqw 3.6cqw 0; margin:0; list-style:none; }
 .wi .card, .wl .card { display:block; color:inherit; text-decoration:none; }
