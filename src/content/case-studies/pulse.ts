@@ -33,13 +33,13 @@ export const pulse: CaseStudy = {
       title: "Challenges looked public",
       happened: "4 of 6 testers thought Challenges were public.",
       did: "I gave each feature a one-screen introduction.",
-      changed: "In round 2, 6 of 6 testers understood that Challenges are private.",
+      changed: "In round 2, which mixed returning and new testers, 6 of 6 understood that Challenges are private.",
     },
   ],
   outcome: {
     lines: [
       "A tested prototype.",
-      "After the fixes, 6 of 6 testers in round 2 (returning and new) completed every scenario task.",
+      "After the fixes, 6 of 6 testers in round 2, which mixed returning and new testers, completed every scenario task.",
     ],
   },
   peek: { src: "/case-studies/pulse/peek.jpg", alt: "Pulse's first onboarding screen", width: 600, height: 1300 },

@@ -86,7 +86,7 @@ export const ABOUT = {
     {
       title: "Check I’m right.",
       skills: [
-        { name: "Usability testing", proof: "Pulse round 2: 6 of 6 completed every task", href: "/pulse" },
+        { name: "Usability testing", proof: "Pulse round 2, returning and new testers: 6 of 6 completed every task", href: "/pulse" },
         { name: "Data-informed decisions", proof: "Eventread: risk bands checked on 3,172 real listings", href: "/eventread" },
         { name: "Stakeholder communication", proof: "Cyvore: argued for a 7-second animation over the full video; it shipped", href: "/cyvore" },
       ],
