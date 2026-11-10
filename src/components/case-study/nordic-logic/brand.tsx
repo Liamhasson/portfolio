@@ -11,7 +11,7 @@ const WORDS = ["Efficient", "Automated", "Precise", "Personal", "Safe", "Modern"
 const NEVER = ["Industrial", "Boring", "Generic fintech", "Playful", "Startup-cute"];
 /** What three of the words became, and what three of the nevers ruled out. */
 const DECIDED: [string, string][] = [
-  ["Precise", "Plex Mono for every figure, and no number on the site without a source."],
+  ["Precise", "Plex Mono for every figure, and the rule is no number without a source."],
   ["Personal", "Light weights that stop at 500, and the voice of one founder."],
   ["Safe", "No cookie banner, and every uploaded file deleted after 100 days."],
 ];
@@ -40,7 +40,7 @@ export function NordicLogicBrand({ kind, title }: { kind: "supporting"; title: s
         {/* The idea as the text's lead line, as Solution and How it works open (Liam, 2026-10-26: set apart as its own
             headline it read as unconnected to Brand). */}
         <p className="body" style={{ gridColumn: "8 / 13" }}>
-          <span className="lead">Show the working.</span> That’s the idea the brand is built on. Nordic Logic’s buyer expects to be sold to, so it never asks for trust: every number is sourced, every finding stays on the page. The brief’s seven words and five nevers each became a decision.
+          <span className="lead">Show the working.</span> That’s the idea the brand is built on. Nordic Logic’s buyer expects to be sold to, so the plan was never to ask for trust: give every number a source and keep every finding on the page. The brief’s seven words and five nevers each became a decision.
         </p>
       </div>
 
@@ -132,7 +132,7 @@ export function NordicLogicBrand({ kind, title }: { kind: "supporting"; title: s
           <blockquote className="b3-q">“35%, the market standard is <span className="nw">40–50%</span>.”</blockquote>
           <p className="label">What shipped</p>
           <blockquote className="b3-two">What this costs. <span>One invoice, and only if we recover.</span></blockquote>
-          <div className="foot"><p className="t">Every claim survives a check.</p></div>
+          <div className="foot"><p className="t">The rule: every claim has to survive a check.</p></div>
         </div>
         <div className="b3-card b3-tex">
           <LazyVideo className="b3-dots" src="/case-studies/nordic-logic/dot-grid.mp4" poster="/case-studies/nordic-logic/dot-grid-poster.jpg" label="The site's dot grid: the dots part around the cursor and ease back into place" />

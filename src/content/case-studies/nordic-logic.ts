@@ -41,7 +41,7 @@ export const nordicLogic: CaseStudy = {
     },
   ],
   outcome: {
-    lines: ["Live at nordic-logic.vercel.app, three weeks from brief to launch.", "Every claim on it is traced to a source, or cut."],
+    lines: ["Live at nordic-logic.vercel.app, about three weeks from brief to first live version.", "The rule for every claim on it: trace it to a source, or cut it."],
     link: { href: "https://nordic-logic.vercel.app", label: "Visit site" },
   },
   peek: { src: "/case-studies/nordic-logic/peek.jpg", alt: "Nordic Logic's home page: Your carriers owe you, over the client portal's overview", width: 1200, height: 750 },
