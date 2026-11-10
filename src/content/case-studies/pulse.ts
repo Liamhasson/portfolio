@@ -19,7 +19,7 @@ export const pulse: CaseStudy = {
       title: "The Injury Log read as medical advice",
       happened: "4 of 6 testers took the Injury Log's results as medical advice: a liability risk.",
       did: "I removed the Injury Log and reframed it as the Training Log: progress and habit-building instead of analysis and guidance.",
-      changed: "Nothing in the app reads as medical guidance any more: the log tracks how sessions felt, milestones and progression.",
+      changed: "Nothing in the app reads as medical guidance any more: the log tracks milestones and progression.",
     },
     {
       kind: "user",

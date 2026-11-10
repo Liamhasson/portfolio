@@ -9,7 +9,7 @@ export function PulseHowItWorks({ kind, title }: { kind: "supporting"; title: st
     <section aria-labelledby={id} data-block={kind} className="f how">
         <div className="g12" style={{ alignItems: "end" }}>
           <h2 id={id} className="title" style={{ gridColumn: "1/7", marginLeft: "calc(var(--u) * -3)" }}>{title}</h2>
-          <p className="body" style={{ gridColumn: "8/13" }}><span className="lead">Challenges without pressure.</span> Overview, reflect, progress: a Training Log for how sessions felt, and Challenges that are private, progress-based and unlimited.</p>
+          <p className="body" style={{ gridColumn: "8/13" }}><span className="lead">Challenges without pressure.</span> Overview, reflect, progress: a Training Log for milestones and progress, and Challenges that are private, progress-based and unlimited.</p>
         </div>
         <div className="trio">
           <div className="glow" aria-hidden="true" style={{ width: "calc(var(--u) * 1000)", height: "calc(var(--u) * 700)", left: "50%", top: "50%", transform: "translate(-50%,-50%)" }}></div>
