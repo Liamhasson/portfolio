@@ -70,7 +70,7 @@ export function EventreadHowItWorks({ kind, title }: { kind: "supporting"; title
       <div className="g12">
         <div className="hood" style={{ gridColumn: "1/13" }}>
           <p>
-            <span className="label" style={{ marginRight: "calc(var(--u) * 16)" }}>Under the hood</span>Ticketmaster covers the big ticketed shows and JamBase the local ones it doesn&apos;t list: for Berlin in November 2026, 487 shows against 93, 436 of them not on Ticketmaster at all. &quot;Cambridge&quot; returned 124 events across the UK and the US until places carried their country (21 after the fix), and tour shows wanting the same night are assigned in two passes.
+            <span className="label" style={{ marginRight: "calc(var(--u) * 16)" }}>Under the hood</span>Ticketmaster covers the big ticketed shows and JamBase the local ones it doesn&apos;t list: for Berlin in November 2026, JamBase counted 487 shows against Ticketmaster&apos;s 93, and 436 of JamBase&apos;s weren&apos;t on Ticketmaster at all. &quot;Cambridge&quot; returned 124 events across the UK and the US until places carried their country (21 after the fix), and tour shows wanting the same night are assigned in two passes.
           </p>
         </div>
       </div>
