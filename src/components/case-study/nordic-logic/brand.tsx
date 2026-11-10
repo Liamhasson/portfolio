@@ -140,7 +140,7 @@ export function NordicLogicBrand({ kind, title }: { kind: "supporting"; title: s
         </div>
         <div className="b3-card c-prod b3-prod">
           <Image src="/case-studies/nordic-logic/in-use-portal.jpg" alt="The client portal: the mark on its tile at the top of the dark sidebar" width={940} height={480} sizes="(min-width: 1100px) 22vw, 100vw" />
-          <div className="foot"><p className="label">The client portal</p><p className="t">The mark carries into the product.</p></div>
+          <div className="foot"><p className="label">The client portal · sample data</p><p className="t">The mark carries into the product.</p></div>
         </div>
       </div>
     </section>

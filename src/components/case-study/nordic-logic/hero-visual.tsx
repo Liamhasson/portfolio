@@ -13,6 +13,7 @@ export function NordicLogicHeroVisual() {
         poster="/case-studies/nordic-logic/hero-film.jpg"
         label="Nordic Logic's home page arriving: Your carriers owe you builds letter by letter, a FedEx invoice turns in 3D and its errors light up, they split into findings and a chart, and land as the client portal's overview"
       />
+      <p className="label nl-sample">Portal figures are sample data</p>
     </div>
   );
 }

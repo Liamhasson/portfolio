@@ -11,10 +11,13 @@ const PHONES = [
 export function NordicLogicPhones() {
   return (
     // A focus stop with a name: on a phone the row scrolls sideways, and a scroll region has to be reachable by keyboard.
-    <div className="phones" role="region" aria-label="The live site on a phone" tabIndex={0}>
-      {PHONES.map((p) => (
-        <Image key={p.src} src={`/case-studies/nordic-logic/${p.src}.jpg`} alt={p.alt} width={1179} height={2556} sizes="(min-width: 1100px) 300px, 70vw" />
-      ))}
-    </div>
+    <>
+      <div className="phones" role="region" aria-label="The live site on a phone" tabIndex={0}>
+        {PHONES.map((p) => (
+          <Image key={p.src} src={`/case-studies/nordic-logic/${p.src}.jpg`} alt={p.alt} width={1179} height={2556} sizes="(min-width: 1100px) 300px, 70vw" />
+        ))}
+      </div>
+      <p className="label nl-sample-note">Figures on these screens are sample data.</p>
+    </>
   );
 }

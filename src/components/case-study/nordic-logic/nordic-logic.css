@@ -37,6 +37,8 @@
 [data-world="nordic-logic"] .hero-right { display: flex; align-items: center; gap: calc(var(--u) * 36); padding-bottom: calc(var(--u) * 6); }
 [data-world="nordic-logic"] .hero-line { font-size: calc(var(--u) * 28); line-height: 1.2; letter-spacing: -.01em; color: var(--ink-2); max-width: 24ch; }
 [data-world="nordic-logic"] .tray { position: absolute; left: calc(var(--u) * 72); top: calc(var(--u) * 276); width: calc(var(--u) * 1296); height: calc(var(--u) * 1177); border-radius: calc(var(--u) * 24); background: var(--mist); overflow: hidden; }
+[data-world="nordic-logic"] .nl-sample { position: absolute; right: calc(var(--u) * 56); bottom: calc(var(--u) * 56); margin: 0; padding: calc(var(--u) * 8) calc(var(--u) * 12); border-radius: calc(var(--u) * 6); background: rgba(10,12,16,.82); color: #fff; }
+[data-world="nordic-logic"] .nl-sample-note { width: calc(var(--u) * 1296); max-width: 100%; margin: calc(var(--u) * 16) auto 0; text-align: center; }
 [data-world="nordic-logic"] .tray video { position: absolute; left: calc(var(--u) * 40); top: calc(var(--u) * 40); display: block; width: calc(var(--u) * 1216); height: auto; aspect-ratio: 2400 / 2166; border-radius: calc(var(--u) * 12); background: var(--canvas); box-shadow: 0 0 0 calc(var(--u) * 1) var(--hair); }
 
 /* ------------------------------ 2 at a glance ------------------------------ */
@@ -317,6 +319,7 @@
   [data-world="nordic-logic"] .hero-right .btn { margin-top: calc(var(--u) * 22); }
   [data-world="nordic-logic"] .tray { position: relative; left: auto; top: auto; width: auto; height: auto; margin-top: calc(var(--u) * 32); padding: calc(var(--u) * 12); border-radius: calc(var(--u) * 20); }
   [data-world="nordic-logic"] .tray video { position: static; width: 100%; border-radius: calc(var(--u) * 10); }
+  [data-world="nordic-logic"] .nl-sample { position: static; margin-top: calc(var(--u) * 10); padding: 0; background: none; color: var(--ink-3); }
   [data-world="nordic-logic"] .glance { height: auto; padding: calc(var(--u) * 24) calc(var(--u) * 16); }
   [data-world="nordic-logic"] .strip { margin: 0; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   [data-world="nordic-logic"] .strip > div { padding: calc(var(--u) * 18) calc(var(--u) * 12) calc(var(--u) * 18) 0; border-left: 0; border-top: calc(var(--u) * 1) solid var(--hair); }
