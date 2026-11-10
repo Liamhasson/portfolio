@@ -7,7 +7,7 @@ export function CyvoreProblem({ kind, title }: { kind: "problem"; title: string 
     <section aria-labelledby={id} data-block={kind} className="f problem">
         <div className="g12">
           <h2 id={id} className="title" style={{ gridColumn: "1/13", marginLeft: "calc(var(--u) * -3)" }}>{title}</h2>
-          <p className="display" style={{ gridColumn: "1/12", marginTop: "calc(var(--u) * 48)" }}>A linear site vs an investor meeting. Cyvore was raising its first round. <em className="quiet">Its website was linear: about 35 seconds of non-stop scrolling to reach a section, and no story holding it together.</em></p>
+          <p className="display" style={{ gridColumn: "1/12", marginTop: "calc(var(--u) * 48)" }}>A linear site vs an investor meeting. Cyvore was raising a funding round. <em className="quiet">Its website was linear: about 35 seconds of non-stop scrolling to reach a section, and no story holding it together.</em></p>
         </div>
         <div className="g12" style={{ marginTop: "calc(var(--u) * 88)", alignItems: "end" }}>
           <div style={{ gridColumn: "1/6" }}>

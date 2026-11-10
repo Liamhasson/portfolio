@@ -47,7 +47,7 @@ describe("About and Contact content (spec 2026-10-12-about-contact-design.md)", 
     expect(his(ABOUT.lines[0])).toEqual(["I’m Liam. I love crafting products"]);
     expect(his(ABOUT.lines[1])).toEqual(["eight years managing two rock bands", "making something out of nothing"]);
     expect(his(ABOUT.lines[2])).toEqual(["That’s still how I work.", "problems nobody pointed at"]);
-    expect(his(ABOUT.quotes[0].text)).toEqual(["we closed our first funding round."]);
+    expect(his(ABOUT.quotes[0].text)).toEqual(["we closed our funding round."]);
     expect(his(ABOUT.closing)).toEqual(["I’d like to hear about it."]);
   });
   test("Andrada's quote, verbatim from the live portfolio, the problems part in white (Liam, 2026-10-12)", () => {
@@ -57,7 +57,7 @@ describe("About and Contact content (spec 2026-10-12-about-contact-design.md)", 
     expect(q).toMatchObject({ name: "Andrada Popan-Dorca", role: "UX Mentor, CareerFoundry" });
   });
   test("the quotes: Yoav's verbatim; room for up to four", () => {
-    expect(plain(ABOUT.quotes[0].text)).toBe("We weren't looking for a designer. Liam reached us and thanks to his work, we closed our first funding round.");
+    expect(plain(ABOUT.quotes[0].text)).toBe("We weren't looking for a designer. Liam reached us and thanks to his work, we closed our funding round.");
     expect(ABOUT.quotes[0]).toMatchObject({ name: "Yoav Rotem", role: "CTO, Cyvore" });
     expect(ABOUT.quotes.length).toBeGreaterThanOrEqual(1);
     expect(ABOUT.quotes.length).toBeLessThanOrEqual(4);

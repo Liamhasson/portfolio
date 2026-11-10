@@ -27,7 +27,7 @@ describe("case-study content", () => {
 
   test("Cyvore's quote is the home-page wording", () => {
     expect(cyvore.outcome.quote?.text).toBe(
-      "We weren't looking for a designer. Liam reached us and thanks to his work, we closed our first funding round.",
+      "We weren't looking for a designer. Liam reached us and thanks to his work, we closed our funding round.",
     );
   });
 

@@ -33,13 +33,13 @@ test("two colours: the highlights are the near-white spans", () => {
   render(<AboutTrack />);
   const his = [...document.querySelectorAll(".hi")].map((n) => n.textContent);
   expect(his).toContain("I’m Liam. I love crafting products");
-  expect(his).toContain("we closed our first funding round.");
+  expect(his).toContain("we closed our funding round.");
 });
 
 test("the quotes are quotes: a blockquote with who said it", () => {
   render(<AboutTrack />);
   const fig = screen.getByText("Yoav Rotem · CTO, Cyvore").closest("figure")!;
-  expect(within(fig).getByText(/we closed our first funding round/).closest("blockquote")).not.toBeNull();
+  expect(within(fig).getByText(/we closed our funding round/).closest("blockquote")).not.toBeNull();
 });
 
 test("What I do: three verbs, twelve skills, each proof linking to its case study (3D modeling: no link)", () => {

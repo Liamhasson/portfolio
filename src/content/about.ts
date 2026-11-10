@@ -61,7 +61,7 @@ export const ABOUT = {
   // (Emil's, from Nordic Logic, added here when it comes; up to four)
   quotes: [
     {
-      text: [{ t: "We weren't looking for a designer. Liam reached us and thanks to his work, " }, { t: "we closed our first funding round.", hi: true }],
+      text: [{ t: "We weren't looking for a designer. Liam reached us and thanks to his work, " }, { t: "we closed our funding round.", hi: true }],
       name: "Yoav Rotem",
       role: "CTO, Cyvore",
     },

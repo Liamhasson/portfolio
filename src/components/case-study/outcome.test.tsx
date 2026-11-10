@@ -9,7 +9,7 @@ test("outcome with a quote", () => {
   render(<Outcome outcome={cyvore.outcome} />);
   expect(screen.getByRole("region", { name: "Impact" })).toBeInTheDocument();
   const quote = screen.getByRole("blockquote");
-  expect(quote).toHaveTextContent("we closed our first funding round");
+  expect(quote).toHaveTextContent("we closed our funding round");
   // Board copy (Part C appendix A): the quote in curly marks, name and title on their own lines.
   expect(quote.textContent).toBe(`\u201c${cyvore.outcome.quote!.text}\u201d`);
   expect(screen.getByText("Yoav Rotem")).toBeInTheDocument();

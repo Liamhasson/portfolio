@@ -35,7 +35,7 @@ export const cyvore: CaseStudy = {
       "3 of 3 stakeholders completed all four tasks.",
     ],
     quote: {
-      text: "We weren't looking for a designer. Liam reached us and thanks to his work, we closed our first funding round.",
+      text: "We weren't looking for a designer. Liam reached us and thanks to his work, we closed our funding round.",
       name: "Yoav Rotem",
       title: "CTO, Cyvore",
     },
