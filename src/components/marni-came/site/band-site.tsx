@@ -30,8 +30,9 @@ const VIDEOS = [
 ] as const;
 
 /** The band's own site in the week After Heartbreaks came out (spec §5; board Part 3). Inside the case study it runs in an
- *  iframe and hands its sound to the page; opened on its own, it plays itself. */
-export function BandSite({ className }: { className?: string }) {
+ *  iframe and hands its sound to the page; opened on its own, it plays itself. heroOnly (/marni-came/site/hero, the case
+ *  study's embed since Liam 2026-11-19): the first screen alone, nothing to scroll; its links open the whole site. */
+export function BandSite({ className, heroOnly = false }: { className?: string; heroOnly?: boolean }) {
   const embedded = useSyncExternalStore(noop, () => isEmbedded(window), () => false);
   const [ctrl, setCtrl] = useState<AudioController | null>(null);
   useEffect(() => {
@@ -44,17 +45,19 @@ export function BandSite({ className }: { className?: string }) {
   const menuBtn = useRef<HTMLButtonElement>(null);
   const closeMenu = useCallback(() => { setMenu(false); menuBtn.current?.focus(); }, []);
   const closeVideo = useCallback(() => setVideo(null), []);
+  // hero only: a section link can't scroll to anything here, so it opens the whole site at that section in a new tab
+  const at = (id: string) => (heroOnly ? { href: `/marni-came/site#${id}`, target: "_blank", rel: "noreferrer" } : { href: `#${id}` });
 
   return (
-    <article data-world="marni-came" className={`ms ${className ?? ""}`}>
+    <article data-world="marni-came" data-hero-only={heroOnly ? "" : undefined} className={`ms ${className ?? ""}`}>
       <header className="ms-nav">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <a href="#top" className="ms-mark"><img src={MC_ASSETS.wordmarkDistressedBone} alt="Marni Came" /></a>
-        <nav aria-label="Sections" className="ms-links">{NAV.map(([id, label]) => <a key={id} href={`#${id}`}>{label}</a>)}</nav>
+        <a {...(heroOnly ? at("top") : { href: "#top" })} className="ms-mark"><img src={MC_ASSETS.wordmarkDistressedBone} alt="Marni Came" /></a>
+        <nav aria-label="Sections" className="ms-links">{NAV.map(([id, label]) => <a key={id} {...at(id)}>{label}</a>)}</nav>
         {ctrl && !embedded && <SoundToggle ctrl={ctrl} className="ms-sound" />}
         <button type="button" className="ms-menu-b" ref={menuBtn} aria-expanded={menu} aria-haspopup="dialog" onClick={() => setMenu(true)}>Menu</button>
       </header>
-      <SiteMenu open={menu} onClose={closeMenu} ctrl={ctrl} embedded={embedded} />
+      <SiteMenu open={menu} onClose={closeMenu} ctrl={ctrl} embedded={embedded} at={at} />
 
       <section id="top" className="ms-hero" aria-label="New single">
         <LazyVideo className="rel-video" src={MC_ASSETS.releaseLoop} poster={MC_ASSETS.releasePoster} label="A loop from the After Heartbreaks music video" />
@@ -70,6 +73,7 @@ export function BandSite({ className }: { className?: string }) {
         </div>
       </section>
 
+      {!heroOnly && (<>
       <section id="music" className="ms-sec" aria-labelledby="ms-music"><h2 id="ms-music" className="ms-h">Music</h2>
         <ol className="ms-tracks">{(Object.keys(TRACKS) as TrackId[]).map((id, i) => <Track key={id} id={id} n={i + 1} ctrl={ctrl} />)}</ol>
       </section>
@@ -125,6 +129,7 @@ export function BandSite({ className }: { className?: string }) {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={MC_ASSETS.wordmarkDistressedBone} alt="Marni Came" /><span className="ms-k">Berlin</span>
       </footer>
+      </>)}
 
       {video && <Lightbox video={video} onClose={closeVideo} ctrl={ctrl} />}
     </article>
@@ -181,7 +186,7 @@ function Track({ id, n, ctrl }: { id: TrackId; n: number; ctrl: AudioController 
 }
 
 /** The site's phone menu: a native modal dialog (focus moves in, Escape closes, the page behind is inert). */
-function SiteMenu({ open, onClose, ctrl, embedded }: { open: boolean; onClose: () => void; ctrl: AudioController | null; embedded: boolean }) {
+function SiteMenu({ open, onClose, ctrl, embedded, at }: { open: boolean; onClose: () => void; ctrl: AudioController | null; embedded: boolean; at: (id: string) => { href: string } }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const d = ref.current; if (!d) return;
@@ -201,7 +206,7 @@ function SiteMenu({ open, onClose, ctrl, embedded }: { open: boolean; onClose: (
         <img src={MC_ASSETS.wordmarkDistressedBone} alt="" />
         <button type="button" onClick={() => ref.current?.close()}>Close</button>
       </div>
-      {NAV.map(([id, label]) => <a key={id} href={`#${id}`} onClick={() => ref.current?.close()}>{label}</a>)}
+      {NAV.map(([id, label]) => <a key={id} {...at(id)} onClick={() => ref.current?.close()}>{label}</a>)}
       {ctrl && !embedded && <SoundToggle ctrl={ctrl} className="ms-sound" />}
     </dialog>
   );

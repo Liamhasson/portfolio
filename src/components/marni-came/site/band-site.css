@@ -37,6 +37,9 @@
 
 /* release week */
 .ms-hero { position: relative; height: 100svh; min-height: 560px; overflow: hidden; }
+/* hero only (the case study's embed): the first screen is the whole page, so there is nothing to scroll */
+.ms[data-hero-only] { height: 100svh; overflow: hidden; }
+.ms[data-hero-only] .ms-hero { min-height: 0; }
 .ms-hero .rel-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .ms-hero::before { content: ""; position: absolute; inset: 0; z-index: 1; background: linear-gradient(to top, rgba(10,9,8,.75), rgba(10,9,8,0) 50%); }
 /* (the release loop already carries the video's own burns: this one is lighter, and fades out above the title so it

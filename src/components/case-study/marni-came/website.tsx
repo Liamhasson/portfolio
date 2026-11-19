@@ -6,8 +6,9 @@ import { MC_ASSETS } from "@/lib/marni-came/assets";
 const WIDE = "(min-width: 1100px)";
 const subscribe = (fn: () => void) => { const m = window.matchMedia(WIDE); m.addEventListener("change", fn); return () => m.removeEventListener("change", fn); };
 
-/** Board CS 08 · Website: the release-week site, live in the page at its desktop size (scaled to the column); on phones,
- *  three stills and the link. */
+/** Board CS 08 · Website: the release-week site's first screen, live in the page at its desktop size (scaled to the
+ *  column) with nothing below it to scroll (Liam, 2026-11-19: only the hero); on phones, its still. The link opens the
+ *  whole site. */
 export function MarniCameWebsite({ kind, title }: { kind: "supporting"; title: string }) {
   const id = useId();
   const wide = useSyncExternalStore(subscribe, () => window.matchMedia(WIDE).matches, () => false);
@@ -40,17 +41,13 @@ export function MarniCameWebsite({ kind, title }: { kind: "supporting"; title: s
         <div className="mc-site">
           <div className="bar" aria-hidden="true"><span /><span /><span /></div>
           <div className="win" ref={box}>
-            <iframe ref={frame} data-focus={inside ? "" : undefined} src="/marni-came/site?embed=1" title="Marni Came's site in the week After Heartbreaks came out" loading="lazy" style={{ transform: `scale(${scale})` }} />
+            <iframe ref={frame} data-focus={inside ? "" : undefined} src="/marni-came/site/hero" title="The first screen of Marni Came's site in the week After Heartbreaks came out" loading="lazy" style={{ transform: `scale(${scale})` }} />
           </div>
         </div>
       ) : (
         <div className="mc-site-stills">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img className="wide" src={MC_ASSETS.releasePoster} alt="The site's first screen: After Heartbreaks, new single, out now" loading="lazy" />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={MC_ASSETS.bandGroup} alt="The site's band section: Pedro, Sami, Liam and Rikki" loading="lazy" />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={MC_ASSETS.posters.lido} alt="The site's shows section: the Lido poster" loading="lazy" />
         </div>
       )}
       <a className="label mc-open-site" href="/marni-came/site" target="_blank" rel="noreferrer">Open the site ↗<span className="sr-only"> (opens in a new tab)</span></a>

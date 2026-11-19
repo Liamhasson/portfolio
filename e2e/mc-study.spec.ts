@@ -184,18 +184,24 @@ test("the stage flag is shown whole: its picture never outgrows its tile", async
   }
 });
 
-test("website at 1440: the site live in the page, and Listen inside it turns the page's sound on", async ({ page }) => {
+test("website at 1440: only the site's first screen, live and not scrollable, and Listen inside it turns the page's sound on (Liam, 2026-11-19)", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(URL);
-  const frame = page.locator('iframe[src="/marni-came/site?embed=1"]');
+  const frame = page.locator('iframe[src="/marni-came/site/hero"]');
   await frame.scrollIntoViewIfNeeded();
   await expect(frame).toBeVisible();
   await expect(page.getByRole("link", { name: /open the site/i })).toHaveAttribute("href", "/marni-came/site");
-  const site = page.frameLocator('iframe[src="/marni-came/site?embed=1"]');
+  const site = page.frameLocator('iframe[src="/marni-came/site/hero"]');
+  await expect(site.getByRole("heading", { name: "After Heartbreaks" })).toBeVisible();
+  await expect(site.getByRole("heading", { name: "Music" })).toHaveCount(0); // (the hero alone: no sections below it)
   await expect(site.getByRole("button", { name: /sound/i })).toHaveCount(0); // (the page holds the one control)
-  // no smooth scroll inside the frame, so the wheel hands back to the page at the site's end
-  const inner = page.frames().find((f) => f.url().includes("/marni-came/site"))!;
-  expect(await inner.evaluate(() => document.documentElement.classList.contains("lenis"))).toBe(false);
+  const inner = page.frames().find((f) => f.url().includes("/marni-came/site/hero"))!;
+  const [scrollH, viewH] = await inner.evaluate(() => [document.documentElement.scrollHeight, window.innerHeight]);
+  expect(scrollH).toBeLessThanOrEqual(viewH + 1); // nothing to scroll
+  expect(await inner.evaluate(() => document.documentElement.classList.contains("lenis"))).toBe(false); // (the wheel stays the page's)
+  // a section link opens the whole site at that section, in a new tab
+  await expect(site.getByRole("link", { name: "Music" })).toHaveAttribute("href", "/marni-came/site#music");
+  await expect(site.getByRole("link", { name: "Music" })).toHaveAttribute("target", "_blank");
   await site.getByRole("button", { name: /^listen$/i }).click();
   await expect(page.getByRole("button", { name: "Audio" })).toHaveAttribute("aria-pressed", "true");
   const playing = await page.evaluate(() => (window as unknown as { __mcPlaying?: number }).__mcPlaying ?? null);
@@ -204,10 +210,10 @@ test("website at 1440: the site live in the page, and Listen inside it turns the
 
 test.describe("website on a 390 px phone", () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true });
-  test("no iframe: three stills and the link", async ({ page }) => {
+  test("no iframe: the first screen's still and the link", async ({ page }) => {
     await page.goto(URL);
     await expect(page.locator(".website iframe")).toHaveCount(0);
-    await expect(page.locator(".mc-site-stills img")).toHaveCount(3);
+    await expect(page.locator(".mc-site-stills img")).toHaveCount(1);
     await expect(page.getByRole("link", { name: /open the site/i })).toBeVisible();
   });
 });
