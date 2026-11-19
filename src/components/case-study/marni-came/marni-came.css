@@ -15,12 +15,16 @@
 [data-world="marni-came"] .g12 { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: calc(var(--u) * 24); padding: 0 calc(var(--u) * 48); }
 [data-world="marni-came"] .ic { width: calc(var(--u) * 16); height: calc(var(--u) * 16); fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 [data-world="marni-came"] .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+/* Impact's lesson (lesson.tsx): emphasis the site's way, the rest dimmed and the two strongest phrases in full white,
+   same weight (Liam, 2026-11-19) */
+[data-world="marni-came"] .mc-lesson { margin-top: calc(var(--u) * 48); max-width: 62ch; }
+[data-world="marni-came"] .mc-lesson .label { margin: 0 0 calc(var(--u) * 12); }
+[data-world="marni-came"] .mc-lesson .body { color: var(--ink-3); }
+[data-world="marni-came"] .mc-lesson .hi { color: var(--ink); }
 /* ------------------------------ the audio button (the study's shell) ------------------------------ */
 /* Liam 10-26, after lusion.co: a round button at the bottom centre. Off, a flat line and the word Audio in one dark pill
    (the word says what it is). On, just the circle: its fill follows the loudness in the burn colours and its line draws
    the track's waveform (audio-button.tsx writes both). No glow: a flat fill. */
-[data-world="marni-came"] .mc-lesson { margin-top: calc(var(--u) * 48); max-width: 62ch; }
-[data-world="marni-came"] .mc-lesson .label { margin: 0 0 calc(var(--u) * 12); }
 [data-world="marni-came"] .mc-audio { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 50; display: inline-flex; align-items: center; gap: 4px;
   height: 50px; padding: 0 18px 0 0; border-radius: 26px; background: rgba(10,9,8,.72); border: 1px solid var(--hair-2); color: var(--bone);
   font: 400 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; cursor: pointer;
