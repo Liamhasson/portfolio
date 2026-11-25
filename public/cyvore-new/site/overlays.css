@@ -1,0 +1,114 @@
+/* Overlays (overlays.js). Request a meeting as an overlay: the page underneath keeps going (its film, its place in the story); a light veil comes over it
+   and the copy, the form and the demo video sit on the veil. Same words and form as the live page. */
+.mo { position: fixed; inset: 0; z-index: 60; overflow: hidden;
+  visibility: hidden; opacity: 0; transition: opacity .45s ease, visibility 0s linear .45s; color: var(--ink, #1b2340); font-family: "Hanken Grotesk", system-ui, sans-serif; }
+/* the page's own nav steps back while an overlay is up (the overlay has its own close button) */
+html.mo-on nav, html.mo-on .navpill, html.mo-on #hint { opacity: 0 !important; pointer-events: none !important; transition: opacity .3s ease; }
+/* under an overlay only the scene stays: every piece of the page's own UI (copy, buttons, cards, chain, files, footer) steps out */
+html.mo-on .copy, html.mo-on .clients, html.mo-on .scrim, html.mo-on .topband, html.mo-on #scene .sc, html.mo-on #scene .pin, html.mo-on #say,
+html.mo-on .dossier, html.mo-on #dsLines, html.mo-on .tag, html.mo-on .foot, html.mo-on main { opacity: 0 !important; pointer-events: none !important; transition: opacity .35s ease !important; }
+.mo.open { visibility: visible; opacity: 1; transition: opacity .45s ease, visibility 0s; }
+/* the whole screen scrolls the overlay, wherever the pointer or finger is */
+.mo-scroll { position: absolute; inset: 0; z-index: 1; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.mo-veil { position: absolute; inset: 0; background: linear-gradient(100deg, rgba(255,250,244,.92) 0%, rgba(255,250,244,.78) 34%, rgba(255,250,244,.32) 52%, rgba(255,250,244,0) 66%); }
+.mo-in { position: relative; display: grid; gap: 22px; width: min(640px, 100%); box-sizing: content-box; padding: 112px var(--gx, 40px) 64px;
+  transform: translateY(18px); opacity: 0; transition: transform .6s cubic-bezier(.22,1,.36,1), opacity .45s ease; }
+.mo.open .mo-in { transform: none; opacity: 1; transition-delay: .08s; }
+.mo-x { position: fixed; top: 22px; right: var(--gx, 40px); z-index: 2; width: 48px; height: 48px; display: grid; place-items: center; border: 0; border-radius: 50%; cursor: pointer; color: var(--ink, #1b2340);
+  background: linear-gradient(140deg, rgba(255,251,247,.8), rgba(255,247,240,.55)); -webkit-backdrop-filter: blur(14px) saturate(170%); backdrop-filter: blur(14px) saturate(170%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.8), inset 0 0 0 1px rgba(255,255,255,.4), 0 10px 26px -10px rgba(60,28,8,.35); transition: transform .25s ease; }
+.mo-x:hover { transform: rotate(90deg); }
+.mo-x svg { width: 20px; height: 20px; }
+
+.mo h2.mo-title { margin: 0; font-size: clamp(48px, 6vw, 96px); line-height: .98; font-weight: 300; letter-spacing: -.035em; }
+.mo h2.mo-title strong { display: block; font-weight: 800; letter-spacing: -.04em; }
+.mo .mo-lede { margin: 18px 0 0; max-width: 34em; font-size: clamp(17px, 1.35vw, 21px); line-height: 1.5; color: var(--ink-2, rgba(27,35,64,.74)); }
+
+.mo-card { position: relative; border-radius: 28px; padding: 28px;
+  background: linear-gradient(140deg, rgba(255,251,247,.74), rgba(255,247,240,.5)); -webkit-backdrop-filter: blur(14px) saturate(165%); backdrop-filter: blur(14px) saturate(165%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.6), inset 0 0 0 1px rgba(255,255,255,.4), 0 24px 60px -18px rgba(60,28,8,.28), 0 2px 8px rgba(60,28,8,.06); }
+.mo-form { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 14px; }
+.mo-field { display: grid; gap: 6px; min-width: 0; }
+.mo-field.wide, .mo-end { grid-column: 1 / -1; }
+.mo-field label { font-size: 13px; font-weight: 700; color: var(--ink, #1b2340); }
+.mo-field label i { font-style: normal; font-weight: 500; color: var(--ink-3, rgba(27,35,64,.64)); }
+.mo-field input, .mo-field textarea { width: 100%; box-sizing: border-box; font: 500 16px/1.4 "Hanken Grotesk", system-ui, sans-serif; color: var(--ink, #1b2340); padding: 12px 14px; border-radius: 14px; border: 0;
+  background: rgba(255,255,255,.75); box-shadow: inset 0 0 0 1px rgba(27,35,64,.10), inset 0 1px 2px rgba(27,35,64,.06); transition: box-shadow .2s ease, background .2s ease; }
+.mo-field textarea { min-height: 110px; resize: vertical; }
+.mo-field input:focus, .mo-field textarea:focus { outline: none; background: #fff; box-shadow: inset 0 0 0 2px var(--accent, #e8542f), 0 0 0 4px rgba(232,84,47,.16); }
+.mo-field input[aria-invalid="true"] { box-shadow: inset 0 0 0 2px #d83a2a; }
+.mo-err { margin: 0; font-size: 13px; font-weight: 600; color: #c2321f; }
+.mo-err:empty { display: none; }
+.mo-end { display: grid; gap: 14px; justify-items: start; margin-top: 4px; }
+.mo-submit { display: inline-flex; align-items: center; gap: 8px; border: 0; cursor: pointer; font: 700 17px/1 "Hanken Grotesk", system-ui, sans-serif; color: #fff; background: var(--accent, #e8542f);
+  padding: 15px 24px 15px 26px; border-radius: 999px; box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 10px 24px -10px rgba(232,84,47,.65); transition: transform .25s ease; }
+.mo-submit:hover { transform: translateY(-1px); } .mo-submit:disabled { opacity: .6; cursor: progress; } .mo-submit svg { width: 18px; height: 18px; }
+.mo-note { margin: 0; font-size: 13px; line-height: 1.5; color: var(--ink-3, rgba(27,35,64,.64)); }
+.mo-note a, .mo-fail a { color: var(--ink, #1b2340); text-underline-offset: 2px; }
+.mo-fail { margin: 0; font-size: 14px; font-weight: 600; color: #c2321f; }
+.mo-sent { display: grid; gap: 14px; justify-items: start; padding: 8px 4px; }
+.mo-sent h3 { margin: 0; font-size: clamp(30px, 3vw, 42px); font-weight: 800; letter-spacing: -.03em; outline: none; }
+.mo-sent p { margin: 0; font-size: 18px; line-height: 1.5; color: var(--ink-2, rgba(27,35,64,.74)); }
+.mo-back { border: 0; cursor: pointer; font: 700 15px/1 "Hanken Grotesk", system-ui, sans-serif; padding: 12px 20px; border-radius: 999px; color: var(--ink, #1b2340); background: rgba(255,255,255,.75); box-shadow: inset 0 0 0 1px rgba(27,35,64,.12); }
+
+.mo-media { padding: 12px 12px 16px; }
+.mo-video { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; padding: 0; border: 0; border-radius: 18px; overflow: hidden; background: #111; cursor: pointer; }
+.mo-video img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform .8s cubic-bezier(.22,1,.36,1); }
+.mo-video:hover img { transform: scale(1.03); }
+.mo-video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.mo-play { position: absolute; left: 16px; bottom: 16px; display: inline-flex; align-items: center; gap: 10px; padding: 11px 18px 11px 14px; border-radius: 999px; font-size: 15px; font-weight: 700; color: var(--ink, #1b2340);
+  background: linear-gradient(140deg, rgba(255,251,247,.86), rgba(255,247,240,.66)); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: 0 10px 24px -10px rgba(0,0,0,.45); }
+.mo-play svg { width: 14px; height: 14px; color: var(--accent, #e8542f); }
+.mo-media .mo-note { margin: 12px 6px 0; }
+.mo :focus-visible { outline: 3px solid rgba(232,84,47,.55); outline-offset: 3px; }
+
+.mo-veil.full { background: rgba(250,240,232,.5); -webkit-backdrop-filter: blur(22px) saturate(140%); backdrop-filter: blur(22px) saturate(140%); }
+/* Press and About us: the real page in a frame, in overlay mode (no nav, no backdrop of its own), over the frosted veil */
+.mo-page { overflow: hidden; }
+.mo-frame { position: fixed; inset: 0; z-index: 1; width: 100%; height: 100%; border: 0; background: transparent; color-scheme: normal; opacity: 0; transform: translateY(18px); transition: opacity .45s ease, transform .6s cubic-bezier(.22,1,.36,1); }
+.mo-page.open.loaded .mo-frame { opacity: 1; transform: none; }
+
+
+/* ScanMySMS: paste a link or a message, see if it's safe */
+.mo-scanwrap .mo-title { font-size: clamp(40px, 4.4vw, 68px) !important; line-height: 1 !important; font-weight: 300; letter-spacing: -.035em; margin: 0; }
+.mo-scanwrap .mo-title strong { display: block; font-weight: 800; letter-spacing: -.04em; }
+.mo-kick { margin: 0 0 14px; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3, rgba(27,35,64,.64)); }
+.mo-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.mo-scanwrap .mo-lede { margin: 18px 0 26px; max-width: 34em; font-size: clamp(17px, 1.35vw, 21px); line-height: 1.5; color: var(--ink-2, rgba(27,35,64,.74)); }
+.scanbox { position: relative; display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: 999px; overflow: hidden; isolation: isolate;
+  background: rgba(255,255,255,.82); box-shadow: inset 0 0 0 1px rgba(27,35,64,.1), 0 14px 36px -16px rgba(60,28,8,.4); }
+.scanbox:focus-within { box-shadow: inset 0 0 0 2px var(--accent, #e8542f), 0 0 0 4px rgba(232,84,47,.16), 0 14px 36px -16px rgba(60,28,8,.4); }
+.scanbox input { flex: 1; min-width: 0; border: 0; background: transparent; outline: none; padding: 13px 14px 13px 20px; font: 500 17px/1.3 "Hanken Grotesk", system-ui, sans-serif; color: var(--ink, #1b2340); }
+.scanbox input::placeholder { color: var(--ink-3, rgba(27,35,64,.64)); }
+.scanbox .mo-submit { flex: none; padding: 14px 20px 14px 22px; font-size: 16px; }
+/* checking: the same breathing light as the chain of events runs through the box */
+.scanbox::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: 0; transition: opacity .3s ease;
+  background: linear-gradient(90deg, transparent, rgba(232,84,47,.16), transparent) no-repeat; background-size: 40% 100%; background-position: -60% 0; }
+.scanbox.busy::after { opacity: 1; animation: scanWave 1.4s cubic-bezier(.45,0,.55,1) infinite; }
+@keyframes scanWave { from { background-position: -60% 0; } to { background-position: 160% 0; } }
+.scanres { margin-top: 16px; padding: 20px 22px; border-radius: 22px; background: linear-gradient(140deg, rgba(255,251,247,.8), rgba(255,247,240,.6)); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.6), 0 20px 50px -20px rgba(60,28,8,.3); animation: resIn .45s cubic-bezier(.22,1,.36,1); }
+@keyframes resIn { from { opacity: 0; transform: translateY(8px); } }
+.scanres .rh { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.scanres .badge { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px 7px 10px; border-radius: 999px; font-size: 14px; font-weight: 800; color: #fff; background: rgba(27,35,64,.64); }
+.scanres .badge svg { width: 16px; height: 16px; }
+.scanres[data-v="safe"] .badge { background: #2f9e6e; } .scanres[data-v="suspicious"] .badge { background: #d98a16; } .scanres[data-v="malicious"] .badge { background: #d8402c; }
+.scanres .host { font-size: 15px; font-weight: 700; color: var(--ink, #1b2340); overflow-wrap: anywhere; }
+.scanres p { margin: 10px 0 0; font-size: 15.5px; line-height: 1.5; color: var(--ink-2, rgba(27,35,64,.74)); }
+.scanres ul { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 6px; font-size: 15px; line-height: 1.45; color: var(--ink, #1b2340); }
+.scanres .again { margin-top: 12px; border: 0; background: none; padding: 0; font: 700 14px/1 "Hanken Grotesk", system-ui, sans-serif; color: var(--accent, #e8542f); cursor: pointer; }
+.scanres .pv { margin-top: 12px; font-size: 12.5px; color: var(--ink-3, rgba(27,35,64,.64)); }
+@media (prefers-reduced-motion: reduce) { .scanbox.busy::after { animation: none; } }
+
+@media (max-width: 760px), (max-aspect-ratio: 1/1) {
+  .mo-veil.side { background: linear-gradient(180deg, rgba(255,250,244,.94) 0%, rgba(255,250,244,.86) 50%, rgba(255,250,244,.76) 100%); }
+  .mo-in { width: auto; padding: 84px var(--gx, 16px) 40px; gap: 14px; }
+  .mo-x { top: 14px; width: 44px; height: 44px; }
+  .mo-card { padding: 20px 16px; border-radius: 22px; }
+  .mo-form { grid-template-columns: 1fr; gap: 14px; }
+  .mo h2.mo-title { font-size: 44px; }
+  .mo-scanwrap .mo-title { font-size: 34px !important; }
+  .scanbox { border-radius: 22px; flex-wrap: wrap; } .scanbox input { flex: 1 1 100%; padding: 12px; font-size: 16px; } .scanbox .mo-submit { flex: 1; justify-content: center; }
+  .scanres { padding: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .mo, .mo-in { transition: opacity .2s ease !important; transform: none !important; } }

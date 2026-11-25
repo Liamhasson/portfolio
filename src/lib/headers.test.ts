@@ -27,3 +27,13 @@ test("the story's and the case studies' media is kept a day by browsers, then re
   expect(forPath("/about")["Cache-Control"]).toBeUndefined();   // (pages keep Next's own)
   expect(forPath("/Liam-Hasson-Resume.pdf")["Cache-Control"]).toBeUndefined();   // (the resume: always the latest)
 });
+
+test("the Cyvore new website snapshot is kept out of search, framed only by this site, and cached like the other media (spec 2026-11-25 §2)", () => {
+  for (const p of ["/cyvore-new/site/index.html", "/cyvore-new/site/hero-v2-2k.mp4"]) {
+    const h = forPath(p);
+    expect(h["X-Robots-Tag"], p).toBe("noindex, nofollow");
+    expect(h["Cache-Control"], p).toBe("public, max-age=86400, stale-while-revalidate=604800");
+    expect(h["Content-Security-Policy"], p).toBe("frame-ancestors 'self'");
+  }
+  expect(forPath("/cyvore-new")["X-Robots-Tag"]).toBeUndefined();   // (the teaser page itself is indexed)
+});

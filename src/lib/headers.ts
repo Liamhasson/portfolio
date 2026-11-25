@@ -19,5 +19,7 @@ export function siteHeaders(): Rule[] {
   return [
     { source: "/:path*", headers: SECURITY },
     ...["/lab/:path*", "/work/:path*", "/case-studies/:path*"].map((source) => ({ source, headers: MEDIA })),
+    // the Cyvore new website's hero, framed on /cyvore-new (spec 2026-11-25 §2): a copy of an unlaunched site, out of search
+    { source: "/cyvore-new/site/:path*", headers: [...MEDIA, { key: "X-Robots-Tag", value: "noindex, nofollow" }] },
   ];
 }
