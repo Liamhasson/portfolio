@@ -17,20 +17,25 @@ export function AtAGlance({ data }: { data: Data }) {
           <dt className="label">Team</dt>
           <dd><p>{data.team}</p></dd>
         </div>
-        <div>
-          <dt className="label">Tools</dt>
-          <dd>
-            <ul className="tools">
-              {data.tools.map((t) => <li key={t}>{t}</li>)}
-            </ul>
-          </dd>
+        {/* (no tools yet: the Cyvore new website teaser until Liam gives them; the column goes unless a Type is in it) */}
+        {(data.tools.length > 0 || data.type) && <div>
+          {data.tools.length > 0 && (
+            <>
+              <dt className="label">Tools</dt>
+              <dd>
+                <ul className="tools">
+                  {data.tools.map((t) => <li key={t}>{t}</li>)}
+                </ul>
+              </dd>
+            </>
+          )}
           {data.type && (
             <>
               <dt className="label" style={{ margin: "calc(var(--u) * 22) 0 calc(var(--u) * 10)" }}>Type</dt>
               <dd><p>{data.type}</p></dd>
             </>
           )}
-        </div>
+        </div>}
         {data.impact && (
           <div>
             <dt className="label">Impact</dt>

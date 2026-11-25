@@ -14,3 +14,8 @@ test("next project loops Eventread → Cyvore → Marni Came → Pulse → Nordi
   rerender(<NextProject from="nordic-logic" />);
   expect(screen.getByRole("link", { name: /Next project: Eventread/ })).toHaveAttribute("href", "/eventread");
 });
+
+test("the Cyvore new website teaser opens onto the first finished study (spec 2026-11-25 §2)", () => {
+  render(<NextProject from="cyvore-new" />);
+  expect(screen.getByRole("link", { name: /Next project: Nordic Logic/ })).toHaveAttribute("href", "/nordic-logic");
+});

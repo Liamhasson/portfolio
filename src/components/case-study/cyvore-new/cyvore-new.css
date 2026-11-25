@@ -1,0 +1,75 @@
+/* The Cyvore new website teaser (spec docs/superpowers/specs/2026-11-25-cyvore-new-website-teaser-design.md §2), in
+   the boards' --u units (frame.css). Type and the at-a-glance follow the Cyvore study (cyvore.css); the frame follows
+   the Marni Came Website section (marni-came.css); Nordic Logic peeks in as it does at the foot of Pulse (pulse.css).
+   No glow anywhere. */
+[data-world="cyvore-new"] .label { font: 400 max(11px, calc(var(--u) * 12))/1.15 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
+[data-world="cyvore-new"] .title { font-size: calc(var(--u) * 72); line-height: .95; letter-spacing: -.025em; }
+[data-world="cyvore-new"] .ic { width: calc(var(--u) * 16); height: calc(var(--u) * 16); fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+[data-world="cyvore-new"] .tag { display: inline-block; margin-left: calc(var(--u) * 14); padding: calc(var(--u) * 6) calc(var(--u) * 10); border-radius: 999px; border: calc(var(--u) * 1) solid var(--hair-2); color: var(--ink); vertical-align: middle; line-height: 1; }
+
+/* 1 hero: the title, the line, then the site's first screen */
+[data-world="cyvore-new"] .hero { padding: calc(var(--u) * 132) calc(var(--u) * 72) calc(var(--u) * 24); }
+[data-world="cyvore-new"] .hero-head { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "label label" "title line"; align-items: end; column-gap: calc(var(--u) * 48); }
+[data-world="cyvore-new"] .hero-head .label { grid-area: label; }
+[data-world="cyvore-new"] .hero-head .title { grid-area: title; margin-top: calc(var(--u) * 20); margin-left: calc(var(--u) * -3); }
+[data-world="cyvore-new"] .hero-line { grid-area: line; font-size: calc(var(--u) * 28); line-height: 1.2; letter-spacing: -.01em; color: var(--ink-2); max-width: 24ch; text-align: right; padding-bottom: calc(var(--u) * 6); }
+
+[data-world="cyvore-new"] .cn-site { margin-top: calc(var(--u) * 56); border: 1px solid var(--hair-2); border-radius: 10px; overflow: hidden; }
+[data-world="cyvore-new"] .cn-site .bar { display: flex; align-items: center; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--hair-2); }
+[data-world="cyvore-new"] .cn-site .bar span { width: 10px; height: 10px; border-radius: 50%; background: #2a2723; }
+[data-world="cyvore-new"] .cn-site .win { position: relative; overflow: hidden; background: #f3d9c4; }
+[data-world="cyvore-new"] .cn-site iframe { position: absolute; left: 0; top: 0; border: 0; transform-origin: 0 0; background: #f3d9c4; }
+[data-world="cyvore-new"] .cn-site img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* 2 at a glance: one ruled strip (three columns while there are no tools) */
+[data-world="cyvore-new"] .glance { padding: calc(var(--u) * 56) 0; }
+[data-world="cyvore-new"] .strip { margin: 0 calc(var(--u) * 72); display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); border-top: calc(var(--u) * 1) solid var(--hair-2); border-bottom: calc(var(--u) * 1) solid var(--hair-2); }
+[data-world="cyvore-new"] .strip > div { padding: calc(var(--u) * 28) calc(var(--u) * 24) calc(var(--u) * 30); border-left: calc(var(--u) * 1) solid var(--hair); }
+[data-world="cyvore-new"] .strip > div:first-child { padding-left: 0; border-left: 0; }
+[data-world="cyvore-new"] .strip .label { margin-bottom: calc(var(--u) * 14); }
+[data-world="cyvore-new"] .strip p { font-size: max(15px, calc(var(--u) * 17)); line-height: 1.5; max-width: 30ch; }
+[data-world="cyvore-new"] .tools { display: flex; flex-wrap: wrap; gap: 0 calc(var(--u) * 20); font-size: max(15px, calc(var(--u) * 17)); line-height: 1.55; }
+
+/* 3 about: a few lines in Liam's words, then what's coming */
+[data-world="cyvore-new"] .about { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: calc(var(--u) * 24); padding: calc(var(--u) * 40) calc(var(--u) * 72) calc(var(--u) * 120); }
+[data-world="cyvore-new"] .about > .label { grid-column: 1 / 6; padding-top: calc(var(--u) * 8); }
+[data-world="cyvore-new"] .about-body { grid-column: 7 / 13; max-width: 34ch; }
+[data-world="cyvore-new"] .about-body p { font-size: max(17px, calc(var(--u) * 24)); line-height: 1.4; letter-spacing: -.01em; color: var(--ink-2); }
+[data-world="cyvore-new"] .about-body p + p { margin-top: 1em; }
+[data-world="cyvore-new"] .about-body .soon { margin-top: calc(var(--u) * 40); font: 400 max(11px, calc(var(--u) * 13))/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink); }
+
+/* 4 next: Nordic Logic peeks in, in its Daylight (as at the foot of Pulse) */
+[data-world="cyvore-new"] .next { height: calc(var(--u) * 630); }
+[data-world="cyvore-new"] .nl { position: absolute; left: 0; right: 0; top: calc(var(--u) * 64); bottom: calc(var(--u) * -40); background: #f9f9f8; color: #0c1116; border-radius: calc(var(--u) * 32) calc(var(--u) * 32) 0 0; overflow: hidden; }
+[data-world="cyvore-new"] .nl-text { position: absolute; left: calc(var(--u) * 72); top: calc(var(--u) * 72); width: calc(var(--u) * 520); }
+[data-world="cyvore-new"] .nl-next { display: flex; align-items: center; gap: calc(var(--u) * 14); font: 400 max(11px, calc(var(--u) * 13))/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #5a6672; }
+[data-world="cyvore-new"] .nl-next i { display: block; width: calc(var(--u) * 80); height: calc(var(--u) * 1); background: #d4d0c9; }
+[data-world="cyvore-new"] .nl-title { font-size: calc(var(--u) * 72); line-height: .95; letter-spacing: -.025em; color: rgba(12,17,22,.55); margin-top: calc(var(--u) * 150); }
+[data-world="cyvore-new"] .f .nl-line { font-size: max(15px, calc(var(--u) * 19)); line-height: 1.5; color: #363b40; margin-top: calc(var(--u) * 40); max-width: 32ch; }
+[data-world="cyvore-new"] .nl-frame { position: absolute; left: calc(var(--u) * 640); top: calc(var(--u) * 72); width: calc(var(--u) * 728); height: calc(var(--u) * 560); border-radius: calc(var(--u) * 20); overflow: hidden; background: #efedeb; box-shadow: 0 0 0 calc(var(--u) * 1) #e4e1dc; }
+[data-world="cyvore-new"] .nl-frame img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 0; display: block; }
+
+@container (max-width: 1099px) {
+  [data-world="cyvore-new"] .hero { padding: calc(var(--u) * 108) calc(var(--u) * 16) calc(var(--u) * 16); }
+  [data-world="cyvore-new"] .hero-head { display: block; }
+  [data-world="cyvore-new"] .hero-head .title { font-size: calc(var(--u) * 48); margin-top: calc(var(--u) * 14); }
+  [data-world="cyvore-new"] .hero-line { font-size: max(15px, calc(var(--u) * 22)); margin-top: calc(var(--u) * 14); max-width: none; text-align: left; padding: 0; }
+  [data-world="cyvore-new"] .cn-site { margin-top: calc(var(--u) * 28); border-radius: 16px; }
+  [data-world="cyvore-new"] .glance { padding: calc(var(--u) * 24) calc(var(--u) * 16); }
+  [data-world="cyvore-new"] .strip { margin: 0; grid-auto-flow: row; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  [data-world="cyvore-new"] .strip > div { padding: calc(var(--u) * 18) calc(var(--u) * 12) calc(var(--u) * 18) 0; border-left: 0; border-top: calc(var(--u) * 1) solid var(--hair); }
+  [data-world="cyvore-new"] .strip > div:nth-child(-n + 2) { border-top: 0; }
+  [data-world="cyvore-new"] .strip > div:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  [data-world="cyvore-new"] .strip p { font-size: max(15px, calc(var(--u) * 15)); }
+  [data-world="cyvore-new"] .about { padding: calc(var(--u) * 24) calc(var(--u) * 16) calc(var(--u) * 64); }
+  [data-world="cyvore-new"] .about { display: block; }
+  [data-world="cyvore-new"] .about > .label { margin-bottom: calc(var(--u) * 16); }
+  [data-world="cyvore-new"] .about-body { max-width: none; }
+  [data-world="cyvore-new"] .about-body p { font-size: max(16px, calc(var(--u) * 18)); }
+  [data-world="cyvore-new"] .next { height: auto; padding-bottom: calc(var(--u) * 40); }
+  [data-world="cyvore-new"] .nl { position: relative; inset: auto; display: block; padding: calc(var(--u) * 40) calc(var(--u) * 16) calc(var(--u) * 24); margin-top: calc(var(--u) * 24); }
+  [data-world="cyvore-new"] .nl-text { position: static; width: auto; }
+  [data-world="cyvore-new"] .nl-title { font-size: calc(var(--u) * 48); margin-top: calc(var(--u) * 24); }
+  [data-world="cyvore-new"] .nl-line { margin-top: calc(var(--u) * 16); }
+  [data-world="cyvore-new"] .nl-frame { position: relative; left: auto; top: auto; width: 100%; height: calc(var(--u) * 240); margin-top: calc(var(--u) * 28); }
+}

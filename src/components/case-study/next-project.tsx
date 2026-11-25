@@ -19,8 +19,9 @@ const PEEK: Record<CaseSlug, { p: string; frame: string }> = {
   "marni-came": { p: "mc", frame: "mc-frame" },
 };
 
-/** Board frame 08 · Next project: the next study peeks in, in its own world. */
-export function NextProject({ from }: { from: CaseSlug }) {
+/** Board frame 08 · Next project: the next study peeks in, in its own world. (From the Cyvore new website teaser:
+ *  the first finished study, spec 2026-11-25 §2.) */
+export function NextProject({ from }: { from: CaseSlug | "cyvore-new" }) {
   const next = STUDIES[nextProject(from).slug as CaseSlug];
   const { p, frame } = PEEK[next.slug];
   return (

@@ -19,7 +19,7 @@ const PAGE = `<!doctype html><html><head><title>Cyvore</title></head><body>
 
 function load(html: string) {
   const dom = new JSDOM(html, { runScripts: "dangerously", url: "http://localhost/cyvore-new/site/index.html" });
-  const w = dom.window as unknown as Window & { hits: string[] };
+  const w = dom.window as unknown as typeof globalThis & { hits: string[] };
   return { w, doc: dom.window.document };
 }
 

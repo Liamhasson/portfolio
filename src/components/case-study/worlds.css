@@ -19,6 +19,15 @@
 }
 [data-world="cyvore"] .f { background: var(--void); color: var(--ink); }
 
+/* The Cyvore new website teaser (spec 2026-11-25): the portfolio's own dark around the client's storybook frame */
+[data-world="cyvore-new"] {
+  --nav-ink: #0a0a0b; --nav-canvas: #f4f1ee;
+  --void: #0a0a0b; --raise: #151516; --hair: rgba(244,241,238,.09); --hair-2: rgba(244,241,238,.16);
+  --ink: #f4f1ee; --ink-2: rgba(244,241,238,.74); --ink-3: rgba(244,241,238,.52);
+  background: var(--void); color: var(--ink);
+}
+[data-world="cyvore-new"] .f { background: var(--void); color: var(--ink); }
+
 [data-world="pulse"] {
   --nav-ink: #0b1422; --nav-canvas: #eef3fa; /* the site nav and Back in this world (each board's .sh-nav colours) */
   --void: #060b14; --panel: #0b1422; --raise: #101b2e; --hair: rgba(220,232,250,.09); --hair-2: rgba(220,232,250,.16);
