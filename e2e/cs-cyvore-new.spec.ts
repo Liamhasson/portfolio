@@ -96,3 +96,18 @@ test("the snapshot is kept out of search; the page is not", async ({ request }) 
   const teaser = await request.get(URL);
   expect(teaser.headers()["x-robots-tag"]).toBeUndefined();
 });
+
+test("reduced motion: the still of the first screen, with its text, stands in for the moving frame", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto(URL);
+  const still = page.locator(".cn-site img");
+  await expect(still).toBeVisible();
+  await expect(page.locator(".cn-site iframe")).toHaveCount(0);
+  expect(await still.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBe(1200);
+  await expect(still).toHaveAttribute("alt", /Agentic workspace security/);
+});
+
+test("the link preview is the first screen's still", async ({ page }) => {
+  await page.goto(URL);
+  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", /\/case-studies\/cyvore-new\/peek\.jpg$/);
+});
