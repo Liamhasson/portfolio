@@ -4,6 +4,7 @@ import { liveProjects, nextProject, projects } from "./projects";
 describe("project registry", () => {
   test("home grid order matches the live site", () => {
     expect(projects.map((p) => p.slug)).toEqual([
+      "cyvore-new",
       "nordic-logic",
       "eventread",
       "cyvore",
@@ -19,6 +20,16 @@ describe("project registry", () => {
 
   test("tags have no duplicates", () => {
     for (const p of projects) expect(new Set(p.tags).size).toBe(p.tags.length);
+  });
+
+  test("the Cyvore new website teaser leads the grid, outside the finished studies (Liam, 2026-11-25)", () => {
+    expect(projects[0]).toMatchObject({ slug: "cyvore-new", name: "Cyvore · New website", status: "preview", tags: ["Web design", "Brand"] });
+    expect(liveProjects.map((p) => p.slug)).not.toContain("cyvore-new");
+  });
+
+  test("the teaser opens onto the first finished study and no study leads to it", () => {
+    expect(nextProject("cyvore-new").slug).toBe("nordic-logic");
+    for (const p of liveProjects) expect(nextProject(p.slug).slug).not.toBe("cyvore-new");
   });
 
   test("next project cycles through live projects, in their order", () => {
