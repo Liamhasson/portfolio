@@ -18,17 +18,19 @@ import { useEffect, useId, useRef, useState } from "react";
 import { matrix3d, type Pt } from "@/three/sand/homography";
 import { holdLoop, loopVideo } from "@/three/sand/card-loops";
 import { NextPagePull } from "@/components/shell/next-page-pull";
+import { cyvoreNew } from "@/content/cyvore-new";
 
 /** The projects (copy and tags from the approved plan and the current portfolio). Each opens its case study and plays a
  *  loop of the product in use (Nordic Logic live since 2026-10-13: its hero film landing on the portal). */
-const CARDS: { n: string; name: string; tags: string[]; line?: string; href?: string; video?: string; poster?: string; progress?: boolean; soon?: boolean }[] = [
-  { n: "01", name: "Nordic Logic", tags: ["B2B website", "Design system"], line: "A launch site for a startup with no clients to point to yet.", href: "/nordic-logic", video: "/work/nordic-logic-live", poster: "/work/nordic-logic-live.jpg" },
-  { n: "02", name: "Eventread", tags: ["SaaS web app", "Designer-builder"], line: "The check every booker skips.", href: "/eventread", video: "/work/eventread", poster: "/work/eventread.jpg" },
-  { n: "03", name: "Cyvore", tags: ["B2B website", "Information architecture"], line: "A cybersecurity startup needed a site investors would believe in.", href: "/cyvore", video: "/work/cyvore", poster: "/work/cyvore.jpg" },
-  { n: "04", name: "Marni Came", tags: ["Brand identity", "Art direction"], line: "A Berlin grunge rock band that kept its mistakes, in sound and in brand.", href: "/marni-came", video: "/work/marni-came-lido", poster: "/work/marni-came-lido.jpg" },
-  { n: "05", name: "Pulse", tags: ["Fitness app", "User research"], line: "A goal-focused fitness app designed around four retention milestones.", href: "/pulse", video: "/work/pulse", poster: "/work/pulse.jpg" },
-  // always more on the way: the next case study, still being made (Liam, 2026-10-20)
-  { n: "06", name: "Coming soon", tags: ["In progress"], soon: true },
+const CARDS: { n: string; name: string; tags: string[]; line?: string; href?: string; video?: string; poster?: string; progress?: boolean }[] = [
+  // the work being made now, first (Liam, 2026-11-25): Cyvore's new website, its teaser open, "In progress" on its loop
+  // (it took over from the "Coming soon" card of 2026-10-20: always more on the way, now a real one)
+  { n: "01", name: cyvoreNew.title, tags: ["Web design", "Brand"], line: cyvoreNew.line, href: "/cyvore-new", video: "/work/cyvore-new", poster: "/work/cyvore-new.jpg", progress: true },
+  { n: "02", name: "Nordic Logic", tags: ["B2B website", "Design system"], line: "A launch site for a startup with no clients to point to yet.", href: "/nordic-logic", video: "/work/nordic-logic-live", poster: "/work/nordic-logic-live.jpg" },
+  { n: "03", name: "Eventread", tags: ["SaaS web app", "Designer-builder"], line: "The check every booker skips.", href: "/eventread", video: "/work/eventread", poster: "/work/eventread.jpg" },
+  { n: "04", name: "Cyvore", tags: ["B2B website", "Information architecture"], line: "A cybersecurity startup needed a site investors would believe in.", href: "/cyvore", video: "/work/cyvore", poster: "/work/cyvore.jpg" },
+  { n: "05", name: "Marni Came", tags: ["Brand identity", "Art direction"], line: "A Berlin grunge rock band that kept its mistakes, in sound and in brand.", href: "/marni-came", video: "/work/marni-came-lido", poster: "/work/marni-came-lido.jpg" },
+  { n: "06", name: "Pulse", tags: ["Fitness app", "User research"], line: "A goal-focused fitness app designed around four retention milestones.", href: "/pulse", video: "/work/pulse", poster: "/work/pulse.jpg" },
 ];
 
 export interface WorkIndexHandle {
