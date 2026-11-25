@@ -8,8 +8,10 @@ const URL = "/cyvore-new";
 /** The framed snapshot, once its page has loaded. */
 async function site(page: Page) {
   await expect(page.locator(".cn-site iframe")).toBeVisible();
-  const frame = page.frame({ url: /\/cyvore-new\/site\/index\.html/ });
-  expect(frame).not.toBeNull();
+  // (the frame is added once the page has measured its box: wait for it to reach the snapshot)
+  const find = () => page.frame({ url: /\/cyvore-new\/site\/index\.html/ });
+  await expect.poll(() => find() !== null).toBe(true);
+  const frame = find();
   await frame!.waitForLoadState("load");
   return frame!;
 }
@@ -107,7 +109,63 @@ test("reduced motion: the still of the first screen, with its text, stands in fo
   await expect(still).toHaveAttribute("alt", /Agentic workspace security/);
 });
 
+test("reduced motion on phones: the portrait still, its text in view (final review #5)", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto(URL);
+  const still = page.locator(".cn-site img");
+  await expect(still).toHaveAttribute("src", /peek-phone\.jpg$/);
+  const { w, h } = await still.evaluate((img: HTMLImageElement) => ({ w: img.naturalWidth, h: img.naturalHeight }));
+  expect(h).toBeGreaterThan(w);
+});
+
 test("the link preview is the first screen's still", async ({ page }) => {
   await page.goto(URL);
   await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", /\/case-studies\/cyvore-new\/peek\.jpg$/);
+});
+
+test("the portfolio page scrolls past the frame: a wheel over it on desktop (final review #1)", async ({ page }) => {
+  await page.goto(URL);
+  await site(page);
+  const box = (await page.locator(".cn-site iframe").boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.wheel(0, 600);
+  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(200);
+});
+
+test("the portfolio page scrolls past the frame: a swipe over it on a phone (final review #1)", async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const page = await ctx.newPage();
+  await page.goto(URL);
+  await site(page);
+  const box = (await page.locator(".cn-site iframe").boundingBox())!;
+  const x = box.x + box.width / 2, y0 = Math.min(box.y + box.height / 2, 700);
+  const cdp = await ctx.newCDPSession(page);
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y: y0 }] });
+  for (let i = 1; i <= 10; i++) await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y: y0 - i * 40 }] });
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(150);
+  await ctx.close();
+});
+
+test("tablets: the portrait frame fits the screen, it doesn't fill the column (final review #4)", async ({ page }) => {
+  for (const [w, h] of [[1024, 768], [768, 1024]]) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto(URL);
+    await site(page);
+    const box = (await page.locator(".cn-site .win").boundingBox())!;
+    expect(box.height, `${w}x${h}`).toBeLessThanOrEqual(h);
+  }
+});
+
+test("the server's page has no frame in it: phones never start loading the desktop site (final review #6)", async ({ request }) => {
+  const html = await (await request.get(URL)).text();
+  expect(html).not.toContain("<iframe");
+});
+
+test("no 'Scroll' pill on the held hero (final review #2)", async ({ page }) => {
+  await page.goto(URL);
+  const f = await site(page);
+  await page.waitForTimeout(4500);
+  await expect(f.locator("#hint")).toBeHidden();
 });

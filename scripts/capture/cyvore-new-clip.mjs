@@ -22,6 +22,12 @@ await still.waitForTimeout(2500);
 fs.mkdirSync("public/case-studies/cyvore-new", { recursive: true });
 await still.screenshot({ path: "public/case-studies/cyvore-new/peek.jpg", type: "jpeg", quality: 85 });
 await still.close();
+// and in the site's phone layout (the reduced-motion stand-in on phones)
+const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+await phone.goto(SITE, { waitUntil: "networkidle" });
+await phone.waitForTimeout(2500);
+await phone.screenshot({ path: "public/case-studies/cyvore-new/peek-phone.jpg", type: "jpeg", quality: 82 });
+await phone.close();
 
 // the loop: 16:10 like every card
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });

@@ -25,4 +25,6 @@ export const cyvoreNew = {
   site: "/cyvore-new/site/index.html",
   /** The hero still with its text: the link preview, and the frame's stand-in under reduced motion. */
   still: { src: "/case-studies/cyvore-new/peek.jpg", width: 1200, height: 630, alt: "The first screen of Cyvore's new website: Agentic workspace security, Charlie on the gate arch" },
+  /** The same screen in the site's phone layout: the reduced-motion stand-in below 1100px. */
+  stillPhone: { src: "/case-studies/cyvore-new/peek-phone.jpg", width: 780, height: 1688, alt: "The first screen of Cyvore's new website on a phone: Agentic workspace security, Charlie at the gate" },
 } as const;

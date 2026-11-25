@@ -14,6 +14,7 @@ const PAGE = `<!doctype html><html><head><title>Cyvore</title></head><body>
   addEventListener('touchmove', f, { passive: true });
   addEventListener('scroll', f);
   document.addEventListener('click', f);
+  addEventListener('message', f);
 </script>
 </body></html>`;
 
@@ -36,6 +37,7 @@ describe("heroOnly", () => {
     const style = out.match(/<style data-hero-only>([\s\S]*?)<\/style>/)![1];
     expect(style).toMatch(/html,\s*body\s*\{\s*overflow:\s*hidden\s*!important;?\s*\}/);
     expect(style).toMatch(/a,\s*button,\s*\[role="button"\]\s*\{\s*cursor:\s*default\s*!important;?\s*\}/);
+    expect(style).toMatch(/#hint\s*\{\s*display:\s*none\s*!important;?\s*\}/);   // (its "Scroll" pill: nothing scrolls; final review #2)
   });
 
   test("wheel, scroll keys, touch drags and clicks never reach the page's own listeners", () => {
@@ -50,6 +52,34 @@ describe("heroOnly", () => {
     expect(w.hits).toEqual([]);
     expect(click.defaultPrevented).toBe(true);
   });
+
+  test("a wheel or a swipe over the frame isn't cancelled: the portfolio page around it still scrolls (final review #1)", () => {
+    const { w, doc } = load(heroOnly(PAGE));
+    const wheel = new w.WheelEvent("wheel", { deltaY: 400, bubbles: true, cancelable: true });
+    doc.body.dispatchEvent(wheel);
+    const start = new w.Event("touchstart", { bubbles: true, cancelable: true });
+    const move = new w.Event("touchmove", { bubbles: true, cancelable: true });
+    doc.body.dispatchEvent(start);
+    doc.body.dispatchEvent(move);
+    const down = new w.KeyboardEvent("keydown", { key: "PageDown", bubbles: true, cancelable: true });
+    doc.body.dispatchEvent(down);
+    expect([wheel, start, move, down].map((e) => e.defaultPrevented)).toEqual([false, false, false, false]);
+    expect(w.hits).toEqual([]);
+  });
+
+  test("Enter on a link still does nothing (it would follow it)", () => {
+    const { w, doc } = load(heroOnly(PAGE));
+    const enter = new w.KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
+    doc.getElementById("cta")!.dispatchEvent(enter);
+    expect(enter.defaultPrevented).toBe(true);
+  });
+
+  test("messages never reach the page: its overlays.js would follow any href sent to it (final review #3)", () => {
+    const { w } = load(heroOnly(PAGE));
+    w.dispatchEvent(new w.MessageEvent("message", { data: { cyvore: 1, href: "javascript:alert(1)" } }));
+    expect(w.hits).toEqual([]);
+  });
+
 
   test("Tab still moves focus (only the keys that scroll or activate are held)", () => {
     const { w, doc } = load(heroOnly(PAGE));

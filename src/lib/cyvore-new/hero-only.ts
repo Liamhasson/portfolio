@@ -9,15 +9,22 @@
 const STYLE = `<style data-hero-only>
 html, body { overflow: hidden !important; }
 a, button, [role="button"] { cursor: default !important; }
+#hint { display: none !important; }
 </style>`;
 
+// Scrolling input is only kept from the page's listeners, never cancelled: inside an iframe a cancelled wheel or swipe
+// is lost to the portfolio page around it too, and overflow:hidden already holds the hero (final review #1). Clicks,
+// submits and Enter are cancelled (they'd follow links). Messages never reach the page: its overlays.js would follow
+// any href posted to it, on the portfolio's origin (final review #3).
 const SCRIPT = `<script data-hero-only>
 (() => {
-  const held = new Set(["ArrowDown", "ArrowUp", "PageDown", "PageUp", "Home", "End", " ", "Spacebar", "Enter"]);
-  const stop = (e) => { if (e.cancelable) e.preventDefault(); e.stopImmediatePropagation(); };
   const opt = { capture: true, passive: false };
-  for (const t of ["wheel", "touchstart", "touchmove", "click", "auxclick", "dblclick", "submit"]) addEventListener(t, stop, opt);
-  addEventListener("keydown", (e) => { if (held.has(e.key)) stop(e); }, opt);
+  const keep = (e) => e.stopImmediatePropagation();
+  const stop = (e) => { if (e.cancelable) e.preventDefault(); e.stopImmediatePropagation(); };
+  for (const t of ["wheel", "touchstart", "touchmove", "message"]) addEventListener(t, keep, opt);
+  for (const t of ["click", "auxclick", "dblclick", "submit"]) addEventListener(t, stop, opt);
+  const scrollKeys = new Set(["ArrowDown", "ArrowUp", "PageDown", "PageUp", "Home", "End", " ", "Spacebar"]);
+  addEventListener("keydown", (e) => { if (e.key === "Enter") stop(e); else if (scrollKeys.has(e.key)) keep(e); }, opt);
   addEventListener("pointerdown", (e) => { if (e.target instanceof Element && e.target.closest("a, button, [role=button]")) stop(e); }, opt);
   addEventListener("load", () => scrollTo(0, 0));
 })();
